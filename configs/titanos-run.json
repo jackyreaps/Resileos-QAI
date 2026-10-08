@@ -1,0 +1,33 @@
+{
+  "packet_version": "1.0.0",
+  "dim": 10000,
+  "m": 100,
+  "n": 100,
+  "r": 8,
+  "seed": 1337,
+  "n_loops": 12,
+
+  "classical_conf": 0.09,
+  "abstention_gate": 0.035,
+  "quantum_samples": 16,
+  "convergence_threshold": 0.02,
+
+  "conf_mode": "composite",
+  "conf_alpha": 0.6,
+
+  "sigma_E": 10.0,
+  "sigma_k": 3,
+
+  "N_warm": 512,
+  "E_sat": 10.0,
+  "E_sigma": 10.0,
+  "tau_sat": 0.9,
+  "tau_low": 0.1,
+
+  "X": 70.0,
+  "Y": 3,
+  "seed_list": [0, 1, 2],
+  "scar_var_floor": 0.0,
+  "deltaS_range_floor": 0.0,
+  "drift_ratio_floor": 0.0
+}
