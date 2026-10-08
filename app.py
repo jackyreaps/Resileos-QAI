@@ -12,10 +12,11 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+# Fallback path resolution so this runs even without `pip install -e .`
 ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "src"))
-sys.path.insert(0, str(ROOT / "scripts"))
+for p in (ROOT, ROOT / "src", ROOT / "scripts"):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 from titanos import Titanos, TitanosConfig  # noqa: E402
 
@@ -104,12 +105,14 @@ def query_substrate(payload: QueryRequest):
             "mode": ans.mode,
             "loops": ans.loops,
             "reason": ans.reason,
+            "gate_state": ans.gate_state,
             "trace": [
                 {
                     "loop": h["loop"],
                     "scar": float(h["scar_energy"]),
                     "delta": float(h["delta"]),
                     "mu": h["mu"],
+                    "deltas": float(h.get("DeltaS", 0.0)),
                     "vol_ok": h["volume_ok"],
                     "gate_state": h["gate_state"],
                 }
