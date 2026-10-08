@@ -8,15 +8,14 @@ Architecture:
     Router          SigmaGate → route_signals → CLASSICAL | QUANTUM_SIM | ABSTAIN
     Coda            substrate readout, cleanup, provenance
 
-Fixes applied vs the first draft:
-  - Consecutive volume failures tracked; escalation via SigmaGate (k=3).
-  - Routing uses abstention.route_signals precedence (sigma1 > volume > machine).
-  - Packet version pinned to "1.0.0".
-  - Residual exponents emitted as int16 clamped to [-16,+16] (via core).
-  - Quantum path labeled QUANTUM_SIM everywhere, never as real quantum.
-  - Core treated as frozen: no gradient, no mutation of Λ / guard / schedule.
-  - Config loads from JSON; substrate persists to disk.
-  - Optional thin NLP front-end; not on the reasoning path.
+Confidence modes (conf_mode):
+    sim        cosine only (baseline)
+    mag        magnitude only
+    product    sim * mag
+    min        min(sim, mag)
+    composite  alpha*sim_norm + (1-alpha)*mag_norm
+
+The "quantum" path is a labeled simulation (QUANTUM_SIM). Not real quantum.
 """
 from __future__ import annotations
 
@@ -57,7 +56,10 @@ class TitanosConfig:
     quantum_samples: int = 16
     convergence_threshold: float = 0.02
 
-    sigma_E: float = 0.35
+    conf_mode: str = "sim"
+    conf_alpha: float = 0.6
+
+    sigma_E: float = 10.0
     sigma_k: int = 3
 
     N_warm: int = 512
@@ -109,11 +111,9 @@ class Titanos:
 
         self.rng = np.random.default_rng(cfg.seed)
 
-        # Frozen core (no gradients, no mutation of Λ / guard / schedule)
         self.core = ResidualCore(CoreConfig(m=cfg.m, n=cfg.n, r=cfg.r),
                                  seed=cfg.seed)
 
-        # Substrate
         self.acc = np.zeros(cfg.dim, dtype=np.int32)
         self._perm = self.rng.permutation(cfg.dim)
         self._perm_cache: dict[int, np.ndarray] = {0: np.arange(cfg.dim)}
@@ -124,7 +124,6 @@ class Titanos:
         for name in ("S", "O"):
             self.roles[name] = self._bip()
 
-        # Router
         self.sigma = SigmaGate(E_sigma=cfg.E_sigma, k=cfg.sigma_k)
         self.thresholds = AbstentionThresholds(
             E_sat=cfg.E_sat, tau_sat=cfg.tau_sat, tau_low=cfg.tau_low,
@@ -163,17 +162,69 @@ class Titanos:
     def _readout(self) -> np.ndarray:
         return np.where(self.acc >= 0, 1, -1).astype(np.int8)
 
-    def _cleanup(self, vec: np.ndarray,
-                 exclude: set[str] | None = None) -> tuple[str | None, float]:
+    # ── confidence scoring ─────────────────────────────────────────────
+    def _score_candidates(self, vec: np.ndarray,
+                          exclude: set[str] | None = None,
+                          ) -> list[tuple[str, float, float]]:
+        """
+        Returns (name, sim, mag) per candidate.
+
+        sim = <v_bipolar, anchor> / D      -- sign-aware cosine-style signal
+        mag = |<acc_float, anchor>| / D    -- magnitude-only signal from accumulator
+        """
         exclude = exclude or set()
-        best, best_sim = None, -1.0
+        acc_f = self.acc.astype(np.float64)
+        out: list[tuple[str, float, float]] = []
         for name, anchor in self.entities.items():
             if name in exclude:
                 continue
+            a = anchor.astype(np.float64)
             sim = float(np.dot(vec, anchor)) / self.cfg.dim
-            if sim > best_sim:
-                best_sim, best = sim, name
-        return best, best_sim
+            mag = abs(float(np.dot(acc_f, a))) / self.cfg.dim
+            out.append((name, sim, mag))
+        return out
+
+    def _cleanup(self, vec: np.ndarray,
+                 exclude: set[str] | None = None,
+                 ) -> tuple[str | None, float]:
+        """
+        Composite confidence per candidate.
+
+        conf_mode:
+          "sim"       -- cosine only (baseline)
+          "mag"       -- magnitude only
+          "product"   -- sim * mag
+          "min"       -- min(sim, mag)
+          "composite" -- alpha*sim_norm + (1-alpha)*mag_norm
+        """
+        scores = self._score_candidates(vec, exclude)
+        if not scores:
+            return None, 0.0
+
+        names = [n for n, _, _ in scores]
+        sims = np.array([s for _, s, _ in scores], dtype=np.float64)
+        mags = np.array([m for _, _, m in scores], dtype=np.float64)
+
+        mode = getattr(self.cfg, "conf_mode", "sim")
+        alpha = getattr(self.cfg, "conf_alpha", 0.6)
+
+        if mode == "sim":
+            conf = sims
+        elif mode == "mag":
+            conf = mags
+        elif mode == "product":
+            conf = sims * mags
+        elif mode == "min":
+            conf = np.minimum(sims, mags)
+        elif mode == "composite":
+            smax = sims.max() + 1e-12
+            mmax = mags.max() + 1e-12
+            conf = alpha * (sims / smax) + (1.0 - alpha) * (mags / mmax)
+        else:
+            raise ValueError(f"unknown conf_mode: {mode}")
+
+        idx = int(np.argmax(conf))
+        return names[idx], float(conf[idx])
 
     # ── Learn ──────────────────────────────────────────────────────────
     def learn(self, subject: str, relation: str, obj: str) -> None:
@@ -193,10 +244,6 @@ class Titanos:
     # ── Recurrent block ────────────────────────────────────────────────
     def _recurrent(self, initial_h: np.ndarray,
                    ) -> tuple[np.ndarray, list[dict], str, str]:
-        """
-        Returns (refined_h, history, exit_reason, gate_state).
-        exit_reason ∈ {"CONVERGED", "MAX_LOOPS", "SIGMA1", "ABSTAIN"}
-        """
         h = initial_h.copy()
         history: list[dict] = []
 
@@ -215,15 +262,12 @@ class Titanos:
             scar = float(np.linalg.norm(packet.Lambda))
             delta = float(np.abs(h - h_compressed).mean())
 
-            # Sigma-1 gate: tracks consecutive volume failures internally.
             gate_action = self.sigma.evaluate(
                 scar_energy=scar,
                 mu=int(packet.mu),
                 volume_ok=bool(packet.volume_ok),
             )
 
-            # Route using the frozen precedence (RES-302 / RES-303):
-            # sigma1 > volume_ok > abstention machine.
             inputs = AbstentionInputs(
                 DeltaS=float(packet.DeltaS),
                 mu=int(packet.mu),
@@ -258,16 +302,10 @@ class Titanos:
 
         return h, history, "MAX_LOOPS", history[-1]["gate_state"]
 
-    # ── Quantum-simulated retrieval (labeled) ──────────────────────────
+    # ── Quantum-simulated retrieval ────────────────────────────────────
     def _quantum_sim(self, probe: np.ndarray,
                      exclude: set[str],
                      ) -> tuple[str | None, float]:
-        """
-        Simulated quantum retrieval: bundle K sparse perturbations
-        (superposition), hard readout (measurement), cleanup.
-
-        Labeled QUANTUM_SIM. Not a real quantum computation.
-        """
         readout = self._readout()
         candidates = []
         for _ in range(self.cfg.quantum_samples):
@@ -366,7 +404,7 @@ class Titanos:
             return Answer(None, sim, "ABSTAINED", "CLASSICAL", 0,
                           reason=f"analogy similarity {sim:.4f} below gate")
         return Answer(best, sim, "ACCEPTED", "CLASSICAL", 0,
-                      path=[(a, "→", b), (c, "→", best)])
+                      path=[(a, "->", b), (c, "->", best)])
 
     # ── Introspection ──────────────────────────────────────────────────
     def explain(self, ans: Answer) -> str:
@@ -406,6 +444,7 @@ class Titanos:
             "relations": len(self.relations),
             "accumulator_energy": int(np.sum(self.acc.astype(np.int64) ** 2)),
             "packet_version": self.cfg.packet_version,
+            "conf_mode": getattr(self.cfg, "conf_mode", "sim"),
         }
 
     # ── Persistence ────────────────────────────────────────────────────
@@ -439,14 +478,14 @@ class Titanos:
 # Thin NLP front-end (optional; not on the reasoning path)
 # ═══════════════════════════════════════════════════════════════════════════
 _PATTERNS = [
-    # "who is the parent of Zeus" / "who is parent of zeus"
-    (re.compile(r"who is the (\w+) of (\w+)", re.I), lambda m: (m.group(2), m.group(1), True)),
-    # "who is Zeus's parent" / "what is Zeus's domain"
-    (re.compile(r"(?:who|what) is (\w+)'s (\w+)", re.I), lambda m: (m.group(1), m.group(2), False)),
-    # "what is the parent of Zeus"
-    (re.compile(r"what is the (\w+) of (\w+)", re.I), lambda m: (m.group(2), m.group(1), True)),
-    # "zeus parent" (compact)
-    (re.compile(r"^(\w+)\s+(\w+)$", re.I), lambda m: (m.group(1), m.group(2), False)),
+    (re.compile(r"who is the (\w+) of (\w+)", re.I),
+     lambda m: (m.group(2), m.group(1), True)),
+    (re.compile(r"(?:who|what) is (\w+)'s (\w+)", re.I),
+     lambda m: (m.group(1), m.group(2), False)),
+    (re.compile(r"what is the (\w+) of (\w+)", re.I),
+     lambda m: (m.group(2), m.group(1), True)),
+    (re.compile(r"^(\w+)\s+(\w+)$", re.I),
+     lambda m: (m.group(1), m.group(2), False)),
 ]
 
 
@@ -466,7 +505,7 @@ def _demo():
     titan = Titanos(cfg)
 
     print("=" * 72)
-    print("Titanos — recurrent-depth quantum-classical prototype")
+    print("Titanos - recurrent-depth quantum-classical prototype")
     print("=" * 72)
     for k, v in titan.stats().items():
         print(f"  {k:18s} = {v}")
@@ -496,44 +535,44 @@ def _demo():
         titan.learn(s, r, o)
     print(f"[learned {len(facts)} facts]\n")
 
-    print("── Single-hop ──")
+    print("-- Single-hop --")
     for s, r in [("Zeus", "parent_of"), ("Zeus", "domain"), ("Cronus", "parent_of")]:
         a = titan.ask(s, r)
         print(f"  {s} --{r}--> {a.value or '(abstain)'}   "
               f"[{a.mode}, {a.loops} loops, conf {a.confidence:.4f}]")
 
-    print("\n── Inverse ──")
+    print("\n-- Inverse --")
     for o, r in [("Zeus", "parent_of"), ("Athena", "parent_of"), ("sea", "domain")]:
         a = titan.ask_inverse(o, r)
         print(f"  ? --{r}--> {o}  =  {a.value or '(abstain)'}   "
               f"[{a.mode}, conf {a.confidence:.4f}]")
 
-    print("\n── Multi-hop ──")
+    print("\n-- Multi-hop --")
     print(titan.explain(titan.chain("Uranus", ["parent_of", "parent_of", "parent_of"])))
 
-    print("\n── Analogy ──")
+    print("\n-- Analogy --")
     print(titan.explain(titan.analogy("Zeus", "sky", "Poseidon")))
     print(titan.explain(titan.analogy("Poseidon", "sea", "Hades")))
 
-    print("\n── Abstention ──")
+    print("\n-- Abstention --")
     for s, r in [("Zeus", "capital_of"), ("Odin", "parent_of")]:
         a = titan.ask(s, r)
         print(f"  {s} --{r}--> ?")
         print(f"    {titan.explain(a)}")
 
-    print("\n── NLP front-end ──")
+    print("\n-- NLP front-end --")
     for text in ["Who is the parent of Zeus?",
                  "Who is Zeus's parent?",
                  "What is Poseidon's domain?"]:
         parsed = parse_query(text)
         print(f"  '{text}'")
-        print(f"    parsed → {parsed}")
+        print(f"    parsed -> {parsed}")
         if parsed:
             subj, rel, inv = parsed
             ans = titan.ask_inverse(subj, rel) if inv else titan.ask(subj, rel)
-            print(f"    → {ans.value or '(abstain)'}  [{ans.mode}]")
+            print(f"    -> {ans.value or '(abstain)'}  [{ans.mode}]")
 
-    print("\n── Loop trace (Zeus → parent_of) ──")
+    print("\n-- Loop trace (Zeus -> parent_of) --")
     a = titan.ask("Zeus", "parent_of")
     print(titan.loop_trace(a))
     print()
@@ -541,4 +580,15 @@ def _demo():
 
 
 if __name__ == "__main__":
-    _demo()
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--config", default=None)
+    args = p.parse_args()
+
+    if args.config:
+        cfg = TitanosConfig.from_json(args.config)
+        titan = Titanos(cfg)
+        print(f"Loaded config from {args.config}")
+        print(f"  conf_mode = {cfg.conf_mode}  alpha = {cfg.conf_alpha}")
+    else:
+        _demo()
