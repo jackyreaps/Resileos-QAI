@@ -2,44 +2,39 @@
 """
 End-to-end hybrid runner for Resileos-QAI.
 
-Composes the full pipeline:
+Composes:
+    ResidualCore → Packet → HDRIFTAdapter → SigmaGate + Abstention
+    → HybridValidator → report.json
 
-    ResidualCore (RES-200)
-        └─ emits Packet (RES-201/202)
-               └─ HDRIFTAdapter (RES-300)
-                      ├─ build_moments (RES-301) — real FPE
-                      ├─ holographic_drift
-                      └─ SigmaGate (RES-303) + Abstention (RES-302)
-                            └─ HybridValidator (RES-402)
-                                   └─ report.json
-
-Optionally trains the front-end encoder first (RES-401).
-Frozen core never receives gradients.
+Optional Titanos application block via --titanos.
 
 Usage:
     python scripts/run_hybrid.py --config configs/example-run.json
-    python scripts/run_hybrid.py --config configs/example-run.json --train
-    python scripts/run_hybrid.py --config configs/example-run.json --out report.json
+    python scripts/run_hybrid.py --config configs/titanos-run.json --titanos
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
 
-# Allow running from repo root without install.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
-from resileos.abstention import AbstentionThresholds
-from resileos.adapter import HDRIFTAdapter
-from resileos.core import CoreConfig, ResidualCore
-from resileos.moments import Seeds
-from resileos.sigma import SigmaGate
-from resileos.training import FrontEndEncoder, TrainingConfig, train
-from resileos.validation import HybridValidator, RunConfig, save_report
+from resileos.abstention import AbstentionThresholds  # noqa: E402
+from resileos.adapter import HDRIFTAdapter  # noqa: E402
+from resileos.core import CoreConfig, ResidualCore  # noqa: E402
+from resileos.moments import Seeds  # noqa: E402
+from resileos.sigma import SigmaGate  # noqa: E402
+from resileos.training import FrontEndEncoder, TrainingConfig, train  # noqa: E402
+from resileos.validation import (  # noqa: E402
+    HybridValidator, RunConfig, save_report,
+)
 
 
 # ── config loading ────────────────────────────────────────────────────────
@@ -69,7 +64,7 @@ def build_stack(cfg: RunConfig,
                 n: int = 32,
                 core_seed: int = 0,
                 encoder_seed: int = 0,
-                ) -> tuple[ResidualCore, FrontEndEncoder, HDRIFTAdapter, HybridValidator]:
+                ):
     r = 8  # latent rank; must stay <= min(m, n)
 
     core = ResidualCore(CoreConfig(m=m, n=n, r=r), seed=core_seed)
@@ -95,12 +90,6 @@ def make_packet_fn(core: ResidualCore,
                    m: int,
                    n: int,
                    ):
-    """
-    Returns a callable (seed, step) -> Packet that:
-      1. Generates a weight block for the seed.
-      2. Runs the trained encoder to produce binary factors.
-      3. Runs the frozen core step to produce a conformant packet.
-    """
     def packet_fn(seed: int, step: int):
         W = make_block(seed + step * 1000, m, n)
 
@@ -108,19 +97,77 @@ def make_packet_fn(core: ResidualCore,
         Ub = enc_out["Ub"]
         Vb = enc_out["Vb"]
 
-        # F_res proxy: signed reconstruction residual magnitude direction.
         R = W - Ub @ Vb
         F_res = float(np.mean(R))
 
         return core.step(
             W=W,
-            mu=int(step % 2),         # replaced by real parity stream in prod
+            mu=int(step % 2),
             F_res=F_res,
             theta_hi=0.0,
             theta_lo=0.0,
             DeltaS=float(1.0 / (1.0 + np.linalg.norm(R))),
         )
     return packet_fn
+
+
+# ── Titanos application block ─────────────────────────────────────────────
+def run_titanos_block(cfg_path: Path, report: dict) -> None:
+    """Application-layer validation. Adds report['titanos'] if corpus is present."""
+    try:
+        from titanos import Titanos, TitanosConfig
+    except ImportError:
+        print("[runner] titanos.py not importable, skipping --titanos")
+        return
+
+    corpus_path = ROOT / "configs" / "titanos-facts.json"
+    if not corpus_path.exists():
+        print(f"[runner] corpus missing: {corpus_path}, skipping --titanos")
+        return
+
+    try:
+        tcfg = TitanosConfig.from_json(cfg_path)
+    except Exception as e:
+        print(f"[runner] TitanosConfig.from_json failed: {e}")
+        return
+
+    titan = Titanos(tcfg)
+
+    raw = json.loads(corpus_path.read_text())
+    for s, r, o in raw["facts"]:
+        titan.learn(s, r, o)
+
+    correct = 0
+    abstained = 0
+    modes: Counter = Counter()
+
+    for q in raw["queries"]:
+        ans = (
+            titan.ask_inverse(q["subject"], q["relation"])
+            if q["inverse"]
+            else titan.ask(q["subject"], q["relation"])
+        )
+        modes[ans.mode] += 1
+        if ans.status == "ABSTAINED":
+            abstained += 1
+        elif ans.value == q["expected"]:
+            correct += 1
+
+    total = len(raw["queries"])
+    accuracy = 100.0 * correct / max(total, 1)
+
+    report["titanos"] = {
+        "accuracy_pct": accuracy,
+        "X_target": tcfg.X,
+        "conformant": bool(accuracy >= tcfg.X),
+        "queries_total": total,
+        "queries_correct": correct,
+        "abstentions": abstained,
+        "modes": dict(modes),
+        "stats": titan.stats(),
+    }
+    print(f"[runner] titanos accuracy   = {accuracy:.2f}% "
+          f"(target {tcfg.X:.1f}%, conformant={report['titanos']['conformant']})")
 
 
 # ── main ──────────────────────────────────────────────────────────────────
@@ -135,6 +182,8 @@ def main() -> int:
     p.add_argument("--n", type=int, default=32, help="Weight block cols")
     p.add_argument("--no-verify", action="store_true",
                    help="Skip adapter acceptance tests")
+    p.add_argument("--titanos", action="store_true",
+                   help="Run the Titanos application block")
     args = p.parse_args()
 
     cfg_path = Path(args.config)
@@ -172,7 +221,7 @@ def main() -> int:
         acc = train_report["acceptance"]
         print(f"[runner] training conformant = {acc['conformant']}")
         print(f"[runner]   scar variance     = {acc['scar_energy_variance']:.6g}")
-        print(f"[runner]   ΔS range          = {acc['DeltaS_range']:.6g}")
+        print(f"[runner]   deltaS range      = {acc['DeltaS_range']:.6g}")
 
         if not acc["conformant"]:
             print("[runner] warning: training floors not met", file=sys.stderr)
@@ -184,9 +233,9 @@ def main() -> int:
         diag = adapter.verify(sample_packet, x_sample)
         print(f"[runner] adapter cos         = {diag['cos']:.4f} "
               f"({'ok' if diag['cos_ok'] else 'FAIL'})")
-        print(f"[runner] drift variance     = {diag['drift_ratio_variance']:.6g} "
+        print(f"[runner] drift variance      = {diag['drift_ratio_variance']:.6g} "
               f"({'ok' if diag['drift_ratio_variance_ok'] else 'FAIL'})")
-        print(f"[runner] drift SNR          = {diag['drift_ratio_snr']:.4f}")
+        print(f"[runner] drift SNR           = {diag['drift_ratio_snr']:.4f}")
         if not diag["pass"]:
             print("[runner] warning: adapter acceptance failed", file=sys.stderr)
 
@@ -210,15 +259,23 @@ def main() -> int:
         recon_err_fn=recon_err_fn,
     )
 
+    # ── Titanos application block ─────────────────────────────────────────
+    if args.titanos:
+        run_titanos_block(cfg_path, report)
+
     save_report(report, args.out)
 
     agg = report["aggregate"]
-    print(f"[runner] NRMSE reduction    = {agg['nrmse_reduction_mean_pct']:.3f}% "
+    print(f"[runner] NRMSE reduction     = {agg['nrmse_reduction_mean_pct']:.3f}% "
           f"(± {agg['nrmse_reduction_std_pct']:.3f})")
-    print(f"[runner] horizon extension  = {agg['horizon_extension_mean']:.2f} steps "
+    print(f"[runner] horizon extension   = {agg['horizon_extension_mean']:.2f} steps "
           f"(± {agg['horizon_extension_std']:.2f})")
-    print(f"[runner] conformant         = {report['conformant']}")
-    print(f"[runner] report written to  = {args.out}")
+    print(f"[runner] conformant          = {report['conformant']}")
+
+    if "titanos" in report:
+        print(f"[runner] titanos conformant  = {report['titanos']['conformant']}")
+
+    print(f"[runner] report written to   = {args.out}")
 
     return 0 if report["conformant"] else 1
 
