@@ -1,6 +1,10 @@
 """
 Hybrid generative validation harness against declared (X, Y).
 Owning doc: RES-402. Conformance rule: X and Y must be declared before run.
+
+Sigma-1 gate is evaluated by default each step (RES-303). Consecutive
+volume failures escalate through the gate to CLEANUP rather than falling
+through the abstention machine to ABSTAIN.
 """
 from __future__ import annotations
 
@@ -13,6 +17,7 @@ import numpy as np
 
 from .adapter import HDRIFTAdapter
 from .abstention import AbstentionInputs, AbstentionThresholds, route_signals
+from .sigma import SigmaGate, SigmaAction
 
 
 @dataclass(frozen=True)
@@ -39,7 +44,9 @@ class RunConfig:
     def assert_declared(self) -> None:
         """RES-402 §conformance: no run without declared X, Y."""
         if self.X is None or self.Y is None:
-            raise ValueError("RunConfig non-conformant: X and Y must be declared before execution.")
+            raise ValueError(
+                "RunConfig non-conformant: X and Y must be declared before execution."
+            )
 
 
 def flat_nrmse(targets: np.ndarray, predictions: np.ndarray) -> float:
@@ -55,17 +62,36 @@ def horizon(errors: np.ndarray, tol: float) -> int:
 
 
 class HybridValidator:
+    """
+    Runs the adapter over a declared seed list, applies the sigma-1 gate
+    (RES-303) and the abstention state machine (RES-302) each step, and
+    reports (X, Y) conformance per RES-402.
+
+    The sigma-1 gate owns volume-failure escalation: k consecutive
+    volume_ok == False steps escalate to CLEANUP before the abstention
+    machine is consulted.
+    """
+
     def __init__(self,
                  config: RunConfig,
                  adapter: HDRIFTAdapter,
-                 thresholds: AbstentionThresholds) -> None:
+                 thresholds: AbstentionThresholds,
+                 sigma_gate: SigmaGate | None = None) -> None:
         config.assert_declared()
         self.cfg = config
         self.adapter = adapter
         self.thresholds = thresholds
+        self.sigma_gate = sigma_gate or SigmaGate(
+            E_sigma=config.E_sigma,
+            k=config.sigma1_k,
+        )
         self.logs: list[dict[str, Any]] = []
 
-    def _route(self, packet: Any, scar_energy: float, sigma1_action: str | None) -> str:
+    # ── routing ────────────────────────────────────────────────────────────
+    def _route(self,
+               packet: Any,
+               scar_energy: float,
+               sigma1_action: str | None) -> str:
         get = (lambda k: packet[k]) if isinstance(packet, dict) else (lambda k: getattr(packet, k))
         return route_signals(
             AbstentionInputs(
@@ -78,26 +104,63 @@ class HybridValidator:
             sigma1_action,
         )
 
+    # ── per-step gate evaluation ───────────────────────────────────────────
+    def _evaluate_sigma1(self,
+                         packet: Any,
+                         scar_energy: float,
+                         step: int,
+                         sigma1_fn: Callable[[Any, int], str | None] | None,
+                         ) -> SigmaAction:
+        get = (lambda k: packet[k]) if isinstance(packet, dict) else (lambda k: getattr(packet, k))
+
+        gate_action = self.sigma_gate.evaluate(
+            scar_energy=scar_energy,
+            mu=int(get("mu")),
+            volume_ok=bool(get("volume_ok")),
+        )
+
+        # Optional external override for tests / custom schedules.
+        if sigma1_fn is not None:
+            override = sigma1_fn(packet, step)
+            if override is not None:
+                gate_action = SigmaAction(override)
+
+        return gate_action
+
+    # ── main run ───────────────────────────────────────────────────────────
     def run(self,
             packet_fn: Callable[[int, int], Any],
             x_fn: Callable[[int, int], np.ndarray],
             horizon_len: int,
             recon_err_fn: Callable[[Any], float],
-            sigma1_fn: Callable[[Any, int], str | None] = lambda p, t: None,
+            sigma1_fn: Callable[[Any, int], str | None] | None = None,
             ) -> dict[str, Any]:
         per_seed = []
         for seed in self.cfg.seed_list:
             errs_h = np.zeros(horizon_len)
             errs_f = np.zeros(horizon_len)
             repulse_counter = 0
+
             for t in range(horizon_len):
                 packet = packet_fn(seed, t)
                 x_enc = x_fn(seed, t)
                 out = self.adapter.step(packet, x_enc)
+
                 get = (lambda k: packet[k]) if isinstance(packet, dict) else (lambda k: getattr(packet, k))
 
-                s1 = sigma1_fn(packet, t)
-                state = self._route(packet, out["scar_energy"], s1)
+                # Sigma-1 gate first (RES-303 precedence).
+                gate_action = self._evaluate_sigma1(
+                    packet=packet,
+                    scar_energy=out["scar_energy"],
+                    step=t,
+                    sigma1_fn=sigma1_fn,
+                )
+                sigma1_arg = gate_action.value if gate_action != SigmaAction.NONE else None
+
+                # Abstention machine (or sigma-1 result if it fired).
+                state = self._route(packet, out["scar_energy"], sigma1_arg)
+
+                # Optional REPULSE hold counter (RES-500 §1).
                 if state == "REPULSE":
                     repulse_counter += 1
                     if self.cfg.repulse_hold > 0 and repulse_counter > self.cfg.repulse_hold:
@@ -105,20 +168,25 @@ class HybridValidator:
                 else:
                     repulse_counter = 0
 
+                # B.3 §10 five-tuple + extras.
                 self.logs.append({
-                    "seed": seed, "step": t,
+                    "seed": seed,
+                    "step": t,
                     "reconstruction_rel_error": float(recon_err_fn(packet)),
                     "scar_energy": float(out["scar_energy"]),
                     "DeltaS": float(get("DeltaS")),
                     "mu": int(get("mu")),
                     "logdetJ_abs": float(abs(np.log10(abs(float(get("volume"))) + 1e-300))),
                     "F_res": float(get("F_res")),
-                    "sigma1_action": str(s1 or "NONE"),
+                    "sigma1_gate": bool(gate_action != SigmaAction.NONE),
+                    "sigma1_action": str(gate_action.value),
                     "gate_state": state,
                     "drift_ratio": float(out["ratio"]),
                 })
 
-                target = x_enc + 0.01 * np.random.default_rng(seed * 1000 + t).standard_normal(x_enc.shape)
+                target = x_enc + 0.01 * np.random.default_rng(
+                    seed * 1000 + t
+                ).standard_normal(x_enc.shape)
                 errs_h[t] = np.linalg.norm(x_enc + out["drift"] - target)
                 errs_f[t] = np.linalg.norm(x_enc - target)
 
@@ -138,8 +206,13 @@ class HybridValidator:
 
         red = np.array([r["nrmse_reduction_pct"] for r in per_seed])
         ext = np.array([r["horizon_extension"] for r in per_seed])
+
         return {
-            "run_config": asdict(self.cfg) if hasattr(self.cfg, "__dataclass_fields__") else self.cfg.__dict__,
+            "run_config": (
+                asdict(self.cfg)
+                if hasattr(self.cfg, "__dataclass_fields__")
+                else self.cfg.__dict__
+            ),
             "per_seed": per_seed,
             "aggregate": {
                 "nrmse_reduction_mean_pct": float(np.mean(red)),
@@ -147,7 +220,9 @@ class HybridValidator:
                 "horizon_extension_mean": float(np.mean(ext)),
                 "horizon_extension_std": float(np.std(ext)),
             },
-            "conformant": bool(np.mean(red) >= self.cfg.X and np.mean(ext) >= self.cfg.Y),
+            "conformant": bool(
+                np.mean(red) >= self.cfg.X and np.mean(ext) >= self.cfg.Y
+            ),
             "step_log": self.logs,
         }
 
