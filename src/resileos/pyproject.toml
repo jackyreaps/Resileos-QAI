@@ -14,10 +14,21 @@ dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "jsonschema>=4"]
+ui = [
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "streamlit>=1.30",
+  "pandas>=2.0",
+  "requests>=2.31",
+]
+all = ["resileos[dev,ui]"]
+
+[project.scripts]
+titanos = "titanos:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "scripts"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 testpaths = ["tests"]
