@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jackyreaps/Resileos-QAI/docs/900-reference/schemas/run-config.schema.json",
+  "title": "Resileos-QAI Run Config",
+  "type": "object",
+  "required": [
+    "packet_version", "dim", "seeds",
+    "N_warm", "E_sat", "E_sigma",
+    "tau_sat", "tau_low", "sigma1_k",
+    "X", "Y", "seed_list",
+    "scar_var_floor", "deltaS_range_floor", "drift_ratio_floor"
+  ],
+  "properties": {
+    "packet_version":     { "type": "string" },
+    "dim":                { "type": "integer", "minimum": 1 },
+    "seeds": {
+      "type": "object",
+      "required": ["factor", "scale", "scar", "monitor"],
+      "properties": {
+        "factor":         { "type": "integer" },
+        "scale":          { "type": "integer" },
+        "scar":           { "type": "integer" },
+        "monitor":        { "type": "integer" },
+        "permute_uv":     { "type": "integer" },
+        "permute_scar":   { "type": "integer" },
+        "permute_scale":  { "type": "integer" },
+        "permute_mon":    { "type": "integer" }
+      }
+    },
+    "N_warm":             { "type": "integer", "minimum": 1 },
+    "E_sat":              { "type": "number" },
+    "E_sigma":            { "type": "number" },
+    "tau_sat":            { "type": "number" },
+    "tau_low":            { "type": "number" },
+    "sigma1_k":           { "type": "integer", "minimum": 1 },
+    "X":                  { "type": "number" },
+    "Y":                  { "type": "integer" },
+    "seed_list":          { "type": "array", "items": { "type": "integer" } },
+    "repulse_hold":       { "type": "integer", "minimum": 0 },
+    "volume_escalation":  { "type": "string" },
+    "shift_monitor": {
+      "type": "object",
+      "properties": {
+        "kind":     { "type": "string", "enum": ["rolling_DeltaS_var", "F_res_stat"] },
+        "window":   { "type": "integer" },
+        "trigger":  { "type": "number" }
+      }
+    },
+    "scar_var_floor":     { "type": "number" },
+    "deltaS_range_floor": { "type": "number" },
+    "drift_ratio_floor":  { "type": "number" }
+  },
+  "additionalProperties": false
+}
