@@ -8,7 +8,7 @@ referenced_by: [RES-100]
 
 # Resileos-QAI Documentation
 
-**Version:** see [`/VERSION`](../VERSION) · **Changelog:** [`/CHANGELOG.md`](../CHANGELOG.md)
+**Version:** see [`/version`](../version) · **Changelog:** [`/changelog.md`](../changelog.md)
 
 ## Reading order
 
