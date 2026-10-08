@@ -13,7 +13,6 @@ of a trained and measured classical loop. See `docs/500-notes/roadmap.md`.
 - **Index:** [`docs/README.md`](docs/README.md)
 - **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 - **Version:** [`VERSION`](VERSION)
-
 ## Install
 
     pip install -e .
