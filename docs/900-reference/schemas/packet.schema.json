@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jackyreaps/Resileos-QAI/docs/900-reference/schemas/packet.schema.json",
+  "title": "Resileos-QAI Control Packet",
+  "type": "object",
+  "required": [
+    "version",
+    "Ub", "Vb",
+    "row_s_k", "col_s_k", "lat_s_k",
+    "Lambda",
+    "mu", "DeltaS", "F_res",
+    "volume", "volume_ok",
+    "rank", "schedule_index",
+    "sigma1_gate", "sigma1_action",
+    "packet_hash"
+  ],
+  "properties": {
+    "version":            { "type": "string" },
+    "Ub":                 { "type": "array" },
+    "Vb":                 { "type": "array" },
+    "row_s_k":            { "type": "array", "items": { "type": "integer", "minimum": -16, "maximum": 16 } },
+    "col_s_k":            { "type": "array", "items": { "type": "integer", "minimum": -16, "maximum": 16 } },
+    "lat_s_k":            { "type": "array", "items": { "type": "integer", "minimum": -16, "maximum": 16 } },
+    "Lambda":             { "type": "array" },
+    "mu":                 { "type": "integer", "enum": [0, 1] },
+    "DeltaS":             { "type": "number" },
+    "F_res":              { "type": "number" },
+    "volume":             { "type": "number" },
+    "volume_ok":          { "type": "boolean" },
+    "rank":               { "type": "integer" },
+    "schedule_index":     { "type": "integer" },
+    "sigma1_gate":        { "type": "boolean" },
+    "sigma1_action":      { "type": "string", "enum": ["CLEANUP", "REEMBED", "REPULSE_ABSTAIN", "NONE"] },
+    "packet_hash":        { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": false
+}
