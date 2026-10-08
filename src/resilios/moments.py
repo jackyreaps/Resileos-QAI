@@ -1,6 +1,11 @@
 """
 Moment-bundle contract: (μ_hv, ν_hv) from a control packet.
 Owning doc: RES-301.
+
+FPE engine (RES-300 §leCore boundary) preserves:
+  - unit-norm output
+  - determinism in (x, dim, seed)
+  - signature fpe_encode(x, dim, seed) -> np.ndarray
 """
 from __future__ import annotations
 
@@ -10,6 +15,7 @@ from typing import Any
 import numpy as np
 
 
+# ── Seeds (RES-301) ───────────────────────────────────────────────────────
 @dataclass(frozen=True)
 class Seeds:
     factor: int
@@ -31,23 +37,41 @@ class Seeds:
         )
 
 
-# ── VSA primitives (leCore shim) ──────────────────────────────────────────
+# ── FPE engine (real-valued, position-bound) ──────────────────────────────
 def fpe_encode(x: np.ndarray, dim: int, seed: int) -> np.ndarray:
     """
-    Reference FPE shim. Real leCore engine must preserve:
-    unit-norm, determinism in (x, dim, seed), this signature.
+    Fractional Power Encoding.
+
+    For input x of length L:
+      1. Generate a fixed phase vector ω ∈ R^dim  ~ U(-π, π).
+      2. Generate per-position bind signs b_i ∈ {-1, +1}^dim.
+      3. Scalar encoding: cos(x_i · ω), shape (dim,).
+      4. Bind with position: cos(x_i · ω) * b_i.
+      5. Bundle across positions: sum.
+      6. Unit-normalize.
+
+    Properties:
+      - Smooth kernel: <enc(x), enc(y)> is high for nearby x, y.
+      - Deterministic in (x, dim, seed).
+      - Unit-norm for non-empty input.
     """
     x = np.asarray(x, dtype=np.float64).ravel()
     if x.size == 0:
         return np.zeros(dim, dtype=np.float64)
-    x_n = x / (np.linalg.norm(x) + 1e-12) * np.sqrt(len(x))
+
     rng = np.random.default_rng(seed)
-    proj = rng.standard_normal((dim, len(x)))
-    proj /= np.linalg.norm(proj, axis=0, keepdims=True) + 1e-12
-    h = np.tanh(proj @ x_n)
+    omega = rng.uniform(-np.pi, np.pi, size=dim)                 # (dim,)
+    bind_signs = rng.choice([-1.0, 1.0], size=(x.size, dim))      # (L, dim)
+
+    # (L, dim) elementwise; then bind with per-position signs.
+    scalar_enc = np.cos(x[:, None] * omega[None, :])
+    bound = scalar_enc * bind_signs
+
+    h = np.sum(bound, axis=0)
     return h / (np.linalg.norm(h) + 1e-12)
 
 
+# ── VSA primitives ────────────────────────────────────────────────────────
 def bundle(*vecs: np.ndarray) -> np.ndarray:
     s = np.sum(vecs, axis=0)
     return s / (np.linalg.norm(s) + 1e-12)
@@ -63,7 +87,7 @@ def permute(v: np.ndarray, seed: int) -> np.ndarray:
     return v[rng.permutation(len(v))]
 
 
-# ── Correlation control (implementation detail, not a doc clause) ────────
+# ── Correlation control (implementation detail) ───────────────────────────
 def _mix_to_cos(mu: np.ndarray, nu: np.ndarray, target: float) -> np.ndarray:
     mu = mu / (np.linalg.norm(mu) + 1e-12)
     nu = nu / (np.linalg.norm(nu) + 1e-12)
