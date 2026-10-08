@@ -1,0 +1,33 @@
+{
+  "packet_version": "1.0.0",
+  "dim": 1024,
+  "seeds": {
+    "factor": 42,
+    "scale": 42,
+    "scar": 42,
+    "monitor": 42,
+    "permute_uv": 42,
+    "permute_scar": 43,
+    "permute_scale": 44,
+    "permute_mon": 45
+  },
+  "N_warm": 512,
+  "E_sat": 1.0,
+  "E_sigma": 1.0,
+  "tau_sat": 0.9,
+  "tau_low": 0.1,
+  "sigma1_k": 3,
+  "X": 10.0,
+  "Y": 8,
+  "seed_list": [0, 1, 2, 3, 4],
+  "repulse_hold": 0,
+  "volume_escalation": "sigma1_CLEANUP",
+  "shift_monitor": {
+    "kind": "rolling_DeltaS_var",
+    "window": 256,
+    "trigger": 2.0
+  },
+  "scar_var_floor": 1e-4,
+  "deltaS_range_floor": 0.2,
+  "drift_ratio_floor": 1e-3
+}
