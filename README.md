@@ -11,8 +11,8 @@ of a trained and measured classical loop. See `docs/500-notes/roadmap.md`.
 ## Documentation
 
 - **Index:** [`docs/readme.md`](docs/README.md)
-- **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
-- **Version:** [`VERSION`](VERSION)
+- **Changelog:** [`changelog.md`](changelog.md)
+- **Version:** [`version`](version)
 ## Install
 
     pip install -e .
