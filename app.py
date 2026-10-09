@@ -1,152 +1,99 @@
 """
-FastAPI backend for the Titanos substrate.
-Keeps the engine alive in-memory; exposes structured JSON.
+FastAPI backend for Resileos-QAI.
 
-Run:
-    uvicorn app:app --port 8000 --reload
+Endpoints:
+    /api/v1/verify_manifold   QD-TER bridge verification (RES-600/601/602)
 """
-import logging
+from __future__ import annotations
+
+import os
 import sys
 from pathlib import Path
 
+import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-# Fallback path resolution so this runs even without `pip install -e .`
 ROOT = Path(__file__).resolve().parent
 for p in (ROOT, ROOT / "src", ROOT / "scripts"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from titanos import Titanos, TitanosConfig  # noqa: E402
+from resileos.substrate.geometry import LowRankMetricHead  # noqa: E402
+from resileos.substrate.reduction import VerifiableFEPReductionHead  # noqa: E402
 
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("titanos.api")
+app = FastAPI(title="Resileos-QAI")
 
-app = FastAPI(title="Resileos-QAI Titanos Core Engine")
+HIDDEN_DIM = int(os.getenv("RESILEOS_HIDDEN_DIM", "128"))
+KERNEL_DIM = int(os.getenv("RESILEOS_KERNEL_DIM", "1"))   # rank-1 per RES-600 §4
 
-cfg = TitanosConfig(dim=10000, m=100, n=100, r=8, n_loops=12, seed=1337)
-titan = Titanos(cfg)
 
-STATE_FILE = ROOT / "titanos_live_state.json"
-if STATE_FILE.exists():
+class SubstrateContainer:
+    """Module-level persistent model singleton."""
+
+    def __init__(self) -> None:
+        torch.manual_seed(42)
+        raw_kernel = torch.randn(HIDDEN_DIM, KERNEL_DIM)
+        q_kernel, _ = torch.linalg.qr(raw_kernel)
+
+        self.geo_head = LowRankMetricHead(hidden_dim=HIDDEN_DIM)
+        self.fep_head = VerifiableFEPReductionHead(
+            hidden_dim=HIDDEN_DIM, L_H_kernel=q_kernel, rank=1,
+        )
+        self.is_trained = False
+        self.training_steps = 0
+
+
+substrate_singleton = SubstrateContainer()
+
+
+class VerificationRequest(BaseModel):
+    hierarchical_states: list   # [1, T, L, D]
+    velocity_direction: list    # [1, T, D]
+    g_field_sequence: list      # [1, T, 1]
+
+
+@app.post("/api/v1/verify_manifold")
+def verify_manifold(payload: VerificationRequest):
+    if not substrate_singleton.is_trained:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Substrate is UNTRAINED. "
+                f"completed_steps={substrate_singleton.training_steps}."
+            ),
+        )
     try:
-        titan = Titanos.load(STATE_FILE)
-        log.info("Loaded substrate state from %s", STATE_FILE)
-    except Exception as e:
-        log.warning("State file unreadable, starting fresh: %s", e)
+        h = torch.tensor(payload.hierarchical_states, dtype=torch.float32)
+        x = torch.tensor(payload.velocity_direction, dtype=torch.float32)
+        g = torch.tensor(payload.g_field_sequence, dtype=torch.float32)
 
+        if h.dim() != 4 or h.size(0) != 1:
+            raise ValueError(f"hierarchical_states must be [1, T, L, D], got {tuple(h.shape)}")
+        trunk = h.mean(dim=2)     # [1, T, D]
 
-# ── schemas ───────────────────────────────────────────────────────────────
-class LearnRequest(BaseModel):
-    subject: str
-    relation: str
-    obj: str
+        with torch.no_grad():
+            _, geo_loss = substrate_singleton.geo_head(trunk, x)
+            psi_s, fep_loss = substrate_singleton.fep_head(trunk, g)
 
-
-class QueryRequest(BaseModel):
-    subject: str
-    relation: str
-    inverse: bool = False
-
-
-class ChainRequest(BaseModel):
-    start: str
-    relations: list[str]
-
-
-class BatchLearnRequest(BaseModel):
-    facts: list[list[str]]
-
-
-# ── endpoints ─────────────────────────────────────────────────────────────
-@app.post("/api/v1/learn")
-def learn_fact(payload: LearnRequest):
-    s, r, o = payload.subject.strip(), payload.relation.strip(), payload.obj.strip()
-    if not (s and r and o):
-        raise HTTPException(status_code=400, detail="subject/relation/obj must be non-empty")
-    try:
-        titan.learn(s, r, o)
-        titan.save(STATE_FILE)
-        return {"status": "SUCCESS", "records": titan.stats()["facts"]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/v1/learn_batch")
-def learn_batch(payload: BatchLearnRequest):
-    if not payload.facts:
-        raise HTTPException(status_code=400, detail="facts list is empty")
-    added = 0
-    for row in payload.facts:
-        if len(row) != 3:
-            continue
-        s, r, o = (x.strip() for x in row)
-        if not (s and r and o):
-            continue
-        titan.learn(s, r, o)
-        added += 1
-    if added:
-        titan.save(STATE_FILE)
-    return {"status": "SUCCESS", "added": added, "records": titan.stats()["facts"]}
-
-
-@app.post("/api/v1/query")
-def query_substrate(payload: QueryRequest):
-    try:
-        if payload.inverse:
-            ans = titan.ask_inverse(payload.subject, payload.relation)
-        else:
-            ans = titan.ask(payload.subject, payload.relation)
         return {
-            "value": ans.value,
-            "confidence": float(ans.confidence),
-            "status": ans.status,
-            "mode": ans.mode,
-            "loops": ans.loops,
-            "reason": ans.reason,
-            "gate_state": ans.gate_state,
-            "trace": [
-                {
-                    "loop": h["loop"],
-                    "scar": float(h["scar_energy"]),
-                    "delta": float(h["delta"]),
-                    "mu": h["mu"],
-                    "deltas": float(h.get("DeltaS", 0.0)),
-                    "vol_ok": h["volume_ok"],
-                    "gate_state": h["gate_state"],
-                }
-                for h in ans.loop_history
-            ],
+            "status": "verified",
+            "parallel_transport_penalty": float(geo_loss.item()),
+            "fep_ode_alignment_loss": float(fep_loss.item()),
+            "slow_subspace_trajectory": psi_s.squeeze(0).squeeze(-1).tolist(),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"manifold error: {e}")
 
 
-@app.post("/api/v1/chain")
-def query_chain(payload: ChainRequest):
-    if not payload.relations:
-        raise HTTPException(status_code=400, detail="relations must be non-empty")
-    try:
-        ans = titan.chain(payload.start, payload.relations)
-        return {
-            "value": ans.value,
-            "confidence": float(ans.confidence),
-            "status": ans.status,
-            "mode": ans.mode,
-            "path": ans.path,
-            "reason": ans.reason,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/v1/stats")
-def get_stats():
-    return titan.stats()
-
-
-@app.post("/api/v1/save")
-def save_now():
-    titan.save(STATE_FILE)
-    return {"status": "SAVED", "path": str(STATE_FILE)}
+@app.get("/api/v1/substrate_stats")
+def substrate_stats():
+    return {
+        "hidden_dim": HIDDEN_DIM,
+        "kernel_dim": KERNEL_DIM,
+        "is_trained": substrate_singleton.is_trained,
+        "training_steps": substrate_singleton.training_steps,
+        "bridge_locked": True,     # BridgeMetricHead raises NotImplementedError
+    }
