@@ -57,8 +57,9 @@ Endpoints, grouped by layer:
 
     streamlit run ui.py --server.port 8501
 
-Then open `http://localhost:8501`. Four tabs: single-fact ingestion, batch
-CSV upload, substrate query with convergence trace, multi-hop chain.
+Then open `http://localhost:8501`. Five tabs: single-fact ingestion, batch
+CSV upload, substrate query with convergence trace, multi-hop chain, and
+ε-sweep verification.
 
 The backend keeps the Titanos substrate in memory and persists it to
 `titanos_live_state.json` after every write. Restart and it reloads.
@@ -99,7 +100,7 @@ residual bound in RES-600 §4. See `docs/600-qdter/integration.md` §7.
     pyproject.toml                  build + install metadata
 
     app.py                          FastAPI backend (Titanos + substrate)
-    ui.py                           Streamlit dashboard
+    ui.py                           Streamlit dashboard (5 tabs)
     titanos.py                      root shim -> scripts/titanos.py
     scripts/                        run_hybrid.py, run_fep_sweep.py, titanos.py
     src/resileos/                   frozen classical core + substrate
