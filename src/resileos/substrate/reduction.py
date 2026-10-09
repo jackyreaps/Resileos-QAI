@@ -60,15 +60,14 @@ class VerifiableFEPReductionHead(nn.Module):
 
         basis = L_H_kernel[:, :rank]
         Q, _ = torch.linalg.qr(basis)
-        self.register_buffer("basis", Q)                      # [D, rank]
-        self.register_buffer("P_s", Q @ Q.transpose(0, 1))    # [D, D]
+        self.register_buffer("basis", Q)
+        self.register_buffer("P_s", Q @ Q.transpose(0, 1))
 
         self.f_scalar = nn.Parameter(torch.tensor(1.0))
 
         self.register_buffer("psi_a", torch.tensor(0.5))
         self.register_buffer("psi_b", torch.tensor(1.5))
 
-    # ── core forward ────────────────────────────────────────────────────
     def forward(self, trunk_state: torch.Tensor,
                 G_field: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         if trunk_state.dim() != 3 or trunk_state.size(0) != 1:
@@ -85,15 +84,15 @@ class VerifiableFEPReductionHead(nn.Module):
                 f"G_field must be [1, T, 1], got {tuple(G_field.shape)}"
             )
 
-        psi_s_full = trunk_state @ self.P_s          # [1, T, D]
-        psi_s = psi_s_full @ self.basis              # [1, T, rank]
-        psi_scalar = psi_s[..., 0:1]                 # [1, T, 1] — first coord
+        psi_s_full = trunk_state @ self.P_s
+        psi_s = psi_s_full @ self.basis
+        psi_scalar = psi_s[..., 0:1]
 
         pi_o = self.f_scalar * self.psi_a * self.psi_b
         pi_s = self.f_scalar * self.psi_b * (self.psi_b - self.psi_a)
         gamma_eff = G_field.mean() * (pi_o + pi_s)
 
-        delta_psi = psi_scalar - self.psi_b          # [1, T, 1]
+        delta_psi = psi_scalar - self.psi_b
 
         if T > 1:
             d_dt = delta_psi[:, 1:, :] - delta_psi[:, :-1, :]
@@ -104,7 +103,6 @@ class VerifiableFEPReductionHead(nn.Module):
 
         return psi_s, ode_error
 
-    # ── verification harness ────────────────────────────────────────────
     def sweep_epsilon(
         self,
         trajectory_factory,
@@ -177,8 +175,7 @@ def simulate_linear_ode(
 ) -> torch.Tensor:
     """
     [1, T, D] trajectory whose first component follows δΨ̇ = −γ · δΨ
-    exactly, embedded in a D-dimensional ambient space. Remaining
-    components are small noise. Used by the test suite.
+    exactly, embedded in a D-dimensional ambient space. Used by the tests.
     """
     rng = np.random.default_rng(seed)
     dt = 1.0 / max(seq_len - 1, 1)
@@ -206,6 +203,10 @@ def simulate_axiom_d(
     dt: float = 0.01,
     seed: int = 0,
     embed_noise: float = 0.02,
+    # ── stress knobs (all default to the ideal case) ────────────────────
+    off_manifold_frac: float = 0.0,
+    g_ramp: float = 0.0,
+    dt_coarse: float = 1.0,
 ) -> torch.Tensor:
     """
     Integrate Axiom D on the slow coordinate and embed in dim-dimensional
@@ -215,22 +216,52 @@ def simulate_axiom_d(
         dΨ/dt = −L_H Ψ + M_E · F(Ψ, f)
         F(Ψ, f) = f · Ψ(Ψ_A − Ψ)(Ψ − Ψ_B)
 
-    with L_H = 0 on the slow subspace (by construction) and
-    M_E = G · Ψ_B / (Ψ_B − Ψ_A) per Axiom C.
+    Stress parameters (all default to the ideal case, so calling with
+    defaults reproduces the previous behavior):
+
+        off_manifold_frac:
+            Fraction of ε that leaks off the slow axis into the ambient
+            subspace at t=0. Ideal = 0.0 (all ε on coordinate 0).
+            Stress range: 0.0 .. 0.5.
+
+        g_ramp:
+            Linear drift of G over the trajectory, as a fraction of
+            g_field. Ideal = 0.0 (constant G). Stress range: 0.0 .. 0.3.
+
+        dt_coarse:
+            Multiplier on the integration step. Ideal = 1.0 (fine).
+            Stress range: 1.0 .. 8.0 (coarser discretization).
 
     The trajectory starts at Ψ = Ψ_B + ε and decays toward Ψ_B.
     """
     rng = np.random.default_rng(seed)
     m_e = g_field * psi_b / (psi_b - psi_a)
+    dt_eff = dt * dt_coarse
 
     psi = psi_b + epsilon
     traj = np.zeros(seq_len, dtype=np.float64)
     traj[0] = psi
     for t in range(1, seq_len):
         F_val = f * psi * (psi_a - psi) * (psi - psi_b)
-        psi = psi + m_e * F_val * dt
+        psi = psi + m_e * F_val * dt_eff
         traj[t] = psi
 
+    # Ambient subspace: Gaussian noise plus optional off-manifold leakage
     ambient = rng.standard_normal((seq_len, dim - 1)) * embed_noise
+    if off_manifold_frac > 0.0 and dim > 1:
+        # Inject ε * off_manifold_frac into a random ambient direction
+        leak_dir = rng.standard_normal(dim - 1)
+        leak_dir /= (np.linalg.norm(leak_dir) + 1e-12)
+        leak = epsilon * off_manifold_frac * leak_dir[None, :]
+        ambient = ambient + leak
+
     full = np.concatenate([traj[:, None], ambient], axis=1)
+
+    # G ramp: modulate the slow axis slightly if requested. Applied after
+    # the fact rather than inside the integrator, so the pure Axiom D
+    # trajectory is preserved and only the input signal is stressed.
+    if g_ramp > 0.0:
+        ramp = np.linspace(0.0, g_ramp * g_field, seq_len)
+        full[:, 0] = full[:, 0] * (1.0 + ramp / (g_field + 1e-12))
+
     return torch.tensor(full[None, ...], dtype=torch.float32)
