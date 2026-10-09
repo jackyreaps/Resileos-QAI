@@ -1,24 +1,25 @@
-"""
-Resileos-QAI — Hybrid Classical Residual Core + HDRIFT Generative Substrate.
+"""Resileos-QAI substrate package.
 
-Documentation: docs/README.md (RES-000)
-Layer ownership:
-    RES-200/201/202  classical core, packet, canonicalization
-    RES-300..303     HDRIFT adapter, moments, abstention, sigma gate
-    RES-400..402     run config, training, validation
+Two-head system for QD-TER bridge integration:
+    geometry.py   — Head 1: geometric manifold tracking (RES-601)
+    reduction.py  — Head 2: FEP reduction tracking (RES-600)
+    spd.py        — Positive-definiteness utility (RES-601 §7 precondition)
 """
-from .packet import Packet, canonical_json, packet_hash
-from .moments import Seeds, build_moments
-from .adapter import HDRIFTAdapter
-from .abstention import AbstentionInputs, AbstentionThresholds, route_signals
-from .sigma import SigmaGate, SigmaAction
+from .geometry import LowRankMetricHead, BridgeMetricHead
+from .reduction import (
+    VerifiableFEPReductionHead,
+    simulate_axiom_d,
+    simulate_linear_ode,
+)
+from .spd import assert_spd, is_spd, min_eigenvalue
 
 __all__ = [
-    "Packet", "canonical_json", "packet_hash",
-    "Seeds", "build_moments",
-    "HDRIFTAdapter",
-    "AbstentionInputs", "AbstentionThresholds", "route_signals",
-    "SigmaGate", "SigmaAction",
+    "LowRankMetricHead",
+    "BridgeMetricHead",
+    "VerifiableFEPReductionHead",
+    "simulate_axiom_d",
+    "simulate_linear_ode",
+    "assert_spd",
+    "is_spd",
+    "min_eigenvalue",
 ]
-
-__version__ = "1.0.0"
