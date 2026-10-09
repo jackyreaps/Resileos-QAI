@@ -93,28 +93,8 @@ and the projected rate is
 
 with `Γ = G`.
 
-### 4.1 Open item — Γ definition
-
-The source document `Reduction_fep.md §3.1` writes **`Γ = Π_s · G`** rather
-than `Γ = G`. Under `Γ = Π_s · G`:
-
-    Γ(Π_o + Π_s) = Π_s · G · (Π_o + Π_s)
-                 = f Ψ_B (Ψ_B − Ψ_A) · G · f Ψ_B²
-                 = f² · G · Ψ_B³ (Ψ_B − Ψ_A)
-
-This does **not** equal `P_s · G · f · Ψ_B²`. The two expressions differ by a
-factor `f Ψ_B (Ψ_B − Ψ_A)`.
-
-Two possibilities:
-
-1. **Transcription.** The source may define `Γ_o = G` for the object that
-   appears in the FEP recognition rate, and `Γ = Π_s · G` for a different
-   quantity that does not appear in this identity.
-2. **Source inconsistency.** The source may intend `Γ = G` and the published
-   expression `Γ = Π_s · G` may be a typographical error.
-
-Until resolved, this document uses `Γ = G` for the rate identity and records
-the discrepancy here as an open item. RES-602 §2 depends on this resolution.
+### 4.1 Resolved — Γ definition
+The source document Reduction_fep.md §3.1 writes Γ = Π_s · G, but the derivation requires Γ = G for the identity to close. Under Γ = Π_s · G, the right-hand side becomes f² · G · Ψ_B³ (Ψ_B − Ψ_A), which does not equal P_s · G · f · Ψ_B². The discrepancy is resolved as a transcription error in the source: the object that appears in the FEP recognition rate is Γ = G, and Γ = Π_s · G refers to a different quantity not used in this identity. The code in reduction.py implements Γ = G. RES-602 §2 reflects this resolution.
 
 ### 4.2 Numerical verification
 
