@@ -23,6 +23,7 @@ Documents outside the first three values live in the 600-series.
 4. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
 5. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
 6. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+7. [Speculative Cross-Stream Layer](600-qdter/speculative-cross-stream.md) — RES-603
 
 ## Categories
 
