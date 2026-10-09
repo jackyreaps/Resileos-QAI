@@ -35,7 +35,7 @@ Documents outside the first three values live in the 600-series.
 | 400 | Operations | [Run Config](400-operations/run-config.md) |
 | 500 | Notes & Roadmap | [Behavioral](500-notes/behavioral.md) |
 | 600 | QD-TER Bridge | [FEP Reduction](600-qdter/fep-reduction.md) |
-| 900 | Reference | [Glossary](900-reference/glossary.md) |
+| 900 | Reference | [Glossary](900-reference/glossary.md) || 600 | QD-TER Bridge | [FEP Reduction](600-qdter/fep-reduction.md) — RES-600 … RES-603 |
 
 ## Dependency graph
 
