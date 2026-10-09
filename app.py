@@ -3,12 +3,12 @@ FastAPI backend for Resileos-QAI.
 
 Endpoints:
     GET  /api/v1/substrate_stats     — current model state
-    POST /api/v1/train_substrate     — optimize the two heads, flip is_trained
-    POST /api/v1/verify_manifold     — infer on a trajectory (gated on is_trained)
-    POST /api/v1/sweep_epsilon       — run the ε-sweep verification (ungated)
+    POST /api/v1/train_substrate     — optimize heads, flip is_trained
+    POST /api/v1/verify_manifold     — infer on a trajectory (gated)
+    POST /api/v1/sweep_epsilon       — ε-sweep verification (ungated)
 
-The sweep is a numerical verification of RES-600 §4. It does not require
-trained heads and is therefore exposed without the is_trained gate.
+The sweep is a diagnostic on the RES-600 §4 bound; it does not require
+trained heads and is exposed without the is_trained gate.
 """
 from __future__ import annotations
 
@@ -35,25 +35,28 @@ from resileos.substrate.reduction import (  # noqa: E402
 app = FastAPI(title="Resileos-QAI")
 
 HIDDEN_DIM = int(os.getenv("RESILEOS_HIDDEN_DIM", "128"))
-KERNEL_DIM = int(os.getenv("RESILEOS_KERNEL_DIM", "1"))    # rank-1 per RES-600 §4
+KERNEL_DIM = int(os.getenv("RESILEOS_KERNEL_DIM", "1"))
 MIN_TRAIN_STEPS = int(os.getenv("RESILEOS_MIN_TRAIN_STEPS", "5"))
 
 
-# ── persistent container ─────────────────────────────────────────────────
+# ── persistent container ────────────────────────────────────────────────
 class SubstrateContainer:
     """Module-level persistent model singleton."""
 
     def __init__(self) -> None:
         torch.manual_seed(42)
-        raw_kernel = torch.randn(HIDDEN_DIM, KERNEL_DIM)
-        q_kernel, _ = torch.linalg.qr(raw_kernel)
+
+        # Slow subspace basis: span{e_0}, matching simulate_axiom_d,
+        # which places the slow coordinate on ambient axis 0.
+        kernel = torch.zeros(HIDDEN_DIM, KERNEL_DIM)
+        kernel[0, 0] = 1.0
 
         self.hidden_dim = HIDDEN_DIM
         self.kernel_dim = KERNEL_DIM
 
         self.geo_head = LowRankMetricHead(hidden_dim=HIDDEN_DIM)
         self.fep_head = VerifiableFEPReductionHead(
-            hidden_dim=HIDDEN_DIM, L_H_kernel=q_kernel, rank=1,
+            hidden_dim=HIDDEN_DIM, L_H_kernel=kernel, rank=1,
         )
 
         trainable = (
@@ -72,14 +75,13 @@ class SubstrateContainer:
         epsilon: float,
         seed: int,
     ) -> dict:
-        """One optimization step on a synthetic Axiom D trajectory."""
         self.optimizer.zero_grad()
 
         trunk = simulate_axiom_d(
             dim=self.hidden_dim, seq_len=seq_len,
             epsilon=epsilon, g_field=g_field, seed=seed,
         )
-        # Direction: finite difference as a proxy for X
+        # X: finite difference of trunk along time (proxy for velocity)
         X = torch.zeros_like(trunk)
         X[:, :-1] = trunk[:, 1:] - trunk[:, :-1]
         X[:, -1] = X[:, -2]
@@ -106,7 +108,7 @@ class SubstrateContainer:
 substrate_singleton = SubstrateContainer()
 
 
-# ── request schemas ─────────────────────────────────────────────────────
+# ── request schemas ────────────────────────────────────────────────────
 class VerificationRequest(BaseModel):
     hierarchical_states: list = Field(
         ..., description="[1, T, L, D] hierarchy of hidden states"
@@ -124,18 +126,15 @@ class TrainRequest(BaseModel):
 
 
 class SweepRequest(BaseModel):
-    mode: str = "simulate"                        # "simulate" | "data"
-    epsilons: list[float] = [
-        0.1, 0.05, 0.02, 0.01, 0.005, 0.001
-    ]
-    metric: str = "rmse"                          # "rmse" | "mse"
+    mode: str = "simulate"                 # "simulate" | "data"
+    epsilons: list[float] = [0.1, 0.05, 0.02, 0.01, 0.005, 0.001]
+    metric: str = "rmse"                   # "rmse" | "mse"
     g_field: float = 0.85
     seq_len: int = 64
-    # Only used when mode == "data"
-    trajectory: list | None = None                # [T, D] or [K, T, D]
+    trajectory: list | None = None         # used only when mode == "data"
 
 
-# ── endpoints ───────────────────────────────────────────────────────────
+# ── endpoints ──────────────────────────────────────────────────────────
 @app.get("/api/v1/substrate_stats")
 def substrate_stats():
     return {
@@ -145,18 +144,17 @@ def substrate_stats():
         "training_steps": substrate_singleton.training_steps,
         "min_train_steps": MIN_TRAIN_STEPS,
         "last_train_metrics": substrate_singleton.last_train_metrics,
-        "bridge_locked": True,    # BridgeMetricHead raises NotImplementedError
+        "bridge_locked": True,
     }
 
 
 @app.post("/api/v1/train_substrate")
 def train_substrate(payload: TrainRequest):
     if payload.steps < 1 or payload.steps > 500:
-        raise HTTPException(400, "steps must be in [1, 500]")
+        raise HTTPException(status_code=400, detail="steps must be in [1, 500]")
 
     history = []
     for i in range(payload.steps):
-        # Vary ε per step so the ODE sees a range of perturbation scales
         eps = payload.base_epsilon / (1.0 + 0.3 * i)
         try:
             metrics = substrate_singleton.train_step(
@@ -166,7 +164,7 @@ def train_substrate(payload: TrainRequest):
                 seed=payload.seed + i,
             )
         except Exception as e:
-            raise HTTPException(500, f"training step {i} failed: {e}")
+            raise HTTPException(status_code=500, detail=f"training step {i} failed: {e}")
         history.append({"step": i, "epsilon": eps, **metrics})
 
     if substrate_singleton.training_steps >= MIN_TRAIN_STEPS:
@@ -199,15 +197,14 @@ def verify_manifold(payload: VerificationRequest):
 
         if h.dim() != 4 or h.size(0) != 1:
             raise ValueError(
-                f"hierarchical_states must be [1, T, L, D], "
-                f"got {tuple(h.shape)}"
+                f"hierarchical_states must be [1, T, L, D], got {tuple(h.shape)}"
             )
         if h.size(-1) != substrate_singleton.hidden_dim:
             raise ValueError(
                 f"last dim must equal hidden_dim "
                 f"({substrate_singleton.hidden_dim}), got {h.size(-1)}"
             )
-        trunk = h.mean(dim=2)          # [1, T, D]
+        trunk = h.mean(dim=2)
 
         with torch.no_grad():
             _, geo_loss = substrate_singleton.geo_head(trunk, x)
@@ -217,32 +214,26 @@ def verify_manifold(payload: VerificationRequest):
             "status": "verified",
             "parallel_transport_penalty": float(geo_loss.item()),
             "fep_ode_alignment_loss": float(fep_loss.item()),
-            "slow_subspace_trajectory": (
-                psi_s.squeeze(0).squeeze(-1).tolist()
-            ),
+            "slow_subspace_trajectory": psi_s.squeeze(0).squeeze(-1).tolist(),
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"manifold error: {e}")
+        raise HTTPException(status_code=500, detail=f"manifold error: {e}")
 
 
 @app.post("/api/v1/sweep_epsilon")
 def sweep_epsilon(payload: SweepRequest):
-    """
-    Run the ε-sweep verification.
-
-    Ungated — the sweep measures the theorem's residual scaling on either a
-    simulated Axiom D trajectory or a user-supplied trajectory. It does not
-    require trained heads.
-    """
+    """Ungated ε-sweep verification endpoint."""
     if payload.metric not in ("rmse", "mse"):
-        raise HTTPException(400, f"metric must be 'rmse' | 'mse', got "
-                                 f"{payload.metric!r}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"metric must be 'rmse' | 'mse', got {payload.metric!r}",
+        )
     if len(payload.epsilons) < 2:
-        raise HTTPException(400, "at least two epsilon values required")
+        raise HTTPException(status_code=400, detail="at least two epsilon values required")
     if any(e <= 0.0 for e in payload.epsilons):
-        raise HTTPException(400, "epsilons must all be > 0")
+        raise HTTPException(status_code=400, detail="epsilons must all be > 0")
 
     dim = substrate_singleton.hidden_dim
 
@@ -254,23 +245,21 @@ def sweep_epsilon(payload: SweepRequest):
             )
     elif payload.mode == "data":
         if payload.trajectory is None:
-            raise HTTPException(
-                400, "mode='data' requires a trajectory array"
-            )
+            raise HTTPException(status_code=400, detail="mode='data' requires a trajectory array")
         arr = np.asarray(payload.trajectory, dtype=np.float32)
         if arr.ndim == 2:
             arr = arr[None, ...]
         if arr.ndim != 3:
             raise HTTPException(
-                400, f"trajectory must be [T, D] or [K, T, D], got {arr.shape}"
+                status_code=400,
+                detail=f"trajectory must be [T, D] or [K, T, D], got {arr.shape}",
             )
         if arr.shape[-1] != dim:
             raise HTTPException(
-                400, f"trajectory last dim {arr.shape[-1]} != hidden_dim {dim}"
+                status_code=400,
+                detail=f"trajectory last dim {arr.shape[-1]} != hidden_dim {dim}",
             )
-        trunk_ref = torch.tensor(
-            arr.mean(axis=0)[None, ...], dtype=torch.float32
-        )
+        trunk_ref = torch.tensor(arr.mean(axis=0)[None, ...], dtype=torch.float32)
 
         def factory(eps: float) -> torch.Tensor:
             t = trunk_ref.clone()
@@ -278,17 +267,18 @@ def sweep_epsilon(payload: SweepRequest):
             return t
     else:
         raise HTTPException(
-            400, f"mode must be 'simulate' | 'data', got {payload.mode!r}"
-       ing )
+            status_code=400,
+            detail=f"mode must be 'simulate' | 'data', got {payload.mode!r}",
+        )
 
     try:
         sample = factory(payload.epsilons[0])
         G = torch.ones(1, sample.shape[1], 1)
-        result = substrate_sleton.fep_head.sweep_epsilon(
+        result = substrate_singleton.fep_head.sweep_epsilon(
             factory, payload.epsilons, G, metric=payload.metric,
         )
     except Exception as e:
-        raise HTTPException(500, f"sweep failed: {e}")
+        raise HTTPException(status_code=500, detail=f"sweep failed: {e}")
 
     slope = result["slope"]
     if payload.metric == "rmse":
