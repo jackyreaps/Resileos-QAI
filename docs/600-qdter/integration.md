@@ -79,6 +79,24 @@ not claim that the source documents require a joint architecture.
   verification restricts to `|δΨ_s| < ε`, sweeps `ε`, and checks that the
   residual scales as `C_1 / λ_2`.
 
+### 5.4 FPE backend substitution
+
+The substrate's Fractional Power Encoding has two backends, selected at
+import time by `src/resileos/substrate/fpe.py`:
+
+- **leCore** — if `lecore.holographic.sampling_and_signal.holographic_fpe`
+  is importable, its FPE is used and quantized to bipolar.
+- **in-house** — otherwise, the historical in-house implementation is used.
+
+Both satisfy the RES-300 §leCore boundary contract (unit-norm, determinism,
+`(x, dim, seed)` signature). The leCore path applies an additional
+bipolar quantization step; this is a lossy conversion and results under
+leCore will differ from results under the in-house backend by design.
+
+The backend in use is reported by `resileos.substrate.fpe.backend_name()`
+and is logged at import time. This is a **substitution**, not a drop-in
+replacement, in the sense of RES-602 §5.4.
+
 ## 6. Numerical verification harness
 
 `VerifiableFEPReductionHead.sweep_epsilon()` runs the reduction ODE across
