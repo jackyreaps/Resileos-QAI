@@ -29,9 +29,8 @@ are stable and never reused.
   to the categories table.
 
 ### Notes
-- The `Γ = Π_s·G` (source) vs `Γ = G` (derivation) discrepancy is recorded as
-  an open item in RES-600 §4.1 and referenced from RES-602 §2. The code in
-  `reduction.py` uses the `Γ = G` resolution.
+### Notes
+- The Γ = Π_s·G (source) vs Γ = G (derivation) discrepancy is resolved as a transcription error in the source. RES-600 §4.1 now records the resolution; RES-602 §2 reflects it. The code in reduction.py implements Γ = G.
 
 ## [1.0.0] — 2026-10-08
 
