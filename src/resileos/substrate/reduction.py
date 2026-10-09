@@ -28,19 +28,13 @@ class VerifiableFEPReductionHead(nn.Module):
         trunk_state   [1, T, D]    temporal trajectory
         G_field       [1, T, 1]    coherence field sequence
     Returns:
-        psi_s         [1, T, 1]    slow coordinate
+        psi_s         [1, T, rank] slow coordinate
         ode_error     scalar       MSE of the ODE fit
     """
 
     def __init__(self, hidden_dim: int,
                  L_H_kernel: torch.Tensor,
                  rank: int = 1):
-        """
-        Args:
-            hidden_dim:  state dimensionality
-            L_H_kernel:  [hidden_dim, kernel_dim] orthonormal basis of ker(L_H)
-            rank:        number of slow coordinates to track (default 1)
-        """
         super().__init__()
         self.hidden_dim = hidden_dim
         self.rank = rank
@@ -57,16 +51,12 @@ class VerifiableFEPReductionHead(nn.Module):
             )
 
         basis = L_H_kernel[:, :rank]
-        # Enforce orthonormality of the retained columns
         Q, _ = torch.linalg.qr(basis)
         self.register_buffer("basis", Q)                      # [D, rank]
-        # P_s = Q Qᵀ  (orthogonal projector onto ker(L_H), rank-rank)
         self.register_buffer("P_s", Q @ Q.transpose(0, 1))    # [D, D]
 
-        # Free scalar f (RES-600 §7: free parameter, not Re_ε·c)
         self.f_scalar = nn.Parameter(torch.tensor(1.0))
 
-        # Well positions (fixed, not trained — they are properties of U(Ψ))
         self.register_buffer("psi_a", torch.tensor(0.5))
         self.register_buffer("psi_b", torch.tensor(1.5))
 
@@ -85,23 +75,15 @@ class VerifiableFEPReductionHead(nn.Module):
                 f"G_field must be [1, T, 1], got {tuple(G_field.shape)}"
             )
 
-        # Ψ_s = P_s Ψ  →  [1, T, D]  (all mass on the rank-r subspace)
-        psi_s_full = trunk_state @ self.P_s
+        psi_s_full = trunk_state @ self.P_s          # [1, T, D]
+        psi_s = psi_s_full @ self.basis              # [1, T, rank]
+        psi_scalar = psi_s[..., 0:1]                 # [1, T, 1]
 
-        # Reduce to rank-r coordinates by projecting onto the basis
-        # (basis is orthonormal, so this is a scalar/vector per step)
-        psi_s = psi_s_full @ self.basis                    # [1, T, rank]
-
-        # Scalar-well coupling: use only the first component if rank > 1
-        psi_scalar = psi_s[..., 0:1]                        # [1, T, 1]
-
-        # Precision terms from free f
         pi_o = self.f_scalar * self.psi_a * self.psi_b
         pi_s = self.f_scalar * self.psi_b * (self.psi_b - self.psi_a)
-        gamma_eff = G_field.mean() * (pi_o + pi_s)          # scalar
+        gamma_eff = G_field.mean() * (pi_o + pi_s)
 
-        # Coordinate shift per RES-600 §4
-        delta_psi = psi_scalar - self.psi_b                 # [1, T, 1]
+        delta_psi = psi_scalar - self.psi_b          # [1, T, 1]
 
         if T > 1:
             d_dt = delta_psi[:, 1:, :] - delta_psi[:, :-1, :]
@@ -113,7 +95,7 @@ class VerifiableFEPReductionHead(nn.Module):
         return psi_s, ode_error
 
     # ── verification harness ────────────────────────────────────────────
-def sweep_epsilon(
+    def sweep_epsilon(
         self,
         trajectory_factory,
         epsilons: list[float] | tuple[float, ...],
@@ -125,27 +107,17 @@ def sweep_epsilon(
         the log-log slope of residual vs ε.
 
         metric:
-            "rmse" — root-mean-square residual (norm). Matches the O(ε)
-                     residual bound in RES-600 §4. Expected slope ≈ 1.
-            "mse"  — mean-square residual (norm squared). Expected slope ≈ 2.
-
-        Defaults to "rmse" because RES-600 §4 bounds a norm, not a norm².
+            "rmse" — root-mean-square residual. Matches O(ε) norm bound.
+                     Expected slope ≈ 1.
+            "mse"  — mean-square residual. Expected slope ≈ 2.
 
         Args:
             trajectory_factory: callable(eps) -> trunk_state [1, T, D]
             epsilons:           iterable of positive floats
-            G_field:            [1, T, 1] coherence field (same for all runs)
+            G_field:            [1, T, 1]
             metric:             "rmse" | "mse"
 
-        Returns:
-            {
-              "metric":   "rmse" | "mse",
-              "epsilons": [...],
-              "errors":   [...],
-              "slope":    float,
-              "intercept":float,
-              "r_squared":float,
-            }
+        Returns dict with metric, epsilons, errors, slope, intercept, r_squared.
         """
         if metric not in ("rmse", "mse"):
             raise ValueError(f"metric must be 'rmse' or 'mse', got {metric!r}")
@@ -183,7 +155,7 @@ def sweep_epsilon(
         }
 
 
-# ── structured trajectory generator for tests ───────────────────────────
+# ── trajectory generators (shared by CLI and API) ────────────────────────
 def simulate_linear_ode(
     hidden_dim: int,
     seq_len: int,
@@ -193,16 +165,14 @@ def simulate_linear_ode(
     seed: int = 0,
 ) -> torch.Tensor:
     """
-    Generates a [1, T, D] trajectory whose first component follows
-    δΨ̇ = −gamma_true · δΨ exactly, embedded in a D-dim ambient space.
-
-    Used to verify the reduction head recovers gamma_true when fed a
-    trajectory that obeys the theorem. Remaining components are noise.
+    [1, T, D] trajectory whose first component follows δΨ̇ = −γ · δΨ
+    exactly, embedded in a D-dimensional ambient space. Remaining
+    components are small noise. Used by the test suite.
     """
     rng = np.random.default_rng(seed)
     dt = 1.0 / max(seq_len - 1, 1)
     delta = np.zeros(seq_len, dtype=np.float64)
-    delta[0] = 0.5                       # initial perturbation
+    delta[0] = 0.5
     for t in range(1, seq_len):
         delta[t] = delta[t - 1] - gamma_true * delta[t - 1] * dt
     psi = psi_b + delta
@@ -212,3 +182,44 @@ def simulate_linear_ode(
     if noise > 0.0:
         trunk += rng.standard_normal(trunk.shape) * noise
     return torch.tensor(trunk[None, ...], dtype=torch.float32)
+
+
+def simulate_axiom_d(
+    dim: int,
+    seq_len: int,
+    epsilon: float,
+    psi_a: float = 0.5,
+    psi_b: float = 1.5,
+    f: float = 1.0,
+    g_field: float = 0.85,
+    dt: float = 0.01,
+    seed: int = 0,
+    embed_noise: float = 0.02,
+) -> torch.Tensor:
+    """
+    Integrate Axiom D on the slow coordinate and embed in dim-dimensional
+    ambient space. Returns [1, T, D].
+
+    Axiom D:
+        dΨ/dt = −L_H Ψ + M_E · F(Ψ, f)
+        F(Ψ, f) = f · Ψ(Ψ_A − Ψ)(Ψ − Ψ_B)
+
+    with L_H = 0 on the slow subspace (by construction) and
+    M_E = G · Ψ_B / (Ψ_B − Ψ_A) per Axiom C.
+
+    The trajectory starts at Ψ = Ψ_B + ε and decays toward Ψ_B.
+    """
+    rng = np.random.default_rng(seed)
+    m_e = g_field * psi_b / (psi_b - psi_a)
+
+    psi = psi_b + epsilon
+    traj = np.zeros(seq_len, dtype=np.float64)
+    traj[0] = psi
+    for t in range(1, seq_len):
+        F_val = f * psi * (psi_a - psi) * (psi - psi_b)
+        psi = psi + m_e * F_val * dt
+        traj[t] = psi
+
+    ambient = rng.standard_normal((seq_len, dim - 1)) * embed_noise
+    full = np.concatenate([traj[:, None], ambient], axis=1)
+    return torch.tensor(full[None, ...], dtype=torch.float32)
