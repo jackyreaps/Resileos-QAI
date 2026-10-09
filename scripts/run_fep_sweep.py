@@ -3,14 +3,9 @@
 FEP ε-sweep runner.
 
 Three modes:
-
     --simulate              ideal Axiom D trajectory (baseline)
     --stress                stress-tested Axiom D trajectory
     --data <path.npy>       user-supplied trajectory
-
-The stress mode runs the sweep at multiple stress levels and prints the
-slope at each, so you can see whether the linear O(ε) bound holds as
-conditions degrade from ideal.
 
 Usage:
     python scripts/run_fep_sweep.py --simulate --dim 128 --seq-len 64
@@ -60,11 +55,6 @@ def _verdict(slope: float, metric: str) -> tuple[str, bool]:
     return "unexpected MSE scaling", False
 
 
-def _run_one(head, factory, eps_list, metric):
-    G = torch.ones(1, factory(eps_list[0]).shape[1], 1)
-    return head.sweep_epsilon(factory, eps_list, G, metric=metric)
-
-
 def _print_result(result, header=None):
     if header:
         print(f"\n--- {header} ---")
@@ -99,7 +89,7 @@ def main() -> int:
         hidden_dim=args.dim, L_H_kernel=basis, rank=1,
     )
 
-    # ── mode: data ───────────────────────────────────────────────────────
+    # ── data mode ────────────────────────────────────────────────────────
     if args.data:
         trunk_ref, label = load_trunk(Path(args.data), args.dim)
         print(f"[sweep] source: {label}")
@@ -109,11 +99,11 @@ def main() -> int:
             t[:, 0, 0] = 1.5 + eps
             return t
 
-        result = _run_one(head, factory, eps_list, args.metric)
+        G = torch.ones(1, factory(eps_list[0]).shape[1], 1)
+        result = head.sweep_epsilon(factory, eps_list, G, metric=args.metric)
         _print_result(result)
         verdict, ok = _verdict(result["slope"], args.metric)
         print(f"verdict       = {verdict}")
-
         if args.out:
             Path(args.out).write_text(json.dumps({
                 "source": args.data, "dim": args.dim,
@@ -122,7 +112,7 @@ def main() -> int:
             print(f"\n[sweep] wrote {args.out}")
         return 0 if ok else 1
 
-    # ── mode: simulate ───────────────────────────────────────────────────
+    # ── simulate mode ────────────────────────────────────────────────────
     if args.simulate:
         print(f"[sweep] source: simulated Axiom D  (dim={args.dim}, "
               f"T={args.seq_len}, G={args.g_field})")
@@ -133,11 +123,11 @@ def main() -> int:
                 g_field=args.g_field, seed=0,
             )
 
-        result = _run_one(head, factory, eps_list, args.metric)
+        G = torch.ones(1, args.seq_len, 1) * args.g_field
+        result = head.sweep_epsilon(factory, eps_list, G, metric=args.metric)
         _print_result(result)
         verdict, ok = _verdict(result["slope"], args.metric)
         print(f"verdict       = {verdict}")
-
         if args.out:
             Path(args.out).write_text(json.dumps({
                 "source": "simulate", "dim": args.dim,
@@ -147,7 +137,7 @@ def main() -> int:
             print(f"\n[sweep] wrote {args.out}")
         return 0 if ok else 1
 
-    # ── mode: stress ─────────────────────────────────────────────────────
+    # ── stress mode ──────────────────────────────────────────────────────
     if args.stress:
         print(f"[sweep] source: stress-tested Axiom D  (dim={args.dim}, "
               f"T={args.seq_len}, G={args.g_field})")
@@ -155,9 +145,8 @@ def main() -> int:
         print("Stress levels (off_manifold_frac, g_ramp, dt_coarse):")
         print("-" * 60)
 
-        # 5 levels from ideal to heavily stressed
         levels = [
-            (0.0, 0.0, 1.0),   # ideal (sanity: must match --simulate)
+            (0.0, 0.0, 1.0),   # ideal (must match --simulate)
             (0.1, 0.05, 2.0),  # mild
             (0.2, 0.10, 4.0),  # moderate
             (0.3, 0.20, 6.0),  # strong
@@ -167,14 +156,25 @@ def main() -> int:
         all_results = []
 
         for i, (om, gr, dtc) in enumerate(levels):
-            def factory(eps: float, om=om, gr=gr, dtc=dtc) -> torch.Tensor:
+            def factory(eps: float, om=om, gr=gr, dtc=dtc):
                 return simulate_axiom_d(
                     dim=args.dim, seq_len=args.seq_len, epsilon=eps,
                     g_field=args.g_field, seed=0,
                     off_manifold_frac=om, g_ramp=gr, dt_coarse=dtc,
+                    return_g_series=True,
                 )
 
-            result = _run_one(head, factory, eps_list, args.metric)
+            # The factory returns (trunk, g_series) — unwrap for the head.
+            def factory_trunk(eps: float, factory=factory):
+                return factory(eps)[0]
+
+            def factory_g(eps: float, factory=factory):
+                return factory(eps)[1]
+
+            G = factory_g(eps_list[0])
+            result = head.sweep_epsilon(
+                factory_trunk, eps_list, G, metric=args.metric,
+            )
             slopes.append(result["slope"])
             all_results.append({
                 "level": i,
