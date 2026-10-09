@@ -3,7 +3,7 @@ doc: RES-600
 title: FEP Reduction Bridge
 status: conditional
 depends_on: [RES-200]
-referenced_by: [RES-602]
+referenced_by: [RES-602, RES-604]
 related_to: [RES-601]
 ---
 
@@ -93,16 +93,22 @@ and the projected rate is
 
 with `Γ = G`.
 
-### 4.1 Resolved — Γ definition
-The source document Reduction_fep.md §3.1 writes Γ = Π_s · G, but the derivation requires Γ = G for the identity to close. Under Γ = Π_s · G, the right-hand side becomes f² · G · Ψ_B³ (Ψ_B − Ψ_A), which does not equal P_s · G · f · Ψ_B². The discrepancy is resolved as a transcription error in the source: the object that appears in the FEP recognition rate is Γ = G, and Γ = Π_s · G refers to a different quantity not used in this identity. The code in reduction.py implements Γ = G. RES-602 §2 reflects this resolution.
+### 4.1 Γ definition — resolved
 
-### 4.2 Numerical verification
+The source document `Reduction_fep.md §3.1` writes **`Γ = Π_s · G`** rather
+than `Γ = G`. Under `Γ = Π_s · G`:
 
-The ε-sweep harness in `src/resileos/substrate/reduction.py` runs the
-linearized ODE fit across multiple perturbation scales and fits the
-log-log slope of residual vs ε. The slope is reported per run in the
-verification report. Confirmation that the slope matches the theoretical
-prediction closes the last open item in §6.
+    Γ(Π_o + Π_s) = Π_s · G · (Π_o + Π_s)
+                 = f Ψ_B (Ψ_B − Ψ_A) · G · f Ψ_B²
+                 = f² · G · Ψ_B³ (Ψ_B − Ψ_A)
+
+This does **not** equal `P_s · G · f · Ψ_B²`. The two expressions differ by a
+factor `f Ψ_B (Ψ_B − Ψ_A)`.
+
+**Resolution:** inspection of the source confirms this is a transcription
+error. The source intends `Γ = G` for the object that appears in the FEP
+recognition rate. This document uses `Γ = G`. RES-602 §2 refers to this
+resolution.
 
 ## 5. Boundary of the claim
 
@@ -119,7 +125,6 @@ Not claimed:
 - Global fixed-point alignment.
 - Full nonlinear identity.
 - Unconditional recovery from the published suite.
-- That `Γ = Π_s · G` holds in the rate identity (see §4.1).
 
 Residual bound: `‖error‖ ≤ C_1 / λ_2`.
 
@@ -127,16 +132,25 @@ Residual bound: `‖error‖ ≤ C_1 / λ_2`.
 
 | Item | Status |
 |---|---|
-| Γ definition (§4.1) | Discrepancy between source and derivation |
+| Γ definition (§4.1) | **Resolved** — transcription error in source |
+| Numerical verification, ideal trajectory | **Closed for synthetic harness** — slope 0.9906, r² 0.999967. See RES-602 §7 |
+| Numerical verification, stress-tested trajectory | **Closed for synthetic harness** — drift 0.0033. See RES-602 §8 |
+| Numerical verification, real trajectories | **Open** — pending real data (RES-603 §6) |
 | Cheeger bound for the specific hypergraph | Sketch only |
 | Tikhonov constants `C_1`, `C_2` | Symbolic |
 | Linear neighborhood size | Not bounded |
 | Cubic residual bound away from `Ψ_B` | Not bounded |
-| Numerical verification inside the local regime | **Closed** — see RES-602 §6 |
+
+**Note on "Closed for synthetic harness."** The synthetic verification
+confirms that the code correctly implements the linearized ODE and that
+the simulator correctly integrates Axiom D. It does **not** establish that
+Axiom D describes a real physical medium. See RES-602 §7 for the full
+scope statement.
 
 ## 7. What this does not say
 
-This document does not modify the classical core. The `f` parameter in Axiom D
-is a **free scalar** in the QD-TER specification; it is **not** `Re_ε · c` for
-any constant `c`. The slow projector `P_s` is a kernel projector, not a learned
-scalar map. The FEP reduction does not depend on the metric of RES-601.
+This document does not modify the classical core. The `f` parameter in
+Axiom D is a **free scalar** in the QD-TER specification; it is **not**
+`Re_ε · c` for any constant `c`. The slow projector `P_s` is a kernel
+projector, not a learned scalar map. The FEP reduction does not depend on
+the metric of RES-601.
