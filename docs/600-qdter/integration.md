@@ -40,11 +40,7 @@ and the identity closes.
 
 Three corrections relative to earlier drafts:
 
-1. **`Γ = G`, not `Π_s · G`.** An earlier draft used `Γ = Π_s · G` for the
-   FEP recognition rate, which does not close the identity (RES-600 §4.1). The
-   source document `Reduction_fep.md §3.1` writes `Γ = Π_s · G`; if that is
-   not a transcription error, the source and the derivation disagree and the
-   discrepancy is an open item.
+1. ** Γ = G, not Π_s · G. An earlier draft used Γ = Π_s · G for the FEP recognition rate, which does not close the identity. The source document Reduction_fep.md §3.1 writes Γ = Π_s · G, but this is a transcription error: the rate identity requires Γ = G (RES-600 §4.1, resolved). The code in reduction.py implements Γ = G.
 2. **`f` is a free parameter**, not `Re_ε · 0.1`.
 3. **`P_s` is the orthogonal projector onto `ker(L_H)`**, not a learned scalar
    map. If a learned projection is used as a stand-in, the docstring must say
