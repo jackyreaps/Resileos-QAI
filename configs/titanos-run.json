@@ -12,7 +12,7 @@
   "quantum_samples": 16,
   "convergence_threshold": 0.02,
 
-  "conf_mode": "composite",
+  "conf_mode": "mag",
   "conf_alpha": 0.6,
 
   "sigma_E": 10.0,
