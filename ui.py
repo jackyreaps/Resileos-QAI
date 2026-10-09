@@ -1,5 +1,5 @@
 """
-Streamlit dashboard for the Titanos engine.
+Streamlit dashboard for the Titanos console.
 
 Run (after app.py is up on :8000):
     streamlit run ui.py --server.port 8501
@@ -14,28 +14,27 @@ st.title("Titanos Substrate Management Console")
 BACKEND_URL = "http://localhost:8000/api/v1"
 
 MYTHOS_SEED = [
-    ["Uranus",   "parent_of", "Cronus"],
-    ["Cronus",   "parent_of", "Zeus"],
-    ["Cronus",   "parent_of", "Poseidon"],
-    ["Cronus",   "parent_of", "Hades"],
-    ["Zeus",     "parent_of", "Ares"],
-    ["Zeus",     "parent_of", "Athena"],
-    ["Zeus",     "domain",    "sky"],
-    ["Poseidon", "domain",    "sea"],
-    ["Hades",    "domain",    "underworld"],
-    ["Ares",     "domain",    "war"],
-    ["Athena",   "domain",    "wisdom"],
-    ["Uranus",   "is_a",      "primordial"],
-    ["Cronus",   "is_a",      "titan"],
-    ["Zeus",     "is_a",      "olympian"],
-    ["Poseidon", "is_a",      "olympian"],
-    ["Hades",    "is_a",      "olympian"],
-    ["Ares",     "is_a",      "olympian"],
-    ["Athena",   "is_a",      "olympian"],
+    ["Uranus", "parent_of", "Cronus"],
+    ["Cronus", "parent_of", "Zeus"],
+    ["Cronus", "parent_of", "Poseidon"],
+    ["Cronus", "parent_of", "Hades"],
+    ["Zeus", "parent_of", "Ares"],
+    ["Zeus", "parent_of", "Athena"],
+    ["Zeus", "domain", "sky"],
+    ["Poseidon", "domain", "sea"],
+    ["Hades", "domain", "underworld"],
+    ["Ares", "domain", "war"],
+    ["Athena", "domain", "wisdom"],
+    ["Uranus", "is_a", "primordial"],
+    ["Cronus", "is_a", "titan"],
+    ["Zeus", "is_a", "olympian"],
+    ["Poseidon", "is_a", "olympian"],
+    ["Hades", "is_a", "olympian"],
+    ["Ares", "is_a", "olympian"],
+    ["Athena", "is_a", "olympian"],
 ]
 
-
-# ── sidebar ───────────────────────────────────────────────────────────────
+# ── sidebar ─────────────────────────────────────────────────────────────
 st.sidebar.header("System Topology")
 try:
     stats = requests.get(f"{BACKEND_URL}/stats", timeout=5).json()
@@ -43,8 +42,7 @@ try:
     st.sidebar.metric("Active Entities", stats.get("entities", 0))
     st.sidebar.text(f"Core Dim: {stats.get('core_matrix', '-')}")
     st.sidebar.text(f"Latent Rank: {stats.get('latent_rank', '-')}")
-    st.sidebar.text(f"):
-"Packet Protocol: v{stats.get('packet_version',                '-')}")
+    st.sidebar.text(f"Packet Protocol: v{stats.get('packet_version', '-')}")
     st.sidebar.text(f"Confidence Mode: {stats.get('conf_mode', 'sim')}")
 except Exception:
     st.sidebar.error("Cannot connect to Titanos backend.")
@@ -56,15 +54,15 @@ if st.sidebar.button("Seed Greek mythos corpus"):
             json={"facts": MYTHOS_SEED},
             timeout=60,
         ).json()
-        st.sidebar.success(f"Added {res.get('added', 0)} facts. Total: {res.get('records')}.")
+        st.sidebar.success(
+            f"Added {res.get('added', 0)} facts. Total: {res.get('records')}.")
     except Exception as e:
         st.sidebar.error(f"Seed failed: {e}")
 
 
-# ── tabs ──────────────────────────────────────────────────────────────────
+# ── tabs ────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4 = st.tabs(
-    ["Fact Ingestion", "Batch Upload", "Substrate Query", "Multi-Hop Chain"]
-)
+    ["Fact Ingestion", "Batch Upload", "Substrate Query", "Multi-Hop Chain"])
 
 with tab1:
     st.subheader("Memory Matrix Ingestion")
@@ -85,7 +83,7 @@ with tab1:
                 json={"subject": s, "relation": r, "obj": o},
                 timeout=30,
             ).json()
-            if res.get("status") == " factsSUCCESS":
+            if res.get("status") == "SUCCESS":
                 st.success(f"Fact committed. Database size: {res['records']} facts.")
                 st.rerun()
         else:
@@ -100,7 +98,8 @@ with tab2:
         try:
             df = pd.read_csv(uploaded)
             st.dataframe(df.head(20))
-            if st.button("Commit all rows = df[["subject", "relation", "obj"]].astype(str).values.tolist()
+            if st.button("Commit all rows"):
+                facts = df[["subject", "relation", "obj"]].astype(str).values.tolist()
                 res = requests.post(
                     f"{BACKEND_URL}/learn_batch",
                     json={"facts": facts},
@@ -112,7 +111,7 @@ with tab2:
             st.error(f"Failed to parse CSV: {e}")
 
 with tab3:
-    st.subheader("Sub("strate Probing & Abstconfidenceention")
+    st.subheader("Substrate Probing & Abstention")
     q_s = st.text_input("Target Entity/Value")
     q_r = st.text_input("Target Relation Type")
     q_inv = st.checkbox("Inverse query")
@@ -125,28 +124,18 @@ with tab3:
                 timeout=30,
             ).json()
 
-            status = ans.get("status", "ABSTAINED")
-            mode = ans.get("mode", "ABSTAIN")
-            loops = ans.get("loops", 0)
-            conf = ans.get", 0.0)
-
-            if status == "ABSTAINED":
+            if ans.get("status") == "ABSTAINED":
                 st.warning(f"Engine abstained: {ans.get('reason')}")
             else:
-                badge = "CLASSICAL" if mode == "CLASSICAL" else "QUANTUM_SIM"
+                badge = "CLASSICAL" if ans.get("mode") == "CLASSICAL" else "QUANTUM_SIM"
                 st.success(
                     f"[{badge}] {ans.get('value')}  "
-                    f"(confidence {conf:.4f}, loops {loops})"
-                )
-                if ans.get("gate_state"):
-                    st.caption(f"Final gate state: {ans['gate_state']}")
+                    f"(confidence {ans.get('confidence', 0):.4f})")
 
             if ans.get("trace"):
                 st.subheader("Core Convergence Telemetry")
                 df = pd.DataFrame(ans["trace"])
                 st.dataframe(df)
-
-                # Line chart of the loop signals if any are numeric
                 numeric_cols = [c for c in ("scar", "delta", "deltas") if c in df.columns]
                 if numeric_cols and len(df) > 1:
                     st.line_chart(df.set_index("loop")[numeric_cols])
@@ -165,10 +154,7 @@ with tab4:
                 timeout=30,
             ).json()
             if ans.get("status") == "ACCEPTED":
-                st.success(
-                    f"Chain resolved: {ans['value']}  "
-                    f"({ans.get('mode', '?')}, confidence {ans.get('confidence', 0):.4f})"
-                )
+                st.success(f"Chain resolved: {ans['value']}")
                 st.json(ans["path"])
             else:
                 st.error(f"Chain broke: {ans.get('reason')}")
