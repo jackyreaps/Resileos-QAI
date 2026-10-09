@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-FEP ε-sweep runner.
+FEP ε-sweep CLI runner.
 
-Produces the numerical evidence for RES-600 §4 / RES-602 §6.
+Thin CLI wrapper over the substrate ε-sweep harness. The simulator and
+harness live in `resileos.substrate.reduction`; this script only handles
+argument parsing and output formatting.
 
 Fits log(residual) vs log(ε) under a chosen metric:
-    --metric rmse (default)  — matches the O(ε) norm bound. Slope ≈ 1.
-    --metric mse             — squared error. Slope ≈ 2.
+    --metric rmse (default) — matches O(ε) norm bound. Slope ≈ 1.
+    --metric mse            — squared error. Slope ≈ 2.
 
 Usage:
     python scripts/run_fep_sweep.py --simulate --dim 128 --seq-len 64
@@ -26,36 +28,10 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from resileos.substrate.reduction import VerifiableFEPReductionHead  # noqa: E402
-
-
-def simulate_axiom_d(
-    dim: int,
-    seq_len: int,
-    epsilon: float,
-    psi_a: float = 0.5,
-    psi_b: float = 1.5,
-    f: float = 1.0,
-    g_field: float = 0.85,
-    dt: float = 0.01,
-    seed: int = 0,
-    embed_noise: float = 0.02,
-) -> torch.Tensor:
-    """Integrate Axiom D on the slow coordinate; embed in dim-dimensional ambient."""
-    rng = np.random.default_rng(seed)
-    m_e = g_field * psi_b / (psi_b - psi_a)
-
-    psi = psi_b + epsilon
-    traj = np.zeros(seq_len, dtype=np.float64)
-    traj[0] = psi
-    for t in range(1, seq_len):
-        F = f * psi * (psi_a - psi) * (psi - psi_b)
-        psi = psi + m_e * F * dt
-        traj[t] = psi
-
-    ambient = rng.standard_normal((seq_len, dim - 1)) * embed_noise
-    full = np.concatenate([traj[:, None], ambient], axis=1)
-    return torch.tensor(full[None, ...], dtype=torch.float32)
+from resileos.substrate.reduction import (  # noqa: E402
+    VerifiableFEPReductionHead,
+    simulate_axiom_d,
+)
 
 
 def load_trunk(path: Path, dim: int) -> tuple[torch.Tensor, str]:
@@ -78,9 +54,7 @@ def main() -> int:
     p.add_argument("--seq-len", type=int, default=64)
     p.add_argument("--epsilons", default="0.1,0.05,0.02,0.01,0.005,0.001")
     p.add_argument("--g-field", type=float, default=0.85)
-    p.add_argument("--metric", default="rmse", choices=["rmse", "mse"],
-                   help="rmse matches O(ε) norm bound (slope≈1); "
-                        "mse gives slope≈2")
+    p.add_argument("--metric", default="rmse", choices=["rmse", "mse"])
     p.add_argument("--out", default=None)
     args = p.parse_args()
 
@@ -136,13 +110,10 @@ def main() -> int:
         elif slope < 0.85:
             verdict = "sub-linear; check trajectory or discretization"
             ok = False
-        elif slope > 1.15:
+        else:
             verdict = "super-linear; check discretization error dominance"
             ok = False
-        else:
-            verdict = "inconclusive"
-            ok = False
-    else:  # mse
+    else:
         if 1.85 <= slope <= 2.15:
             verdict = "consistent with O(ε) residual under MSE metric"
             ok = True
