@@ -25,19 +25,18 @@ class VerifiableFEPReductionHead(nn.Module):
     verifying the C_1/λ_2 residual scaling claimed in RES-600 §4.
 
     Rank handling:
-        P_s may be rank-k (k = `rank` argument). psi_s returns the full
-        [1, T, rank] coordinate. The scalar ODE fit uses the first
-        coordinate only — this matches RES-600 §4, which is scalar. If a
-        vector ODE fit is required in a future extension, extend the
-        forward pass; the sweep harness works unchanged because it consumes
-        the scalar `ode_error`.
+        P_s may be rank-k. The scalar ODE fit uses the first coordinate.
+
+    G-field handling:
+        The ODE fit uses per-step Γ_eff(t) = G(t) · (Π_o + Π_s). When
+        G_field is constant this reduces to the scalar form.
 
     Inputs:
-        trunk_state   [1, T, D]       temporal trajectory
-        G_field       [1, T, 1]       coherence field sequence
+        trunk_state   [1, T, D]
+        G_field       [1, T, 1]
     Returns:
-        psi_s         [1, T, rank]    slow coordinate(s)
-        ode_error     scalar          MSE of the scalar ODE fit
+        psi_s         [1, T, rank]
+        ode_error     scalar
     """
 
     def __init__(self, hidden_dim: int,
@@ -90,13 +89,15 @@ class VerifiableFEPReductionHead(nn.Module):
 
         pi_o = self.f_scalar * self.psi_a * self.psi_b
         pi_s = self.f_scalar * self.psi_b * (self.psi_b - self.psi_a)
-        gamma_eff = G_field.mean() * (pi_o + pi_s)
+        pi_sum = pi_o + pi_s
 
         delta_psi = psi_scalar - self.psi_b
 
         if T > 1:
+            # Per-step Γ_eff(t) = G(t) · Π_sum, shape [1, T-1, 1]
+            gamma_t = G_field[:, :-1, :] * pi_sum
             d_dt = delta_psi[:, 1:, :] - delta_psi[:, :-1, :]
-            expected = -gamma_eff * delta_psi[:, :-1, :]
+            expected = -gamma_t * delta_psi[:, :-1, :]
             ode_error = F.mse_loss(d_dt, expected)
         else:
             ode_error = trunk_state.new_zeros(())
@@ -164,7 +165,7 @@ class VerifiableFEPReductionHead(nn.Module):
         }
 
 
-# ── trajectory generators (shared by CLI, API, and tests) ────────────────
+# ── trajectory generators ───────────────────────────────────────────────
 def simulate_linear_ode(
     hidden_dim: int,
     seq_len: int,
@@ -173,10 +174,7 @@ def simulate_linear_ode(
     noise: float = 0.0,
     seed: int = 0,
 ) -> torch.Tensor:
-    """
-    [1, T, D] trajectory whose first component follows δΨ̇ = −γ · δΨ
-    exactly, embedded in a D-dimensional ambient space. Used by the tests.
-    """
+    """[1, T, D] trajectory following δΨ̇ = −γ·δΨ. Used by tests."""
     rng = np.random.default_rng(seed)
     dt = 1.0 / max(seq_len - 1, 1)
     delta = np.zeros(seq_len, dtype=np.float64)
@@ -203,65 +201,79 @@ def simulate_axiom_d(
     dt: float = 0.01,
     seed: int = 0,
     embed_noise: float = 0.02,
-    # ── stress knobs (all default to the ideal case) ────────────────────
+    # stress knobs
     off_manifold_frac: float = 0.0,
     g_ramp: float = 0.0,
     dt_coarse: float = 1.0,
-) -> torch.Tensor:
+    return_g_series: bool = False,
+):
     """
     Integrate Axiom D on the slow coordinate and embed in dim-dimensional
-    ambient space. Returns [1, T, D].
+    ambient space.
 
     Axiom D:
-        dΨ/dt = −L_H Ψ + M_E · F(Ψ, f)
+        dΨ/dt = −L_H Ψ + M_E(t) · F(Ψ, f)
         F(Ψ, f) = f · Ψ(Ψ_A − Ψ)(Ψ − Ψ_B)
+        M_E(t) = G(t) · Ψ_B / (Ψ_B − Ψ_A)          per Axiom C
 
-    Stress parameters (all default to the ideal case, so calling with
-    defaults reproduces the previous behavior):
+    Stress parameters (all default to ideal behavior):
 
         off_manifold_frac:
             Fraction of ε that leaks off the slow axis into the ambient
-            subspace at t=0. Ideal = 0.0 (all ε on coordinate 0).
-            Stress range: 0.0 .. 0.5.
+            subspace at t=0. The slow-axis starting value is reduced by
+            the same fraction so total ε magnitude is preserved.
+            Ideal = 0.0. Stress range 0.0 – 0.5.
+            NOTE: with the current axis-aligned basis (e_0), this does
+            not change psi_s; it is a placeholder for future multi-axis
+            extensions.
 
         g_ramp:
-            Linear drift of G over the trajectory, as a fraction of
-            g_field. Ideal = 0.0 (constant G). Stress range: 0.0 .. 0.3.
+            Fractional drift of G over the trajectory. G(t) goes from
+            g_field to g_field·(1 + g_ramp). Modulates the decay RATE
+            inside the integrator — the trajectory stays on-manifold,
+            only Γ_eff(t) varies. Ideal = 0.0. Stress range 0.0 – 0.3.
 
         dt_coarse:
-            Multiplier on the integration step. Ideal = 1.0 (fine).
-            Stress range: 1.0 .. 8.0 (coarser discretization).
+            Multiplier on the integration step. Ideal = 1.0.
+            Stress range 1.0 – 8.0.
 
-    The trajectory starts at Ψ = Ψ_B + ε and decays toward Ψ_B.
+    Returns:
+        trunk           [1, T, D] if return_g_series is False
+        (trunk, G_series)  if return_g_series is True
+                          G_series is [1, T, 1] as fed to the integrator.
     """
     rng = np.random.default_rng(seed)
-    m_e = g_field * psi_b / (psi_b - psi_a)
     dt_eff = dt * dt_coarse
 
-    psi = psi_b + epsilon
+    # G(t): constant unless g_ramp > 0
+    if g_ramp > 0.0:
+        g_series = g_field * (1.0 + np.linspace(0.0, g_ramp, seq_len))
+    else:
+        g_series = np.full(seq_len, g_field, dtype=np.float64)
+
+    # Slow-axis start: ε reduced by off-manifold leak
+    psi = psi_b + epsilon * (1.0 - off_manifold_frac)
     traj = np.zeros(seq_len, dtype=np.float64)
     traj[0] = psi
+
     for t in range(1, seq_len):
+        g_t = g_series[t]
+        m_e_t = g_t * psi_b / (psi_b - psi_a)
         F_val = f * psi * (psi_a - psi) * (psi - psi_b)
-        psi = psi + m_e * F_val * dt_eff
+        psi = psi + m_e_t * F_val * dt_eff
         traj[t] = psi
 
-    # Ambient subspace: Gaussian noise plus optional off-manifold leakage
     ambient = rng.standard_normal((seq_len, dim - 1)) * embed_noise
     if off_manifold_frac > 0.0 and dim > 1:
-        # Inject ε * off_manifold_frac into a random ambient direction
         leak_dir = rng.standard_normal(dim - 1)
         leak_dir /= (np.linalg.norm(leak_dir) + 1e-12)
         leak = epsilon * off_manifold_frac * leak_dir[None, :]
         ambient = ambient + leak
 
     full = np.concatenate([traj[:, None], ambient], axis=1)
+    trunk = torch.tensor(full[None, ...], dtype=torch.float32)
 
-    # G ramp: modulate the slow axis slightly if requested. Applied after
-    # the fact rather than inside the integrator, so the pure Axiom D
-    # trajectory is preserved and only the input signal is stressed.
-    if g_ramp > 0.0:
-        ramp = np.linspace(0.0, g_ramp * g_field, seq_len)
-        full[:, 0] = full[:, 0] * (1.0 + ramp / (g_field + 1e-12))
-
-    return torch.tensor(full[None, ...], dtype=torch.float32)
+    if return_g_series:
+        g_tensor = torch.tensor(g_series[None, :, None], dtype=torch.float32)
+        return trunk, g_tensor
+    return trunk
