@@ -144,7 +144,7 @@ Residual bound: `‖error‖ ≤ C_1 / λ_2`.
 | Tikhonov constants `C_1`, `C_2` | Symbolic |
 | Linear neighborhood size | Not bounded |
 | Cubic residual bound away from `Ψ_B` | Not bounded |
-| Numerical verification inside the local regime | Planned |
+| Numerical verification inside the local regime | **Closed** — see RES-602 §6 |
 
 ## 7. What this does not say
 
