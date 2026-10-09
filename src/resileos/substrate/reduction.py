@@ -113,24 +113,33 @@ class VerifiableFEPReductionHead(nn.Module):
         return psi_s, ode_error
 
     # ── verification harness ────────────────────────────────────────────
-    def sweep_epsilon(
+def sweep_epsilon(
         self,
         trajectory_factory,
         epsilons: list[float] | tuple[float, ...],
         G_field: torch.Tensor,
+        metric: str = "rmse",
     ) -> dict:
         """
         Runs the ODE fit across multiple perturbation scales ε and fits
-        the log-log slope of error vs ε. This is the numerical verification
-        claimed in RES-600 §4: residual scales as C_1/λ_2.
+        the log-log slope of residual vs ε.
+
+        metric:
+            "rmse" — root-mean-square residual (norm). Matches the O(ε)
+                     residual bound in RES-600 §4. Expected slope ≈ 1.
+            "mse"  — mean-square residual (norm squared). Expected slope ≈ 2.
+
+        Defaults to "rmse" because RES-600 §4 bounds a norm, not a norm².
 
         Args:
             trajectory_factory: callable(eps) -> trunk_state [1, T, D]
             epsilons:           iterable of positive floats
             G_field:            [1, T, 1] coherence field (same for all runs)
+            metric:             "rmse" | "mse"
 
         Returns:
             {
+              "metric":   "rmse" | "mse",
               "epsilons": [...],
               "errors":   [...],
               "slope":    float,
@@ -138,13 +147,17 @@ class VerifiableFEPReductionHead(nn.Module):
               "r_squared":float,
             }
         """
+        if metric not in ("rmse", "mse"):
+            raise ValueError(f"metric must be 'rmse' or 'mse', got {metric!r}")
+
         eps_arr = np.asarray(epsilons, dtype=np.float64)
         errs = []
         for eps in eps_arr:
             trunk = trajectory_factory(float(eps))
             with torch.no_grad():
                 _, err = self.forward(trunk, G_field)
-            errs.append(max(float(err.item()), 1e-30))
+            mse = max(float(err.item()), 1e-30)
+            errs.append(mse ** 0.5 if metric == "rmse" else mse)
         err_arr = np.asarray(errs, dtype=np.float64)
 
         log_eps = np.log(eps_arr)
@@ -161,6 +174,7 @@ class VerifiableFEPReductionHead(nn.Module):
             r_squared = float("nan")
 
         return {
+            "metric": metric,
             "epsilons": eps_arr.tolist(),
             "errors": err_arr.tolist(),
             "slope": float(slope),
