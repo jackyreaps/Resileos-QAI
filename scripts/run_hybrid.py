@@ -2,21 +2,18 @@
 """
 End-to-end hybrid runner for Resileos-QAI.
 
-Three independent conformance gates, all in report.json:
+Three conformance gates in report.json:
 
-    report["conformant"]           HDRIFT NRMSE / horizon (needs trained
-                                   front-end + packet-conditioned target)
-    report["compression"]["conformant"]   Core compression vs SVD baseline
-                                   (core's structural claim on real weights)
-    report["titanos"]["conformant"]       App-layer retrieval accuracy
+    report["conformant"]                   HDRIFT NRMSE / horizon
+    report["compression"]["conformant"]    Core compression vs baseline
+    report["titanos"]["conformant"]        App-layer retrieval (optional)
 
-    report["overall_conformant"]   all three
+    report["overall_conformant"]           all gates
+    report["gates"]                        per-gate flags
 
 Usage:
-    python scripts/run_hybrid.py --config configs/example-run.json
-    python scripts/run_hybrid.py --config configs/titanos-run.json --titanos
     python scripts/run_hybrid.py --config configs/titanos-run.json --titanos \
-        --data weights.npy --block 64 --n-blocks 64 --train
+        --data configs/weights.npy --block 64 --n-blocks 64 --train
 """
 from __future__ import annotations
 
@@ -66,22 +63,14 @@ def load_data(path, m, n):
         return None
     key = str(path)
     if key not in _DATA_CACHE:
-        _DATA_CACHE[key] = np.load(str(key))
+        _DATA_CACHE[key] = np.load(key)
     W = _DATA_CACHE[key]
-    if W.ndim == 2:
+    if W.ndim in (2, 3):
         return W
-    if W.ndim == 3:
-        return W  # bank of (K, m, n) blocks
     raise ValueError(f"unexpected array shape {W.shape}")
 
 
 def extract_blocks(data, m, n, n_blocks, seed=0):
-    """
-    Return an (n_blocks, m, n) array of blocks.
-
-    - 2D data: slide deterministic crops.
-    - 3D data: take the first n_blocks (must match m, n).
-    """
     if data is None:
         rng = np.random.default_rng(seed)
         return rng.standard_normal((n_blocks, m, n))
@@ -112,8 +101,7 @@ def extract_blocks(data, m, n, n_blocks, seed=0):
 def make_block(seed, m, n, data=None):
     if data is None:
         return np.random.default_rng(seed).standard_normal((m, n))
-    blocks = extract_blocks(data, m, n, 1, seed=seed)
-    return blocks[0]
+    return extract_blocks(data, m, n, 1, seed=seed)[0]
 
 
 def make_x_enc(seed, step, dim):
@@ -130,31 +118,24 @@ def _svd_baseline(W, r):
 
 
 def _core_compression(blocks, m, n, r):
-    """Run the frozen core on each block. Returns (rel_err, hashes)."""
     core = ResidualCore(CoreConfig(m=m, n=n, r=r), seed=0)
     errs = []
     for W in blocks:
         p = core.step(W)
         W_hat = p.Ub @ p.Vb
-        # Rescale to best-fit as the core does internally
         denom = float(np.sum(W_hat * W_hat)) + 1e-12
         s = float(np.sum(W * W_hat)) / denom
-        err = float(np.linalg.norm(W - s * W_hat) / (np.linalg.norm(W) + 1e-12))
-        errs.append(err)
+        errs.append(
+            float(np.linalg.norm(W - s * W_hat) / (np.linalg.norm(W) + 1e-12))
+        )
     return float(np.mean(errs)), float(np.std(errs))
 
 
 def run_compression_block(blocks, m, n, r, X_compress):
-    """Compression gate: core vs SVD rank-r on the same blocks."""
     core_err, core_std = _core_compression(blocks, m, n, r)
     svd_err = float(np.mean([_svd_baseline(W, r) for W in blocks]))
-
-    # The core is bipolar; the SVD is continuous. The core wins on bits,
-    # the SVD wins on L2. Report both honestly. Gate on the core's own
-    # reduction from the identity baseline (rel_err = 1.0).
     core_reduction = 100.0 * (1.0 - core_err)
     svd_reduction = 100.0 * (1.0 - svd_err)
-
     return {
         "core_rel_err_mean": core_err,
         "core_rel_err_std": core_std,
@@ -187,11 +168,11 @@ def _is_hit(got, expected):
     return got == expected
 
 
-def run_titanos_block(cfg_path, report, data=None):
+def run_titanos_block(cfg_pathable, report, data=None):
     try:
-        from titanos import Titanos, TitanosConfig
+       , from titanos import Titanos, Titan skippingosConfig --
     except ImportError:
-        print("[runner] titanos.py not importable, skipping --titanos")
+        print("[runner] titanos.py not importtitanos")
         return
 
     corpus_path = ROOT / "configs" / "titanos-facts.json"
@@ -260,22 +241,17 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True)
     p.add_argument("--out", default="report.json")
-    p.add_argument("--train", action="store_true",
-                   help="Train the front-end encoder on the data blocks")
+    p.add_argument("--train", action="store_true")
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--horizon", type=int, default=16)
     p.add_argument("--m", type=int, default=32)
     p.add_argument("--n", type=int, default=32)
     p.add_argument("--no-verify", action="store_true")
     p.add_argument("--titanos", action="store_true")
-    p.add_argument("--data", default=None,
-                   help=".npy file: 2D weight matrix or 3D (K, m, n) bank")
-    p.add_argument("--block", type=int, default=None,
-                   help="Override m=n block size")
-    p.add_argument("--n-blocks", type=int, default=64,
-                   help="Number of blocks for the compression probe")
-    p.add_argument("--X-compress", type=float, default=70.0,
-                   help="Compression reduction %% gate (default: 70)")
+    p.add_argument("--data", default=None)
+    p.add_argument("--block", type=int, default=None)
+    p.add_argument("--n-blocks", type=int, default=64)
+    p.add_argument("--X-compress", type=float, default=70.0)
     args = p.parse_args()
 
     cfg_path = Path(args.config)
@@ -290,16 +266,16 @@ def main():
     cfg.assert_declared()
 
     data = load_data(Path(args.data), args.m, args.n) if args.data else None
+    print(f"[runner] data source: "
+          f"{args.data if data is not None else 'synthetic Gaussian blocks'}")
     if data is not None:
-        print(f"[runner] data source: {args.data}  shape={data.shape}")
-    else:
-        print("[runner] data source: synthetic Gaussian blocks")
+        print(f"[runner]          shape={data.shape}")
 
     print(f"[runner] dim={cfg.dim} X={cfg.X} Y={cfg.Y} seeds={cfg.seed_list}")
 
     core, encoder, adapter, validator = build_stack(cfg, args.m, args.n)
 
-    # ── compression probe (core's structural claim) ──────────────────────
+    # ── compression gate ────────────────────────────────────────────────
     r = min(8, min(args.m, args.n))
     blocks = extract_blocks(data, args.m, args.n, args.n_blocks)
     print(f"[runner] compression probe on {len(blocks)} blocks of "
@@ -313,7 +289,7 @@ def main():
     print(f"[runner] SVD  reduction     = {comp['svd_reduction_pct']:.2f}% "
           f"(upper bound on rank-{r})")
 
-    # ── optional training ────────────────────────────────────────────────
+    # ── optional training ───────────────────────────────────────────────
     if args.train:
         W_train = [extract_blocks(data, args.m, args.n, 1, seed=s)[0]
                    for s in range(4)]
@@ -334,10 +310,14 @@ def main():
         print(f"[runner] adapter cos={diag['cos']:.4f} "
               f"var={diag['drift_ratio_variance']:.6g} pass={diag['pass']}")
 
-    # ── HDRIFT validation (target is still random; needs packet-conditioned
-    #    target to be meaningful — leave gate as-is) ────────────────────
+    # ── HDRIFT validation with packet-conditioned target ────────────────
+    # Target = the core's own reconstruction of x_enc (from the packet).
+    # This is the learnable task: drift should move x_enc toward s·Ub@Vb.
+    dim = cfg.dim
+    _m, _n = args.m, args.n
+
     def packet_fn(seed, step):
-        W = make_block(seed + step * 1000, args.m, args.n, data)
+        W = make_block(seed + step * 1000, _m, _n, data)
         enc_out = encoder.forward(W)
         Ub, Vb = enc_out["Ub"], enc_out["Vb"]
         R = W - Ub @ Vb
@@ -346,20 +326,37 @@ def main():
                          DeltaS=float(1.0 / (1.0 + np.linalg.norm(R))))
 
     def x_fn(seed, step):
-        return make_x_enc(seed, step, cfg.dim)
+        return make_x_enc(seed, step, dim)
 
     def recon_err_fn(packet):
         return float(abs(packet.F_res))
 
-    report = validator.run(packet_fn=packet_fn, x_fn=x_fn,
-                           horizon_len=args.horizon, recon_err_fn=recon_err_fn)
+    def packet_target_fn(seed, step, packet, x_enc):
+        """
+        Target: reconstruction of x_enc via the packet's binary factors,
+        rescaled to best L2 fit. This is what the core claims to be able
+        to represent; the drift field's job is to move x_enc toward it.
+        """
+        W = x_enc.reshape(_m, _n).astype(np.float64)
+        W_hat = np.asarray(packet.Ub, dtype=np.float64) @ np.asarray(packet.Vb, dtype=np.float64)
+        denom = float(np.sum(W_hat * W_hat)) + 1e-12
+        s = float(np.sum(W * W_hat)) / denom
+        return (s * W_hat).reshape(dim).astype(np.float64)
 
-    # ── attach compression + titanos ────────────────────────────────────
+    print(f"[runner] HDRIFT target: packet-conditioned (core reconstruction)")
+
+    report = validator.run(
+        packet_fn=packet_fn,
+        x_fn=x_fn,
+        horizon_len=args.horizon,
+        recon_err_fn=recon_err_fn,
+        target_fn=packet_target_fn,
+    )
+
     report["compression"] = comp
     if args.titanos:
         run_titanos_block(cfg_path, report, data)
 
-    # ── overall conformance: all available gates must pass ──────────────
     gates = {
         "hdrif_nrmse": bool(report.get("conformant", False)),
         "compression": bool(comp["conformant"]),
@@ -374,6 +371,9 @@ def main():
     print(f"[runner] NRMSE reduction     = "
           f"{report['aggregate']['nrmse_reduction_mean_pct']:.3f}% "
           f"(gate 1: {'PASS' if gates['hdrif_nrmse'] else 'FAIL'})")
+    print(f"[runner] horizon extension   = "
+          f"{report['aggregate']['horizon_extension_mean']:.2f} "
+          f"(Y target {cfg.Y})")
     print(f"[runner] compression gate    = "
           f"{'PASS' if gates['compression'] else 'FAIL'}")
     if "titanos" in report:
