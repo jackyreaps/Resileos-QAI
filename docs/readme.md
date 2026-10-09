@@ -17,9 +17,14 @@ Documents outside the first three values live in the 600-series.
 
 ## Reading order
 
+Foundations:
+
 1. [Overview](100-foundations/overview.md) — RES-100
 2. [Architecture](100-foundations/architecture.md) — RES-101
 3. [Design Principles](100-foundations/design-principles.md) — RES-102
+
+QD-TER bridge:
+
 4. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
 5. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
 6. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
@@ -34,8 +39,8 @@ Documents outside the first three values live in the 600-series.
 | 300 | Generative Substrate | [HDRIFT Adapter](300-substrate/hdrift-adapter.md) |
 | 400 | Operations | [Run Config](400-operations/run-config.md) |
 | 500 | Notes & Roadmap | [Behavioral](500-notes/behavioral.md) |
-| 600 | QD-TER Bridge | [FEP Reduction](600-qdter/fep-reduction.md) |
-| 900 | Reference | [Glossary](900-reference/glossary.md) || 600 | QD-TER Bridge | [FEP Reduction](600-qdter/fep-reduction.md) — RES-600 … RES-603 |
+| 600 | QD-TER Bridge | [FEP Reduction](600-qdter/fep-reduction.md) — RES-600 … RES-603 |
+| 900 | Reference | [Glossary](900-reference/glossary.md) |
 
 ## Dependency graph
 
@@ -57,4 +62,4 @@ Documents outside the first three values live in the 600-series.
     RES-600  (related)  RES-601
                    │
                    ▼
-                 RES-602
+                 RES-602 ─▶ RES-603
