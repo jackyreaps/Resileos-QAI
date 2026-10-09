@@ -2,15 +2,9 @@
 """
 Titanos — recurrent-depth quantum-classical prototype on the frozen contracts.
 
-Architecture:
-    Prelude         encode query into a hyperdimensional probe
-    Recurrent Block frozen ResidualCore applied N times, weight-shared
-    Router          SigmaGate -> route_signals -> CLASSICAL | QUANTUM_SIM | ABSTAIN
-    Coda            substrate readout, cleanup, provenance
-
 Confidence modes (conf_mode):
     sim        cosine only (baseline)
-    mag        magnitude only
+    mag        magnitude only (measured winner on current corpus)
     product    sim * mag
     min        min(sim, mag)
     composite  alpha*sim_norm + (1-alpha)*mag_norm
@@ -24,7 +18,6 @@ import re
 import sys
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 
@@ -38,9 +31,6 @@ from resileos.abstention import (
 )
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Config
-# ═══════════════════════════════════════════════════════════════════════════
 @dataclass
 class TitanosConfig:
     packet_version: str = "1.0.0"
@@ -56,7 +46,7 @@ class TitanosConfig:
     quantum_samples: int = 16
     convergence_threshold: float = 0.02
 
-    conf_mode: str = "sim"
+    conf_mode: str = "mag"
     conf_alpha: float = 0.6
 
     sigma_E: float = 10.0
@@ -83,15 +73,12 @@ class TitanosConfig:
         return cls(**raw)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Answer
-# ═══════════════════════════════════════════════════════════════════════════
 @dataclass
 class Answer:
     value: str | None
     confidence: float
-    status: str          # ACCEPTED | ABSTAINED
-    mode: str            # CLASSICAL | QUANTUM_SIM | ABSTAIN
+    status: str
+    mode: str
     loops: int
     path: list[tuple[str, str, str]] = field(default_factory=list)
     reason: str = ""
@@ -99,9 +86,6 @@ class Answer:
     gate_state: str = ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Titanos
-# ═══════════════════════════════════════════════════════════════════════════
 class Titanos:
 
     def __init__(self, cfg: TitanosConfig):
@@ -110,7 +94,6 @@ class Titanos:
             raise ValueError(f"m*n ({cfg.m*cfg.n}) must equal dim ({cfg.dim})")
 
         self.rng = np.random.default_rng(cfg.seed)
-
         self.core = ResidualCore(CoreConfig(m=cfg.m, n=cfg.n, r=cfg.r),
                                  seed=cfg.seed)
 
@@ -131,7 +114,6 @@ class Titanos:
 
         self.facts: list[tuple[str, str, str]] = []
 
-    # ── VSA ────────────────────────────────────────────────────────────
     def _bip(self) -> np.ndarray:
         return self.rng.choice([-1, 1], size=self.cfg.dim).astype(np.int8)
 
@@ -162,19 +144,10 @@ class Titanos:
     def _readout(self) -> np.ndarray:
         return np.where(self.acc >= 0, 1, -1).astype(np.int8)
 
-    # ── confidence scoring ─────────────────────────────────────────────
+    # ── confidence ─────────────────────────────────────────────────────
     def _score_candidates(self, vec: np.ndarray,
                           exclude: set[str] | None = None,
                           ) -> list[tuple[str, float, float]]:
-        """
-        Returns (name, sim, mag) per candidate.
-
-        sim = <vec, anchor> / D                 -- sign-aware, candidate-specific
-        mag = |<acc, anchor>| / D               -- magnitude, candidate-specific
-
-        mag uses the float accumulator, not the bipolar readout.
-        Candidate-specific, so it participates in the ranking (not a constant).
-        """
         exclude = exclude or set()
         D = float(self.cfg.dim)
         acc_f = self.acc.astype(np.float64)
@@ -191,20 +164,9 @@ class Titanos:
     def _cleanup(self, vec: np.ndarray,
                  exclude: set[str] | None = None,
                  ) -> tuple[str | None, float]:
-        """
-        Composite confidence per candidate.
-
-        conf_mode:
-          "sim"       -- cosine only (baseline, current main behavior)
-          "mag"       -- magnitude only
-          "product"   -- sim * mag
-          "min"       -- min(sim, mag)
-          "composite" -- alpha*sim_norm + (1-alpha)*mag_norm
-                         (both normalized per query so alpha is a real weight)
-        """
         exclude = exclude or set()
         alpha = getattr(self.cfg, "conf_alpha", 0.6)
-        mode = getattr(self.cfg, "conf_mode", "sim")
+        mode = getattr(self.cfg, "conf_mode", "mag")
         D = float(self.cfg.dim)
         acc_f = self.acc.astype(np.float64)
 
@@ -243,7 +205,7 @@ class Titanos:
         idx = int(np.argmax(conf))
         return names[idx], float(conf[idx])
 
-    # ── Learn ──────────────────────────────────────────────────────────
+    # ── learn ──────────────────────────────────────────────────────────
     def learn(self, subject: str, relation: str, obj: str) -> None:
         s, o = self._ent(subject), self._ent(obj)
         sr = self._slot("S", relation)
@@ -251,27 +213,34 @@ class Titanos:
         self.acc += (s * sr + o * orr).astype(np.int32)
         self.facts.append((subject, relation, obj))
 
-    # ── Prelude ────────────────────────────────────────────────────────
     def _encode_probe(self, subject: str, relation: str,
                       inverse: bool = False) -> np.ndarray:
         s = self._ent(subject)
         slot = self._slot("O" if inverse else "S", relation)
         return (s * slot).astype(np.int8)
 
-    # ── Recurrent block ────────────────────────────────────────────────
+    # ── recurrent block ────────────────────────────────────────────────
     def _recurrent(self, initial_h: np.ndarray,
                    ) -> tuple[np.ndarray, list[dict], str, str]:
         h = initial_h.copy()
         history: list[dict] = []
+        sqrt_dim = float(np.sqrt(self.cfg.dim))
 
         for i in range(self.cfg.n_loops):
             W = h.reshape(self.cfg.m, self.cfg.n).astype(np.float64)
+
+            # DeltaS calibration: W is a reshape of a bipolar vector,
+            # so ||W||_F is ~sqrt(dim) and normalizing by that gives
+            # ~1. DeltaS = 1/(1+1) = 0.5, safely above tau_low.
+            norm_W = float(np.linalg.norm(W)) / sqrt_dim
+            DeltaS = float(1.0 / (1.0 + norm_W))
+
             packet = self.core.step(
                 W,
                 version=self.cfg.packet_version,
                 mu=int(i % 2),
                 F_res=float(np.mean(W)),
-                DeltaS=float(1.0 / (1.0 + np.linalg.norm(W))),
+                DeltaS=DeltaS,
             )
 
             W_hat = (packet.Ub @ packet.Vb).astype(np.float64)
@@ -319,7 +288,7 @@ class Titanos:
 
         return h, history, "MAX_LOOPS", history[-1]["gate_state"]
 
-    # ── Quantum-simulated retrieval ────────────────────────────────────
+    # ── quantum-sim ────────────────────────────────────────────────────
     def _quantum_sim(self, probe: np.ndarray,
                      exclude: set[str],
                      ) -> tuple[str | None, float]:
@@ -333,7 +302,7 @@ class Titanos:
         measured = np.where(superposition >= 0, 1, -1).astype(np.int8)
         return self._cleanup(measured, exclude=exclude)
 
-    # ── Top-level ask ──────────────────────────────────────────────────
+    # ── ask ────────────────────────────────────────────────────────────
     def _ask(self, subject: str, relation: str, inverse: bool) -> Answer:
         if subject not in self.entities:
             return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", 0,
@@ -423,7 +392,6 @@ class Titanos:
         return Answer(best, sim, "ACCEPTED", "CLASSICAL", 0,
                       path=[(a, "->", b), (c, "->", best)])
 
-    # ── Introspection ──────────────────────────────────────────────────
     def explain(self, ans: Answer) -> str:
         head = (f"[{ans.status}] mode={ans.mode} loops={ans.loops} "
                 f"conf={ans.confidence:.4f}")
@@ -461,11 +429,10 @@ class Titanos:
             "relations": len(self.relations),
             "accumulator_energy": int(np.sum(self.acc.astype(np.int64) ** 2)),
             "packet_version": self.cfg.packet_version,
-            "conf_mode": getattr(self.cfg, "conf_mode", "sim"),
+            "conf_mode": getattr(self.cfg, "conf_mode", "mag"),
             "conf_alpha": float(getattr(self.cfg, "conf_alpha", 0.6)),
         }
 
-    # ── Persistence ────────────────────────────────────────────────────
     def save(self, path: str | Path) -> None:
         Path(path).write_text(json.dumps({
             "cfg": {**asdict(self.cfg), "seed_list": list(self.cfg.seed_list)},
@@ -492,9 +459,6 @@ class Titanos:
         return obj
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Thin NLP front-end (optional; not on the reasoning path)
-# ═══════════════════════════════════════════════════════════════════════════
 _PATTERNS = [
     (re.compile(r"who is the (\w+) of (\w+)", re.I),
      lambda m: (m.group(2), m.group(1), True)),
@@ -515,98 +479,34 @@ def parse_query(text: str) -> tuple[str, str, bool] | None:
     return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# DEMO
-# ═══════════════════════════════════════════════════════════════════════════
-def _demo():
-    cfg = TitanosConfig(dim=10000, m=100, n=100, r=8, n_loops=12, seed=1337)
-    titan = Titanos(cfg)
-
-    print("=" * 72)
-    print("Titanos - recurrent-depth quantum-classical prototype")
-    print("=" * 72)
-    for k, v in titan.stats().items():
-        print(f"  {k:18s} = {v}")
-    print()
-
-    facts = [
-        ("Uranus",   "parent_of", "Cronus"),
-        ("Cronus",   "parent_of", "Zeus"),
-        ("Cronus",   "parent_of", "Poseidon"),
-        ("Cronus",   "parent_of", "Hades"),
-        ("Zeus",     "parent_of", "Ares"),
-        ("Zeus",     "parent_of", "Athena"),
-        ("Zeus",     "domain",    "sky"),
-        ("Poseidon", "domain",    "sea"),
-        ("Hades",    "domain",    "underworld"),
-        ("Ares",     "domain",    "war"),
-        ("Athena",   "domain",    "wisdom"),
-        ("Uranus",   "is_a",      "primordial"),
-        ("Cronus",   "is_a",      "titan"),
-        ("Zeus",     "is_a",      "olympian"),
-        ("Poseidon", "is_a",      "olympian"),
-        ("Hades",    "is_a",      "olympian"),
-        ("Ares",     "is_a",      "olympian"),
-        ("Athena",   "is_a",      "olympian"),
-    ]
-    for s, r, o in facts:
-        titan.learn(s, r, o)
-    print(f"[learned {len(facts)} facts]\n")
-
-    print("-- Single-hop --")
-    for s, r in [("Zeus", "parent_of"), ("Zeus", "domain"), ("Cronus", "parent_of")]:
-        a = titan.ask(s, r)
-        print(f"  {s} --{r}--> {a.value or '(abstain)'}   "
-              f"[{a.mode}, {a.loops} loops, conf {a.confidence:.4f}]")
-
-    print("\n-- Inverse --")
-    for o, r in [("Zeus", "parent_of"), ("Athena", "parent_of"), ("sea", "domain")]:
-        a = titan.ask_inverse(o, r)
-        print(f"  ? --{r}--> {o}  =  {a.value or '(abstain)'}   "
-              f"[{a.mode}, conf {a.confidence:.4f}]")
-
-    print("\n-- Multi-hop --")
-    print(titan.explain(titan.chain("Uranus", ["parent_of", "parent_of", "parent_of"])))
-
-    print("\n-- Analogy --")
-    print(titan.explain(titan.analogy("Zeus", "sky", "Poseidon")))
-    print(titan.explain(titan.analogy("Poseidon", "sea", "Hades")))
-
-    print("\n-- Abstention --")
-    for s, r in [("Zeus", "capital_of"), ("Odin", "parent_of")]:
-        a = titan.ask(s, r)
-        print(f"  {s} --{r}--> ?")
-        print(f"    {titan.explain(a)}")
-
-    print("\n-- NLP front-end --")
-    for text in ["Who is the parent of Zeus?",
-                 "Who is Zeus's parent?",
-                 "What is Poseidon's domain?"]:
-        parsed = parse_query(text)
-        print(f"  '{text}'")
-        print(f"    parsed -> {parsed}")
-        if parsed:
-            subj, rel, inv = parsed
-            ans = titan.ask_inverse(subj, rel) if inv else titan.ask(subj, rel)
-            print(f"    -> {ans.value or '(abstain)'}  [{ans.mode}]")
-
-    print("\n-- Loop trace (Zeus -> parent_of) --")
-    a = titan.ask("Zeus", "parent_of")
-    print(titan.loop_trace(a))
-    print()
-    print(titan.explain(a))
-
-
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
     p.add_argument("--config", default=None)
     args = p.parse_args()
 
-    if args.config:
-        cfg = TitanosConfig.from_json(args.config)
-        titan = Titanos(cfg)
-        print(f"Loaded config from {args.config}")
-        print(f"  conf_mode = {cfg.conf_mode}  alpha = {cfg.conf_alpha}")
-    else:
-        _demo()
+    cfg = TitanosConfig.from_json(args.config) if args.config else TitanosConfig()
+    titan = Titanos(cfg)
+    print(f"conf_mode = {cfg.conf_mode}  alpha = {cfg.conf_alpha}")
+
+    facts = [
+        ("Uranus", "parent_of", "Cronus"), ("Cronus", "parent_of", "Zeus"),
+        ("Cronus", "parent_of", "Poseidon"), ("Cronus", "parent_of", "Hades"),
+        ("Zeus", "parent_of", "Ares"), ("Zeus", "parent_of", "Athena"),
+        ("Zeus", "domain", "sky"), ("Poseidon", "domain", "sea"),
+        ("Hades", "domain", "underworld"), ("Ares", "domain", "war"),
+        ("Athena", "domain", "wisdom"), ("Uranus", "is_a", "primordial"),
+        ("Cronus", "is_a", "titan"), ("Zeus", "is_a", "olympian"),
+        ("Poseidon", "is_a", "olympian"), ("Hades", "is_a", "olympian"),
+        ("Ares", "is_a", "olympian"), ("Athena", "is_a", "olympian"),
+    ]
+    for s, r, o in facts:
+        titan.learn(s, r, o)
+
+    for subj, rel in [("Zeus", "domain"), ("Zeus", "parent_of")]:
+        a = titan.ask(subj, rel)
+        print(f"{subj} --{rel}--> {a.value} [{a.mode} conf={a.confidence:.4f}]")
+
+    for subj, rel in [("Zeus", "capital_of"), ("Odin", "parent_of")]:
+        a = titan.ask(subj, rel)
+        print(f"{subj} --{rel}--> ? [{a.status} conf={a.confidence:.4f}]")
