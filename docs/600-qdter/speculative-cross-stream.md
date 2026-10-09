@@ -71,13 +71,35 @@ subspace verifier** because it implements the RES-600 §3 quantities.
 
 ## 6. Open items
 
-| Item | Status |
-|---|---|
-| Drafter checkpoint for Muse Glimmer 30B | External (llama.cpp PR #26841) |
-| Trained `LowRankMetricHead` on real trajectories | Not started |
-| `sweep_epsilon` run on a real FEP trajectory | Pending |
-| Integration test of the full speculative pass | Not started |
-| Zero-overhead overlap scheduler | Not started |
+| Item | Status | Notes |
+|---|---|---|
+| Muse Glimmer 30B drafter checkpoint | External | Not distributed with this repo |
+| Trained `LowRankMetricHead` on real trajectories | Not started | Requires item below |
+| Real-trajectory sweep | Pending — **data mode fixed** | See note |
+| Full speculative integration test | Not started | Depends on drafter checkpoint |
+| Overlap scheduler | Not started | Last in line |
+
+### 6.1 Real-trajectory sweep — data mode
+
+An earlier version of `scripts/run_fep_sweep.py --data` overwrote
+coordinate 0 of the loaded trajectory with a synthetic offset
+(`t[:, 0, 0] = 1.5 + eps`) before running the sweep. That is not a real
+perturbation — it discards the trajectory's actual initial deviation and
+substitutes a hardcoded one.
+
+The current implementation is honest about what real data can support:
+
+- **`[K, T, D]` with `K ≥ 3`** — real ε sweep. Ψ_B is estimated from the
+  mean of the last 10% of each trajectory on coordinate 0. ε_k is the
+  actual deviation `traj_k[0, 0] − Ψ_B`. The log-log fit is over the K
+  trajectories' own ε values. This is a genuine sweep.
+- **`[T, D]` or `K < 3`** — single-trajectory mode. The head reports the
+  ODE residual at the actual ε and the slope field is `null`. A slope
+  requires ≥3 trajectories with distinct initial deviations.
+
+Note: the trajectory file does not carry a G(t) series. The sweep uses
+`--g-field` as a constant. If the real data has time-varying G, that must
+be supplied separately; the current interface does not accept it.
 
 ## 7. Where this fits in the doc set
 
