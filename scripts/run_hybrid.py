@@ -6,7 +6,7 @@ Usage:
     python scripts/run_hybrid.py --config configs/example-run.json
     python scripts/run_hybrid.py --config configs/titanos-run.json --titanos
     python scripts/run_hybrid.py --config configs/titanos-run.json --titanos \
-        --data path/to/weights.npy --block 64
+        --data weights.npy --block 64
 """
 from __future__ import annotations
 
@@ -29,19 +29,15 @@ from resileos.core import CoreConfig, ResidualCore
 from resileos.moments import Seeds
 from resileos.sigma import SigmaGate
 from resileos.training import FrontEndEncoder, TrainingConfig, train
-from resileos.validation import (
-    HybridValidator, RunConfig, save_report,
-)
+from resileos.validation import HybridValidator, RunConfig, save_report
 
 
-# ── config loading with key filtering ─────────────────────────────────────
-def _filter_for(cls, raw: dict) -> dict:
-    """Keep only keys that `cls` declares. Drops Titanos-only keys for RunConfig."""
+def _filter_for(cls, raw):
     valid = {f.name for f in dataclasses.fields(cls)}
     return {k: v for k, v in raw.items() if k in valid}
 
 
-def load_run_config(path: Path) -> RunConfig:
+def load_run_config(path):
     raw = json.loads(path.read_text())
     if "seeds" in raw:
         raw["seeds"] = Seeds(**raw["seeds"])
@@ -50,12 +46,10 @@ def load_run_config(path: Path) -> RunConfig:
     return RunConfig(**_filter_for(RunConfig, raw))
 
 
-# ── data source ───────────────────────────────────────────────────────────
-_DATA_CACHE: dict[str, np.ndarray] = {}
+_DATA_CACHE = {}
 
 
-def load_data(path: Path | None, m: int, n: int) -> np.ndarray | None:
-    """Return a 2D array of blocks or None for synthetic fallback."""
+def load_data(path, m, n):
     if path is None:
         return None
     key = str(path)
@@ -67,19 +61,12 @@ def load_data(path: Path | None, m: int, n: int) -> np.ndarray | None:
     return W
 
 
-def make_block(seed: int, m: int, n: int,
-               data: np.ndarray | None = None) -> np.ndarray:
-    """
-    Deterministic test block. If `data` is provided, slice a real m x n
-    block from it (wrapping by seed). Otherwise Gaussian synthetic.
-    """
+def make_block(seed, m, n, data=None):
     if data is None:
         return np.random.default_rng(seed).standard_normal((m, n))
-
     H, Wd = data.shape
     if H < m or Wd < n:
-        raise ValueError(f"data {data.shape} too small for block {m}x{n}")
-
+        raise ValueError(f"data {data.shape} too small for {m}x{n}")
     rows = (H - m) // max(1, (seed % 32 + 1))
     cols = (Wd - n) // max(1, (seed % 16 + 1))
     r0 = min(rows, max(0, H - m))
@@ -87,31 +74,33 @@ def make_block(seed: int, m: int, n: int,
     return data[r0:r0 + m, c0:c0 + n].astype(np.float64)
 
 
-def make_x_enc(seed: int, step: int, dim: int) -> np.ndarray:
+def make_x_enc(seed, step, dim):
     rng = np.random.default_rng(seed * 100_000 + step)
     v = rng.standard_normal(dim)
     return v / (np.linalg.norm(v) + 1e-12)
 
 
-# ── stack assembly ────────────────────────────────────────────────────────
-def build_stack(cfg: RunConfig, m: int, n: int):
+def build_stack(cfg, m, n):
     r = min(8, min(m, n))
     core = ResidualCore(CoreConfig(m=m, n=n, r=r), seed=0)
     encoder = FrontEndEncoder(m=m, n=n, r=r, seed=0)
-    adapter = HDRIFTAdapter(
-        dim=cfg.dim, seeds=cfg.seeds, drift_ratio_floor=cfg.drift_ratio_floor,
-    )
-    thresholds = AbstentionThresholds(
-        E_sat=cfg.E_sat, tau_sat=cfg.tau_sat, tau_low=cfg.tau_low,
-    )
+    adapter = HDRIFTAdapter(dim=cfg.dim, seeds=cfg.seeds,
+                            drift_ratio_floor=cfg.drift_ratio_floor)
+    thresholds = AbstentionThresholds(E_sat=cfg.E_sat, tau_sat=cfg.tau_sat,
+                                      tau_low=cfg.tau_low)
     gate = SigmaGate(E_sigma=cfg.E_sigma, k=cfg.sigma1_k)
     validator = HybridValidator(cfg, adapter, thresholds, sigma_gate=gate)
     return core, encoder, adapter, validator
 
 
-# ── Titanos block ─────────────────────────────────────────────────────────
-def run_titanos_block(cfg_path: Path, report: dict,
-                      data: np.ndarray | None = None) -> None:
+def _is_hit(got, expected):
+    """expected can be str or list of str. Hit if got matches any."""
+    if isinstance(expected, list):
+        return got in expected
+    return got == expected
+
+
+def run_titanos_block(cfg_path, report, data=None):
     try:
         from titanos import Titanos, TitanosConfig
     except ImportError:
@@ -131,37 +120,28 @@ def run_titanos_block(cfg_path: Path, report: dict,
         return
 
     titan = Titanos(tcfg)
-
     raw = json.loads(corpus_path.read_text())
     for s, r, o in raw["facts"]:
         titan.learn(s, r, o)
 
-    correct = 0
-    abstained = 0
-    modes: Counter = Counter()
-    details: list[dict] = []
+    correct, abstained = 0, 0
+    modes = Counter()
+    details = []
 
     for q in raw["queries"]:
-        ans = (
-            titan.ask_inverse(q["subject"], q["relation"])
-            if q["inverse"]
-            else titan.ask(q["subject"], q["relation"])
-        )
+        ans = (titan.ask_inverse(q["subject"], q["relation"])
+               if q["inverse"] else titan.ask(q["subject"], q["relation"]))
         modes[ans.mode] += 1
-        hit = (ans.status == "ACCEPTED" and ans.value == q["expected"])
+        hit = ans.status == "ACCEPTED" and _is_hit(ans.value, q["expected"])
         if ans.status == "ABSTAINED":
             abstained += 1
         if hit:
             correct += 1
         details.append({
-            "subject": q["subject"],
-            "relation": q["relation"],
-            "inverse": q["inverse"],
-            "expected": q["expected"],
-            "got": ans.value,
-            "status": ans.status,
-            "confidence": float(ans.confidence),
-            "hit": hit,
+            "subject": q["subject"], "relation": q["relation"],
+            "inverse": q["inverse"], "expected": q["expected"],
+            "got": ans.value, "status": ans.status,
+            "confidence": float(ans.confidence), "hit": hit,
         })
 
     total = len(raw["queries"])
@@ -181,16 +161,14 @@ def run_titanos_block(cfg_path: Path, report: dict,
     print(f"[runner] titanos accuracy   = {accuracy:.2f}% "
           f"({correct}/{total}, target {tcfg.X:.1f}%, "
           f"conformant={report['titanos']['conformant']})")
+    for d in details:
+        if not d["hit"]:
+            print(f"[runner]   miss: {d['subject']} --{d['relation']}--> "
+                  f"expected {d['expected']}, got {d['got']} "
+                  f"({d['status']}, conf {d['confidence']:.4f})")
 
-    misses = [d for d in details if not d["hit"]]
-    for d in misses[:5]:
-        print(f"[runner]   miss: {d['subject']} --{d['relation']}--> "
-              f"expected {d['expected']}, got {d['got']} "
-              f"({d['status']}, conf {d['confidence']:.4f})")
 
-
-# ── main ──────────────────────────────────────────────────────────────────
-def main() -> int:
+def main():
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True)
     p.add_argument("--out", default="report.json")
@@ -201,10 +179,8 @@ def main() -> int:
     p.add_argument("--n", type=int, default=32)
     p.add_argument("--no-verify", action="store_true")
     p.add_argument("--titanos", action="store_true")
-    p.add_argument("--data", default=None,
-                   help="Path to .npy file with real weight blocks")
-    p.add_argument("--block", type=int, default=None,
-                   help="Override m=n block size (default: use --m/--n)")
+    p.add_argument("--data", default=None)
+    p.add_argument("--block", type=int, default=None)
     args = p.parse_args()
 
     cfg_path = Path(args.config)
@@ -231,11 +207,9 @@ def main() -> int:
     if args.train:
         W_train = [make_block(s, args.m, args.n, data) for s in range(4)]
         W_hold = [make_block(100 + s, args.m, args.n, data) for s in range(2)]
-        tcfg = TrainingConfig(
-            epochs=args.epochs, lr=0.05, lam=1e-4,
-            scar_var_floor=cfg.scar_var_floor,
-            deltaS_range_floor=cfg.deltaS_range_floor,
-        )
+        tcfg = TrainingConfig(epochs=args.epochs, lr=0.05, lam=1e-4,
+                              scar_var_floor=cfg.scar_var_floor,
+                              deltaS_range_floor=cfg.deltaS_range_floor)
         rep = train(core, encoder, W_train, W_hold, tcfg)
         print(f"[runner] train conformant = {rep['acceptance']['conformant']}")
 
@@ -246,27 +220,23 @@ def main() -> int:
         print(f"[runner] adapter cos={diag['cos']:.4f} "
               f"var={diag['drift_ratio_variance']:.6g} pass={diag['pass']}")
 
-    def packet_fn(seed: int, step: int):
+    def packet_fn(seed, step):
         W = make_block(seed + step * 1000, args.m, args.n, data)
         enc_out = encoder.forward(W)
         Ub, Vb = enc_out["Ub"], enc_out["Vb"]
         R = W - Ub @ Vb
-        return core.step(
-            W=W, mu=int(step % 2), F_res=float(np.mean(R)),
-            theta_hi=0.0, theta_lo=0.0,
-            DeltaS=float(1.0 / (1.0 + np.linalg.norm(R))),
-        )
+        return core.step(W=W, mu=int(step % 2), F_res=float(np.mean(R)),
+                         theta_hi=0.0, theta_lo=0.0,
+                         DeltaS=float(1.0 / (1.0 + np.linalg.norm(R))))
 
-    def x_fn(seed: int, step: int) -> np.ndarray:
+    def x_fn(seed, step):
         return make_x_enc(seed, step, cfg.dim)
 
-    def recon_err_fn(packet) -> float:
+    def recon_err_fn(packet):
         return float(abs(packet.F_res))
 
-    report = validator.run(
-        packet_fn=packet_fn, x_fn=x_fn,
-        horizon_len=args.horizon, recon_err_fn=recon_err_fn,
-    )
+    report = validator.run(packet_fn=packet_fn, x_fn=x_fn,
+                           horizon_len=args.horizon, recon_err_fn=recon_err_fn)
 
     if args.titanos:
         run_titanos_block(cfg_path, report, data)
