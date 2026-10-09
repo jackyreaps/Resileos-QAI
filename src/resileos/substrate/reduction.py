@@ -8,7 +8,7 @@ theorem. Follows RES-600 §4 and RES-602 §5.4:
     - f is a free learnable scalar (RES-600 §7)
     - P_s is a fixed kernel projector onto ker(L_H), not learned
     - δΨ_s = Ψ_s − Ψ_B applied per RES-600 §4
-    - rank-1 P_s (simplification; rank-k is a future extension)
+    - P_s may be rank-k; see class docstring for ODE scope note
 """
 from __future__ import annotations
 
@@ -24,12 +24,20 @@ class VerifiableFEPReductionHead(nn.Module):
     residual δΨ̇_s = −Γ_eff · δΨ_s, and provides an ε-sweep harness for
     verifying the C_1/λ_2 residual scaling claimed in RES-600 §4.
 
+    Rank handling:
+        P_s may be rank-k (k = `rank` argument). psi_s returns the full
+        [1, T, rank] coordinate. The scalar ODE fit uses the first
+        coordinate only — this matches RES-600 §4, which is scalar. If a
+        vector ODE fit is required in a future extension, extend the
+        forward pass; the sweep harness works unchanged because it consumes
+        the scalar `ode_error`.
+
     Inputs:
-        trunk_state   [1, T, D]    temporal trajectory
-        G_field       [1, T, 1]    coherence field sequence
+        trunk_state   [1, T, D]       temporal trajectory
+        G_field       [1, T, 1]       coherence field sequence
     Returns:
-        psi_s         [1, T, rank] slow coordinate
-        ode_error     scalar       MSE of the ODE fit
+        psi_s         [1, T, rank]    slow coordinate(s)
+        ode_error     scalar          MSE of the scalar ODE fit
     """
 
     def __init__(self, hidden_dim: int,
@@ -69,7 +77,9 @@ class VerifiableFEPReductionHead(nn.Module):
             )
         _, T, D = trunk_state.shape
         if D != self.hidden_dim:
-            raise ValueError(f"hidden_dim {self.hidden_dim} != trunk last dim {D}")
+            raise ValueError(
+                f"hidden_dim {self.hidden_dim} != trunk last dim {D}"
+            )
         if G_field.dim() != 3 or G_field.size(0) != 1 or G_field.size(1) != T:
             raise ValueError(
                 f"G_field must be [1, T, 1], got {tuple(G_field.shape)}"
@@ -77,7 +87,7 @@ class VerifiableFEPReductionHead(nn.Module):
 
         psi_s_full = trunk_state @ self.P_s          # [1, T, D]
         psi_s = psi_s_full @ self.basis              # [1, T, rank]
-        psi_scalar = psi_s[..., 0:1]                 # [1, T, 1]
+        psi_scalar = psi_s[..., 0:1]                 # [1, T, 1] — first coord
 
         pi_o = self.f_scalar * self.psi_a * self.psi_b
         pi_s = self.f_scalar * self.psi_b * (self.psi_b - self.psi_a)
@@ -117,7 +127,8 @@ class VerifiableFEPReductionHead(nn.Module):
             G_field:            [1, T, 1]
             metric:             "rmse" | "mse"
 
-        Returns dict with metric, epsilons, errors, slope, intercept, r_squared.
+        Returns dict with metric, epsilons, errors, slope, intercept,
+        r_squared.
         """
         if metric not in ("rmse", "mse"):
             raise ValueError(f"metric must be 'rmse' or 'mse', got {metric!r}")
@@ -155,7 +166,7 @@ class VerifiableFEPReductionHead(nn.Module):
         }
 
 
-# ── trajectory generators (shared by CLI and API) ────────────────────────
+# ── trajectory generators (shared by CLI, API, and tests) ────────────────
 def simulate_linear_ode(
     hidden_dim: int,
     seq_len: int,
