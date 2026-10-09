@@ -2,10 +2,12 @@
 Moment-bundle contract: (μ_hv, ν_hv) from a control packet.
 Owning doc: RES-301.
 
-FPE engine (RES-300 §leCore boundary) preserves:
-  - unit-norm output
-  - determinism in (x, dim, seed)
-  - signature fpe_encode(x, dim, seed) -> np.ndarray
+FPE backend:
+    The substrate uses a bipolar FPE. The backend is selected at import
+    time by `resileos.substrate.fpe`:
+        - leCore's FPE if importable, quantized to bipolar
+        - in-house FPE otherwise
+    Both paths satisfy the RES-300 §leCore boundary contract.
 """
 from __future__ import annotations
 
@@ -14,8 +16,9 @@ from typing import Any
 
 import numpy as np
 
+from .substrate.fpe import fpe_encode_bipolar, backend_name
 
-# ── Seeds (RES-301) ───────────────────────────────────────────────────────
+
 @dataclass(frozen=True)
 class Seeds:
     factor: int
@@ -37,41 +40,14 @@ class Seeds:
         )
 
 
-# ── FPE engine (real-valued, position-bound) ──────────────────────────────
 def fpe_encode(x: np.ndarray, dim: int, seed: int) -> np.ndarray:
     """
-    Fractional Power Encoding.
-
-    For input x of length L:
-      1. Generate a fixed phase vector ω ∈ R^dim  ~ U(-π, π).
-      2. Generate per-position bind signs b_i ∈ {-1, +1}^dim.
-      3. Scalar encoding: cos(x_i · ω), shape (dim,).
-      4. Bind with position: cos(x_i · ω) * b_i.
-      5. Bundle across positions: sum.
-      6. Unit-normalize.
-
-    Properties:
-      - Smooth kernel: <enc(x), enc(y)> is high for nearby x, y.
-      - Deterministic in (x, dim, seed).
-      - Unit-norm for non-empty input.
+    Bipolar FPE. Backend selected by `resileos.substrate.fpe`.
+    See module docstring.
     """
-    x = np.asarray(x, dtype=np.float64).ravel()
-    if x.size == 0:
-        return np.zeros(dim, dtype=np.float64)
-
-    rng = np.random.default_rng(seed)
-    omega = rng.uniform(-np.pi, np.pi, size=dim)                 # (dim,)
-    bind_signs = rng.choice([-1.0, 1.0], size=(x.size, dim))      # (L, dim)
-
-    # (L, dim) elementwise; then bind with per-position signs.
-    scalar_enc = np.cos(x[:, None] * omega[None, :])
-    bound = scalar_enc * bind_signs
-
-    h = np.sum(bound, axis=0)
-    return h / (np.linalg.norm(h) + 1e-12)
+    return fpe_encode_bipolar(x, dim, seed)
 
 
-# ── VSA primitives ────────────────────────────────────────────────────────
 def bundle(*vecs: np.ndarray) -> np.ndarray:
     s = np.sum(vecs, axis=0)
     return s / (np.linalg.norm(s) + 1e-12)
@@ -87,7 +63,6 @@ def permute(v: np.ndarray, seed: int) -> np.ndarray:
     return v[rng.permutation(len(v))]
 
 
-# ── Correlation control (implementation detail) ───────────────────────────
 def _mix_to_cos(mu: np.ndarray, nu: np.ndarray, target: float) -> np.ndarray:
     mu = mu / (np.linalg.norm(mu) + 1e-12)
     nu = nu / (np.linalg.norm(nu) + 1e-12)
@@ -103,7 +78,6 @@ def _mix_to_cos(mu: np.ndarray, nu: np.ndarray, target: float) -> np.ndarray:
     return out / (np.linalg.norm(out) + 1e-12)
 
 
-# ── Moment bundle (RES-301) ──────────────────────────────────────────────
 def build_moments(packet: dict[str, Any] | Any,
                   dim: int,
                   seeds: Seeds,
@@ -152,3 +126,9 @@ def build_moments(packet: dict[str, Any] | Any,
 
     nu_hv = _mix_to_cos(mu_hv, nu_hv, target=target_cos)
     return mu_hv, nu_hv
+
+
+__all__ = [
+    "Seeds", "fpe_encode", "bundle", "bind", "permute",
+    "build_moments", "backend_name",
+]
