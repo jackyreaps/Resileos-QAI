@@ -116,6 +116,14 @@ Two possibilities:
 Until resolved, this document uses `Γ = G` for the rate identity and records
 the discrepancy here as an open item. RES-602 §2 depends on this resolution.
 
+### 4.2 Numerical verification
+
+The ε-sweep harness in `src/resileos/substrate/reduction.py` runs the
+linearized ODE fit across multiple perturbation scales and fits the
+log-log slope of residual vs ε. The slope is reported per run in the
+verification report. Confirmation that the slope matches the theoretical
+prediction closes the last open item in §6.
+
 ## 5. Boundary of the claim
 
 Established:
