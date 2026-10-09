@@ -1,0 +1,71 @@
+{
+  "entities": [
+    "Uranus", "Cronus", "Zeus", "Poseidon", "Hades",
+    "Ares", "Athena", "Apollo", "Artemis", "Hephaestus",
+    "Hermes", "Demeter", "Aphrodite",
+    "sky", "sea", "underworld", "war", "wisdom",
+    "music", "hunt", "forge", "messengers", "harvest", "love",
+    "primordial", "titan", "olympian"
+  ],
+  "relations": ["parent_of", "domain", "is_a"],
+  "facts": [
+    ["Uranus",     "parent_of", "Cronus"],
+    ["Cronus",     "parent_of", "Zeus"],
+    ["Cronus",     "parent_of", "Poseidon"],
+    ["Cronus",     "parent_of", "Hades"],
+    ["Zeus",       "parent_of", "Ares"],
+    ["Zeus",       "parent_of", "Athena"],
+    ["Zeus",       "parent_of", "Apollo"],
+    ["Zeus",       "parent_of", "Artemis"],
+
+    ["Zeus",       "domain",    "sky"],
+    ["Poseidon",   "domain",    "sea"],
+    ["Hades",      "domain",    "underworld"],
+    ["Ares",       "domain",    "war"],
+    ["Athena",     "domain",    "wisdom"],
+    ["Apollo",     "domain",    "music"],
+    ["Artemis",    "domain",    "hunt"],
+    ["Hephaestus", "domain",    "forge"],
+    ["Hermes",     "domain",    "messengers"],
+    ["Demeter",    "domain",    "harvest"],
+    ["Aphrodite",  "domain",    "love"],
+
+    ["Uranus",     "is_a",      "primordial"],
+    ["Cronus",     "is_a",      "titan"],
+    ["Zeus",       "is_a",      "olympian"],
+    ["Poseidon",   "is_a",      "olympian"],
+    ["Hades",      "is_a",      "olympian"],
+    ["Ares",       "is_a",      "olympian"],
+    ["Athena",     "is_a",      "olympian"],
+    ["Apollo",     "is_a",      "olympian"],
+    ["Artemis",    "is_a",      "olympian"],
+    ["Hephaestus", "is_a",      "olympian"],
+    ["Hermes",     "is_a",      "olympian"],
+    ["Demeter",    "is_a",      "olympian"],
+    ["Aphrodite",  "is_a",      "olympian"]
+  ],
+  "queries": [
+    { "subject": "Zeus",       "relation": "domain", "expected": "sky",        "inverse": false },
+    { "subject": "Poseidon",   "relation": "domain", "expected": "sea",        "inverse": false },
+    { "subject": "Hades",      "relation": "domain", "expected": "underworld", "inverse": false },
+    { "subject": "Ares",       "relation": "domain", "expected": "war",        "inverse": false },
+    { "subject": "Athena",     "relation": "domain", "expected": "wisdom",     "inverse": false },
+    { "subject": "Apollo",     "relation": "domain", "expected": "music",      "inverse": false },
+    { "subject": "Artemis",    "relation": "domain", "expected": "hunt",       "inverse": false },
+    { "subject": "Hephaestus", "relation": "domain", "expected": "forge",      "inverse": false },
+    { "subject": "Hermes",     "relation": "domain", "expected": "messengers", "inverse": false },
+    { "subject": "Demeter",    "relation": "domain", "expected": "harvest",    "inverse": false },
+    { "subject": "Aphrodite",  "relation": "domain", "expected": "love",       "inverse": false },
+
+    { "subject": "Zeus",       "relation": "is_a",   "expected": "olympian",   "inverse": false },
+    { "subject": "Cronus",     "relation": "is_a",   "expected": "titan",      "inverse": false },
+    { "subject": "Uranus",     "relation": "is_a",   "expected": "primordial", "inverse": false },
+
+    { "subject": "sky",        "relation": "domain", "expected": "Zeus",       "inverse": true },
+    { "subject": "sea",        "relation": "domain", "expected": "Poseidon",   "inverse": true },
+    { "subject": "music",      "relation": "domain", "expected": "Apollo",     "inverse": true },
+    { "subject": "love",       "relation": "domain", "expected": "Aphrodite",  "inverse": true },
+    { "subject": "primordial", "relation": "is_a",   "expected": "Uranus",     "inverse": true },
+    { "subject": "titan",      "relation": "is_a",   "expected": "Cronus",     "inverse": true }
+  ]
+}
