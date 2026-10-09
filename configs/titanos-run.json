@@ -16,13 +16,24 @@
   "conf_alpha": 0.6,
 
   "sigma_E": 10.0,
-  "sigma_k": 3,
+  "sigma1_k": 3,
 
   "N_warm": 512,
   "E_sat": 10.0,
   "E_sigma": 10.0,
   "tau_sat": 0.9,
   "tau_low": 0.1,
+
+  "seeds": {
+    "factor": 42,
+    "scale": 42,
+    "scar": 42,
+    "monitor": 42,
+    "permute_uv": 42,
+    "permute_scar": 43,
+    "permute_scale": 44,
+    "permute_mon": 45
+  },
 
   "X": 70.0,
   "Y": 3,
