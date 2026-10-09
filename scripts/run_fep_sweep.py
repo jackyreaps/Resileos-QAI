@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-FEP ε-sweep CLI runner.
+FEP ε-sweep runner.
 
-Thin CLI wrapper over the substrate ε-sweep harness. The simulator and
-harness live in `resileos.substrate.reduction`; this script only handles
-argument parsing and output formatting.
+Three modes:
 
-Fits log(residual) vs log(ε) under a chosen metric:
-    --metric rmse (default) — matches O(ε) norm bound. Slope ≈ 1.
-    --metric mse            — squared error. Slope ≈ 2.
+    --simulate              ideal Axiom D trajectory (baseline)
+    --stress                stress-tested Axiom D trajectory
+    --data <path.npy>       user-supplied trajectory
+
+The stress mode runs the sweep at multiple stress levels and prints the
+slope at each, so you can see whether the linear O(ε) bound holds as
+conditions degrade from ideal.
 
 Usage:
     python scripts/run_fep_sweep.py --simulate --dim 128 --seq-len 64
-    python scripts/run_fep_sweep.py --data trunk.npy --dim 128 --metric rmse
-    python scripts/run_fep_sweep.py --simulate --out report_sweep.json
+    python scripts/run_fep_sweep.py --stress --dim 128 --seq-len 64
+    python scripts/run_fep_sweep.py --data trunk.npy --dim 128
 """
 from __future__ import annotations
 
@@ -46,10 +48,41 @@ def load_trunk(path: Path, dim: int) -> tuple[torch.Tensor, str]:
     return trunk, f"{path} (K={arr.shape[0]}, T={arr.shape[1]}, D={arr.shape[2]})"
 
 
+def _verdict(slope: float, metric: str) -> tuple[str, bool]:
+    if metric == "rmse":
+        if 0.85 <= slope <= 1.15:
+            return "consistent with linear O(ε) residual (RES-600 §4)", True
+        if slope < 0.85:
+            return "sub-linear; check trajectory or discretization", False
+        return "super-linear; check discretization error dominance", False
+    if 1.85 <= slope <= 2.15:
+        return "consistent with O(ε) residual under MSE metric", True
+    return "unexpected MSE scaling", False
+
+
+def _run_one(head, factory, eps_list, metric):
+    G = torch.ones(1, factory(eps_list[0]).shape[1], 1)
+    return head.sweep_epsilon(factory, eps_list, G, metric=metric)
+
+
+def _print_result(result, header=None):
+    if header:
+        print(f"\n--- {header} ---")
+    print(f"metric: {result['metric']}")
+    print("eps        | residual")
+    print("-" * 30)
+    for eps, err in zip(result["epsilons"], result["errors"]):
+        print(f"{eps:10.5f} | {err:.6e}")
+    print(f"fitted slope  = {result['slope']:.4f}")
+    print(f"intercept     = {result['intercept']:.4f}")
+    print(f"r_squared     = {result['r_squared']:.6f}")
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--data", default=None)
     p.add_argument("--simulate", action="store_true")
+    p.add_argument("--stress", action="store_true")
     p.add_argument("--dim", type=int, default=128)
     p.add_argument("--seq-len", type=int, default=64)
     p.add_argument("--epsilons", default="0.1,0.05,0.02,0.01,0.005,0.001")
@@ -66,6 +99,7 @@ def main() -> int:
         hidden_dim=args.dim, L_H_kernel=basis, rank=1,
     )
 
+    # ── mode: data ───────────────────────────────────────────────────────
     if args.data:
         trunk_ref, label = load_trunk(Path(args.data), args.dim)
         print(f"[sweep] source: {label}")
@@ -74,7 +108,22 @@ def main() -> int:
             t = trunk_ref.clone()
             t[:, 0, 0] = 1.5 + eps
             return t
-    elif args.simulate:
+
+        result = _run_one(head, factory, eps_list, args.metric)
+        _print_result(result)
+        verdict, ok = _verdict(result["slope"], args.metric)
+        print(f"verdict       = {verdict}")
+
+        if args.out:
+            Path(args.out).write_text(json.dumps({
+                "source": args.data, "dim": args.dim,
+                "g_field": args.g_field, **result, "verdict": verdict,
+            }, indent=2, default=float))
+            print(f"\n[sweep] wrote {args.out}")
+        return 0 if ok else 1
+
+    # ── mode: simulate ───────────────────────────────────────────────────
+    if args.simulate:
         print(f"[sweep] source: simulated Axiom D  (dim={args.dim}, "
               f"T={args.seq_len}, G={args.g_field})")
 
@@ -83,59 +132,88 @@ def main() -> int:
                 dim=args.dim, seq_len=args.seq_len, epsilon=eps,
                 g_field=args.g_field, seed=0,
             )
-    else:
-        print("error: pass --data or --simulate", file=sys.stderr)
-        return 2
 
-    G = torch.ones(1, factory(eps_list[0]).shape[1], 1)
-    result = head.sweep_epsilon(factory, eps_list, G, metric=args.metric)
+        result = _run_one(head, factory, eps_list, args.metric)
+        _print_result(result)
+        verdict, ok = _verdict(result["slope"], args.metric)
+        print(f"verdict       = {verdict}")
 
-    print()
-    print(f"metric: {result['metric']}")
-    print("eps        | residual")
-    print("-" * 30)
-    for eps, err in zip(result["epsilons"], result["errors"]):
-        print(f"{eps:10.5f} | {err:.6e}")
+        if args.out:
+            Path(args.out).write_text(json.dumps({
+                "source": "simulate", "dim": args.dim,
+                "seq_len": args.seq_len, "g_field": args.g_field,
+                **result, "verdict": verdict,
+            }, indent=2, default=float))
+            print(f"\n[sweep] wrote {args.out}")
+        return 0 if ok else 1
 
-    print()
-    print(f"fitted slope  = {result['slope']:.4f}")
-    print(f"intercept     = {result['intercept']:.4f}")
-    print(f"r_squared     = {result['r_squared']:.6f}")
+    # ── mode: stress ─────────────────────────────────────────────────────
+    if args.stress:
+        print(f"[sweep] source: stress-tested Axiom D  (dim={args.dim}, "
+              f"T={args.seq_len}, G={args.g_field})")
+        print()
+        print("Stress levels (off_manifold_frac, g_ramp, dt_coarse):")
+        print("-" * 60)
 
-    slope = result["slope"]
-    if result["metric"] == "rmse":
-        if 0.85 <= slope <= 1.15:
-            verdict = "consistent with linear O(ε) residual (RES-600 §4)"
+        # 5 levels from ideal to heavily stressed
+        levels = [
+            (0.0, 0.0, 1.0),   # ideal (sanity: must match --simulate)
+            (0.1, 0.05, 2.0),  # mild
+            (0.2, 0.10, 4.0),  # moderate
+            (0.3, 0.20, 6.0),  # strong
+            (0.5, 0.30, 8.0),  # extreme
+        ]
+        slopes = []
+        all_results = []
+
+        for i, (om, gr, dtc) in enumerate(levels):
+            def factory(eps: float, om=om, gr=gr, dtc=dtc) -> torch.Tensor:
+                return simulate_axiom_d(
+                    dim=args.dim, seq_len=args.seq_len, epsilon=eps,
+                    g_field=args.g_field, seed=0,
+                    off_manifold_frac=om, g_ramp=gr, dt_coarse=dtc,
+                )
+
+            result = _run_one(head, factory, eps_list, args.metric)
+            slopes.append(result["slope"])
+            all_results.append({
+                "level": i,
+                "off_manifold_frac": om,
+                "g_ramp": gr,
+                "dt_coarse": dtc,
+                **result,
+            })
+            print(f"  L{i}  om={om:.2f}  gr={gr:.2f}  dtc={dtc:.1f}  "
+                  f"->  slope={result['slope']:.4f}  "
+                  f"r²={result['r_squared']:.6f}")
+
+        print()
+        print("Summary:")
+        print(f"  slope range: {min(slopes):.4f} .. {max(slopes):.4f}")
+        drift = max(slopes) - min(slopes)
+        if drift < 0.15:
+            print(f"  drift = {drift:.4f}  ->  bound holds under stress")
             ok = True
-        elif slope < 0.85:
-            verdict = "sub-linear; check trajectory or discretization"
-            ok = False
-        else:
-            verdict = "super-linear; check discretization error dominance"
-            ok = False
-    else:
-        if 1.85 <= slope <= 2.15:
-            verdict = "consistent with O(ε) residual under MSE metric"
+        elif drift < 0.4:
+            print(f"  drift = {drift:.4f}  ->  bound degrades under stress")
             ok = True
         else:
-            verdict = "unexpected MSE scaling"
+            print(f"  drift = {drift:.4f}  ->  bound does not hold at high stress")
             ok = False
 
-    print(f"verdict       = {verdict}")
+        if args.out:
+            Path(args.out).write_text(json.dumps({
+                "source": "stress", "dim": args.dim,
+                "seq_len": args.seq_len, "g_field": args.g_field,
+                "levels": all_results,
+                "slope_range": [min(slopes), max(slopes)],
+                "drift": drift,
+            }, indent=2, default=float))
+            print(f"\n[sweep] wrote {args.out}")
+        return 0 if ok else 1
 
-    if args.out:
-        payload = {
-            "source": "simulate" if args.simulate else args.data,
-            "dim": args.dim,
-            "seq_len": args.seq_len,
-            "g_field": args.g_field,
-            **result,
-            "verdict": verdict,
-        }
-        Path(args.out).write_text(json.dumps(payload, indent=2, default=float))
-        print(f"\n[sweep] wrote {args.out}")
-
-    return 0 if ok else 1
+    print("error: pass --simulate, --stress, or --data", file=sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":
