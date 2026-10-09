@@ -13,6 +13,7 @@ The "quantum" path is a labeled simulation (QUANTUM_SIM). Not real quantum.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 import sys
@@ -50,7 +51,7 @@ class TitanosConfig:
     conf_alpha: float = 0.6
 
     sigma_E: float = 10.0
-    sigma_k: int = 3
+    sigma1_k: int = 3
 
     N_warm: int = 512
     E_sat: float = 10.0
@@ -70,7 +71,10 @@ class TitanosConfig:
         raw = json.loads(Path(path).read_text())
         if "seed_list" in raw:
             raw["seed_list"] = tuple(raw["seed_list"])
-        return cls(**raw)
+        # Filter out keys that belong to RunConfig (seeds, etc.)
+        valid = {f.name for f in dataclasses.fields(cls)}
+        filtered = {k: v for k, v in raw.items() if k in valid}
+        return cls(**filtered)
 
 
 @dataclass
@@ -107,7 +111,7 @@ class Titanos:
         for name in ("S", "O"):
             self.roles[name] = self._bip()
 
-        self.sigma = SigmaGate(E_sigma=cfg.E_sigma, k=cfg.sigma_k)
+        self.sigma = SigmaGate(E_sigma=cfg.E_sigma, k=cfg.sigma1_k)
         self.thresholds = AbstentionThresholds(
             E_sat=cfg.E_sat, tau_sat=cfg.tau_sat, tau_low=cfg.tau_low,
         )
@@ -229,9 +233,6 @@ class Titanos:
         for i in range(self.cfg.n_loops):
             W = h.reshape(self.cfg.m, self.cfg.n).astype(np.float64)
 
-            # DeltaS calibration: W is a reshape of a bipolar vector,
-            # so ||W||_F is ~sqrt(dim) and normalizing by that gives
-            # ~1. DeltaS = 1/(1+1) = 0.5, safely above tau_low.
             norm_W = float(np.linalg.norm(W)) / sqrt_dim
             DeltaS = float(1.0 / (1.0 + norm_W))
 
