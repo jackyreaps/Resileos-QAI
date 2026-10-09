@@ -5,7 +5,7 @@ Titanos — recurrent-depth quantum-classical prototype on the frozen contracts.
 Architecture:
     Prelude         encode query into a hyperdimensional probe
     Recurrent Block frozen ResidualCore applied N times, weight-shared
-    Router          SigmaGate → route_signals → CLASSICAL | QUANTUM_SIM | ABSTAIN
+    Router          SigmaGate -> route_signals -> CLASSICAL | QUANTUM_SIM | ABSTAIN
     Coda            substrate readout, cleanup, provenance
 
 Confidence modes (conf_mode):
@@ -169,18 +169,22 @@ class Titanos:
         """
         Returns (name, sim, mag) per candidate.
 
-        sim = <v_bipolar, anchor> / D      -- sign-aware cosine-style signal
-        mag = |<acc_float, anchor>| / D    -- magnitude-only signal from accumulator
+        sim = <vec, anchor> / D                 -- sign-aware, candidate-specific
+        mag = |<acc, anchor>| / D               -- magnitude, candidate-specific
+
+        mag uses the float accumulator, not the bipolar readout.
+        Candidate-specific, so it participates in the ranking (not a constant).
         """
         exclude = exclude or set()
+        D = float(self.cfg.dim)
         acc_f = self.acc.astype(np.float64)
         out: list[tuple[str, float, float]] = []
         for name, anchor in self.entities.items():
             if name in exclude:
                 continue
             a = anchor.astype(np.float64)
-            sim = float(np.dot(vec, anchor)) / self.cfg.dim
-            mag = abs(float(np.dot(acc_f, a))) / self.cfg.dim
+            sim = float(np.dot(vec, anchor)) / D
+            mag = abs(float(np.dot(acc_f, a))) / D
             out.append((name, sim, mag))
         return out
 
@@ -191,35 +195,48 @@ class Titanos:
         Composite confidence per candidate.
 
         conf_mode:
-          "sim"       -- cosine only (baseline)
+          "sim"       -- cosine only (baseline, current main behavior)
           "mag"       -- magnitude only
           "product"   -- sim * mag
           "min"       -- min(sim, mag)
           "composite" -- alpha*sim_norm + (1-alpha)*mag_norm
+                         (both normalized per query so alpha is a real weight)
         """
-        scores = self._score_candidates(vec, exclude)
-        if not scores:
+        exclude = exclude or set()
+        alpha = getattr(self.cfg, "conf_alpha", 0.6)
+        mode = getattr(self.cfg, "conf_mode", "sim")
+        D = float(self.cfg.dim)
+        acc_f = self.acc.astype(np.float64)
+
+        names: list[str] = []
+        sims: list[float] = []
+        mags: list[float] = []
+        for name, anchor in self.entities.items():
+            if name in exclude:
+                continue
+            a = anchor.astype(np.float64)
+            names.append(name)
+            sims.append(float(np.dot(vec, anchor)) / D)
+            mags.append(abs(float(np.dot(acc_f, a))) / D)
+
+        if not names:
             return None, 0.0
 
-        names = [n for n, _, _ in scores]
-        sims = np.array([s for _, s, _ in scores], dtype=np.float64)
-        mags = np.array([m for _, _, m in scores], dtype=np.float64)
-
-        mode = getattr(self.cfg, "conf_mode", "sim")
-        alpha = getattr(self.cfg, "conf_alpha", 0.6)
+        s = np.array(sims, dtype=np.float64)
+        m = np.array(mags, dtype=np.float64)
 
         if mode == "sim":
-            conf = sims
+            conf = s
         elif mode == "mag":
-            conf = mags
+            conf = m
         elif mode == "product":
-            conf = sims * mags
+            conf = s * m
         elif mode == "min":
-            conf = np.minimum(sims, mags)
+            conf = np.minimum(s, m)
         elif mode == "composite":
-            smax = sims.max() + 1e-12
-            mmax = mags.max() + 1e-12
-            conf = alpha * (sims / smax) + (1.0 - alpha) * (mags / mmax)
+            smax = s.max() + 1e-12
+            mmax = m.max() + 1e-12
+            conf = alpha * (s / smax) + (1.0 - alpha) * (m / mmax)
         else:
             raise ValueError(f"unknown conf_mode: {mode}")
 
@@ -445,6 +462,7 @@ class Titanos:
             "accumulator_energy": int(np.sum(self.acc.astype(np.int64) ** 2)),
             "packet_version": self.cfg.packet_version,
             "conf_mode": getattr(self.cfg, "conf_mode", "sim"),
+            "conf_alpha": float(getattr(self.cfg, "conf_alpha", 0.6)),
         }
 
     # ── Persistence ────────────────────────────────────────────────────
