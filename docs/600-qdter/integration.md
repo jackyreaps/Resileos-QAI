@@ -8,10 +8,10 @@ referenced_by: []
 
 # Two-Head Integration Note
 
-This document is an **implementation note**, not a specification. It records the
-neural architecture that realises the objects of RES-600 and RES-601 in a
-single model, with the corrections that were required for the code to match the
-source mathematics.
+This document is an **implementation note**, not a specification. It records
+the neural architecture that realises the objects of RES-600 and RES-601 in a
+single model, with the corrections that were required for the code to match
+the source mathematics.
 
 ## 1. The two heads
 
@@ -40,11 +40,15 @@ and the identity closes.
 
 Three corrections relative to earlier drafts:
 
-1. ** Γ = G, not Π_s · G. An earlier draft used Γ = Π_s · G for the FEP recognition rate, which does not close the identity. The source document Reduction_fep.md §3.1 writes Γ = Π_s · G, but this is a transcription error: the rate identity requires Γ = G (RES-600 §4.1, resolved). The code in reduction.py implements Γ = G.
+1. **`Γ = G`, not `Π_s · G`.** An earlier draft used `Γ = Π_s · G` for the
+   FEP recognition rate, which does not close the identity (RES-600 §4.1).
+   The source document `Reduction_fep.md §3.1` writes `Γ = Π_s · G`; if that
+   is not a transcription error, the source and the derivation disagree and
+   the discrepancy is an open item.
 2. **`f` is a free parameter**, not `Re_ε · 0.1`.
-3. **`P_s` is the orthogonal projector onto `ker(L_H)`**, not a learned scalar
-   map. If a learned projection is used as a stand-in, the docstring must say
-   so.
+3. **`P_s` is the orthogonal projector onto `ker(L_H)`**, not a learned
+   scalar map. If a learned projection is used as a stand-in, the docstring
+   must say so.
 
 ## 3. Head 1 — the metric
 
@@ -64,8 +68,8 @@ which it is.
 The two heads are **not** two halves of one system. RES-601 is orthogonal to
 RES-600. A model may compute both, but the FEP reduction does not require the
 metric, and the parallel transport condition does not require the FEP rate.
-This note describes an implementation that happens to compute both; it does not
-claim that the source documents require a joint architecture.
+This note describes an implementation that happens to compute both; it does
+not claim that the source documents require a joint architecture.
 
 ## 5. What is not claimed
 
@@ -78,19 +82,95 @@ claim that the source documents require a joint architecture.
 ## 6. Numerical verification harness
 
 `VerifiableFEPReductionHead.sweep_epsilon()` runs the reduction ODE across
-a user-supplied set of perturbation scales. It returns:
+a user-supplied set of perturbation scales and returns the fit statistics
+of the residual scaling law. It supports two metrics:
 
-- `epsilons`: the scales tested
-- `errors`: the ODE fit MSE at each scale
-- `slope`: log-log slope of `errors` vs `epsilons`
-- `r_squared`: fit quality
+- `rmse` — root-mean-square residual. Matches the norm bound
+  `‖error‖ ≤ C_1/λ_2` in RES-600 §4. Expected slope ≈ 1.
+- `mse` — mean-square residual. Expected slope ≈ 2 (`MSE = RMSE²`).
 
-The slope is the numerical estimate of the residual scaling exponent.
-Under RES-600 §4 the residual is bounded by `C_1/λ_2`; the fitted slope
-is the empirical exponent of that bound on the given trajectory.
+The runner `scripts/run_fep_sweep.py` exercises the harness on either a
+simulated Axiom-D trajectory or a user-supplied `.npy` trunk file.
 
-A structured trajectory generator (`simulate_linear_ode`) is provided for
-the test suite. It produces a `[1, T, D]` trajectory whose first component
-follows `δΨ̇ = −γ · δΨ` exactly, embedded in a D-dimensional ambient space.
-This lets tests verify that the reduction head recovers a **known** rate,
-rather than fitting noise.
+### 6.1 Docstring note on `dt`
+
+The head compares the finite difference `Δδ = δ_{t+1} − δ_t` against
+`−Γ_eff · δ_t`, i.e. it treats the finite difference as a rate. Dimensionally
+this includes a factor of `dt` from the integration step. Because both
+sides scale linearly in ε regardless of `dt`, the **fitted slope is
+unaffected** by the missing normalization. If a future use needs to compare
+the fitted rate constant against the theoretical `Γ_eff`, `dt` normalization
+must be added at the call site.
+
+## 7. Numerical verification result
+
+**Date:** 2026-10-09
+**Source:** simulated Axiom D (self-consistency check)
+**Runner:** `python scripts/run_fep_sweep.py --simulate --dim 128 --seq-len 64 --metric rmse`
+
+**Parameters:**
+
+| Parameter | Value |
+|---|---|
+| dim | 128 |
+| seq_len | 64 |
+| g_field | 0.85 |
+| metric | rmse |
+| epsilons | 0.1, 0.05, 0.02, 0.01, 0.005, 0.001 |
+
+**Result:**
+
+| ε | residual (RMSE) |
+|---|---|
+| 0.10000 | 1.314937e-01 |
+| 0.05000 | 6.731574e-02 |
+| 0.02000 | 2.731726e-02 |
+| 0.01000 | 1.372502e-02 |
+| 0.00500 | 6.879221e-03 |
+| 0.00100 | 1.378518e-03 |
+
+**Fit:**
+
+    slope     = 0.9906
+    intercept = 0.2660
+    r_squared = 0.999967
+
+**Interpretation.** The residual scales as `O(ε)` under the RMSE metric,
+consistent with the linear `C_1/λ_2` bound in RES-600 §4. The log-log fit
+is essentially a perfect power law.
+
+**Scope.** This is a **self-consistency check**: the harness recovers the
+linear scaling on trajectories generated by the same Axiom-D assumptions
+the head assumes. It confirms that the head correctly implements the
+linearized ODE and that the simulator correctly integrates Axiom D. It
+does **not** establish that Axiom D describes a real physical system. That
+would require independent trunk trajectories from a real medium, which are
+not yet available.
+
+**Reproduce:**
+
+    python scripts/run_fep_sweep.py --simulate --dim 128 --seq-len 64 \
+        --metric rmse --out report_sweep_rmse.json
+
+## 8. Stress test
+
+Section §7 reports the sweep on an ideal Axiom D trajectory. Real data
+would not be ideal: it would carry off-manifold leakage, drift in the
+coherence field, and coarser integration steps. `simulate_axiom_d` exposes
+three stress knobs to probe the theorem's robustness envelope:
+
+| Knob | Ideal | Stress range |
+|---|---|---|
+| `off_manifold_frac` | 0.0 | 0.0 – 0.5 |
+| `g_ramp` | 0.0 | 0.0 – 0.3 |
+| `dt_coarse` | 1.0 | 1.0 – 8.0 |
+
+`scripts/run_fep_sweep.py --stress` runs the sweep at five levels from
+ideal to extreme and reports the slope at each. If the slope stays near 1
+across the range, the bound is robust. If it drifts, the drift marks the
+regime where the theorem's assumptions begin to matter.
+
+**Reproduce:**
+
+    python scripts/run_fep_sweep.py --stress --dim 128 --seq-len 64 \
+        --metric rmse --out report_sweep_stress.json
