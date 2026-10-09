@@ -25,10 +25,12 @@ _PRIMES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47)
 
 
 def prime_tower(schedule_index: int) -> int:
+    """RES-200: rank = PrimeTower(schedule_index)."""
     return _PRIMES[int(schedule_index) % len(_PRIMES)]
 
 
 def _strict_lower(N: np.ndarray) -> np.ndarray:
+    """Strict lower-triangular part (zero diagonal)."""
     return np.tril(N, k=-1)
 
 
@@ -43,7 +45,13 @@ class CoreConfig:
 
 
 class ResidualCore:
-    """Deterministic residual-compensation producer (RES-200)."""
+    """
+    Deterministic residual-compensation producer (RES-200).
+
+    Consumes W (m x n), performs latent factorization -> binary factors ->
+    residual membrane -> scar update -> unipotent embed, and emits a
+    conformant control packet per step.
+    """
 
     def __init__(self, cfg: CoreConfig, seed: int = 0) -> None:
         self.cfg = cfg
@@ -55,6 +63,7 @@ class ResidualCore:
         self._Lambda = np.eye(cfg.r, dtype=np.float32)
         self._step = 0
 
+    # ── internals ────────────────────────────────────────────────────────
     def _factorize(self, W: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         U = W @ self._Vb0.T
         V = self._Ub0.T @ W
@@ -93,9 +102,10 @@ class ResidualCore:
             Lambda.astype(np.float64)
         )
         det = float(np.linalg.det(J))
-        log_abs = abs(np.log10(abs(det) + 1e-300))   # <- variable name fixed
+        log_abs = abs(np.log10(abs(det) + 1e-300))
         return det, bool(log_abs < 1e-9)
 
+    # ── public API ───────────────────────────────────────────────────────
     def step(self,
              W: np.ndarray,
              mu: int = 0,
@@ -149,6 +159,7 @@ class ResidualCore:
         self._step += 1
         return packet
 
+    # ── diagnostics ──────────────────────────────────────────────────────
     @property
     def Lambda(self) -> np.ndarray:
         return self._Lambda
