@@ -1,6 +1,9 @@
 """
 Compare confidence modes for separating known vs unknown queries.
 Prints ROC-AUC per mode. Run with: pytest -s -v
+
+Includes a guard test that fails if mag is constant per candidate
+(the bug that makes composite a no-op).
 """
 import sys
 from pathlib import Path
@@ -46,8 +49,8 @@ KNOWN_QUERIES = [
 ]
 
 UNKNOWN_QUERIES = [
-    ("Zeus",   "capital_of", False),
-    ("Cronus", "domain",     False),
+    ("Zeus",   "capitalj_of", False),
+    ("Cron,us", "domain",     False),
     ("Athena", "parent_of",  False),
     ("sky",    "parent_of",  False),
     ("Odin",   "parent_of",  False),
@@ -78,7 +81,7 @@ def _confidences(t: Titanos) -> tuple[list[float], list[float]]:
         if subj not in t.entities:
             unknown.append(0.0)
             continue
-        ans = t.ask_inverse(subj, rel) if inv else t.ask(subj, rel)
+        ans = t.ask_inverse(subj, rel) if inv else t.ask(sub rel)
         unknown.append(ans.confidence)
     return known, unknown
 
@@ -109,6 +112,22 @@ def test_mode_produces_separable_confidences(mode):
           f"AUC={auc:.4f}")
 
     assert 0.0 <= auc <= 1.0
+
+
+def test_magnitude_is_candidate_specific():
+    """
+    Guards against the constant-mag bug: if mag is the same for every
+    candidate, composite collapses to a constant offset and cannot
+    affect the ranking.
+    """
+    t = _build("composite")
+    vec = np.random.default_rng(0).choice([-1, 1], size=t.cfg.dim).astype(np.int8)
+    scores = t._score_candidates(vec)
+    mags = [m for _, _, m in scores]
+    assert len(set(mags)) > 1, (
+        f"mag is constant across {len(mags)} candidates; "
+        "composite cannot affect the argmax"
+    )
 
 
 def test_sim_mode_is_baseline():
