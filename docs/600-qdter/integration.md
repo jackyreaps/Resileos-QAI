@@ -78,3 +78,23 @@ claim that the source documents require a joint architecture.
 - That Head 2's fit is a verification of the local reduction theorem. A real
   verification restricts to `|δΨ_s| < ε`, sweeps `ε`, and checks that the
   residual scales as `C_1 / λ_2`.
+
+## 6. Numerical verification harness
+
+`VerifiableFEPReductionHead.sweep_epsilon()` runs the reduction ODE across
+a user-supplied set of perturbation scales. It returns:
+
+- `epsilons`: the scales tested
+- `errors`: the ODE fit MSE at each scale
+- `slope`: log-log slope of `errors` vs `epsilons`
+- `r_squared`: fit quality
+
+The slope is the numerical estimate of the residual scaling exponent.
+Under RES-600 §4 the residual is bounded by `C_1/λ_2`; the fitted slope
+is the empirical exponent of that bound on the given trajectory.
+
+A structured trajectory generator (`simulate_linear_ode`) is provided for
+the test suite. It produces a `[1, T, D]` trajectory whose first component
+follows `δΨ̇ = −γ · δΨ` exactly, embedded in a D-dimensional ambient space.
+This lets tests verify that the reduction head recovers a **known** rate,
+rather than fitting noise.
