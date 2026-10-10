@@ -14,6 +14,7 @@ authors = [{ name = "jackyreaps" }]
 dependencies = [
   "numpy>=1.24",
   "torch>=2.1",
+  "requests>=2.31",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +28,6 @@ ui = [
   "uvicorn>=0.27",
   "streamlit>=1.30",
   "pandas>=2.0",
-  "requests>=2.31",
 ]
 all = [
   "resileos[dev,ui]",
@@ -36,11 +36,9 @@ all = [
 [project.scripts]
 titanos = "titanos:main"
 
-# Loose top-level modules (root copies of scripts/*.py + the FastAPI app)
 [tool.setuptools]
 py-modules = ["app", "titanos", "run_hybrid"]
 
-# Package discovery for src/resileos
 [tool.setuptools.packages.find]
 where = ["src"]
 
