@@ -16,6 +16,10 @@ Substrate (QD-TER two-head system, RES-600/601/602):
     POST /api/v1/train_substrate
     POST /api/v1/verify_manifold     (gated on is_trained)
     POST /api/v1/sweep_epsilon       (ungated diagnostic)
+
+Integration (leCore capability router):
+    POST /api/v1/lecore/route
+    GET  /api/v1/lecore/health
 """
 from __future__ import annotations
 
@@ -34,6 +38,9 @@ for p in (ROOT, ROOT / "src", ROOT / "scripts"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
+from resileos.integration.lecore_client import (  # noqa: E402
+    LeCoreClient, LeCoreUnreachable, LeCoreError,
+)
 from resileos.substrate.geometry import LowRankMetricHead  # noqa: E402
 from resileos.substrate.reduction import (  # noqa: E402
     VerifiableFEPReductionHead,
@@ -407,4 +414,45 @@ def sweep_epsilon(payload: SweepRequest):
         "g_field": payload.g_field,
         **result,
         "verdict": verdict,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# leCore integration (capability router)
+# ═══════════════════════════════════════════════════════════════════════════
+_lecore = LeCoreClient()   # honours LECORE_URL, LECORE_TOKEN, LECORE_TIMEOUT
+
+
+class LeCoreRouteRequest(BaseModel):
+    query: str
+
+
+@app.get("/api/v1/lecore/health")
+def lecore_health():
+    try:
+        return {"available": True, **_lecore.health()}
+    except (LeCoreUnreachable, LeCoreError) as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.post("/api/v1/lecore/route")
+def lecore_route(payload: LeCoreRouteRequest):
+    """
+    Send a task description to leCore and return ranked capability homes.
+    Soft-fails (returns {available: false}) if leCore is not reachable.
+    """
+    query = payload.query.strip()
+    if not query:
+        raise HTTPException(400, "query is required")
+    try:
+        caps = _lecore.search(query)
+    except (LeCoreUnreachable, LeCoreError) as e:
+        return {"available": False, "error": str(e)}
+    return {
+        "available": True,
+        "query": query,
+        "capabilities": [
+            {"name": c.name, "description": c.description, "score": c.score}
+            for c in caps
+        ],
     }
