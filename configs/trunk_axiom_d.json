@@ -1,0 +1,10 @@
+{
+  "path": "configs/trunk_axiom_d.npy",
+  "shape": [8, 64, 128],
+  "dim": 128,
+  "seq_len": 64,
+  "g_field": 0.85,
+  "psi_b": 1.5,
+  "epsilons": [0.1, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01],
+  "note": "K=8 Axiom-D trajectories; axis0=K, axis1=T, axis2=D; slow coord on D=0"
+}
