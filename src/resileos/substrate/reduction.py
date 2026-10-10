@@ -28,8 +28,8 @@ class VerifiableFEPReductionHead(nn.Module):
         P_s may be rank-k. The scalar ODE fit uses the first coordinate.
 
     G-field handling:
-        The ODE fit uses per-step Γ_eff(t) = G(t) · (Π_o + Π_s). When
-        G_field is constant this reduces to the scalar form.
+        The ODE fit uses per-step Γ_eff(t) = G(t) · (Π_o + Π_s).
+        When G_field is constant this reduces to the scalar form.
 
     Inputs:
         trunk_state   [1, T, D]
@@ -67,6 +67,7 @@ class VerifiableFEPReductionHead(nn.Module):
         self.register_buffer("psi_a", torch.tensor(0.5))
         self.register_buffer("psi_b", torch.tensor(1.5))
 
+    # ── core forward ────────────────────────────────────────────────────
     def forward(self, trunk_state: torch.Tensor,
                 G_field: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         if trunk_state.dim() != 3 or trunk_state.size(0) != 1:
@@ -89,21 +90,22 @@ class VerifiableFEPReductionHead(nn.Module):
 
         pi_o = self.f_scalar * self.psi_a * self.psi_b
         pi_s = self.f_scalar * self.psi_b * (self.psi_b - self.psi_a)
-        pi_sum = pi_o + pi_s
+
+        # Per-step Γ_eff(t) = G(t) · (Π_o + Π_s), shape [1, T, 1]
+        gamma_eff_t = G_field * (pi_o + pi_s)
 
         delta_psi = psi_scalar - self.psi_b
 
         if T > 1:
-            # Per-step Γ_eff(t) = G(t) · Π_sum, shape [1, T-1, 1]
-            gamma_t = G_field[:, :-1, :] * pi_sum
             d_dt = delta_psi[:, 1:, :] - delta_psi[:, :-1, :]
-            expected = -gamma_t * delta_psi[:, :-1, :]
+            expected = -gamma_eff_t[:, :-1, :] * delta_psi[:, :-1, :]
             ode_error = F.mse_loss(d_dt, expected)
         else:
             ode_error = trunk_state.new_zeros(())
 
         return psi_s, ode_error
 
+    # ── verification harness ────────────────────────────────────────────
     def sweep_epsilon(
         self,
         trajectory_factory,
@@ -165,7 +167,7 @@ class VerifiableFEPReductionHead(nn.Module):
         }
 
 
-# ── trajectory generators ───────────────────────────────────────────────
+# ── trajectory generators (shared by CLI, API, tests) ───────────────────
 def simulate_linear_ode(
     hidden_dim: int,
     seq_len: int,
@@ -205,11 +207,10 @@ def simulate_axiom_d(
     off_manifold_frac: float = 0.0,
     g_ramp: float = 0.0,
     dt_coarse: float = 1.0,
-    return_g_series: bool = False,
-):
+) -> torch.Tensor:
     """
     Integrate Axiom D on the slow coordinate and embed in dim-dimensional
-    ambient space.
+    ambient space. Returns [1, T, D].
 
     Axiom D:
         dΨ/dt = −L_H Ψ + M_E(t) · F(Ψ, f)
@@ -220,45 +221,32 @@ def simulate_axiom_d(
 
         off_manifold_frac:
             Fraction of ε that leaks off the slow axis into the ambient
-            subspace at t=0. The slow-axis starting value is reduced by
-            the same fraction so total ε magnitude is preserved.
-            Ideal = 0.0. Stress range 0.0 – 0.5.
-            NOTE: with the current axis-aligned basis (e_0), this does
-            not change psi_s; it is a placeholder for future multi-axis
-            extensions.
+            subspace at t=0. Ideal = 0.0. Stress range 0.0 – 0.5.
 
         g_ramp:
-            Fractional drift of G over the trajectory. G(t) goes from
-            g_field to g_field·(1 + g_ramp). Modulates the decay RATE
-            inside the integrator — the trajectory stays on-manifold,
-            only Γ_eff(t) varies. Ideal = 0.0. Stress range 0.0 – 0.3.
+            Fractional drift of G over the trajectory. G(t) ramps linearly
+            from g_field to g_field·(1 + g_ramp). Modulates the decay RATE
+            inside the integrator, keeping the trajectory on-manifold.
+            Ideal = 0.0. Stress range 0.0 – 0.3.
 
         dt_coarse:
             Multiplier on the integration step. Ideal = 1.0.
             Stress range 1.0 – 8.0.
 
-    Returns:
-        trunk           [1, T, D] if return_g_series is False
-        (trunk, G_series)  if return_g_series is True
-                          G_series is [1, T, 1] as fed to the integrator.
+    The trajectory starts at Ψ = Ψ_B + ε and decays toward Ψ_B.
     """
     rng = np.random.default_rng(seed)
     dt_eff = dt * dt_coarse
 
-    # G(t): constant unless g_ramp > 0
-    if g_ramp > 0.0:
-        g_series = g_field * (1.0 + np.linspace(0.0, g_ramp, seq_len))
-    else:
-        g_series = np.full(seq_len, g_field, dtype=np.float64)
+    # G(t) schedule, matching coherence_schedule below.
+    g_schedule = g_field * (1.0 + np.linspace(0.0, g_ramp, seq_len))
 
-    # Slow-axis start: ε reduced by off-manifold leak
-    psi = psi_b + epsilon * (1.0 - off_manifold_frac)
+    psi = psi_b + epsilon
     traj = np.zeros(seq_len, dtype=np.float64)
     traj[0] = psi
-
     for t in range(1, seq_len):
-        g_t = g_series[t]
-        m_e_t = g_t * psi_b / (psi_b - psi_a)
+        # Use G at the start of the step (index t-1) for the update to t.
+        m_e_t = g_schedule[t - 1] * psi_b / (psi_b - psi_a)
         F_val = f * psi * (psi_a - psi) * (psi - psi_b)
         psi = psi + m_e_t * F_val * dt_eff
         traj[t] = psi
@@ -271,9 +259,26 @@ def simulate_axiom_d(
         ambient = ambient + leak
 
     full = np.concatenate([traj[:, None], ambient], axis=1)
-    trunk = torch.tensor(full[None, ...], dtype=torch.float32)
+    return torch.tensor(full[None, ...], dtype=torch.float32)
 
-    if return_g_series:
-        g_tensor = torch.tensor(g_series[None, :, None], dtype=torch.float32)
-        return trunk, g_tensor
-    return trunk
+
+def coherence_schedule(
+    seq_len: int,
+    g_field: float = 0.85,
+    g_ramp: float = 0.0,
+) -> torch.Tensor:
+    """
+    Return the matching G_field series [1, T, 1] for a trajectory produced
+    by `simulate_axiom_d` with the same (g_field, g_ramp). The head's
+    per-step Γ_eff(t) uses this directly.
+    """
+    g = g_field * (1.0 + np.linspace(0.0, g_ramp, seq_len))
+    return torch.tensor(g[None, :, None], dtype=torch.float32)
+
+
+__all__ = [
+    "VerifiableFEPReductionHead",
+    "simulate_axiom_d",
+    "simulate_linear_ode",
+    "coherence_schedule",
+]
