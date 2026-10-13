@@ -7,26 +7,27 @@ A scalar in (0, 1] measuring how closed a residual trajectory is:
     - internal prediction e_t^int = normalized step-to-step monitor change
     - external mismatch   e_t^ext = ||output - reference||, optional
 
+Without living_factor:
+
     CSI_T = exp(-mean v) · exp(-mean e_int) · 1/(1 + mean e_ext)
 
+With living_factor=True, the exp(-mean e_int) term is replaced (not
+multiplied) by a bump around optimal_drift, so a completely frozen
+trajectory does not automatically score highest:
+
+    internal_term = exp(-k · (mean e_int − d*)^2)
+
+At mean e_int = d* the internal term is 1. At mean e_int = 0 it is
+exp(-k · d*²), a penalty for being frozen.
+
 The claim, in this project's terms: finite residual trajectories that
-maintain high CSI form more reliable causal subsystems, in the sense that
-measurements internal to them are more trustworthy. This is a working
-hypothesis, not a theorem. See RES-305 §0.
+maintain high CSI form more reliable causal subsystems, in the sense
+that measurements internal to them are more trustworthy. This is a
+working hypothesis, not a theorem. See RES-305 §0.
 
 The general notion of finite dynamical systems forming closed causal
 subsystems — where the meaningful measurements are internal to the
 dynamics — has been discussed in relational-geometry contexts.
-
-Two optional modifiers:
-
-    external_term (default True)   include the 1/(1+mean e_ext) factor.
-                                   Disable when no external reference exists.
-
-    living_factor (default False)  multiply by exp(-k(mean e_int - d*)^2),
-                                   rewarding moderate internal drift so that
-                                   a trivially frozen system does not
-                                   automatically score highest. Heuristic.
 """
 from __future__ import annotations
 
@@ -91,9 +92,14 @@ def compute_csi(
     """
     CSI over a trajectory.
 
+    Without living_factor:
         CSI = exp(-mean v) · exp(-mean e_int)
               · [1/(1+mean e_ext)] if external_term
-              · exp(-k(mean e_int - d*)^2) if living_factor
+
+    With living_factor=True, the internal-error term is replaced by a
+    bump around optimal_drift:
+
+        internal_term = exp(-k · (mean e_int − d*)^2)
 
     Returns 1.0 for an empty trajectory (no evidence against closure).
     """
@@ -107,16 +113,17 @@ def compute_csi(
     v_mean = float(v.mean())
     e_int_mean = float(e_int.mean())
 
-    csi = math.exp(-v_mean) * math.exp(-e_int_mean)
+    csi = math.exp(-v_mean)
+
+    if living_factor:
+        csi *= math.exp(-living_sharpness * (e_int_mean - optimal_drift) ** 2)
+    else:
+        csi *= math.exp(-e_int_mean)
 
     if external_term and external_errors is not None:
         e_ext = np.asarray(external_errors, dtype=np.float64)
         if e_ext.size > 0 and np.all(np.isfinite(e_ext)):
-            e_ext_mean = float(e_ext.mean())
-            csi /= (1.0 + e_ext_mean)
-
-    if living_factor:
-        csi *= math.exp(-living_sharpness * (e_int_mean - optimal_drift) ** 2)
+            csi /= (1.0 + float(e_ext.mean()))
 
     return float(csi)
 
