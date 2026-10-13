@@ -1,15 +1,5 @@
 """
 Tests for emergent basin reorganization in Titanos.
-
-Without the non-conservative operator in the loop, the basin is static:
-anisotropy stays at 1.0, thresholds do not move, and keeping quality up
-requires external tuning. With it, the geometry reorganizes from
-monitors computed during retrieval.
-
-These tests check the observable consequences, not the internal theory.
-The scaling sigma_eff = sigma_base / sqrt(anisotropy) is a proposal
-(RES-200 §extension); the tests verify the mechanism produces the
-expected direction, not a specific magnitude.
 """
 import sys
 from pathlib import Path
@@ -77,8 +67,6 @@ def test_emergent_anisotropy_grows():
 
 
 def test_emergent_sigma_eff_shrinks():
-    """sigma_eff = sigma_base / sqrt(anisotropy). Growth of anisotropy
-    should shrink the effective noise floor."""
     t = _build(emergent=True)
     rel = "domain"
     s0 = t._noise_sigma_effective(rel)
@@ -89,7 +77,6 @@ def test_emergent_sigma_eff_shrinks():
 
 # ── noise-aware thresholds ──────────────────────────────────────────────
 def test_thresholds_track_effective_sigma():
-    """With no explicit overrides, thresholds must be alpha * sigma_eff."""
     t = _build(emergent=True)
     _drive(t, cycles=2)
     classical, abstain, sigma_eff = t._thresholds_for("domain")
@@ -100,7 +87,6 @@ def test_thresholds_track_effective_sigma():
 
 
 def test_thresholds_shift_after_drive():
-    """Derived thresholds move on their own; no external tuning."""
     t = _build(emergent=True)
     before = t._thresholds_for("domain")
     _drive(t, cycles=8)
@@ -110,7 +96,6 @@ def test_thresholds_shift_after_drive():
 
 
 def test_conservative_thresholds_do_not_shift():
-    """Without emergent mode, thresholds are pinned to sigma_base."""
     t = _build(emergent=False)
     before = t._thresholds_for("domain")
     _drive(t, cycles=8)
@@ -119,8 +104,6 @@ def test_conservative_thresholds_do_not_shift():
 
 
 def test_explicit_overrides_ignore_sigma_eff():
-    """When classical_conf is set explicitly, sigma_eff is computed but
-    does not affect the threshold."""
     cfg = TitanosConfig(
         dim=2500, m=50, n=50, r=4, n_loops=4, seed=42,
         emergent=True,
@@ -205,8 +188,6 @@ def test_agency_weights_update_after_dispatch():
             t.prune()
 
     snap = t.agency.snapshot()
-    # The weaker child should have lost ground, either by weight or by
-    # being eaten. Either outcome is acceptable.
     assert (
         snap["children"]["sim"]["weight"] < snap["children"]["mag"]["weight"]
         or "sim" in snap["eaten"]
@@ -225,20 +206,17 @@ def test_stats_includes_agency_snapshot():
 def test_retrieval_still_works_after_evolution():
     t = _build(emergent=True)
     _drive(t, cycles=3)
-    # Single-hop queries should still resolve.
     assert t.ask("Zeus", "domain").value == "sky"
     assert t.ask("Poseidon", "domain").value == "sea"
     assert t.ask("Cronus", "is_a").value == "titan"
 
 
 def test_backward_compat_single_accumulator_save():
-    """Legacy save format with 'acc' should load cleanly."""
     cfg = TitanosConfig(dim=2500, m=50, n=50, r=4, n_loops=4, seed=42,
                         emergent=False)
     t = Titanos(cfg)
     for s, r, o in FACTS:
         t.learn(s, r, o)
-    # Simulate legacy save: strip bands, put merged acc under "_legacy"
     legacy_state = {
         "cfg": {**t.cfg.__dict__, "seed_list": list(t.cfg.seed_list)},
         "acc": t._merged_acc().tolist(),
@@ -280,4 +258,4 @@ def test_csi_state_persists(tmp_path):
     t.save(p)
     t2 = Titanos.load(p)
     assert t2._csi.samples() == samples_before
-    assert np.isclose(t2._csi.value(), csi_before, rel_tol=1e-9)
+    assert np.isclose(t2._csi.value(), csi_before, rtol=1e-9)
