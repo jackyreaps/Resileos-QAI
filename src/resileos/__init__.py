@@ -1,47 +1,24 @@
 """
-Resileos-QAI substrate package.
+Resileos-QAI.
 
-Two-head system for QD-TER bridge integration, plus support utilities:
+Hybrid Classical Residual Core + HDRIFT Generative Substrate.
 
-    geometry.py         Head 1: geometric manifold tracking (RES-601)
-    reduction.py        Head 2: FEP reduction tracking (RES-600)
-    spd.py              positive-definiteness helpers (RES-601 §7 item 3)
-    fpe.py              FPE backend selector (leCore / in-house)
-    rheology.py         interface for the coordinate map (unbound)
-    nonconservative.py  non-conservative diagonal operator (RES-200 §ext)
+Subpackages:
+    resileos.substrate     — QD-TER two-head system, phasor graph,
+                             CSI, agency (see docs/300-substrate/)
+    resileos.integration   — HTTP clients for external services
+
+Top-level re-exports are intentionally not provided. Import from the
+subpackage you need:
+
+    from resileos.core import ResidualCore
+    from resileos.substrate import PhasorGraph, AgencyGroup, CSIState
+
+The historical pattern of re-exporting geometry/reduction at the
+package root was removed: those modules live under `resileos.substrate`,
+not at the root, and importing them from the root broke `import resileos`.
 """
-from .geometry import (
-    LowRankMetricHead,
-    BridgeMetricHead,
-)
-from .reduction import (
-    VerifiableFEPReductionHead,
-    coherence_schedule,
-    simulate_axiom_d,
-    simulate_linear_ode,
-)
-from .spd import assert_spd, is_spd, min_eigenvalue, isotropic_metric
-from .fpe import fpe_encode_bipolar, backend_name, LECORE_AVAILABLE
-from .nonconservative import NonConservativeOperator
 
-__all__ = [
-    # geometry
-    "LowRankMetricHead",
-    "BridgeMetricHead",
-    # reduction
-    "VerifiableFEPReductionHead",
-    "coherence_schedule",
-    "simulate_axiom_d",
-    "simulate_linear_ode",
-    # spd
-    "assert_spd",
-    "is_spd",
-    "min_eigenvalue",
-    "isotropic_metric",
-    # fpe
-    "fpe_encode_bipolar",
-    "backend_name",
-    "LECORE_AVAILABLE",
-    # nonconservative
-    "NonConservativeOperator",
-]
+__version__ = "1.0.0"
+
+__all__ = ["__version__"]
