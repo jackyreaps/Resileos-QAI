@@ -58,16 +58,11 @@ class TitanosConfig:
     seed: int = 1337
     n_loops: int = 12
 
-    # Emergent mode: the non-conservative operator inside the core is
-    # driven by real monitors computed during retrieval (RES-200 §ext).
     emergent: bool = True
     nc_gamma_max: float = 0.5
     nc_phase_max: float = 0.4
     nc_decay: float = 0.9
 
-    # Derived thresholds. When classical_conf / abstention_gate are None,
-    # they are computed per query as alpha * sigma_eff, where
-    # sigma_eff = sigma_base / sqrt(anisotropy). Explicit values override.
     conf_alpha_classical: float = 4.0
     conf_alpha_abstain: float = 1.5
     classical_conf: float | None = None
@@ -81,7 +76,6 @@ class TitanosConfig:
 
     sigma_E: float = 10.0
     sigma1_k: int = 3
-    # Legacy alias for sigma1_k; if set, overrides it in __post_init__.
     sigma_k: int | None = None
 
     N_warm: int = 512
@@ -90,7 +84,6 @@ class TitanosConfig:
     tau_sat: float = 0.9
     tau_low: float = 0.1
 
-    # CSI (RES-305)
     csi_window: int = 64
     csi_external_term: bool = True
     csi_living_factor: bool = False
@@ -158,7 +151,6 @@ class Titanos:
             nc_phase_max=cfg.nc_phase_max,
             nc_decay=cfg.nc_decay,
         )
-        # Per-relation accumulators (band sharding, RES-306).
         self._bands: dict[str, np.ndarray] = {}
         self._counts: dict[str, int] = {}
         self._perm = self.rng.permutation(cfg.dim)
@@ -182,7 +174,6 @@ class Titanos:
             optimal_drift=cfg.csi_optimal_drift,
             living_sharpness=cfg.csi_living_sharpness,
         )
-        # Agency layer (heuristic, RES-307). Empty by default.
         self.agency = AgencyGroup()
 
     # ── accumulators ─────────────────────────────────────────────────
@@ -383,8 +374,16 @@ class Titanos:
         return names[idx], float(conf[idx])
 
     # ── recurrent loop ───────────────────────────────────────────────
-    def _recurrent(self, initial_h: np.ndarray, F_res: float,
-                   DeltaS: float, mu: int):
+    def _recurrent(self, initial_h: np.ndarray,
+                   F_res: float = 0.0, DeltaS: float = 0.5, mu: int = 0):
+        """
+        Recurrent refinement.
+
+        F_res, DeltaS, mu default to neutral values so callers that pass
+        only the probe (older test code, direct diagnostics) still work.
+        In the full path, `_ask` supplies real monitors computed from
+        retrieval.
+        """
         h = initial_h.copy()
         history: list = []
         sqrt_dim = float(np.sqrt(self.cfg.dim))
@@ -506,7 +505,6 @@ class Titanos:
         if self.cfg.csi_fast_path:
             self._escalation_count += 1
 
-        # Slow path with real monitors.
         F_res, DeltaS, mu = self._compute_monitors(subject, relation, probe)
         refined, history, exit_reason, gate_state = self._recurrent(
             probe, F_res=F_res, DeltaS=DeltaS, mu=mu)
@@ -588,25 +586,13 @@ class Titanos:
     # ── agency layer (RES-307) ───────────────────────────────────────
     def register_child(self, name: str, handler: HandlerFn,
                        weight: float = 1.0) -> AgencyChild:
-        """
-        Register a child query handler. The handler signature is
-        `callable(parent, subject, relation, inverse) -> Answer | None`.
-        Returning None means "this child declines"; routing falls through
-        to the parent's own path.
-        """
+        """Register a child query handler."""
         return self.agency.add_child(name, handler, weight=weight)
 
     def dispatch(self, subject: str, relation: str,
                  inverse: bool = False,
                  handler_name: str | None = None) -> Answer:
-        """
-        Route a query. If a handler is named, call it. Otherwise select
-        by weight among active children. Falls through to the parent if
-        no child is available or the selected child declines.
-
-        After the call, records the child's fitness (the answer's CSI,
-        and whether the answer was non-abstaining).
-        """
+        """Route a query through the agency layer."""
         child: AgencyChild | None = None
         if handler_name is not None:
             child = self.agency.children.get(handler_name)
@@ -636,7 +622,6 @@ class Titanos:
         return ans
 
     def prune(self) -> list[str]:
-        """Run evaluate_and_prune; return names of newly eaten children."""
         return self.agency.evaluate_and_prune()
 
     # ── chain / analogy ──────────────────────────────────────────────
@@ -843,10 +828,8 @@ if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
     p.add_argument("--config", default=None)
-    p.add_argument("--conservative", action="store_true",
-                   help="Disable emergent mode (fixed thresholds, D = I)")
-    p.add_argument("--csi-fast-path", action="store_true",
-                   help="Enable CSI-gated fast-path escalation")
+    p.add_argument("--conservative", action="store_true")
+    p.add_argument("--csi-fast-path", action="store_true")
     args = p.parse_args()
 
     cfg = (TitanosConfig.from_json(args.config)
