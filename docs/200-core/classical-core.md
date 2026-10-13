@@ -52,6 +52,31 @@ Both the raw determinant and the logged quantity are recorded every step.
 `volume`, `volume_ok`, and `rank` are part of the full packet and are
 advisory for the quantum / coherence backend.
 
+## Non-conservative extension
+
+The frozen form `J = I + strict_lower(Λ)` has eigenvalues `{1, …, 1}` by
+`OscGraph.spectrum_one_add_strictLower`, so it cannot reorganize the
+basin: every direction scales identically. The optional extension
+replaces the identity diagonal with a complex diagonal `D`:
+
+    J = diag(D) + strict_lower(Λ),     det(D) = 1
+
+This preserves the volume invariant exactly (`det J = det D = 1`) while
+allowing eigenvalues `{d_1, …, d_r}` to differ from 1. Magnitudes
+`|d_i|` produce non-conservative scaling; phases `arg(d_i)` produce
+phase regulation. Both evolve from the monitors `F_res`, `ΔS`, `μ`.
+
+Mode is off by default. `ResidualCore(..., non_conservative=True)`
+activates it. The `D` diagonal is emitted on every packet and is
+included in `packet_hash`.
+
+### Volume guard semantics
+
+The guard `|log10|det J|| < 1e-9` is a *witness* that the structure is
+triangular, not a numerical stability test. In conservative mode it
+cannot fail on any `Λ`. In non-conservative mode it checks the
+`det(D) = 1` constraint numerically on every step.
+
 ## Prime Tower schedule
 
     rank = PrimeTower(schedule_index)
