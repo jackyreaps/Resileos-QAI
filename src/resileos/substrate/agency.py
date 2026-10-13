@@ -7,11 +7,11 @@ that a child with mean CSI below a threshold *should* be deactivated.
 The thresholds are chosen operational parameters. See RES-307 §0.
 
 Children are specialized query handlers. The group maintains a weight
-per child and routes each query to the highest-weight active child.
-After each query the selected child receives a fitness update. A child
-whose fitness falls below both thresholds is "eaten" — removed from the
-routing pool. Weight is not transferred to another child. The parent
-simply stops offering queries to it.
+per child and routes each query. After each query the selected child
+receives a fitness update. A child whose fitness falls below both
+thresholds is "eaten" — removed from the routing pool. Weight is not
+transferred to another child. The parent simply stops offering queries
+to it.
 
 No state is written to the frozen residual core. The parent's memory
 layer is the only mutable state that survives a query.
@@ -63,7 +63,6 @@ class AgencyChild:
         self.local_csi.append(float(csi))
         if len(self.local_csi) > self.csi_window:
             self.local_csi.pop(0)
-        # EMA on contribution with slow decay.
         self.contribution = 0.9 * self.contribution + 0.1 * float(contribution)
 
     @property
@@ -79,14 +78,13 @@ class AgencyChild:
 
 class AgencyGroup:
     """
-    Routes queries to children by weight. Eats children whose fitness
-    is poor. STATUS: heuristic.
+    Routes queries to children. Eats children whose fitness is poor.
+    STATUS: heuristic.
 
     Parameters:
         eat_threshold_csi        mean CSI below this makes a child edible
         eat_threshold_contrib    EMA contribution below this too
         min_queries_before_eat   require this many queries before eating
-                                 (avoids noisy early decisions)
         min_weight               below this, a child is fully deactivated
         absorption_rate          weight multiplier applied at each eat step
     """
@@ -117,8 +115,7 @@ class AgencyGroup:
         if weight <= 0.0:
             raise ValueError("weight must be > 0")
         child = AgencyChild(
-            name=name,
-            handler=handler,
+            name=name, handler=handler,
             weight=float(weight),
             requested_weight=float(weight),
         )
@@ -133,13 +130,24 @@ class AgencyGroup:
     # ── selection ────────────────────────────────────────────────────
     def select(self) -> AgencyChild | None:
         """
-        Return the active child with the highest weight, or None if no
-        children are registered or all have been eaten. Deterministic.
+        Return an active child for the next query.
+
+        Deterministic. Among active children:
+        - If only one is active, return it.
+        - Otherwise prefer the child with the fewest queries so far
+          (round-robin exploration). Ties are broken by highest weight.
+          Without this, deterministic argmax would route every query
+          to the highest-weight child and the others would never
+          accumulate fitness signal.
         """
         active = [c for c in self.children.values() if c.active]
         if not active:
             return None
-        return max(active, key=lambda c: c.weight)
+        if len(active) == 1:
+            return active[0]
+        min_q = min(c.query_count for c in active)
+        candidates = [c for c in active if c.query_count == min_q]
+        return max(candidates, key=lambda c: c.weight)
 
     def _normalize_weights(self) -> None:
         """
@@ -172,11 +180,6 @@ class AgencyGroup:
             - query_count >= min_queries_before_eat
             - mean_csi < eat_threshold_csi
             - contribution < eat_threshold_contrib
-
-        Both `weight` (visible to the test) and `requested_weight` (used
-        for re-normalization on subsequent add_child calls) are reduced.
-        No re-normalization is performed here, so a single-child weight
-        drops as expected.
         """
         child = self.children.get(name)
         if child is None or not child.active:
