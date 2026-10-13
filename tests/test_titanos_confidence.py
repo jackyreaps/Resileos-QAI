@@ -1,6 +1,9 @@
 """
 Compare confidence modes for separating known vs unknown queries.
 Prints ROC-AUC per mode. Run with: pytest -s -v
+
+Includes a guard test that fails if mag is constant per candidate
+(the bug that makes composite a no-op).
 """
 import sys
 from pathlib import Path
@@ -9,40 +12,50 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from titanos import Titanos, TitanosConfig
 
 
 KNOWN_FACTS = [
-    ("Uranus", "parent_of", "Cronus"), ("Cronus", "parent_of", "Zeus"),
-    ("Cronus", "parent_of", "Poseidon"), ("Cronus", "parent_of", "Hades"),
-    ("Zeus", "parent_of", "Ares"), ("Zeus", "parent_of", "Athena"),
-    ("Zeus", "domain", "sky"), ("Poseidon", "domain", "sea"),
-    ("Hades", "domain", "underworld"), ("Ares", "domain", "war"),
-    ("Athena", "domain", "wisdom"), ("Uranus", "is_a", "primordial"),
-    ("Cronus", "is_a", "titan"), ("Zeus", "is_a", "olympian"),
-    ("Poseidon", "is_a", "olympian"), ("Hades", "is_a", "olympian"),
-    ("Ares", "is_a", "olympian"), ("Athena", "is_a", "olympian"),
+    ("Uranus",   "parent_of", "Cronus"),
+    ("Cronus",   "parent_of", "Zeus"),
+    ("Cronus",   "parent_of", "Poseidon"),
+    ("Cronus",   "parent_of", "Hades"),
+    ("Zeus",     "parent_of", "Ares"),
+    ("Zeus",     "parent_of", "Athena"),
+    ("Zeus",     "domain",    "sky"),
+    ("Poseidon", "domain",    "sea"),
+    ("Hades",    "domain",    "underworld"),
+    ("Ares",     "domain",    "war"),
+    ("Athena",   "domain",    "wisdom"),
+    ("Uranus",   "is_a",      "primordial"),
+    ("Cronus",   "is_a",      "titan"),
+    ("Zeus",     "is_a",      "olympian"),
+    ("Poseidon", "is_a",      "olympian"),
+    ("Hades",    "is_a",      "olympian"),
+    ("Ares",     "is_a",      "olympian"),
+    ("Athena",   "is_a",      "olympian"),
 ]
 
 KNOWN_QUERIES = [
-    ("Zeus", "domain", False),
-    ("Zeus", "parent_of", False),
-    ("Cronus", "parent_of", False),
-    ("Poseidon", "domain", False),
-    ("Athena", "is_a", False),
-    ("Zeus", "parent_of", True),
-    ("Cronus", "parent_of", True),
-    ("sea", "domain", True),
+    ("Zeus",     "domain",    False),
+    ("Zeus",     "parent_of", False),
+    ("Cronus",   "parent_of", False),
+    ("Poseidon", "domain",    False),
+    ("Athena",   "is_a",      False),
+    ("Zeus",     "parent_of", True),
+    ("Cronus",   "parent_of", True),
+    ("sea",      "domain",    True),
 ]
 
 UNKNOWN_QUERIES = [
-    ("Zeus", "capital_of", False),
-    ("Cronus", "domain", False),
-    ("Athena", "parent_of", False),
-    ("sky", "parent_of", False),
-    ("Odin", "parent_of", False),
-    ("Thor", "domain", False),
+    ("Zeus",   "capital_of", False),
+    ("Cronus", "domain",     False),
+    ("Athena", "parent_of",  False),
+    ("sky",    "parent_of",  False),
+    ("Odin",   "parent_of",  False),
+    ("Thor",   "domain",     False),
 ]
 
 
@@ -50,7 +63,7 @@ def _build(mode: str, alpha: float = 0.6) -> Titanos:
     cfg = TitanosConfig(
         dim=2500, m=50, n=50, r=4, n_loops=6, seed=42,
         classical_conf=0.09, abstention_gate=0.035,
-        sigma_E=10.0, sigma_k=3,
+        sigma_E=10.0, sigma1_k=3,
         E_sat=10.0, E_sigma=10.0, tau_sat=0.9, tau_low=0.1,
         conf_mode=mode, conf_alpha=alpha,
     )
@@ -110,7 +123,8 @@ def test_mode_produces_separable_confidences(mode):
 def test_magnitude_is_candidate_specific():
     """Guards against the constant-mag bug."""
     t = _build("mag")
-    vec = np.random.default_rng(0).choice([-1, 1], size=t.cfg.dim).astype(np.int8)
+    vec = np.random.default_rng(0).choice(
+        [-1, 1], size=t.cfg.dim).astype(np.int8)
     scores = t._score_candidates(vec)
     mags = [m for _, _, m in scores]
     assert len(set(mags)) > 1, (
