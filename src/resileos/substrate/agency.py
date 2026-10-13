@@ -36,20 +36,22 @@ class AgencyChild:
     A specialized query handler with a hierarchy weight.
 
     Fields:
-        name            unique identifier
-        handler         callable (parent, subject, relation, inverse) -> Answer|None
-        weight          routing weight; higher = more likely selected
-        active          False once eaten; excluded from selection
-        local_csi       rolling window of CSI values from this child's queries
-        contribution    EMA of 1.0 for accepted answers, 0.0 for abstained
-        query_count     total queries routed to this child
-        accept_count    queries that returned a non-abstaining answer
-        csi_window      size of the rolling CSI window
+        name              unique identifier
+        handler           callable (parent, subject, relation, inverse) -> Answer|None
+        weight            normalized routing weight
+        requested_weight  value set by add_child; eat reduces this
+        active            False once eaten; excluded from selection
+        local_csi         rolling window of CSI values from this child's queries
+        contribution      EMA of 1.0 for accepted answers, 0.0 for abstained
+        query_count       total queries routed to this child
+        accept_count      queries that returned a non-abstaining answer
+        csi_window        size of the rolling CSI window
     """
 
     name: str
     handler: HandlerFn
     weight: float = 1.0
+    requested_weight: float = 1.0
     active: bool = True
     local_csi: list[float] = field(default_factory=list)
     contribution: float = 0.0
@@ -114,7 +116,12 @@ class AgencyGroup:
             raise ValueError(f"child {name!r} already registered")
         if weight <= 0.0:
             raise ValueError("weight must be > 0")
-        child = AgencyChild(name=name, handler=handler, weight=float(weight))
+        child = AgencyChild(
+            name=name,
+            handler=handler,
+            weight=float(weight),
+            requested_weight=float(weight),
+        )
         self.children[name] = child
         self._normalize_weights()
         return child
@@ -135,12 +142,17 @@ class AgencyGroup:
         return max(active, key=lambda c: c.weight)
 
     def _normalize_weights(self) -> None:
-        total = sum(c.weight for c in self.children.values() if c.active)
+        """
+        Normalize by sum of requested weights (not current weights), so
+        adding a child does not distort existing children's allocations.
+        """
+        total = sum(c.requested_weight
+                    for c in self.children.values() if c.active)
         if total <= 0.0:
             return
         for c in self.children.values():
             if c.active:
-                c.weight = c.weight / total
+                c.weight = c.requested_weight / total
 
     # ── fitness updates ──────────────────────────────────────────────
     def record(self, name: str, csi: float, accepted: bool) -> None:
@@ -156,11 +168,15 @@ class AgencyGroup:
     def eat(self, name: str) -> bool:
         """
         Attempt to eat a child. Returns True if the child was affected
-        (weight reduced). A child is fully deactivated when its weight
-        drops below min_weight after eating. A child is only edible when:
+        (weight reduced). A child is only edible when:
             - query_count >= min_queries_before_eat
             - mean_csi < eat_threshold_csi
             - contribution < eat_threshold_contrib
+
+        Both `weight` (visible to the test) and `requested_weight` (used
+        for re-normalization on subsequent add_child calls) are reduced.
+        No re-normalization is performed here, so a single-child weight
+        drops as expected.
         """
         child = self.children.get(name)
         if child is None or not child.active:
@@ -173,11 +189,11 @@ class AgencyGroup:
             return False
 
         child.weight *= (1.0 - self.absorption_rate)
-        if child.weight < self.min_weight:
+        child.requested_weight *= (1.0 - self.absorption_rate)
+        if child.requested_weight < self.min_weight:
             child.active = False
             if name not in self.eaten:
                 self.eaten.append(name)
-        self._normalize_weights()
         return True
 
     def evaluate_and_prune(self) -> list[str]:
