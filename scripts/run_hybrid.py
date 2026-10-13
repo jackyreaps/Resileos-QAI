@@ -108,28 +108,36 @@ def _svd_baseline(W, r):
     return float(np.linalg.norm(W - W_r) / (np.linalg.norm(W) + 1e-12))
 
 
-def _recon_rel_err(W, Ub, Vb):
-    W_hat = Ub @ Vb
-    denom = float(np.sum(W_hat * W_hat)) + 1e-12
-    s = float(np.sum(W * W_hat)) / denom
-    return float(np.linalg.norm(W - s * W_hat) / (np.linalg.norm(W) + 1e-12))
+def _core_compression(blocks, m, n, r, encoder=None, n_layers=12):
+    """
+    Run the core on each block and measure the reconstruction error of
+    the FULL stacked reconstruction (all residual layers), not just
+    layer 0.
 
-
-def _core_compression(blocks, m, n, r, encoder=None):
-    core = ResidualCore(CoreConfig(m=m, n=n, r=r), seed=0)
+    The packet emits only layer 0 (RES-201 frozen); `core.last_reconstruction`
+    is the full stacked approximation. This is what the compression gate
+    is about.
+    """
+    cfg = CoreConfig(m=m, n=n, r=r, n_residual_layers=n_layers)
+    core = ResidualCore(cfg, seed=0)
     errs = []
     for W in blocks:
         if encoder is not None:
             enc = encoder.forward(W)
-            p = core.step(W, factors=(enc["Ub"], enc["Vb"]))
+            core.step(W, factors=(enc["Ub"], enc["Vb"]))
         else:
-            p = core.step(W)
-        errs.append(_recon_rel_err(W, p.Ub, p.Vb))
+            core.step(W)
+        W_hat = core.last_reconstruction
+        errs.append(
+            float(np.linalg.norm(W - W_hat) / (np.linalg.norm(W) + 1e-12))
+        )
     return float(np.mean(errs)), float(np.std(errs))
 
 
-def run_compression_block(blocks, m, n, r, X_compress, encoder=None):
-    core_err, core_std = _core_compression(blocks, m, n, r, encoder)
+def run_compression_block(blocks, m, n, r, X_compress, encoder=None,
+                          n_layers=12):
+    core_err, core_std = _core_compression(blocks, m, n, r, encoder,
+                                            n_layers=n_layers)
     svd_err = float(np.mean([_svd_baseline(W, r) for W in blocks]))
     core_reduction = 100.0 * (1.0 - core_err)
     svd_reduction = 100.0 * (1.0 - svd_err)
@@ -142,6 +150,7 @@ def run_compression_block(blocks, m, n, r, X_compress, encoder=None):
         "X_compress": X_compress,
         "conformant": bool(core_reduction >= X_compress),
         "used_encoder": encoder is not None,
+        "n_residual_layers": int(n_layers),
     }
 
 
@@ -165,7 +174,6 @@ def _is_hit(got, expected):
 
 
 def run_titanos_block(cfg_path, report, data=None):
-    """Application-layer validation. Adds report['titanos']."""
     try:
         from titanos import Titanos, TitanosConfig
     except ImportError:
@@ -249,6 +257,8 @@ def main():
     p.add_argument("--block", type=int, default=None)
     p.add_argument("--n-blocks", type=int, default=64)
     p.add_argument("--X-compress", type=float, default=70.0)
+    p.add_argument("--n-layers", type=int, default=12,
+                   help="residual stack depth for the compression gate")
     args = p.parse_args()
 
     cfg_path = Path(args.config)
@@ -271,14 +281,14 @@ def main():
 
     core, encoder, adapter, validator = build_stack(cfg, args.m, args.n)
 
-    # ── compression gate ────────────────────────────────────────────
     r = min(8, min(args.m, args.n))
     blocks = extract_blocks(data, args.m, args.n, args.n_blocks)
     print(f"[runner] compression probe on {len(blocks)} blocks of "
-          f"{args.m}x{args.n}, rank r={r}")
+          f"{args.m}x{args.n}, rank r={r}, layers={args.n_layers}")
 
     comp_before = run_compression_block(blocks, args.m, args.n, r,
-                                        args.X_compress, encoder=None)
+                                        args.X_compress, encoder=None,
+                                        n_layers=args.n_layers)
     print(f"[runner] baseline core reduction = "
           f"{comp_before['core_reduction_pct']:.2f}%")
 
@@ -299,7 +309,8 @@ def main():
     use_enc = encoder_trained and args.use_encoder
     comp = run_compression_block(blocks, args.m, args.n, r,
                                  args.X_compress,
-                                 encoder=encoder if use_enc else None)
+                                 encoder=encoder if use_enc else None,
+                                 n_layers=args.n_layers)
     print(f"[runner] core rel_err       = {comp['core_rel_err_mean']:.4f} "
           f"(± {comp['core_rel_err_std']:.4f})")
     print(f"[runner] core reduction     = {comp['core_reduction_pct']:.2f}% "
@@ -308,7 +319,6 @@ def main():
     print(f"[runner] SVD  reduction     = {comp['svd_reduction_pct']:.2f}% "
           f"(upper bound on rank-{r})")
 
-    # ── adapter acceptance ──────────────────────────────────────────
     if not args.no_verify:
         sample = core.step(make_block(0, args.m, args.n, data))
         xs = [make_x_enc(0, t, cfg.dim) for t in range(64)]
@@ -317,7 +327,6 @@ def main():
               f"var={diag['drift_ratio_variance']:.6g} "
               f"pass={diag['pass']}")
 
-    # ── HDRIFT validation with packet-conditioned target ────────────
     dim = cfg.dim
     _m, _n = args.m, args.n
     mn = _m * _n
@@ -351,9 +360,7 @@ def main():
     def packet_target_fn(seed, step, packet, x_enc):
         """
         Target: x_enc with the first m*n entries replaced by the core's
-        best L2 reconstruction of that slice. Works for any dim ≥ m*n.
-
-        The drift field's job is to move x_enc toward this reconstruction.
+        best L2 reconstruction of that slice. Works for any dim >= m*n.
         """
         W = x_enc[:mn].reshape(_m, _n).astype(np.float64)
         W_hat = (np.asarray(packet.Ub, dtype=np.float64)
