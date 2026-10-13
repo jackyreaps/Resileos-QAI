@@ -8,8 +8,8 @@ core. When a PhasorGraph's triangular projection is used to build a
 coupling for the core, det(I + strict_lower) = 1 is preserved.
 
 Structural claims are formally verified in the OscGraph Lean package
-(see RES-306 §0). The theorems cited by name in this module's docstrings
-are: unbind_bind, bind_unbind, BandGraph.adjacency_isHermitian,
+(see RES-306 §0). Theorems cited by name in this module's docstrings:
+unbind_bind, bind_unbind, BandGraph.adjacency_isHermitian,
 BandGraph.eigenvalue_real, det_one_add_strictLower,
 laplacianEnergy_nonneg, laplacianEnergy_eq_zero_iff,
 crosstalk_variance, band_sharding.
@@ -179,11 +179,17 @@ class BandCarriers:
         ω_k = 2π · frac(k · φ),   φ = (1 + √5) / 2
         u_k[m] = exp(i ω_k m) / √d
 
-    Binding:      bind(x, k)   = x ⊙ u_k
-    Unbinding:    unbind(y, k) = y ⊙ conj(u_k)
+    The carrier has per-component magnitude 1/√d and unit total norm
+    (‖u_k‖_2 = 1). bind and unbind include a compensating √d factor so
+    that the round-trip is exact:
 
-    Unbinding is exact: unbind(bind(x, k), k) = x, componentwise
-    (OscGraph.unbind_bind, OscGraph.bind_unbind).
+        bind(x, k)   = x ⊙ u_k · √d
+        unbind(y, k) = y ⊙ conj(u_k) · √d
+
+        unbind(bind(x, k), k) = x · |u_k|² · d = x · (1/d) · d = x
+
+    Carriers are unit-norm (BandCarriers.carrier(k) returns u_k).
+    Crosstalk is bounded by 1/√d under the random-phase model.
 
     Golden spacing never locks (OscGraph.golden_never_locks,
     OscGraph.golden_carrier_never_returns). Rational spacings recur
@@ -210,10 +216,11 @@ class BandCarriers:
             )
         else:
             self._carriers = np.zeros((0, dim), dtype=np.complex128)
+        self._scale = float(np.sqrt(dim))
 
     # ── accessors ───────────────────────────────────────────────────────
     def carrier(self, k: int) -> np.ndarray:
-        """Unit-phasor vector for band k, length d."""
+        """Unit-norm phasor vector for band k, length d."""
         if not (0 <= k < self.n_bands):
             raise IndexError(f"band {k} out of range [0, {self.n_bands})")
         return self._carriers[k].copy()
@@ -224,16 +231,26 @@ class BandCarriers:
 
     # ── binding ─────────────────────────────────────────────────────────
     def bind(self, x: np.ndarray, k: int) -> np.ndarray:
-        """Bind x into band k: x ⊙ u_k."""
+        """
+        Bind x into band k: x ⊙ u_k · √d.
+
+        Includes the √d factor so unbind(bind(x, k), k) = x exactly.
+        """
         if not (0 <= k < self.n_bands):
             raise IndexError(f"band {k} out of range [0, {self.n_bands})")
-        return np.asarray(x, dtype=np.complex128) * self._carriers[k]
+        return (np.asarray(x, dtype=np.complex128)
+                * self._carriers[k] * self._scale)
 
     def unbind(self, y: np.ndarray, k: int) -> np.ndarray:
-        """Unbind from band k: y ⊙ conj(u_k). Exact inverse of bind()."""
+        """
+        Unbind from band k: y ⊙ conj(u_k) · √d.
+
+        Includes the √d factor so this is the exact inverse of bind.
+        """
         if not (0 <= k < self.n_bands):
             raise IndexError(f"band {k} out of range [0, {self.n_bands})")
-        return np.asarray(y, dtype=np.complex128) * np.conj(self._carriers[k])
+        return (np.asarray(y, dtype=np.complex128)
+                * np.conj(self._carriers[k]) * self._scale)
 
     # ── diagnostics ─────────────────────────────────────────────────────
     def crosstalk(self) -> float:
@@ -261,16 +278,15 @@ class BandedMemory:
     Holographic memory with K bands, each an independent accumulator.
 
     Storage:
-        acc[k] += key ⊙ value    for the band's chosen k
+        acc[k] += key ⊙ value      (band k)
 
     Retrieval (band k):
         retrieved = acc[k] ⊙ conj(key)
 
     Under the random-key model, per-band crosstalk variance is n/D
-    exactly, where n is the number of other items stored (OscGraph.
-    crosstalk_variance). Splitting N total items over K bands read
-    separately reduces per-query crosstalk amplitude by at least √K
-    (OscGraph.band_sharding).
+    exactly (OscGraph.crosstalk_variance). Splitting N items over K
+    bands read separately reduces per-query crosstalk amplitude by at
+    least √K (OscGraph.band_sharding).
 
     Keys are normalized to unit phasors per component on store. Values
     are used as-is.
