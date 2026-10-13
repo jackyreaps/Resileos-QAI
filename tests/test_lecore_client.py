@@ -1,7 +1,5 @@
 """
-Tests for the leCore HTTP client.
-
-All transport is mocked; no real leCore instance is required.
+Tests for the leCore HTTP client. All transport is mocked.
 """
 import sys
 from pathlib import Path
@@ -43,7 +41,8 @@ def test_health_raises_on_non_200():
 
 
 def test_health_raises_on_unreachable():
-    with patch("requests.get", side_effect=requests.exceptions.ConnectionError("nope")):
+    with patch("requests.get",
+               side_effect=requests.exceptions.ConnectionError("nope")):
         client = LeCoreClient(url="http://x")
         with pytest.raises(LeCoreUnreachable):
             client.health()
@@ -75,8 +74,8 @@ def test_tools_parses_wrapped():
 # ── search ──────────────────────────────────────────────────────────────
 def test_search_parses_dict_items():
     payload = {"results": [
-        {"name": "compress_series", "description": "compress a float series",
-         "score": 0.91},
+        {"name": "compress_series",
+         "description": "compress a float series", "score": 0.91},
         {"name": "fft", "description": "compute the FFT", "score": 0.72},
     ]}
     with patch("requests.post") as p:
@@ -86,7 +85,6 @@ def test_search_parses_dict_items():
         assert len(caps) == 2
         assert caps[0].name == "compress_series"
         assert caps[0].score == pytest.approx(0.91)
-        # Request body shape
         assert p.call_args.kwargs["json"] == {"query": "compress a float series"}
 
 
@@ -107,7 +105,7 @@ def test_invoke_returns_result():
         assert res.ok is True
         assert res.result == {"n": 3}
         assert p.call_args.kwargs["json"] == {
-            "name": "count", "args": {"items": [1, 2, 3]}
+            "name": "count", "args": {"items": [1, 2, 3]},
         }
 
 
@@ -152,14 +150,14 @@ def test_no_auth_header_when_token_absent():
         g.return_value = _mock_response(200, {"ok": True})
         client = LeCoreClient(url="http://x", token=None)
         client.health()
-        assertavailable "Authorization" not in g.call_args.kwargs["headers"]
+        assert "Authorization" not in g.call_args.kwargs["headers"]
 
 
 # ── availability ────────────────────────────────────────────────────────
 def test_is_available_true():
     with patch("requests.get") as g:
         g.return_value = _mock_response(200, {"ok": True})
-        assert LeCoreClient(url="http://x").is_() is True
+        assert LeCoreClient(url="http://x").is_available() is True
 
 
 def test_is_available_false_on_unreachable():
