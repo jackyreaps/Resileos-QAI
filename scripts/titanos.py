@@ -2,27 +2,24 @@
 """
 Titanos — recurrent-depth prototype on the frozen contracts.
 
-Layers, in order of activation:
-
+Layers:
     storage           one accumulator per relation (band sharding, RES-306)
     abstention        thresholds from sigma_base / sqrt(anisotropy)
-                      when not explicitly overridden (RES-200 §extension)
     emergent          non-conservative operator driven by real monitors
     CSI               Causal Sandbox Index over each query (RES-305)
     agency            heuristic routing to registered children (RES-307)
+    order parameter   Kuramoto R from theta gates confidence (RES-309)
 
-The recurrent loop is used to compute loop history and CSI. Retrieval
-itself unbinds the original probe against the band accumulator. The
-recurrent loop's rank-r compression of the probe is too lossy to be
-used as the query vector.
+The order-parameter gate is off by default. Enable via
+`use_order_parameter_gate=True` in the config.
 
-The "quantum" path is a labeled simulation (QUANTUM_SIM). Not real
-quantum.
+The "quantum" path is a labeled simulation (QUANTUM_SIM).
 """
 from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import re
 import sys
 from dataclasses import dataclass, field, asdict
@@ -89,6 +86,14 @@ class TitanosConfig:
     csi_fast_threshold: float = 0.6
     csi_health_threshold: float = 0.5
 
+    # Order parameter gate (RES-309). When True, the confidence returned
+    # by _cleanup is multiplied by (floor + (1 - floor) * R), where
+    # R = (1/r)|Σ exp(i·θ_j)| is the Kuramoto order parameter of the
+    # non-conservative operator's phase vector. High R → no change;
+    # low R → confidence reduced toward floor * conf.
+    use_order_parameter_gate: bool = False
+    order_parameter_floor: float = 0.5
+
     X: float = 70.0
     Y: int = 3
     seed_list: tuple[int, ...] = (0, 1, 2)
@@ -99,6 +104,8 @@ class TitanosConfig:
     def __post_init__(self) -> None:
         if self.sigma_k is not None:
             self.sigma1_k = int(self.sigma_k)
+        if not (0.0 <= self.order_parameter_floor <= 1.0):
+            raise ValueError("order_parameter_floor must be in [0, 1]")
 
     @classmethod
     def from_json(cls, path) -> "TitanosConfig":
@@ -130,6 +137,10 @@ class Answer:
     fast_path_used: bool = False
     escalated: bool = False
     child_name: str | None = None
+    # Order parameter gate (RES-309)
+    order_parameter: float = 1.0
+    raw_confidence: float = 0.0
+    order_parameter_scale: float = 1.0
 
 
 class Titanos:
@@ -197,6 +208,37 @@ class Titanos:
         mags = np.abs(D)
         return float(mags.max() / (mags.min() + 1e-300))
 
+    def _order_parameter(self) -> float:
+        """
+        Kuramoto order parameter R = (1/r) |Σ_j exp(i·θ_j)|.
+
+        R ∈ [0, 1]. R = 1 when all θ_j equal; R → 0 when the phases are
+        uniformly distributed around the circle.
+
+        Reads the non-conservative operator's theta directly. If the
+        operator is not present (or in conservative mode), returns 1.0
+        (no gating).
+        """
+        op = getattr(self.core, "_nonconservative", None)
+        if op is None:
+            return 1.0
+        theta = np.asarray(op.theta, dtype=np.float64).ravel()
+        if theta.size == 0:
+            return 1.0
+        z = np.exp(1j * theta)
+        return float(np.abs(np.mean(z)))
+
+    def _order_parameter_scale(self, R: float) -> float:
+        """
+        Confidence multiplier derived from R.
+
+            scale = floor + (1 - floor) * R
+
+        At R = 1 → scale = 1. At R = 0 → scale = floor.
+        """
+        f = self.cfg.order_parameter_floor
+        return float(f + (1.0 - f) * R)
+
     def _noise_sigma_base(self, relation: str) -> float:
         N_r = self._counts.get(relation, 0)
         if N_r < 2:
@@ -204,14 +246,6 @@ class Titanos:
         return float(np.sqrt((N_r - 1) / self.cfg.dim))
 
     def _noise_sigma_effective(self, relation: str) -> float:
-        """
-        sigma_eff = sigma_base / sqrt(anisotropy). [proposal]
-
-        The Lean gives sigma_base = sqrt((N-1)/D) for uniform random keys
-        (OscGraph.crosstalk_variance). That concentration improves SNR
-        by sqrt(anisotropy) is a hypothesis, not a theorem. Used here as
-        a heuristic; disabled by emergent=False.
-        """
         sigma_base = self._noise_sigma_base(relation)
         if not self.cfg.emergent:
             return sigma_base
@@ -360,12 +394,6 @@ class Titanos:
     # ── recurrent loop ───────────────────────────────────────────────
     def _recurrent(self, initial_h: np.ndarray,
                    F_res: float = 0.0, DeltaS: float = 0.5, mu: int = 0):
-        """
-        Recurrent refinement. F_res, DeltaS, mu default to neutral values
-        so callers passing only the probe still work. The loop produces
-        history and drives the emergent operator; the answer is
-        retrieved separately from the probe (see _ask).
-        """
         h = initial_h.copy()
         history: list = []
         sqrt_dim = float(np.sqrt(self.cfg.dim))
@@ -397,6 +425,7 @@ class Titanos:
                 "packet_hash": packet.packet_hash[:12],
                 "volume_residual": volume_residual(packet.volume),
                 "anisotropy": self._current_anisotropy(),
+                "order_parameter": self._order_parameter(),
             })
             if state == CLEANUP:
                 h = initial_h.copy()
@@ -420,7 +449,7 @@ class Titanos:
         measured = np.where(sup >= 0, 1, -1).astype(np.int8)
         return self._cleanup(measured, acc=acc, exclude=exclude)
 
-    # ── CSI update from a query's loop history ───────────────────────
+    # ── CSI update ───────────────────────────────────────────────────
     def _update_csi_from_history(self, history: list) -> None:
         if not history:
             return
@@ -442,13 +471,15 @@ class Titanos:
             return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", 0,
                           reason=f"unknown entity '{subject}'",
                           emergent=self.cfg.emergent,
-                          csi=self._csi.value())
+                          csi=self._csi.value(),
+                          order_parameter=self._order_parameter())
         acc = self._bands.get(relation)
         if acc is None or self._counts.get(relation, 0) == 0:
             return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", 0,
                           reason=f"no facts stored for relation '{relation}'",
                           emergent=self.cfg.emergent,
-                          csi=self._csi.value())
+                          csi=self._csi.value(),
+                          order_parameter=self._order_parameter())
 
         self._query_count += 1
         probe = self._encode_probe(subject, relation, inverse=inverse)
@@ -457,23 +488,27 @@ class Titanos:
             self._thresholds_for(relation)
         sigma_base = self._noise_sigma_base(relation)
         anisotropy = self._current_anisotropy()
+        R = self._order_parameter()
+        scale = self._order_parameter_scale(R) if self.cfg.use_order_parameter_gate else 1.0
 
-        # Fast path check (RES-305 §4).
+        # Fast path
         readout = self._readout(relation)
         direct = (readout * probe).astype(np.int8)
         fast_best, fast_conf = self._cleanup(
             direct, acc=acc, exclude={subject}, mode=conf_mode_override)
-        fast_conf_blend = fast_confidence(fast_conf, sigma_eff, current_csi)
+        fast_conf_gated = fast_conf * scale
+        fast_conf_blend = fast_confidence(
+            fast_conf_gated, sigma_eff, current_csi)
 
         if (self.cfg.csi_fast_path
                 and fast_best is not None
-                and fast_conf >= classical_thresh
+                and fast_conf_gated >= classical_thresh
                 and fast_conf_blend >= self.cfg.csi_fast_threshold
                 and current_csi >= self.cfg.csi_health_threshold):
             self._fast_path_count += 1
             path = ([(fast_best, relation, subject)] if inverse
                     else [(subject, relation, fast_best)])
-            return Answer(fast_best, fast_conf, "ACCEPTED", "FAST",
+            return Answer(fast_best, fast_conf_gated, "ACCEPTED", "FAST",
                           0, path=path,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -482,7 +517,10 @@ class Titanos:
                           emergent=self.cfg.emergent,
                           csi=current_csi,
                           fast_confidence=fast_conf_blend,
-                          fast_path_used=True, escalated=False)
+                          fast_path_used=True, escalated=False,
+                          order_parameter=R,
+                          raw_confidence=fast_conf,
+                          order_parameter_scale=scale)
 
         if self.cfg.csi_fast_path:
             self._escalation_count += 1
@@ -504,15 +542,18 @@ class Titanos:
                           csi=updated_csi,
                           fast_confidence=fast_conf_blend,
                           fast_path_used=False, escalated=True,
+                          order_parameter=R,
+                          raw_confidence=fast_conf,
+                          order_parameter_scale=scale,
                           reason="sigma-1 gate routed to ABSTAIN")
 
-        # Retrieval unbinds the ORIGINAL probe, not the recurrent output.
-        # The rank-r compression of the probe is too lossy to preserve
-        # the structure needed for unbinding against the accumulator.
         readout2 = self._readout(relation)
         retrieved = (readout2 * probe).astype(np.int8)
-        best, conf = self._cleanup(retrieved, acc=acc, exclude={subject},
-                                   mode=conf_mode_override)
+        best, raw_conf = self._cleanup(
+            retrieved, acc=acc, exclude={subject}, mode=conf_mode_override)
+
+        # Apply the order-parameter gate to the slow-path confidence.
+        conf = raw_conf * scale
 
         if conf >= classical_thresh:
             mode = "CLASSICAL"
@@ -533,8 +574,12 @@ class Titanos:
                           csi=updated_csi,
                           fast_confidence=fast_conf_blend,
                           fast_path_used=False, escalated=True,
-                          reason=(f"confidence {conf:.4f} < abstain "
-                                  f"{abstain_thresh:.4f}"))
+                          order_parameter=R,
+                          raw_confidence=raw_conf,
+                          order_parameter_scale=scale,
+                          reason=(f"gated confidence {conf:.4f} < abstain "
+                                  f"{abstain_thresh:.4f} "
+                                  f"(R={R:.3f}, scale={scale:.3f})"))
 
         if best is None or conf < abstain_thresh:
             return Answer(None, conf, "ABSTAINED", mode, len(history),
@@ -547,7 +592,10 @@ class Titanos:
                           csi=updated_csi,
                           fast_confidence=fast_conf_blend,
                           fast_path_used=False, escalated=True,
-                          reason=f"post-quantum conf {conf:.4f} "
+                          order_parameter=R,
+                          raw_confidence=raw_conf,
+                          order_parameter_scale=scale,
+                          reason=f"post-quantum gated conf {conf:.4f} "
                                  f"< {abstain_thresh:.4f}")
 
         path = ([(best, relation, subject)] if inverse
@@ -560,7 +608,10 @@ class Titanos:
                       emergent=self.cfg.emergent,
                       csi=updated_csi,
                       fast_confidence=fast_conf_blend,
-                      fast_path_used=False, escalated=True)
+                      fast_path_used=False, escalated=True,
+                      order_parameter=R,
+                      raw_confidence=raw_conf,
+                      order_parameter_scale=scale)
 
     def ask(self, subject: str, relation: str) -> Answer:
         return self._ask(subject, relation, inverse=False)
@@ -568,7 +619,7 @@ class Titanos:
     def ask_inverse(self, obj: str, relation: str) -> Answer:
         return self._ask(obj, relation, inverse=True)
 
-    # ── agency layer (RES-307) ───────────────────────────────────────
+    # ── agency layer ─────────────────────────────────────────────────
     def register_child(self, name: str, handler: HandlerFn,
                        weight: float = 1.0) -> AgencyChild:
         return self.agency.add_child(name, handler, weight=weight)
@@ -623,6 +674,7 @@ class Titanos:
                               path=path, loop_history=hist_acc,
                               emergent=self.cfg.emergent,
                               csi=self._csi.value(),
+                              order_parameter=self._order_parameter(),
                               reason=(f"chain broke at '{current} --{rel}--> ?'"))
             path.extend(a.path)
             conf *= a.confidence
@@ -631,7 +683,8 @@ class Titanos:
         return Answer(current, conf, "ACCEPTED", mode, total_loops,
                       path=path, loop_history=hist_acc,
                       emergent=self.cfg.emergent,
-                      csi=self._csi.value())
+                      csi=self._csi.value(),
+                      order_parameter=self._order_parameter())
 
     def analogy(self, a: str, b: str, c: str) -> Answer:
         for n in (a, b, c):
@@ -639,13 +692,18 @@ class Titanos:
                 return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", 0,
                               reason=f"unknown entity '{n}'",
                               emergent=self.cfg.emergent,
-                              csi=self._csi.value())
+                              csi=self._csi.value(),
+                              order_parameter=self._order_parameter())
         transform = (self._ent(a) * self._ent(b)).astype(np.int8)
         candidate = (self._ent(c) * transform).astype(np.int32)
-        best, conf = self._cleanup(candidate, acc=self._merged_acc(),
-                                   exclude={a, b, c})
+        best, raw_conf = self._cleanup(candidate, acc=self._merged_acc(),
+                                       exclude={a, b, c})
         total = sum(self._counts.values())
         sigma = float(np.sqrt(max(total - 1, 0) / self.cfg.dim))
+        R = self._order_parameter()
+        scale = (self._order_parameter_scale(R)
+                 if self.cfg.use_order_parameter_gate else 1.0)
+        conf = raw_conf * scale
         abstain = (self.cfg.abstention_gate
                    if self.cfg.abstention_gate is not None
                    else self.cfg.conf_alpha_abstain * sigma)
@@ -653,11 +711,17 @@ class Titanos:
             return Answer(None, conf, "ABSTAINED", "CLASSICAL", 0,
                           noise_sigma=sigma, emergent=self.cfg.emergent,
                           csi=self._csi.value(),
+                          order_parameter=R,
+                          raw_confidence=raw_conf,
+                          order_parameter_scale=scale,
                           reason=f"analogy conf {conf:.4f} < {abstain:.4f}")
         return Answer(best, conf, "ACCEPTED", "CLASSICAL", 0,
                       path=[(a, "->", b), (c, "->", best)],
                       noise_sigma=sigma, emergent=self.cfg.emergent,
-                      csi=self._csi.value())
+                      csi=self._csi.value(),
+                      order_parameter=R,
+                      raw_confidence=raw_conf,
+                      order_parameter_scale=scale)
 
     # ── introspection ────────────────────────────────────────────────
     def explain(self, ans: Answer) -> str:
@@ -667,6 +731,9 @@ class Titanos:
             head += f" child={ans.child_name}"
         if ans.fast_path_used:
             head += f" fast_conf={ans.fast_confidence:.4f}"
+        if self.cfg.use_order_parameter_gate and ans.order_parameter_scale != 1.0:
+            head += (f" R={ans.order_parameter:.3f} "
+                     f"scale={ans.order_parameter_scale:.3f}")
         if ans.emergent:
             head += (f" sigma_eff={ans.noise_sigma:.4f} "
                      f"aniso={ans.anisotropy:.3f}")
@@ -680,15 +747,16 @@ class Titanos:
     def loop_trace(self, ans: Answer) -> str:
         if not ans.loop_history:
             return "(no loop history)"
-        lines = ["loop | scar | delta | mu | DeltaS | rank | vol | v_t | gate",
-                 "-" * 78]
+        lines = ["loop | scar | delta | mu | DeltaS | rank | vol | v_t | R | gate",
+                 "-" * 84]
         for h in ans.loop_history:
             lines.append(
                 f"  {h['loop']:2d} | {h['scar_energy']:.4f} | "
                 f"{h['delta']:.4f} | {h['mu']}  | {h['DeltaS']:.4f} | "
                 f"{h['rank']:4d} | "
                 f"{'ok' if h['volume_ok'] else 'BAD':>3s} | "
-                f"{h.get('volume_residual', 0.0):.4f} | {h['gate_state']}")
+                f"{h.get('volume_residual', 0.0):.4f} | "
+                f"{h.get('order_parameter', 1.0):.3f} | {h['gate_state']}")
         return "\n".join(lines)
 
     def stats(self) -> dict:
@@ -722,6 +790,9 @@ class Titanos:
             "conf_alpha": float(self.cfg.conf_alpha),
             "emergent": bool(self.cfg.emergent),
             "anisotropy": self._current_anisotropy(),
+            "order_parameter": self._order_parameter(),
+            "use_order_parameter_gate": bool(self.cfg.use_order_parameter_gate),
+            "order_parameter_floor": float(self.cfg.order_parameter_floor),
             "query_count": int(self._query_count),
             "fast_path_count": int(self._fast_path_count),
             "escalation_count": int(self._escalation_count),
@@ -813,6 +884,7 @@ if __name__ == "__main__":
     p.add_argument("--config", default=None)
     p.add_argument("--conservative", action="store_true")
     p.add_argument("--csi-fast-path", action="store_true")
+    p.add_argument("--order-parameter-gate", action="store_true")
     args = p.parse_args()
 
     cfg = (TitanosConfig.from_json(args.config)
@@ -821,10 +893,13 @@ if __name__ == "__main__":
         cfg.emergent = False
     if args.csi_fast_path:
         cfg.csi_fast_path = True
+    if args.order_parameter_gate:
+        cfg.use_order_parameter_gate = True
 
     titan = Titanos(cfg)
     print(f"emergent = {cfg.emergent}  "
-          f"csi_fast_path = {cfg.csi_fast_path}")
+          f"csi_fast_path = {cfg.csi_fast_path}  "
+          f"order_parameter_gate = {cfg.use_order_parameter_gate}")
 
     facts = [
         ("Uranus", "parent_of", "Cronus"),
