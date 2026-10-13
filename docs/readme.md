@@ -10,10 +10,16 @@ referenced_by: [RES-100]
 
 **Version:** see [`/version`](../version) · **Changelog:** [`/changelog.md`](../changelog.md)
 
-**Status vocabulary.** Documents carry one of: `draft`, `stable`, `deprecated`,
-`conditional`, `conjectural`. `conditional` means "true under stated
-assumptions"; `conjectural` means "formal structure awaiting physical input".
-Documents outside the first three values live in the 600-series.
+**Status vocabulary.** Documents carry one of: `draft`, `stable`,
+`deprecated`, `conditional`, `conjectural`, `candidate`, `proposal`,
+`heuristic`. The first three are the original enum. The rest are
+extensions used by the 300-series and 600-series:
+
+- `conditional` — true under stated assumptions
+- `conjectural` — formal structure awaiting physical input
+- `candidate` — a proposed derivation, not the canonical one
+- `proposal` — a metric or design idea under test
+- `heuristic` — operational parameters, not derived invariants
 
 ## Reading order
 
@@ -23,12 +29,43 @@ Foundations:
 2. [Architecture](100-foundations/architecture.md) — RES-101
 3. [Design Principles](100-foundations/design-principles.md) — RES-102
 
+Classical core and substrate:
+
+4. [Classical Core](200-core/classical-core.md) — RES-200
+5. [Control Packet](200-core/control-packet.md) — RES-201
+6. [Canonicalization](200-core/canonicalization.md) — RES-202
+7. [HDRIFT Adapter](300-substrate/hdrift-adapter.md) — RES-300
+8. [Moment Bundle](300-substrate/moment-bundle.md) — RES-301
+9. [Abstention](300-substrate/abstention.md) — RES-302
+10. [Sigma Gate](300-substrate/sigma-gate.md) — RES-303
+
+Recent substrate extensions:
+
+11. [Structure-Flux-Mode Triad](300-substrate/triad.md) — RES-304
+12. [Causal Sandbox Index](300-substrate/causal-sandbox.md) — RES-305
+13. [Phasor Graph](300-substrate/phasor-graph.md) — RES-306
+14. [Agency Hierarchy](300-substrate/agency-hierarchy.md) — RES-307
+
+Operations and notes:
+
+15. [Run Config](400-operations/run-config.md) — RES-400
+16. [Training](400-operations/training.md) — RES-401
+17. [Validation](400-operations/validation.md) — RES-402
+18. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+19. [Roadmap](500-notes/roadmap.md) — RES-501
+
 QD-TER bridge:
 
-4. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-5. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-6. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-7. [Speculative Cross-Stream Layer](600-qdter/speculative-cross-stream.md) — RES-603
+20. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+21. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+22. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+23. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+24. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+25. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+
+Reference:
+
+26. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
@@ -39,8 +76,32 @@ QD-TER bridge:
 | 300 | Generative Substrate | [HDRIFT Adapter](300-substrate/hdrift-adapter.md) |
 | 400 | Operations | [Run Config](400-operations/run-config.md) |
 | 500 | Notes & Roadmap | [Behavioral](500-notes/behavioral.md) |
-| 600 | QD-TER Bridge | [FEP Reduction](600-qdter/fep-reduction.md) — RES-600 … RES-603 |
+| 600 | QD-TER Bridge | [Status](600-qdter/status.md) |
 | 900 | Reference | [Glossary](900-reference/glossary.md) |
+
+## 300-series substrate modules
+
+| Doc | Module | Status | Notes |
+|---|---|---|---|
+| RES-304 | `triad.md` | draft | Structure-Flux-Mode triad |
+| RES-305 | `sandbox.py` | proposal | Causal Sandbox Index; metric defined, not derived |
+| RES-306 | `phasor.py` | stable | Phasor graph, band carriers, banded memory; Lean-backed |
+| RES-307 | `agency.py` | heuristic | Routing layer; thresholds are operational parameters |
+
+## 600-series QD-TER bridge
+
+| Doc | Title | Status |
+|---|---|---|
+| RES-600 | FEP Reduction Bridge | conditional |
+| RES-601 | Non-Dual Adaptation Layer | conjectural |
+| RES-602 | Two-Head Integration Note | draft |
+| RES-603 | Speculative Cross-Stream | draft |
+| RES-604 | QD-TER Bridge Status | stable |
+| RES-605 | leCore Integration Bridge | stable |
+| RES-606 | Metric Bridge Candidate Derivations | candidate (pending) |
+
+The status page (RES-604) is the canonical open/closed inventory.
+Individual docs state their own scope; the status page aggregates them.
 
 ## Dependency graph
 
@@ -53,13 +114,20 @@ QD-TER bridge:
     RES-300 ─▶ RES-301 ─▶ RES-302 ─▶ RES-303
                    │
                    ▼
+    RES-304   RES-305   RES-306 ─▶ RES-307
+                            │
+                            ▼
     RES-400 ─▶ RES-401 ─▶ RES-402
                    │
                    ▼
     RES-500 ─▶ RES-501
                    │
                    ▼
-    RES-600  (related)  RES-601
-                   │
-                   ▼
-                 RES-602 ─▶ RES-603
+    RES-600   RES-601
+        │         │
+        └────┬────┘
+             ▼
+         RES-602 ─▶ RES-603
+             │
+             ▼
+         RES-604 ─▶ RES-605
