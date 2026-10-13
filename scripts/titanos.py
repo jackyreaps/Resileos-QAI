@@ -10,8 +10,13 @@ Layers:
     agency            heuristic routing to registered children (RES-307)
     order parameter   Kuramoto R from theta gates confidence (RES-309)
 
-The order-parameter gate is off by default. Enable via
-`use_order_parameter_gate=True` in the config.
+Storage uses MAP triple binding:
+    band += s * r * o               (elementwise, bipolar)
+    probe = anchor * r
+    retrieved = sign(band) * probe  ~= other_slot + crosstalk
+
+This recovers the object from a forward probe and the subject from an
+inverse probe, without role slots.
 
 The "quantum" path is a labeled simulation (QUANTUM_SIM).
 """
@@ -64,7 +69,7 @@ class TitanosConfig:
     quantum_samples: int = 16
     convergence_threshold: float = 0.02
 
-    conf_mode: str = "mag"
+    conf_mode: str = "sim"
     conf_alpha: float = 0.6
 
     sigma_E: float = 10.0
@@ -86,11 +91,6 @@ class TitanosConfig:
     csi_fast_threshold: float = 0.6
     csi_health_threshold: float = 0.5
 
-    # Order parameter gate (RES-309). When True, the confidence returned
-    # by _cleanup is multiplied by (floor + (1 - floor) * R), where
-    # R = (1/r)|Σ exp(i·θ_j)| is the Kuramoto order parameter of the
-    # non-conservative operator's phase vector. High R → no change;
-    # low R → confidence reduced toward floor * conf.
     use_order_parameter_gate: bool = False
     order_parameter_floor: float = 0.5
 
@@ -137,7 +137,6 @@ class Answer:
     fast_path_used: bool = False
     escalated: bool = False
     child_name: str | None = None
-    # Order parameter gate (RES-309)
     order_parameter: float = 1.0
     raw_confidence: float = 0.0
     order_parameter_scale: float = 1.0
@@ -164,6 +163,7 @@ class Titanos:
         self._perm_cache: dict[int, np.ndarray] = {0: np.arange(cfg.dim)}
         self.entities: dict[str, np.ndarray] = {}
         self.relations: dict[str, np.ndarray] = {}
+        # Roles retained for backward compat but unused on the primary path.
         self.roles: dict[str, np.ndarray] = {}
         for name in ("S", "O"):
             self.roles[name] = self._bip()
@@ -209,16 +209,6 @@ class Titanos:
         return float(mags.max() / (mags.min() + 1e-300))
 
     def _order_parameter(self) -> float:
-        """
-        Kuramoto order parameter R = (1/r) |Σ_j exp(i·θ_j)|.
-
-        R ∈ [0, 1]. R = 1 when all θ_j equal; R → 0 when the phases are
-        uniformly distributed around the circle.
-
-        Reads the non-conservative operator's theta directly. If the
-        operator is not present (or in conservative mode), returns 1.0
-        (no gating).
-        """
         op = getattr(self.core, "_nonconservative", None)
         if op is None:
             return 1.0
@@ -229,13 +219,6 @@ class Titanos:
         return float(np.abs(np.mean(z)))
 
     def _order_parameter_scale(self, R: float) -> float:
-        """
-        Confidence multiplier derived from R.
-
-            scale = floor + (1 - floor) * R
-
-        At R = 1 → scale = 1. At R = 0 → scale = floor.
-        """
         f = self.cfg.order_parameter_floor
         return float(f + (1.0 - f) * R)
 
@@ -315,6 +298,7 @@ class Titanos:
         return self.relations[name]
 
     def _slot(self, role: str, relation: str) -> np.ndarray:
+        """Deprecated: roles are no longer used on the primary path."""
         return (self.roles[role] * self._rel(relation)).astype(np.int8)
 
     def _readout(self, relation: str | None = None) -> np.ndarray:
@@ -326,20 +310,31 @@ class Titanos:
                 return np.zeros(self.cfg.dim, dtype=np.int8)
         return np.where(acc >= 0, 1, -1).astype(np.int8)
 
+    # ── MAP triple binding ───────────────────────────────────────────
     def learn(self, subject: str, relation: str, obj: str) -> None:
-        s, o = self._ent(subject), self._ent(obj)
-        sr = self._slot("S", relation)
-        orr = self._slot("O", relation)
+        """
+        band += s * r * o  (elementwise, bipolar).
+
+        Forward probe s * r retrieves o. Inverse probe o * r retrieves s.
+        """
+        s = self._ent(subject)
+        r = self._rel(relation)
+        o = self._ent(obj)
         band = self._get_band(relation)
-        band += (s * sr + o * orr).astype(np.int32)
+        band += (s * r * o).astype(np.int32)
         self._counts[relation] += 1
         self.facts.append((subject, relation, obj))
 
-    def _encode_probe(self, subject: str, relation: str,
+    def _encode_probe(self, anchor: str, relation: str,
                       inverse: bool = False) -> np.ndarray:
-        s = self._ent(subject)
-        slot = self._slot("O" if inverse else "S", relation)
-        return (s * slot).astype(np.int8)
+        """
+        MAP probe: anchor * relation. Recovers the other slot.
+
+        `inverse` is informational; the probe form is the same. What
+        differs is which entity the caller excluded during cleanup and
+        how the returned path is worded.
+        """
+        return (self._ent(anchor) * self._rel(relation)).astype(np.int8)
 
     # ── scoring / cleanup ────────────────────────────────────────────
     def _score_candidates(self, vec: np.ndarray,
@@ -449,7 +444,6 @@ class Titanos:
         measured = np.where(sup >= 0, 1, -1).astype(np.int8)
         return self._cleanup(measured, acc=acc, exclude=exclude)
 
-    # ── CSI update ───────────────────────────────────────────────────
     def _update_csi_from_history(self, history: list) -> None:
         if not history:
             return
@@ -489,9 +483,9 @@ class Titanos:
         sigma_base = self._noise_sigma_base(relation)
         anisotropy = self._current_anisotropy()
         R = self._order_parameter()
-        scale = self._order_parameter_scale(R) if self.cfg.use_order_parameter_gate else 1.0
+        scale = (self._order_parameter_scale(R)
+                 if self.cfg.use_order_parameter_gate else 1.0)
 
-        # Fast path
         readout = self._readout(relation)
         direct = (readout * probe).astype(np.int8)
         fast_best, fast_conf = self._cleanup(
@@ -551,8 +545,6 @@ class Titanos:
         retrieved = (readout2 * probe).astype(np.int8)
         best, raw_conf = self._cleanup(
             retrieved, acc=acc, exclude={subject}, mode=conf_mode_override)
-
-        # Apply the order-parameter gate to the slow-path confidence.
         conf = raw_conf * scale
 
         if conf >= classical_thresh:
@@ -578,8 +570,7 @@ class Titanos:
                           raw_confidence=raw_conf,
                           order_parameter_scale=scale,
                           reason=(f"gated confidence {conf:.4f} < abstain "
-                                  f"{abstain_thresh:.4f} "
-                                  f"(R={R:.3f}, scale={scale:.3f})"))
+                                  f"{abstain_thresh:.4f}"))
 
         if best is None or conf < abstain_thresh:
             return Answer(None, conf, "ABSTAINED", mode, len(history),
