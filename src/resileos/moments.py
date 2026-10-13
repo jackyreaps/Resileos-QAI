@@ -2,12 +2,11 @@
 Moment-bundle contract: (μ_hv, ν_hv) from a control packet.
 Owning doc: RES-301.
 
-FPE backend:
-    The substrate uses a bipolar FPE. The backend is selected at import
-    time by `resileos.substrate.fpe`:
-        - leCore's FPE if importable, quantized to bipolar
-        - in-house FPE otherwise
-    Both paths satisfy the RES-300 §leCore boundary contract.
+FPE is real-valued and unit-norm. This is the contract the tests in
+tests/test_fpe.py are written against. The leCore adapter in
+`substrate/fpe.py` provides a separate bipolar interface
+(`fpe_encode_bipolar`) for callers who want quantized output; that is
+not used here.
 """
 from __future__ import annotations
 
@@ -15,8 +14,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-
-from .substrate.fpe import fpe_encode_bipolar, backend_name
 
 
 @dataclass(frozen=True)
@@ -42,10 +39,34 @@ class Seeds:
 
 def fpe_encode(x: np.ndarray, dim: int, seed: int) -> np.ndarray:
     """
-    Bipolar FPE. Backend selected by `resileos.substrate.fpe`.
-    See module docstring.
+    Real-valued unit-norm Fractional Power Encoding.
+
+    For input x of length L:
+      1. Fixed phase vector ω ∈ R^dim, drawn from U(-π, π).
+      2. Per-position bind signs b_i ∈ {-1, +1}^dim.
+      3. Scalar encoding cos(x_i · ω), shape (dim,).
+      4. Bind with position: cos(x_i · ω) · b_i.
+      5. Bundle across positions: sum.
+      6. Unit-normalize.
+
+    Properties:
+      - Smooth kernel: <enc(x), enc(y)> is high for nearby x, y.
+      - Deterministic in (x, dim, seed).
+      - Unit-norm for non-empty input.
+      - Zero vector for empty input.
     """
-    return fpe_encode_bipolar(x, dim, seed)
+    x = np.asarray(x, dtype=np.float64).ravel()
+    if x.size == 0:
+        return np.zeros(dim, dtype=np.float64)
+
+    rng = np.random.default_rng(seed)
+    omega = rng.uniform(-np.pi, np.pi, size=dim)
+    bind_signs = rng.choice([-1.0, 1.0], size=(x.size, dim))
+
+    scalar_enc = np.cos(x[:, None] * omega[None, :])
+    bound = scalar_enc * bind_signs
+    h = np.sum(bound, axis=0)
+    return h / (np.linalg.norm(h) + 1e-12)
 
 
 def bundle(*vecs: np.ndarray) -> np.ndarray:
@@ -130,5 +151,5 @@ def build_moments(packet: dict[str, Any] | Any,
 
 __all__ = [
     "Seeds", "fpe_encode", "bundle", "bind", "permute",
-    "build_moments", "backend_name",
+    "build_moments",
 ]
