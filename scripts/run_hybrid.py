@@ -7,7 +7,7 @@ Usage:
     python scripts/run_hybrid.py --config configs/titanos-run.json --titanos
     python scripts/run_hybrid.py --config configs/titanos-run.json --titanos \\
         --data configs/weights.npy --block 64 --n-blocks 64 \\
-        --X-compress 70 --horizon 4
+        --X-compress 70 --horizon 4 --constructive
 """
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ from resileos.adapter import HDRIFTAdapter
 from resileos.core import CoreConfig, ResidualCore
 from resileos.moments import Seeds
 from resileos.sigma import SigmaGate
+from resileos.substrate.constructive import ConstructiveHead
 from resileos.training import FrontEndEncoder, TrainingConfig, train
 from resileos.validation import HybridValidator, RunConfig, save_report
 
@@ -109,15 +110,6 @@ def _svd_baseline(W, r):
 
 
 def _core_compression(blocks, m, n, r, encoder=None, n_layers=12):
-    """
-    Run the core on each block and measure the reconstruction error of
-    the FULL stacked reconstruction (all residual layers), not just
-    layer 0.
-
-    The packet emits only layer 0 (RES-201 frozen); `core.last_reconstruction`
-    is the full stacked approximation. This is what the compression gate
-    is about.
-    """
     cfg = CoreConfig(m=m, n=n, r=r, n_residual_layers=n_layers)
     core = ResidualCore(cfg, seed=0)
     errs = []
@@ -241,6 +233,98 @@ def run_titanos_block(cfg_path, report, data=None):
                   f"({d['status']}, conf {d['confidence']:.4f})")
 
 
+def run_constructive_diagnostic(cfg, args, data, use_enc, encoder):
+    """
+    Diagnostic: measure what the constructive head's direction would do
+    to the HDRIFT target, without changing the actual drift.
+
+    For each step, compute:
+        flat_err   = ||x_enc - target||
+        trend_err  = ||x_enc + direction_trend  - target||
+        phase_err  = ||x_enc + direction_phase  - target||
+        both_err   = ||x_enc + direction_both   - target||
+
+    Report the mean reduction of each vs flat. Positive reduction means
+    the direction moves x_enc closer to the target.
+
+    This does not modify HDRIFTAdapter, HybridValidator, or any packet
+    field. It is a pure read-only measurement.
+    """
+    dim = cfg.dim
+    _m, _n = args.m, args.n
+    mn = _m * _n
+    r = min(8, min(_m, _n))
+
+    head_trend = ConstructiveHead(dim, _m, _n, mode="trend")
+    head_phase = ConstructiveHead(dim, _m, _n, mode="phase")
+    head_both = ConstructiveHead(dim, _m, _n, mode="both")
+
+    # A dedicated core for this pass so the diagnostic doesn't perturb
+    # the main validation's state.
+    diag_cfg = CoreConfig(m=_m, n=_n, r=r, n_residual_layers=args.n_layers)
+    diag_core = ResidualCore(diag_cfg, seed=0, non_conservative=True)
+
+    lambda_prev = None
+    flat_errs, trend_errs, phase_errs, both_errs = [], [], [], []
+
+    for seed in cfg.seed_list:
+        for step in range(args.horizon):
+            W = make_block(seed + step * 1000, _m, _n, data)
+            x_enc = make_x_enc(seed, step, dim)
+
+            if use_enc:
+                enc = encoder.forward(W)
+                packet = diag_core.step(
+                    W, mu=int(step % 2), F_res=0.0, DeltaS=0.0,
+                    factors=(enc["Ub"], enc["Vb"]))
+            else:
+                packet = diag_core.step(W, mu=int(step % 2),
+                                        F_res=0.0, DeltaS=0.0)
+
+            # Target: same reconstruction target as the main gate
+            W_slice = x_enc[:mn].reshape(_m, _n).astype(np.float64)
+            W_hat = (np.asarray(packet.Ub, dtype=np.float64)
+                     @ np.asarray(packet.Vb, dtype=np.float64))
+            denom = float(np.sum(W_hat * W_hat)) + 1e-12
+            s = float(np.sum(W_slice * W_hat)) / denom
+            target = x_enc.copy()
+            target[:mn] = (s * W_hat).reshape(-1)
+
+            # Theta from the core's non-conservative operator
+            theta = None
+            if hasattr(diag_core, "_nonconservative"):
+                theta = diag_core._nonconservative.theta
+
+            d_trend = head_trend.forward(x_enc, packet,
+                                         lambda_prev=lambda_prev)
+            d_phase = head_phase.forward(x_enc, packet, theta=theta)
+            d_both = head_both.forward(x_enc, packet,
+                                       lambda_prev=lambda_prev, theta=theta)
+
+            flat_errs.append(float(np.linalg.norm(x_enc - target)))
+            trend_errs.append(float(np.linalg.norm(x_enc + d_trend - target)))
+            phase_errs.append(float(np.linalg.norm(x_enc + d_phase - target)))
+            both_errs.append(float(np.linalg.norm(x_enc + d_both - target)))
+
+            lambda_prev = np.asarray(packet.Lambda, dtype=np.float64).copy()
+
+    def _reduction(errs):
+        f = float(np.mean(flat_errs)) + 1e-12
+        e = float(np.mean(errs))
+        return 100.0 * (1.0 - e / f)
+
+    return {
+        "flat_err_mean": float(np.mean(flat_errs)),
+        "trend_err_mean": float(np.mean(trend_errs)),
+        "phase_err_mean": float(np.mean(phase_errs)),
+        "both_err_mean": float(np.mean(both_errs)),
+        "trend_reduction_pct": _reduction(trend_errs),
+        "phase_reduction_pct": _reduction(phase_errs),
+        "both_reduction_pct": _reduction(both_errs),
+        "n_samples": len(flat_errs),
+    }
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True)
@@ -257,8 +341,9 @@ def main():
     p.add_argument("--block", type=int, default=None)
     p.add_argument("--n-blocks", type=int, default=64)
     p.add_argument("--X-compress", type=float, default=70.0)
-    p.add_argument("--n-layers", type=int, default=12,
-                   help="residual stack depth for the compression gate")
+    p.add_argument("--n-layers", type=int, default=12)
+    p.add_argument("--constructive", action="store_true",
+                   help="run the constructive-head diagnostic")
     args = p.parse_args()
 
     cfg_path = Path(args.config)
@@ -327,6 +412,20 @@ def main():
               f"var={diag['drift_ratio_variance']:.6g} "
               f"pass={diag['pass']}")
 
+    # ── constructive-head diagnostic ─────────────────────────────────
+    constr = None
+    if args.constructive:
+        print("[runner] constructive diagnostic ...")
+        constr = run_constructive_diagnostic(cfg, args, data, use_enc, encoder)
+        print(f"[runner]   flat  err = {constr['flat_err_mean']:.4f}")
+        print(f"[runner]   trend err = {constr['trend_err_mean']:.4f}  "
+              f"({constr['trend_reduction_pct']:+.2f}%)")
+        print(f"[runner]   phase err = {constr['phase_err_mean']:.4f}  "
+              f"({constr['phase_reduction_pct']:+.2f}%)")
+        print(f"[runner]   both  err = {constr['both_err_mean']:.4f}  "
+              f"({constr['both_reduction_pct']:+.2f}%)")
+
+    # ── HDRIFT validation ────────────────────────────────────────────
     dim = cfg.dim
     _m, _n = args.m, args.n
     mn = _m * _n
@@ -358,10 +457,6 @@ def main():
         return float(abs(packet.F_res))
 
     def packet_target_fn(seed, step, packet, x_enc):
-        """
-        Target: x_enc with the first m*n entries replaced by the core's
-        best L2 reconstruction of that slice. Works for any dim >= m*n.
-        """
         W = x_enc[:mn].reshape(_m, _n).astype(np.float64)
         W_hat = (np.asarray(packet.Ub, dtype=np.float64)
                  @ np.asarray(packet.Vb, dtype=np.float64))
@@ -384,6 +479,8 @@ def main():
 
     report["compression"] = comp
     report["compression_baseline"] = comp_before
+    if constr is not None:
+        report["constructive"] = constr
     if args.titanos:
         run_titanos_block(cfg_path, report, data)
 
