@@ -12,6 +12,7 @@ Two-head system for QD-TER bridge integration, plus support utilities:
     phasor.py           phasor graph, band carriers, banded memory (RES-306)
     sandbox.py          Causal Sandbox Index (RES-305)
     agency.py           heuristic routing layer (RES-307)
+    constructive.py     constructive direction head (RES-308)
 """
 from .geometry import (
     LowRankMetricHead,
@@ -40,6 +41,7 @@ from .sandbox import (
     fast_confidence,
 )
 from .agency import AgencyChild, AgencyGroup, HandlerFn
+from .constructive import ConstructiveHead
 
 __all__ = [
     # geometry
@@ -76,4 +78,6 @@ __all__ = [
     "AgencyChild",
     "AgencyGroup",
     "HandlerFn",
+    # constructive
+    "ConstructiveHead",
 ]
