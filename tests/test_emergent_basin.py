@@ -133,6 +133,22 @@ def test_csi_in_answer():
     assert 0.0 <= a.csi <= 1.0
 
 
+# ── retrieval under evolution ───────────────────────────────────────────
+def test_retrieval_still_works_after_evolution():
+    t = _build(emergent=True)
+    _drive(t, cycles=3)
+    assert t.ask("Zeus", "domain").value == "sky"
+    assert t.ask("Poseidon", "domain").value == "sea"
+    assert t.ask("Cronus", "is_a").value == "titan"
+
+
+def test_retrieval_fresh_build():
+    """Sanity: retrieval is correct on a fresh build (no drive)."""
+    t = _build(emergent=True)
+    assert t.ask("Zeus", "domain").value == "sky"
+    assert t.ask("Poseidon", "domain").value == "sea"
+
+
 # ── agency integration ──────────────────────────────────────────────────
 def test_no_children_dispatch_equals_ask():
     t = _build(emergent=True)
@@ -148,12 +164,12 @@ def test_register_child_and_dispatch():
 
     def child_handler(titan, subject, relation, inverse):
         return titan._ask(subject, relation, inverse=inverse,
-                          conf_mode_override="mag")
+                          conf_mode_override="sim")
 
-    t.register_child("mag_child", child_handler, weight=1.0)
+    t.register_child("sim_child", child_handler, weight=1.0)
     ans = t.dispatch("Zeus", "domain")
     assert ans.value == "sky"
-    assert ans.child_name == "mag_child"
+    assert ans.child_name == "sim_child"
 
 
 def test_dispatch_child_declines_falls_through():
@@ -168,30 +184,63 @@ def test_dispatch_child_declines_falls_through():
     assert ans.child_name == "nope"
 
 
-def test_agency_weights_update_after_dispatch():
+def test_agency_eats_low_contributing_child():
+    """
+    Direct test of the eat mechanism.
+
+    A child whose handler always abstains accumulates zero
+    contribution. With enough queries and the CSI gate relaxed, the
+    child is deactivated by prune().
+
+    This replaces an earlier test that relied on mag vs sim children
+    diverging on this corpus. After the float64 fix to _score_candidates,
+    both modes retrieve correctly on the known corpus, so they do not
+    diverge — the mechanism must be tested directly.
+    """
     t = _build(emergent=True)
+    t.agency.min_queries_before_eat = 3
+    t.agency.eat_threshold_contrib = 0.5
+    t.agency.eat_threshold_csi = 1.1   # effectively disable CSI gate
+    t.agency.min_weight = 0.05
+    t.agency.absorption_rate = 0.5
 
-    def mag_reader(titan, subject, relation, inverse):
-        return titan._ask(subject, relation, inverse=inverse,
-                          conf_mode_override="mag")
+    def always_abstain(titan, subject, relation, inverse):
+        return Answer(value=None, confidence=0.0, status="ABSTAINED",
+                      mode="ABSTAIN", loops=0, csi=0.9)
 
-    def sim_reader(titan, subject, relation, inverse):
-        return titan._ask(subject, relation, inverse=inverse,
-                          conf_mode_override="sim")
+    t.register_child("weak", always_abstain, weight=1.0)
 
-    t.register_child("mag", mag_reader, weight=0.5)
-    t.register_child("sim", sim_reader, weight=0.5)
-
-    for _ in range(5):
-        for subj, rel in DRIVE:
+    for _ in range(10):
+        for subj, rel in DRIVE[:3]:
             t.dispatch(subj, rel)
             t.prune()
 
     snap = t.agency.snapshot()
-    assert (
-        snap["children"]["sim"]["weight"] < snap["children"]["mag"]["weight"]
-        or "sim" in snap["eaten"]
-    )
+    assert snap["children"]["weak"]["active"] is False
+    assert "weak" in snap["eaten"]
+
+
+def test_agency_keeps_high_contributing_child():
+    """Mirror of the above: a child that always accepts stays active."""
+    t = _build(emergent=True)
+    t.agency.min_queries_before_eat = 3
+    t.agency.eat_threshold_contrib = 0.5
+    t.agency.eat_threshold_csi = 1.1
+
+    def always_accept(titan, subject, relation, inverse):
+        return Answer(value="x", confidence=1.0, status="ACCEPTED",
+                      mode="CLASSICAL", loops=0, csi=0.9)
+
+    t.register_child("strong", always_accept, weight=1.0)
+
+    for _ in range(10):
+        for subj, rel in DRIVE[:3]:
+            t.dispatch(subj, rel)
+            t.prune()
+
+    snap = t.agency.snapshot()
+    assert snap["children"]["strong"]["active"] is True
+    assert "strong" not in snap["eaten"]
 
 
 def test_stats_includes_agency_snapshot():
@@ -202,15 +251,7 @@ def test_stats_includes_agency_snapshot():
     assert "x" in stats["agency"]["children"]
 
 
-# ── correctness under evolution ─────────────────────────────────────────
-def test_retrieval_still_works_after_evolution():
-    t = _build(emergent=True)
-    _drive(t, cycles=3)
-    assert t.ask("Zeus", "domain").value == "sky"
-    assert t.ask("Poseidon", "domain").value == "sea"
-    assert t.ask("Cronus", "is_a").value == "titan"
-
-
+# ── save/load persistence ───────────────────────────────────────────────
 def test_backward_compat_single_accumulator_save():
     cfg = TitanosConfig(dim=2500, m=50, n=50, r=4, n_loops=4, seed=42,
                         emergent=False)
@@ -237,7 +278,6 @@ def test_backward_compat_single_accumulator_save():
         assert len(t2.facts) == len(t.facts)
 
 
-# ── save/load persistence ───────────────────────────────────────────────
 def test_emergent_state_persists_across_save_load(tmp_path):
     t = _build(emergent=True)
     _drive(t, cycles=3)
