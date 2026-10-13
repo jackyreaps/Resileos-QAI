@@ -11,6 +11,7 @@ Two-head system for QD-TER bridge integration, plus support utilities:
     nonconservative.py  non-conservative diagonal operator (RES-200 §ext)
     phasor.py           phasor graph, band carriers, banded memory (RES-306)
     sandbox.py          Causal Sandbox Index (RES-305)
+    agency.py           heuristic routing layer (RES-307)
 """
 from .geometry import (
     LowRankMetricHead,
@@ -38,6 +39,7 @@ from .sandbox import (
     CSIState,
     fast_confidence,
 )
+from .agency import AgencyChild, AgencyGroup, HandlerFn
 
 __all__ = [
     # geometry
@@ -70,4 +72,8 @@ __all__ = [
     "compute_csi",
     "CSIState",
     "fast_confidence",
+    # agency
+    "AgencyChild",
+    "AgencyGroup",
+    "HandlerFn",
 ]
