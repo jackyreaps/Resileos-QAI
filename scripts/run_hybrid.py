@@ -2,18 +2,12 @@
 """
 End-to-end hybrid runner for Resileos-QAI.
 
-Three conformance gates in report.json:
-
-    report["conformant"]                   HDRIFT NRMSE / horizon
-    report["compression"]["conformant"]    Core compression vs baseline
-    report["titanos"]["conformant"]        App-layer retrieval (optional)
-
-    report["overall_conformant"]           all gates
-    report["gates"]                        per-gate flags
-
 Usage:
-    python scripts/run_hybrid.py --config configs/titanos-run.json --titanos \
-        --data configs/weights.npy --block 64 --n-blocks 64 --train
+    python scripts/run_hybrid.py --config configs/example-run.json
+    python scripts/run_hybrid.py --config configs/titanos-run.json --titanos
+    python scripts/run_hybrid.py --config configs/titanos-run.json --titanos \\
+        --data configs/weights.npy --block 64 --n-blocks 64 \\
+        --X-compress 70 --horizon 4
 """
 from __future__ import annotations
 
@@ -39,7 +33,6 @@ from resileos.training import FrontEndEncoder, TrainingConfig, train
 from resileos.validation import HybridValidator, RunConfig, save_report
 
 
-# ── config ────────────────────────────────────────────────────────────────
 def _filter_for(cls, raw):
     valid = {f.name for f in dataclasses.fields(cls)}
     return {k: v for k, v in raw.items() if k in valid}
@@ -54,7 +47,6 @@ def load_run_config(path):
     return RunConfig(**_filter_for(RunConfig, raw))
 
 
-# ── data ──────────────────────────────────────────────────────────────────
 _DATA_CACHE = {}
 
 
@@ -63,7 +55,7 @@ def load_data(path, m, n):
         return None
     key = str(path)
     if key not in _DATA_CACHE:
-        _DATA_CACHE[key] = np.load(key)
+        _DATA_CACHE[key] = np.load(str(path))
     W = _DATA_CACHE[key]
     if W.ndim in (2, 3):
         return W
@@ -110,29 +102,34 @@ def make_x_enc(seed, step, dim):
     return v / (np.linalg.norm(v) + 1e-12)
 
 
-# ── compression probe ─────────────────────────────────────────────────────
 def _svd_baseline(W, r):
     U, S, Vt = np.linalg.svd(W, full_matrices=False)
     W_r = (U[:, :r] * S[:r]) @ Vt[:r, :]
     return float(np.linalg.norm(W - W_r) / (np.linalg.norm(W) + 1e-12))
 
 
-def _core_compression(blocks, m, n, r):
+def _recon_rel_err(W, Ub, Vb):
+    W_hat = Ub @ Vb
+    denom = float(np.sum(W_hat * W_hat)) + 1e-12
+    s = float(np.sum(W * W_hat)) / denom
+    return float(np.linalg.norm(W - s * W_hat) / (np.linalg.norm(W) + 1e-12))
+
+
+def _core_compression(blocks, m, n, r, encoder=None):
     core = ResidualCore(CoreConfig(m=m, n=n, r=r), seed=0)
     errs = []
     for W in blocks:
-        p = core.step(W)
-        W_hat = p.Ub @ p.Vb
-        denom = float(np.sum(W_hat * W_hat)) + 1e-12
-        s = float(np.sum(W * W_hat)) / denom
-        errs.append(
-            float(np.linalg.norm(W - s * W_hat) / (np.linalg.norm(W) + 1e-12))
-        )
+        if encoder is not None:
+            enc = encoder.forward(W)
+            p = core.step(W, factors=(enc["Ub"], enc["Vb"]))
+        else:
+            p = core.step(W)
+        errs.append(_recon_rel_err(W, p.Ub, p.Vb))
     return float(np.mean(errs)), float(np.std(errs))
 
 
-def run_compression_block(blocks, m, n, r, X_compress):
-    core_err, core_std = _core_compression(blocks, m, n, r)
+def run_compression_block(blocks, m, n, r, X_compress, encoder=None):
+    core_err, core_std = _core_compression(blocks, m, n, r, encoder)
     svd_err = float(np.mean([_svd_baseline(W, r) for W in blocks]))
     core_reduction = 100.0 * (1.0 - core_err)
     svd_reduction = 100.0 * (1.0 - svd_err)
@@ -144,10 +141,10 @@ def run_compression_block(blocks, m, n, r, X_compress):
         "svd_reduction_pct": svd_reduction,
         "X_compress": X_compress,
         "conformant": bool(core_reduction >= X_compress),
+        "used_encoder": encoder is not None,
     }
 
 
-# ── stack ─────────────────────────────────────────────────────────────────
 def build_stack(cfg, m, n):
     r = min(8, min(m, n))
     core = ResidualCore(CoreConfig(m=m, n=n, r=r), seed=0)
@@ -161,18 +158,18 @@ def build_stack(cfg, m, n):
     return core, encoder, adapter, validator
 
 
-# ── titanos block ─────────────────────────────────────────────────────────
 def _is_hit(got, expected):
     if isinstance(expected, list):
         return got in expected
     return got == expected
 
 
-def run_titanos_block(cfg_pathable, report, data=None):
+def run_titanos_block(cfg_path, report, data=None):
+    """Application-layer validation. Adds report['titanos']."""
     try:
-       , from titanos import Titanos, Titan skippingosConfig --
+        from titanos import Titanos, TitanosConfig
     except ImportError:
-        print("[runner] titanos.py not importtitanos")
+        print("[runner] titanos.py not importable, skipping --titanos")
         return
 
     corpus_path = ROOT / "configs" / "titanos-facts.json"
@@ -236,12 +233,12 @@ def run_titanos_block(cfg_pathable, report, data=None):
                   f"({d['status']}, conf {d['confidence']:.4f})")
 
 
-# ── main ──────────────────────────────────────────────────────────────────
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True)
     p.add_argument("--out", default="report.json")
     p.add_argument("--train", action="store_true")
+    p.add_argument("--use-encoder", action="store_true")
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--horizon", type=int, default=16)
     p.add_argument("--m", type=int, default=32)
@@ -270,26 +267,22 @@ def main():
           f"{args.data if data is not None else 'synthetic Gaussian blocks'}")
     if data is not None:
         print(f"[runner]          shape={data.shape}")
-
     print(f"[runner] dim={cfg.dim} X={cfg.X} Y={cfg.Y} seeds={cfg.seed_list}")
 
     core, encoder, adapter, validator = build_stack(cfg, args.m, args.n)
 
-    # ── compression gate ────────────────────────────────────────────────
+    # ── compression gate ────────────────────────────────────────────
     r = min(8, min(args.m, args.n))
     blocks = extract_blocks(data, args.m, args.n, args.n_blocks)
     print(f"[runner] compression probe on {len(blocks)} blocks of "
           f"{args.m}x{args.n}, rank r={r}")
-    comp = run_compression_block(blocks, args.m, args.n, r, args.X_compress)
-    print(f"[runner] core rel_err       = {comp['core_rel_err_mean']:.4f} "
-          f"(± {comp['core_rel_err_std']:.4f})")
-    print(f"[runner] core reduction     = {comp['core_reduction_pct']:.2f}% "
-          f"(target {args.X_compress:.1f}%, "
-          f"conformant={comp['conformant']})")
-    print(f"[runner] SVD  reduction     = {comp['svd_reduction_pct']:.2f}% "
-          f"(upper bound on rank-{r})")
 
-    # ── optional training ───────────────────────────────────────────────
+    comp_before = run_compression_block(blocks, args.m, args.n, r,
+                                        args.X_compress, encoder=None)
+    print(f"[runner] baseline core reduction = "
+          f"{comp_before['core_reduction_pct']:.2f}%")
+
+    encoder_trained = False
     if args.train:
         W_train = [extract_blocks(data, args.m, args.n, 1, seed=s)[0]
                    for s in range(4)]
@@ -299,29 +292,53 @@ def main():
                               scar_var_floor=cfg.scar_var_floor,
                               deltaS_range_floor=cfg.deltaS_range_floor)
         rep = train(core, encoder, W_train, W_hold, tcfg)
-        print(f"[runner] train conformant   = "
-              f"{rep['acceptance']['conformant']}")
+        encoder_trained = True
+        print(f"[runner] trained {args.epochs} epochs, "
+              f"train conformant={rep['acceptance']['conformant']}")
 
-    # ── adapter acceptance ──────────────────────────────────────────────
+    use_enc = encoder_trained and args.use_encoder
+    comp = run_compression_block(blocks, args.m, args.n, r,
+                                 args.X_compress,
+                                 encoder=encoder if use_enc else None)
+    print(f"[runner] core rel_err       = {comp['core_rel_err_mean']:.4f} "
+          f"(± {comp['core_rel_err_std']:.4f})")
+    print(f"[runner] core reduction     = {comp['core_reduction_pct']:.2f}% "
+          f"(target {args.X_compress:.1f}%, "
+          f"conformant={comp['conformant']})")
+    print(f"[runner] SVD  reduction     = {comp['svd_reduction_pct']:.2f}% "
+          f"(upper bound on rank-{r})")
+
+    # ── adapter acceptance ──────────────────────────────────────────
     if not args.no_verify:
         sample = core.step(make_block(0, args.m, args.n, data))
         xs = [make_x_enc(0, t, cfg.dim) for t in range(64)]
         diag = adapter.verify(sample, xs)
         print(f"[runner] adapter cos={diag['cos']:.4f} "
-              f"var={diag['drift_ratio_variance']:.6g} pass={diag['pass']}")
+              f"var={diag['drift_ratio_variance']:.6g} "
+              f"pass={diag['pass']}")
 
-    # ── HDRIFT validation with packet-conditioned target ────────────────
-    # Target = the core's own reconstruction of x_enc (from the packet).
-    # This is the learnable task: drift should move x_enc toward s·Ub@Vb.
+    # ── HDRIFT validation with packet-conditioned target ────────────
     dim = cfg.dim
     _m, _n = args.m, args.n
+    mn = _m * _n
+    if dim < mn:
+        print(f"[runner] error: dim={dim} < m*n={mn}; cannot reshape x_enc",
+              file=sys.stderr)
+        return 2
 
     def packet_fn(seed, step):
         W = make_block(seed + step * 1000, _m, _n, data)
+        if use_enc:
+            enc = encoder.forward(W)
+            R = W - enc["Ub"] @ enc["Vb"]
+            return core.step(W, version=cfg.packet_version,
+                             mu=int(step % 2),
+                             F_res=float(np.mean(R)),
+                             DeltaS=float(1.0 / (1.0 + np.linalg.norm(R))),
+                             factors=(enc["Ub"], enc["Vb"]))
         enc_out = encoder.forward(W)
-        Ub, Vb = enc_out["Ub"], enc_out["Vb"]
-        R = W - Ub @ Vb
-        return core.step(W=W, mu=int(step % 2), F_res=float(np.mean(R)),
+        R = W - enc_out["Ub"] @ enc_out["Vb"]
+        return core.step(W, mu=int(step % 2), F_res=float(np.mean(R)),
                          theta_hi=0.0, theta_lo=0.0,
                          DeltaS=float(1.0 / (1.0 + np.linalg.norm(R))))
 
@@ -333,17 +350,22 @@ def main():
 
     def packet_target_fn(seed, step, packet, x_enc):
         """
-        Target: reconstruction of x_enc via the packet's binary factors,
-        rescaled to best L2 fit. This is what the core claims to be able
-        to represent; the drift field's job is to move x_enc toward it.
+        Target: x_enc with the first m*n entries replaced by the core's
+        best L2 reconstruction of that slice. Works for any dim ≥ m*n.
+
+        The drift field's job is to move x_enc toward this reconstruction.
         """
-        W = x_enc.reshape(_m, _n).astype(np.float64)
-        W_hat = np.asarray(packet.Ub, dtype=np.float64) @ np.asarray(packet.Vb, dtype=np.float64)
+        W = x_enc[:mn].reshape(_m, _n).astype(np.float64)
+        W_hat = (np.asarray(packet.Ub, dtype=np.float64)
+                 @ np.asarray(packet.Vb, dtype=np.float64))
         denom = float(np.sum(W_hat * W_hat)) + 1e-12
         s = float(np.sum(W * W_hat)) / denom
-        return (s * W_hat).reshape(dim).astype(np.float64)
+        target = x_enc.copy()
+        target[:mn] = (s * W_hat).reshape(-1)
+        return target
 
-    print(f"[runner] HDRIFT target: packet-conditioned (core reconstruction)")
+    print("[runner] HDRIFT target: packet-conditioned "
+          f"(encoder={'trained' if use_enc else 'core'})")
 
     report = validator.run(
         packet_fn=packet_fn,
@@ -354,6 +376,7 @@ def main():
     )
 
     report["compression"] = comp
+    report["compression_baseline"] = comp_before
     if args.titanos:
         run_titanos_block(cfg_path, report, data)
 
@@ -368,11 +391,12 @@ def main():
 
     save_report(report, args.out)
 
+    agg = report["aggregate"]
     print(f"[runner] NRMSE reduction     = "
-          f"{report['aggregate']['nrmse_reduction_mean_pct']:.3f}% "
+          f"{agg['nrmse_reduction_mean_pct']:.3f}% "
           f"(gate 1: {'PASS' if gates['hdrif_nrmse'] else 'FAIL'})")
     print(f"[runner] horizon extension   = "
-          f"{report['aggregate']['horizon_extension_mean']:.2f} "
+          f"{agg['horizon_extension_mean']:.2f} "
           f"(Y target {cfg.Y})")
     print(f"[runner] compression gate    = "
           f"{'PASS' if gates['compression'] else 'FAIL'}")
