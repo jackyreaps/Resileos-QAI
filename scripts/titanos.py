@@ -11,14 +11,10 @@ Layers, in order of activation:
     CSI               Causal Sandbox Index over each query (RES-305)
     agency            heuristic routing to registered children (RES-307)
 
-Storage and abstention are always active. Emergent, CSI, and agency are
-optional and can be disabled for comparison. With no registered children,
-`dispatch()` behaves identically to `ask()`.
-
-Agency is heuristic. The thresholds it uses (eat_threshold_csi,
-eat_threshold_contrib, min_queries_before_eat, min_weight,
-absorption_rate) are operational parameters, not derived invariants.
-See RES-307 §0.
+The recurrent loop is used to compute loop history and CSI. Retrieval
+itself unbinds the original probe against the band accumulator. The
+recurrent loop's rank-r compression of the probe is too lossy to be
+used as the query vector.
 
 The "quantum" path is a labeled simulation (QUANTUM_SIM). Not real
 quantum.
@@ -179,7 +175,6 @@ class Titanos:
     # ── accumulators ─────────────────────────────────────────────────
     @property
     def acc(self) -> np.ndarray:
-        """Merged accumulator across all bands. For backward compat."""
         return self._merged_acc()
 
     def _merged_acc(self) -> np.ndarray:
@@ -203,7 +198,6 @@ class Titanos:
         return float(mags.max() / (mags.min() + 1e-300))
 
     def _noise_sigma_base(self, relation: str) -> float:
-        """Per-band baseline noise floor: sqrt((N_r - 1) / D)."""
         N_r = self._counts.get(relation, 0)
         if N_r < 2:
             return 0.0
@@ -211,14 +205,12 @@ class Titanos:
 
     def _noise_sigma_effective(self, relation: str) -> float:
         """
-        Effective noise floor after basin reorganization.
-
         sigma_eff = sigma_base / sqrt(anisotropy). [proposal]
 
         The Lean gives sigma_base = sqrt((N-1)/D) for uniform random keys
-        (OscGraph.crosstalk_variance). That concentration improves SNR by
-        sqrt(anisotropy) is a hypothesis, not a theorem. It is used here
-        as a heuristic and can be disabled by setting emergent=False.
+        (OscGraph.crosstalk_variance). That concentration improves SNR
+        by sqrt(anisotropy) is a hypothesis, not a theorem. Used here as
+        a heuristic; disabled by emergent=False.
         """
         sigma_base = self._noise_sigma_base(relation)
         if not self.cfg.emergent:
@@ -227,7 +219,6 @@ class Titanos:
         return float(sigma_base / np.sqrt(max(a, 1.0)))
 
     def _thresholds_for(self, relation: str) -> tuple[float, float, float]:
-        """Return (classical, abstain, sigma_eff) for this relation."""
         sigma_eff = self._noise_sigma_effective(relation)
         classical = (self.cfg.classical_conf
                      if self.cfg.classical_conf is not None
@@ -239,13 +230,6 @@ class Titanos:
 
     def _compute_monitors(self, subject: str, relation: str,
                           probe: np.ndarray) -> tuple[float, float, int]:
-        """
-        Real monitors computed from a probe against the target band.
-
-        F_res: fraction of candidate mass not explained by the top match.
-        DeltaS: 1 - normalized entropy of the magnitude distribution.
-        mu: sign of the aggregate signed similarity flux.
-        """
         acc = self._bands.get(relation)
         if acc is None:
             return 0.0, 0.0, 0
@@ -377,12 +361,10 @@ class Titanos:
     def _recurrent(self, initial_h: np.ndarray,
                    F_res: float = 0.0, DeltaS: float = 0.5, mu: int = 0):
         """
-        Recurrent refinement.
-
-        F_res, DeltaS, mu default to neutral values so callers that pass
-        only the probe (older test code, direct diagnostics) still work.
-        In the full path, `_ask` supplies real monitors computed from
-        retrieval.
+        Recurrent refinement. F_res, DeltaS, mu default to neutral values
+        so callers passing only the probe still work. The loop produces
+        history and drives the emergent operator; the answer is
+        retrieved separately from the probe (see _ask).
         """
         h = initial_h.copy()
         history: list = []
@@ -524,8 +506,11 @@ class Titanos:
                           fast_path_used=False, escalated=True,
                           reason="sigma-1 gate routed to ABSTAIN")
 
+        # Retrieval unbinds the ORIGINAL probe, not the recurrent output.
+        # The rank-r compression of the probe is too lossy to preserve
+        # the structure needed for unbinding against the accumulator.
         readout2 = self._readout(relation)
-        retrieved = (readout2 * refined).astype(np.int8)
+        retrieved = (readout2 * probe).astype(np.int8)
         best, conf = self._cleanup(retrieved, acc=acc, exclude={subject},
                                    mode=conf_mode_override)
 
@@ -533,7 +518,7 @@ class Titanos:
             mode = "CLASSICAL"
         elif conf >= abstain_thresh:
             best_q, conf_q = self._quantum_sim(
-                refined, acc, exclude={subject})
+                probe, acc, exclude={subject})
             if conf_q > conf:
                 best, conf = best_q, conf_q
             mode = "QUANTUM_SIM"
@@ -586,13 +571,11 @@ class Titanos:
     # ── agency layer (RES-307) ───────────────────────────────────────
     def register_child(self, name: str, handler: HandlerFn,
                        weight: float = 1.0) -> AgencyChild:
-        """Register a child query handler."""
         return self.agency.add_child(name, handler, weight=weight)
 
     def dispatch(self, subject: str, relation: str,
                  inverse: bool = False,
                  handler_name: str | None = None) -> Answer:
-        """Route a query through the agency layer."""
         child: AgencyChild | None = None
         if handler_name is not None:
             child = self.agency.children.get(handler_name)
