@@ -1,221 +1,277 @@
-#!/usr/bin/env python3
 """
-A/B: EvolutionLoop (grid) vs OscillatorOrientedSearch on the same
-toy carrier reward.
+Kuramoto-coupled phase dynamics for the non-conservative operator.
 
-Both searchers share the same discrete grid, the same budget, and the
-same evaluator. The measurement is: does the oscillator-biased order
-reach a better best-so-far at each step than grid order?
+The operator's theta field evolves in one of two ways:
 
-Reports:
-    - best reward after K steps for each
-    - coverage at K
-    - best reward as a function of step
+    linear (default)   theta += (2*mu - 1) * phase_max * pattern
+                       No intrinsic frequencies, no coupling. This is
+                       what RES-200 §extension currently implements.
 
-Usage:
-    python scripts/run_evolution_ab.py --iterations 12
-    python scripts/run_evolution_ab.py --iterations 20 --seed 1
+    oscillator         dtheta_i/dt = omega_i
+                                    + kappa / (alpha + epsilon)
+                                      * sum_j W_ij sin(theta_j - theta_i)
+                       with omega_i from a golden-ratio ladder and W_ij
+                       from an optional coupling matrix (typically the
+                       adjacency of a PhasorGraph).
+
+The oscillator field is a classical dynamical system. It runs on CPU.
+No quantum capability is claimed or required.
+
+Design continuity with QD-TER-Human-Medium:
+    - coupling form matches EEG_hyperscan.py::_coupled_oscillator
+    - v5.0 §3 global chiral commutator has the same sin(delta) form
+    - golden-ratio spacing is the structural signature from
+      QD-TER_HumanMedium_v7.0_PartII.md §1.2.1
+
+The coupling sign is Option A from the design notes:
+
+    kappa / (alpha + epsilon)
+
+High coupling at low error, convergence; low coupling at high error,
+descent to quasi-periodic drift. This matches the substrate's existing
+behavior (Titanos converges when confident, explores when uncertain).
 """
 from __future__ import annotations
 
-import argparse
-import json
-import sys
-from pathlib import Path
+from typing import Optional
 
 import numpy as np
-import torch
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
-from resileos.carrier import SubstrateCarrier
-from resileos.core import CoreConfig, ResidualCore
-from resileos.evolution import EvolutionLoop
-from resileos.evolution_oscillator import OscillatorOrientedSearch
 
 
-M, N = 8, 8
-D_OUT = 16
-SIGMA = 0.5
-N_TRAIN = 256
-N_VAL = 64
-CARRIER_STEPS = 200
-CARRIER_LR = 1e-3
-HIDDEN = 128
+PHI = (1.0 + np.sqrt(5.0)) / 2.0
 
 
-# ── feature pack (duplicated from run_evolution.py) ─────────────────────
-def _extra_dim_for(mask: tuple) -> int:
-    d = 0
-    if "csi" in mask:
-        d += 3
-    if "order_parameter" in mask:
-        d += 1
-    if "direction" in mask:
-        d += D_OUT
-    return d
+# ── frequency ladders ───────────────────────────────────────────────────
+def golden_ladder(r: int, omega_base: float = 2.0 * np.pi) -> np.ndarray:
+    """
+    omega_i = phi^i mod omega_base.
+
+    Powers of phi are maximally irrational. The ladder reduces the
+    density of near-resonances and delays the onset of partial locking.
+    It does not eliminate resonance; for any eps > 0 there exist indices
+    i, j with |omega_i / omega_j - p/q| < eps. The events are rare and
+    slow, not impossible.
+    """
+    powers = PHI ** np.arange(r, dtype=np.float64)
+    return np.mod(powers, omega_base)
 
 
-def _extra_vector(mask: tuple, rng: np.random.Generator) -> np.ndarray:
-    return rng.standard_normal(_extra_dim_for(mask)).astype(np.float64)
+def golden_weyl(r: int, omega_base: float = 2.0 * np.pi) -> np.ndarray:
+    """
+    omega_i = omega_base * frac(phi * i).
+
+    Alternative ladder. More uniform coverage of [0, omega_base) than
+    the powers. Also incommensurate in the sense that no pair forms a
+    rational ratio exactly.
+    """
+    i = np.arange(r, dtype=np.float64)
+    frac = np.mod(PHI * i, 1.0)
+    return frac * omega_base
 
 
-def make_evaluator(base_seed: int = 0):
-    rng = np.random.default_rng(base_seed)
-
-    def evaluate(cfg) -> float:
-        torch.manual_seed(base_seed)
-        rng_local = np.random.default_rng(base_seed + 1)
-
-        core = ResidualCore(
-            CoreConfig(m=M, n=N, r=cfg.r, n_residual_layers=cfg.n_loops),
-            seed=base_seed,
-        )
-        extra_dim = _extra_dim_for(cfg.feature_mask)
-
-        def make_sample(idx: int):
-            W = rng_local.standard_normal((M, N))
-            packet = core.step(W, mu=int(idx % 2), F_res=0.1, DeltaS=0.5)
-            c = rng_local.standard_normal(D_OUT)
-            obs = c + SIGMA * rng_local.standard_normal(D_OUT)
-            extra = _extra_vector(cfg.feature_mask, rng_local)
-            return packet, extra if extra_dim > 0 else None, obs, c
-
-        train = [make_sample(i) for i in range(N_TRAIN)]
-        val = [make_sample(i) for i in range(N_VAL)]
-
-        carrier = SubstrateCarrier(
-            m=M, n=N, r=cfg.r,
-            output_shape=(D_OUT,),
-            hidden_dim=HIDDEN,
-            n_layers=2,
-            extra_dim=extra_dim,
-            seed=base_seed,
-        )
-        opt = torch.optim.Adam(carrier.parameters(), lr=CARRIER_LR)
-
-        step = 0
-        while step < CARRIER_STEPS:
-            opt.zero_grad()
-            total = torch.zeros(())
-            count = 0
-            for packet, extra, obs, c in train:
-                if extra_dim > 0:
-                    b = carrier(packet,
-                                extra=obs if extra_dim == D_OUT else extra)
-                else:
-                    b = carrier(packet)
-                target = torch.from_numpy(c - obs).float()
-                total = total + ((b - target) ** 2).mean()
-                count += 1
-                if count >= 32:
-                    break
-            (total / max(count, 1)).backward()
-            opt.step()
-            step += 1
-
-        with torch.no_grad():
-            losses = []
-            for packet, extra, obs, c in val:
-                if extra_dim > 0:
-                    b = carrier(packet,
-                                extra=obs if extra_dim == D_OUT else extra)
-                else:
-                    b = carrier(packet)
-                target = torch.from_numpy(c - obs).float()
-                losses.append(float(((b - target) ** 2).mean()))
-            return float(np.mean(losses))
-
-    return evaluate
+_LADDERS = {
+    "golden_powers": golden_ladder,
+    "golden_weyl": golden_weyl,
+}
 
 
-# ── main ────────────────────────────────────────────────────────────────
-def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("--iterations", type=int, default=12)
-    p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--out", default=str(ROOT / "report_evolution_ab.json"))
-    args = p.parse_args()
+# ── coupling helpers ────────────────────────────────────────────────────
+def coupling_from_graph(graph) -> np.ndarray:
+    """
+    Symmetric non-negative coupling from a PhasorGraph.
 
-    grid_kwargs = dict(
-        r_values=(4, 6, 8, 12),
-        n_loops_values=(4, 8, 12),
-        feature_masks=(
-            ("packet",),
-            ("packet", "csi"),
-            ("packet", "csi", "order_parameter"),
-            ("packet", "csi", "order_parameter", "direction"),
-        ),
-    )
-
-    evaluator = make_evaluator(base_seed=args.seed)
-
-    print(f"iterations={args.iterations}  seed={args.seed}")
-
-    # Grid
-    grid = EvolutionLoop(
-        **grid_kwargs, strategy="grid", budget=args.iterations,
-    )
-    grid.run(evaluator)
-    grid_bsf = []
-    cur = float("inf")
-    for rec in grid.history():
-        cur = min(cur, rec.reward)
-        grid_bsf.append(cur)
-
-    # Oriented
-    oriented = OscillatorOrientedSearch(
-        **grid_kwargs, budget=args.iterations, seed=args.seed,
-    )
-    oriented.run(evaluator, iterations=args.iterations)
-    oriented_bsf = oriented.best_so_far()
-
-    # Side-by-side
-    print()
-    print("step | grid_best | oriented_best | delta")
-    print("-" * 48)
-    for i in range(max(len(grid_bsf), len(oriented_bsf))):
-        g = grid_bsf[i] if i < len(grid_bsf) else None
-        o = oriented_bsf[i] if i < len(oriented_bsf) else None
-        d = ""
-        if g is not None and o is not None:
-            d = f"{o - g:+.4f}"
-        print(f"{i + 1:4d} | {('%.4f' % g) if g is not None else '   -   '} | "
-              f"{('%.4f' % o) if o is not None else '   -   '} | {d:>8}")
-
-    g_final = grid_bsf[-1] if grid_bsf else float("nan")
-    o_final = oriented_bsf[-1] if oriented_bsf else float("nan")
-    print()
-    print(f"grid best at K:      {g_final:.4f}")
-    print(f"oriented best at K:  {o_final:.4f}")
-    print(f"delta:               {o_final - g_final:+.4f}")
-    print()
-    print(f"grid coverage:       {len(grid.history())}/{len(grid)}")
-    print(f"oriented coverage:   {oriented.n_visited()}/{len(oriented._grid)}")
-    print(f"oriented field R:    {oriented.field.order_parameter():.4f}")
-
-    report = {
-        "iterations": args.iterations,
-        "seed": args.seed,
-        "grid_best_so_far": grid_bsf,
-        "oriented_best_so_far": oriented_bsf,
-        "grid_best_config": {
-            "r": grid.best().config.r,
-            "n_loops": grid.best().config.n_loops,
-            "feature_mask": list(grid.best().config.feature_mask),
-        },
-        "oriented_best_config": {
-            "r": oriented.best().config.r,
-            "n_loops": oriented.best().config.n_loops,
-            "feature_mask": list(oriented.best().config.feature_mask),
-        },
-        "oriented_field_R": oriented.field.order_parameter(),
-    }
-    Path(args.out).write_text(json.dumps(report, indent=2))
-    print(f"\nwrote {args.out}")
-    return 0
+    W_ij = |A_ij|, diagonal zero. For a Hermitian graph, |A_ij| = |A_ji|,
+    so the coupling is symmetric. The amplitudes carry the topology; the
+    phases of the complex weights are not used here.
+    """
+    A = np.asarray(graph.adjacency(), dtype=np.complex128)
+    W = np.abs(A)
+    np.fill_diagonal(W, 0.0)
+    return W
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+def empty_coupling(r: int) -> np.ndarray:
+    return np.zeros((r, r), dtype=np.float64)
+
+
+# ── Kuramoto field ──────────────────────────────────────────────────────
+class KuramotoField:
+    """
+    Phase dynamics for r coupled oscillators.
+
+        dtheta_i/dt = omega_i
+                    + kappa / (alpha + epsilon)
+                      * sum_j W_ij sin(theta_j - theta_i)
+
+    Parameters
+    ----------
+    r : int
+        Number of oscillators. Matches the scar rank.
+    ladder : str
+        'golden_powers' (phi^i mod omega_base) or
+        'golden_weyl'   (omega_base * frac(phi * i)).
+    omega_base : float
+        Upper bound for the frequency range.
+    kappa : float
+        Base coupling strength.
+    alpha : float
+        Regularizer in the denominator (prevents division by zero at
+        epsilon = 0).
+    dt : float
+        Integration step. RK4 by default.
+    seed : int
+        Used only if random_start is True.
+    random_start : bool
+        If True, initialize theta uniform in [-pi, pi]. Otherwise zero.
+    """
+
+    def __init__(
+        self,
+        r: int,
+        ladder: str = "golden_powers",
+        omega_base: float = 2.0 * np.pi,
+        kappa: float = 1.0,
+        alpha: float = 1e-3,
+        dt: float = 0.1,
+        seed: int = 0,
+        random_start: bool = False,
+    ) -> None:
+        if r < 1:
+            raise ValueError("r must be >= 1")
+        if ladder not in _LADDERS:
+            raise ValueError(f"unknown ladder {ladder!r}")
+        if alpha <= 0.0:
+            raise ValueError("alpha must be > 0")
+        if dt <= 0.0:
+            raise ValueError("dt must be > 0")
+
+        self.r = int(r)
+        self.ladder = ladder
+        self.omega_base = float(omega_base)
+        self.kappa = float(kappa)
+        self.alpha = float(alpha)
+        self.dt = float(dt)
+        self.omega = _LADDERS[ladder](self.r, self.omega_base)
+
+        if random_start:
+            rng = np.random.default_rng(seed)
+            self.theta = rng.uniform(-np.pi, np.pi, size=self.r)
+        else:
+            self.theta = np.zeros(self.r, dtype=np.float64)
+
+        self._last_epsilon = 0.0
+
+    # ── dynamics ────────────────────────────────────────────────────
+    def _dtheta(self, theta: np.ndarray, epsilon: float,
+                W: np.ndarray) -> np.ndarray:
+        # diff[i, j] = theta[j] - theta[i]
+        diff = theta[None, :] - theta[:, None]
+        coupling = (W * np.sin(diff)).sum(axis=1)
+        gain = self.kappa / (self.alpha + float(epsilon))
+        return self.omega + gain * coupling
+
+    def velocity(self, theta: Optional[np.ndarray] = None,
+                 epsilon: float = 0.0,
+                 W: Optional[np.ndarray] = None) -> np.ndarray:
+        """
+        Public wrapper for the phase velocity dtheta/dt.
+
+        If theta is None, uses the current field state. If W is None,
+        no coupling (each oscillator rotates at its own omega_i).
+
+        This is the same vector the RK4 integrator uses internally.
+        Callers that need the instantaneous phase velocity — e.g. a
+        search that biases proposals by the sign of dtheta — should
+        call this method rather than reaching into _dtheta.
+        """
+        if theta is None:
+            theta = self.theta
+        theta = np.asarray(theta, dtype=np.float64)
+        if theta.shape != (self.r,):
+            raise ValueError(
+                f"theta shape {theta.shape} != ({self.r},)")
+        if W is None:
+            W = empty_coupling(self.r)
+        W = np.asarray(W, dtype=np.float64)
+        if W.shape != (self.r, self.r):
+            raise ValueError(
+                f"W shape {W.shape} != ({self.r}, {self.r})")
+        return self._dtheta(theta, epsilon, W)
+
+    def step(self, epsilon: float, W: Optional[np.ndarray] = None,
+             dt: Optional[float] = None) -> np.ndarray:
+        """
+        Advance the field by one RK4 step. Returns the new theta.
+
+        epsilon is the tracking error; small epsilon means strong
+        coupling (Option A). W is the (r, r) coupling matrix; if None,
+        no coupling (each oscillator rotates at its own omega_i).
+        """
+        dt = self.dt if dt is None else float(dt)
+        if W is None:
+            W = empty_coupling(self.r)
+        W = np.asarray(W, dtype=np.float64)
+        if W.shape != (self.r, self.r):
+            raise ValueError(
+                f"W shape {W.shape} != ({self.r}, {self.r})")
+
+        theta = self.theta
+        k1 = self._dtheta(theta, epsilon, W)
+        k2 = self._dtheta(theta + 0.5 * dt * k1, epsilon, W)
+        k3 = self._dtheta(theta + 0.5 * dt * k2, epsilon, W)
+        k4 = self._dtheta(theta + dt * k3, epsilon, W)
+        new_theta = theta + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+        # Wrap to [-pi, pi] to keep exp(i*theta) numerically clean.
+        self.theta = ((new_theta + np.pi) % (2.0 * np.pi)) - np.pi
+        self._last_epsilon = float(epsilon)
+        return self.theta.copy()
+
+    # ── readouts ────────────────────────────────────────────────────
+    def order_parameter(self) -> float:
+        """
+        R = (1/r) |sum_j exp(i * theta_j)|.
+
+        R = 1 when all phases equal; R -> 0 when uniformly distributed.
+        """
+        z = np.exp(1j * self.theta)
+        return float(np.abs(np.mean(z)))
+
+    def mean_phase(self) -> float:
+        z = np.exp(1j * self.theta)
+        return float(np.angle(np.mean(z)))
+
+    def reset(self) -> None:
+        self.theta[:] = 0.0
+
+    # ── persistence ─────────────────────────────────────────────────
+    def state_dict(self) -> dict:
+        return {
+            "r": self.r,
+            "ladder": self.ladder,
+            "omega_base": self.omega_base,
+            "kappa": self.kappa,
+            "alpha": self.alpha,
+            "dt": self.dt,
+            "omega": self.omega.tolist(),
+            "theta": self.theta.tolist(),
+        }
+
+    def load_state_dict(self, d: dict) -> None:
+        if d["r"] != self.r:
+            raise ValueError(f"r mismatch: {d['r']} vs {self.r}")
+        self.omega = np.asarray(d["omega"], dtype=np.float64)
+        self.theta = np.asarray(d["theta"], dtype=np.float64)
+        self.kappa = float(d.get("kappa", self.kappa))
+        self.alpha = float(d.get("alpha", self.alpha))
+        self.dt = float(d.get("dt", self.dt))
+
+
+__all__ = [
+    "KuramotoField",
+    "golden_ladder",
+    "golden_weyl",
+    "coupling_from_graph",
+    "empty_coupling",
+    "PHI",
+]
