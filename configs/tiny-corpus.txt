@@ -1,0 +1,11 @@
+# One sequence per line, comma-separated token ids.
+# All ids must be < vocab_size in pipeline-config.json.
+
+3,5,7,11
+1,20,30,40
+0,1,2,3
+10,20,30
+5
+12,24,36,48,60
+7,14,21
+33,44,55,66
