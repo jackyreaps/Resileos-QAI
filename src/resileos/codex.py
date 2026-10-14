@@ -1,31 +1,27 @@
-"""
-φ-phased codex.
+""" φ-phased codex. 
 
-Deterministic token and position encoders built on φ-seeded constant-
-magnitude phasors. Every code is a unit-norm complex vector of dim
-components with per-component magnitude 1/sqrt(dim).
+Deterministic token and position encoders built on φ-seeded 
+constant-magnitude phasors. Every code is a unit-norm complex vector of dim 
+components with per-component magnitude 1/sqrt(dim). 
 
-    token t:      phase[d] = 2π · frac(φ · (t+1) · (d+1))
-    position p:   phase[d] = 2π · frac(φ² · (p+1) · (d+1))
+token t:    phase[d] = 2π · frac(φ · (t+1) · (d+1))
+position p: phase[d] = 2π · frac(φ² · (p+1) · (d+1))
 
 Bind and unbind are exact under these conventions:
+    bind(a, b)    = a * b * sqrt(dim)
+    unbind(c, b)  = c * conj(b) * sqrt(dim)
+    unbind(bind(a, b), b) = a
 
-    bind(a, b)              = a * b * sqrt(dim)
-    unbind(c, b)            = c * conj(b) * sqrt(dim)
-    unbind(bind(a, b), b)   = a
-
-BandCarriers is NOT used here. Its carriers are pure single-frequency
-Fourier modes; under element-wise bind two carriers can sum to another
-carrier's frequency, which aliases multi-token cleanup. φ-seeded hash
-phasors do not alias because adjacent token codes have no additive
-structure.
+BandCarriers is NOT used here. Its carriers are pure single-frequency Fourier 
+modes; under element-wise bind two carriers can sum to another carrier's 
+frequency, which aliases multi-token cleanup. φ-seeded hash phasors do not alias
+because adjacent token codes have no additive structure. 
 """
 from __future__ import annotations
 
 from typing import Optional, Sequence
 
 import numpy as np
-
 
 PHI = (1.0 + np.sqrt(5.0)) / 2.0
 PHI2 = PHI * PHI
@@ -41,9 +37,12 @@ def _phi_phasor(ids: np.ndarray, dim: int, multiplier: float) -> np.ndarray:
 
 
 class PhiPhaseCodex:
-
-    def __init__(self, vocab_size: int, dim: int,
-                 max_positions: int = MAX_POSITIONS_DEFAULT) -> None:
+    def __init__(
+        self,
+        vocab_size: int,
+        dim: int,
+        max_positions: int = MAX_POSITIONS_DEFAULT,
+    ) -> None:
         if vocab_size < 1:
             raise ValueError("vocab_size must be >= 1")
         if dim < 2:
@@ -59,8 +58,7 @@ class PhiPhaseCodex:
         self.codebook = _phi_phasor(token_ids, self.dim, multiplier=PHI)
 
         position_ids = np.arange(1, max_positions + 1, dtype=np.float64)
-        self._positions = _phi_phasor(position_ids, self.dim,
-                                      multiplier=PHI2)
+        self._positions = _phi_phasor(position_ids, self.dim, multiplier=PHI2)
 
     def phase_code(self, token_id: int) -> np.ndarray:
         if not (0 <= token_id < self.vocab_size):
@@ -85,35 +83,3 @@ class PhiPhaseCodex:
         s = np.sum(np.stack(codes, axis=0), axis=0)
         n = float(np.linalg.norm(s))
         return s / n if n > 1e-12 else s
-
-    def encode(self, tokens: Sequence[int]) -> np.ndarray:
-        if len(tokens) == 0:
-            return np.zeros(self.dim, dtype=np.complex128)
-        if len(tokens) > self.max_positions:
-            raise ValueError(
-                f"sequence length {len(tokens)} > max_positions "
-                f"{self.max_positions}")
-        codes = [self.bind(self.phase_code(int(t)), self.phase_slot(p))
-                 for p, t in enumerate(tokens)]
-        return self.bundle(codes)
-
-    def argmax_coherence(self, hv: np.ndarray, position: int,
-                         top_k: Optional[int] = None
-                         ) -> list[tuple[int, float]]:
-        hv = np.asarray(hv, dtype=np.complex128)
-        if hv.shape != (self.dim,):
-            raise ValueError(f"hv shape {hv.shape} != ({self.dim},)")
-        unbound = self.unbind(hv, self.phase_slot(position))
-        norm = float(np.linalg.norm(unbound)) + 1e-12
-        coherence = np.real(self.codebook @ np.conj(unbound)) / norm
-        if top_k is None:
-            top_k = self.vocab_size
-        order = np.argsort(-coherence)[:top_k]
-        return [(int(t), float(coherence[t])) for t in order]
-
-    def cleanup(self, hv: np.ndarray, position: int) -> Optional[int]:
-        ranked = self.argmax_coherence(hv, position, top_k=1)
-        return ranked[0][0] if ranked else None
-
-
-__all__ = ["PhiPhaseCodex", "MAX_POSITIONS_DEFAULT"]
