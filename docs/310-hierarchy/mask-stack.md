@@ -1,10 +1,8 @@
----
 doc: RES-312
 title: Layered Mask Stack
 status: draft
 depends_on: RES-306, RES-310
 referenced_by: RES-313, RES-315
----
 
 # Layered Mask Stack
 
@@ -15,8 +13,8 @@ membrane. The regime change is the mask-to-sheath transition.
 
 This document defines the mask stack as a constructive structure — something
 the build produces, not something a diagnostic observes. It defines the layers,
-the transition criterion, and the API. It does not define the basin metrics used
-to observe the transition. Those are RES-304.
+the transition criterion, and the API. It does not define the basin metrics
+used to observe the transition. Those are RES-304.
 
 ## 1. What a mask is
 
@@ -31,8 +29,8 @@ feature set is the oscillator band set from RES-306:
 | 3..k-1 | reserved | Future features |
 
 A mask is `tuple[bool]` of length `k`. The full stack is a sequence of masks,
-ordered by depth. Layer 0 is the finest mask (most bits set); layer `K-1` is the
-coarsest.
+ordered by depth. Layer 0 is the finest mask (most bits set); layer `K-1` is
+the coarsest.
 
 ## 2. Why layers
 
