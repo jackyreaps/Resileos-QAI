@@ -1,16 +1,18 @@
-"""φ-phased codex. Deterministic token and position encoders built on
-φ-seeded constant-magnitude phasors. Every code is a unit-norm complex vector
-of dim components with per-component magnitude 1/sqrt(dim).
+"""φ-phased codex.
+
+Deterministic token and position encoders built on φ-seeded
+constant-magnitude phasors. Every code is a unit-norm complex vector of dim
+components with per-component magnitude 1/sqrt(dim).
 
 Bind and unbind are exact under these conventions:
     bind(a, b)    = a * b * sqrt(dim)
     unbind(c, b)  = c * conj(b) * sqrt(dim)
     unbind(bind(a, b), b) = a
 
-The multiplicative φ·id·d schedule aliases under element-wise bind — adjacent
-token codes have additive structure in phase. This implementation uses
-φ-seeded random phasors instead: each token ID hashes to a unique RNG seed,
-which produces incommensurate phase patterns with no additive structure.
+The multiplicative φ·id·d schedule aliases under element-wise bind —
+adjacent token codes have additive structure in phase. This implementation
+uses φ-seeded random phasors instead: each token ID hashes to a unique RNG
+seed, which produces incommensurate phase patterns with no additive structure.
 """
 from __future__ import annotations
 
@@ -89,7 +91,8 @@ class PhiPhaseCodex:
             raise ValueError("tokens must be non-empty")
         if len(tokens) > self.max_positions:
             raise ValueError(
-                f"sequence length {len(tokens)} > max_positions {self.max_positions}"
+                f"sequence length {len(tokens)} > max_positions "
+                f"{self.max_positions}"
             )
         codes = []
         for p, t in enumerate(tokens):
