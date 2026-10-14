@@ -3,11 +3,14 @@
 
 Maps a token_id to a phase code and a position to a phase slot using
 BandCarriers (phasor.py) for the golden-Weil schedule already in the
-repo. Encode is bind(slot) then bundle. Decode is unbind(slot) then
-argmax coherence. Cleanup is decode with top_k = 1.
+repo. One BandCarriers instance is used with disjoint index ranges so
+token codes and position codes never coincide for the same index.
 
-Band 0 of each BandCarriers is degenerate (ω_0 = 0), so indices are
-shifted by +1.
+    token code:    band 1 + token_id
+    position code: band (vocab_size + 1) + position
+
+Encode is bind(slot) then bundle. Decode is unbind(slot) then argmax
+coherence. Cleanup is decode with top_k = 1.
 """
 from __future__ import annotations
 
@@ -35,12 +38,14 @@ class PhiPhaseCodex:
         self.dim = int(dim)
         self.max_positions = int(max_positions)
 
-        self._token_bands = BandCarriers(dim=self.dim,
-                                         n_bands=vocab_size + 1)
-        self._position_bands = BandCarriers(dim=self.dim,
-                                            n_bands=max_positions + 1)
+        total_bands = vocab_size + max_positions + 2
+        self._bands = BandCarriers(dim=self.dim, n_bands=total_bands)
+        self._token_base = 1
+        self._position_base = vocab_size + 1
+
         self.codebook = np.stack(
-            [self._token_bands.carrier(t + 1) for t in range(vocab_size)],
+            [self._bands.carrier(self._token_base + t)
+             for t in range(vocab_size)],
             axis=0,
         )
 
@@ -52,7 +57,7 @@ class PhiPhaseCodex:
     def phase_slot(self, position: int) -> np.ndarray:
         if not (0 <= position < self.max_positions):
             raise IndexError(f"position {position} out of range")
-        return self._position_bands.carrier(position + 1)
+        return self._bands.carrier(self._position_base + position)
 
     @staticmethod
     def bind(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -88,7 +93,8 @@ class PhiPhaseCodex:
         if hv.shape != (self.dim,):
             raise ValueError(f"hv shape {hv.shape} != ({self.dim},)")
         unbound = self.unbind(hv, self.phase_slot(position))
-        coherence = np.real(self.codebook @ np.conj(unbound)) / float(self.dim)
+        norm = float(np.linalg.norm(unbound)) + 1e-12
+        coherence = np.real(self.codebook @ np.conj(unbound)) / norm
         if top_k is None:
             top_k = self.vocab_size
         order = np.argsort(-coherence)[:top_k]
