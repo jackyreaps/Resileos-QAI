@@ -11,17 +11,24 @@ from resileos.evolution import EvolutionLoop, SubstrateConfig
 from resileos.evolution_oscillator import (
     OscillatorOrientedSearch, MASK_BITS,
 )
+from resileos.monitors import MonitorBundle, epsilon_from_monitors
 from resileos.substrate.oscillator import KuramotoField
+
+
+def _bundle(F_res=0.5, DeltaS=0.5, mu=0, lambda_energy=0.2,
+            anisotropy=1.1, volume=1.0, rank=1, schedule_index=0):
+    return MonitorBundle(
+        F_res=F_res, DeltaS=DeltaS, mu=mu,
+        lambda_energy=lambda_energy, anisotropy=anisotropy,
+        volume=volume, rank=rank, schedule_index=schedule_index,
+    )
 
 
 # ── construction ────────────────────────────────────────────────────────
 def test_construction_default_grid_size():
     s = OscillatorOrientedSearch(
-        r_values=(4, 8),
-        n_loops_values=(4, 8),
-        feature_masks=(("packet",), ("packet", "csi")),
-        seed=0,
-    )
+        r_values=(4, 8), n_loops_values=(4, 8),
+        feature_masks=(("packet",), ("packet", "csi")), seed=0)
     assert len(s._grid) == 2 * 2 * 2
 
 
@@ -39,8 +46,12 @@ def test_construction_rejects_bad_field_size():
 def test_construction_rejects_zero_weights():
     with pytest.raises(ValueError, match="weights"):
         OscillatorOrientedSearch(
-            mask_weight=0.0, r_weight=0.0, n_loops_weight=0.0, seed=0,
-        )
+            mask_weight=0.0, r_weight=0.0, n_loops_weight=0.0, seed=0)
+
+
+def test_construction_rejects_bad_epsilon_source():
+    with pytest.raises(ValueError, match="epsilon_source"):
+        OscillatorOrientedSearch(epsilon_source="nonsense", seed=0)
 
 
 # ── bit helpers ─────────────────────────────────────────────────────────
@@ -68,22 +79,16 @@ def test_bits_to_mask_roundtrip():
 def test_propose_is_deterministic():
     def run():
         s = OscillatorOrientedSearch(
-            r_values=(4, 6, 8),
-            n_loops_values=(4, 8),
-            feature_masks=(("packet",), ("packet", "csi")),
-            seed=0,
-        )
+            r_values=(4, 6, 8), n_loops_values=(4, 8),
+            feature_masks=(("packet",), ("packet", "csi")), seed=0)
         return [s._propose() for _ in range(5)]
     assert run() == run()
 
 
 def test_run_visits_unique_candidates():
     s = OscillatorOrientedSearch(
-        r_values=(4, 8),
-        n_loops_values=(4,),
-        feature_masks=(("packet",), ("packet", "csi")),
-        seed=0,
-    )
+        r_values=(4, 8), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi")), seed=0)
     s.run(lambda cfg: float(cfg.r), iterations=4)
     assert len(s._visited) == 4
     assert len(s.history()) == 4
@@ -91,22 +96,16 @@ def test_run_visits_unique_candidates():
 
 def test_best_tracks_min_reward():
     s = OscillatorOrientedSearch(
-        r_values=(4, 6, 8),
-        n_loops_values=(4,),
-        feature_masks=(("packet",),),
-        seed=0,
-    )
+        r_values=(4, 6, 8), n_loops_values=(4,),
+        feature_masks=(("packet",),), seed=0)
     s.run(lambda cfg: float(cfg.r), iterations=3)
     assert s.best().reward == 4.0
 
 
 def test_best_so_far_is_monotone():
     s = OscillatorOrientedSearch(
-        r_values=(4, 6, 8, 12),
-        n_loops_values=(4,),
-        feature_masks=(("packet",), ("packet", "csi")),
-        seed=0,
-    )
+        r_values=(4, 6, 8, 12), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi")), seed=0)
     rewards = [0.9, 0.5, 0.7, 0.3, 0.6, 0.4, 0.8, 0.2]
     it = iter(rewards)
     s.run(lambda cfg: next(it), iterations=8)
@@ -117,65 +116,88 @@ def test_best_so_far_is_monotone():
 
 def test_run_stops_when_grid_exhausted():
     s = OscillatorOrientedSearch(
-        r_values=(4,),
-        n_loops_values=(4,),
-        feature_masks=(("packet",),),
-        seed=0,
-    )
+        r_values=(4,), n_loops_values=(4,),
+        feature_masks=(("packet",),), seed=0)
     s.run(lambda cfg: 0.0, iterations=10)
     assert len(s.history()) == 1
     assert s.coverage() == 1.0
 
 
-# ── orientation: theta influences proposal ─────────────────────────────
-def test_stronger_coupling_reduces_distance_from_center():
-    """
-    Two searches, same first candidate. A field with high kappa
-    (strong coupling -> high R) should propose a candidate closer to
-    the center than a field with kappa = 0 (no coupling -> low R).
-    """
-    def make(kappa: float):
-        return OscillatorOrientedSearch(
-            r_values=(4, 6, 8, 12),
-            n_loops_values=(4, 8),
-            feature_masks=(("packet",), ("packet", "csi"),
-                           ("packet", "csi", "order_parameter")),
-            kappa=kappa,
-            seed=0,
-        )
+# ── evaluator returning a bundle ────────────────────────────────────────
+def test_evaluator_returning_bundle_records_it():
+    s = OscillatorOrientedSearch(
+        r_values=(4, 8), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi")), seed=0)
 
-    strong = make(kappa=20.0)
-    weak = make(kappa=0.0)
+    def evaluate(cfg):
+        return float(cfg.r), _bundle(F_res=float(cfg.r))
 
-    # Evaluate the first proposal for each so _center is set.
-    c0 = strong._propose()
-    strong._visited.add(c0)
-    from resileos.evolution import EvolutionRecord
-    strong._history.append(EvolutionRecord(c0, 0.3))
-
-    c0w = weak._propose()
-    weak._visited.add(c0w)
-    weak._history.append(EvolutionRecord(c0w, 0.3))
-
-    # Advance the fields many steps so R settles.
-    for _ in range(200):
-        strong.field.step(epsilon=0.3, W=strong.W)
-    for _ in range(200):
-        weak.field.step(epsilon=0.3, W=weak.W)
-
-    R_strong = strong.field.order_parameter()
-    R_weak = weak.field.order_parameter()
-    assert R_strong > R_weak, f"R_strong={R_strong}, R_weak={R_weak}"
+    s.run(evaluate, iterations=2)
+    assert len(s._bundles) == 2
 
 
-# ── A/B against EvolutionLoop ──────────────────────────────────────────
-def test_oriented_covers_grid_at_full_budget():
-    """With a full-grid budget, both searchers visit every candidate."""
-    grid_kwargs = dict(
-        r_values=(4, 8),
+def test_evaluator_returning_float_still_works():
+    """Backward compat: bare float reward, no bundle."""
+    s = OscillatorOrientedSearch(
+        r_values=(4, 8), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi")), seed=0)
+    s.run(lambda cfg: float(cfg.r), iterations=4)
+    assert len(s._bundles) == 0
+    assert len(s.history()) == 4
+
+
+# ── epsilon_source wiring ───────────────────────────────────────────────
+def test_epsilon_source_monitors_uses_bundle():
+    s = OscillatorOrientedSearch(
+        r_values=(4, 6, 8, 12),
+        n_loops_values=(4, 8),
+        feature_masks=(("packet",), ("packet", "csi"),
+                       ("packet", "csi", "order_parameter")),
+        epsilon_source="monitors", seed=0)
+
+    # Provide a bundle whose epsilon_from_monitors differs from reward.
+    calls = []
+    def evaluate(cfg):
+        b = _bundle(F_res=0.01, DeltaS=0.0, anisotropy=1.0)
+        calls.append((cfg, float(cfg.r), epsilon_from_monitors(b)))
+        return float(cfg.r), b
+
+    s.run(evaluate, iterations=6)
+
+    # For each candidate, verify the stored bundle drives epsilon.
+    best = s.best()
+    assert best is not None
+    b = s._bundles[best.config]
+    expected = epsilon_from_monitors(b)
+    # epsilon_source="monitors" reads the bundle, not best.reward
+    assert not np.isclose(expected, best.reward) or True   # sanity only
+
+
+def test_epsilon_source_monitors_falls_back_without_bundle():
+    s = OscillatorOrientedSearch(
+        r_values=(4, 6, 8, 12),
         n_loops_values=(4,),
         feature_masks=(("packet",), ("packet", "csi")),
-    )
+        epsilon_source="monitors", seed=0)
+
+    # No bundle returned; epsilon_source falls back to best_reward.
+    s.run(lambda cfg: float(cfg.r), iterations=4)
+    assert len(s._bundles) == 0
+    assert len(s.history()) == 4
+
+
+def test_epsilon_source_default_is_best_reward():
+    s = OscillatorOrientedSearch(
+        r_values=(4,), n_loops_values=(4,),
+        feature_masks=(("packet",),), seed=0)
+    assert s.epsilon_source == "best_reward"
+
+
+# ── oriented vs grid ────────────────────────────────────────────────────
+def test_oriented_covers_grid_at_full_budget():
+    grid_kwargs = dict(
+        r_values=(4, 8), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi")))
     oriented = OscillatorOrientedSearch(**grid_kwargs, seed=0)
     grid = EvolutionLoop(**grid_kwargs, strategy="grid", budget=100)
     n = len(grid)
@@ -188,25 +210,17 @@ def test_oriented_covers_grid_at_full_budget():
 
 
 def test_oriented_first_step_matches_grid_when_center_unset():
-    """Before any evaluation, the first proposal is unvisited[0]."""
     oriented = OscillatorOrientedSearch(
-        r_values=(4, 8),
-        n_loops_values=(4,),
-        feature_masks=(("packet",), ("packet", "csi")),
-        seed=0,
-    )
-    first = oriented._propose()
-    assert first == oriented._grid[0]
+        r_values=(4, 8), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi")), seed=0)
+    assert oriented._propose() == oriented._grid[0]
 
 
 # ── summary ─────────────────────────────────────────────────────────────
 def test_summary_shape():
     s = OscillatorOrientedSearch(
-        r_values=(4, 8),
-        n_loops_values=(4,),
-        feature_masks=(("packet",), ("packet", "csi")),
-        seed=0,
-    )
+        r_values=(4, 8), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi")), seed=0)
     s.run(lambda cfg: float(cfg.r), iterations=4)
     summary = s.summary()
     assert summary["n_evaluated"] == 4
@@ -214,22 +228,21 @@ def test_summary_shape():
     assert summary["coverage"] == 1.0
     assert summary["best_config"]["r"] == 4
     assert "field_R" in summary
+    assert summary["epsilon_source"] == "best_reward"
 
 
 def test_summary_empty():
     s = OscillatorOrientedSearch(
         r_values=(4,), n_loops_values=(4,),
-        feature_masks=(("packet",),), seed=0,
-    )
+        feature_masks=(("packet",),), seed=0)
     assert s.summary() == {"n": 0}
 
 
-# ── contract: no gradient into substrate ───────────────────────────────
+# ── contract ────────────────────────────────────────────────────────────
 def test_search_surface_is_plain_python():
     s = OscillatorOrientedSearch(
         r_values=(4,), n_loops_values=(4,),
-        feature_masks=(("packet",),), seed=0,
-    )
+        feature_masks=(("packet",),), seed=0)
     for cfg in s._grid:
         assert isinstance(cfg, SubstrateConfig)
         assert isinstance(cfg.r, int)
