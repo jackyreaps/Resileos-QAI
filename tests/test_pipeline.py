@@ -1,4 +1,5 @@
 """Tests for the language pipeline."""
+
 import json
 import sys
 from pathlib import Path
@@ -9,17 +10,27 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from resileos.pipeline import (
-    PipelineConfig, PipelineResult, LanguagePipeline, load_corpus,
+    PipelineConfig,
+    PipelineResult,
+    LanguagePipeline,
+    load_corpus,
 )
 
 
 def _cfg(**overrides):
     base = dict(
-        dim=256, vocab_size=64, max_positions=64,
-        m=16, n=16, r=8, n_residual_layers=4,
+        dim=256,
+        vocab_size=64,
+        max_positions=64,
+        m=16,
+        n=16,
+        r=8,
+        n_residual_layers=4,
         reaper_n_saved=4,
         phi_compress_enabled=False,
-        oscillator_kappa=1.0, oscillator_alpha=0.5, oscillator_dt=0.1,
+        oscillator_kappa=1.0,
+        oscillator_alpha=0.5,
+        oscillator_dt=0.1,
         seed=0,
     )
     base.update(overrides)
@@ -33,7 +44,8 @@ def _pipeline(**overrides):
 # ── config ──────────────────────────────────────────────────────────────
 def test_config_validates_mn_equals_dim():
     with pytest.raises(ValueError, match="m\\*n"):
-        PipelineConfig(dim=100, m=10, n=10).validate()
+        # 10 * 9 = 90 ≠ 100
+        PipelineConfig(dim=100, m=10, n=9).validate()
 
 
 def test_config_rejects_r_too_large():
@@ -158,10 +170,11 @@ def test_result_to_dict_keys():
     p = _pipeline()
     result = p.step([1, 2, 3])
     d = result.to_dict()
-    for k in ("input_tokens", "recovered", "reaper_fraction",
-              "nexus_count", "henad_count", "rank_used",
-              "order_parameter", "epsilon", "gate_state",
-              "reconstruction_rel_error"):
+    for k in (
+        "input_tokens", "recovered", "reaper_fraction", "nexus_count",
+        "henad_count", "rank_used", "order_parameter", "epsilon",
+        "gate_state", "reconstruction_rel_error",
+    ):
         assert k in d
 
 
@@ -184,7 +197,6 @@ def test_pipeline_stats_shape():
     p = _pipeline()
     p.step([1, 2])
     s = p.stats()
-    for k in ("step_count", "compressions", "current_rank",
-              "last_R", "field_r"):
+    for k in ("step_count", "compressions", "current_rank", "last_R", "field_r"):
         assert k in s
     assert s["step_count"] == 1
