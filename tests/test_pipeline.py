@@ -28,6 +28,8 @@ def _cfg(**overrides):
         n_residual_layers=4,
         reaper_n_saved=4,
         phi_compress_enabled=False,
+        phi_compress_warmup=32,
+        phi_compress_min_R=0.9,
         oscillator_kappa=1.0,
         oscillator_alpha=0.5,
         oscillator_dt=0.1,
@@ -61,6 +63,8 @@ def test_config_from_json_roundtrip(tmp_path):
     assert cfg2.dim == cfg.dim
     assert cfg2.m == cfg.m and cfg2.n == cfg.n
     assert cfg2.r == cfg.r
+    assert cfg2.phi_compress_warmup == cfg.phi_compress_warmup
+    assert cfg2.phi_compress_min_R == cfg.phi_compress_min_R
 
 
 # ── single token ────────────────────────────────────────────────────────
@@ -97,8 +101,6 @@ def test_pipeline_repeated_step_state_advances():
     p = _pipeline()
     a = p.step([1, 2, 3])
     b = p.step([1, 2, 3])
-    # R should not be identical across steps unless field is frozen
-    # (it isn't; random_start=True)
     assert a.order_parameter != b.order_parameter
 
 
@@ -154,15 +156,28 @@ def test_pipeline_phi_compress_no_op_when_disabled():
     assert p.stats()["compressions"] == []
 
 
-def test_pipeline_phi_compress_can_fire():
-    """Force the field into lock and check that a compression fires."""
-    p = _pipeline(phi_compress_enabled=True, phi_compress_min_rank=4)
-    # Drive R up by using small epsilon (strong coupling)
+def test_pipeline_phi_compress_respects_warmup():
+    p = _pipeline(phi_compress_enabled=True, phi_compress_warmup=10)
+    for _ in range(5):
+        p.step([1, 2])
+    assert p.stats()["compressions"] == []
+
+
+def test_pipeline_last_R_starts_at_zero():
+    p = _pipeline()
+    assert p._last_R == 0.0
+
+
+def test_pipeline_phi_compress_fires_after_warmup_and_lock():
+    p = _pipeline(
+        phi_compress_enabled=True,
+        phi_compress_warmup=0,
+        phi_compress_min_R=0.0,
+    )
+    p.step([1, 2])
     p._last_R = 0.95
     p.step([1, 2])
-    # First step compresses if _last_R high; second doesn't unless R stays high
-    # Just verify the mechanism runs without error.
-    assert p.core.cfg.r <= 8
+    assert len(p.stats()["compressions"]) >= 1
 
 
 # ── result serialization ────────────────────────────────────────────────
