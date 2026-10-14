@@ -4,8 +4,8 @@ Vocab is the sorted set of codepoints in the fitted text, prefixed by special
 tokens. Indices are stable across machines and Python versions.
 
 Greek support:
-    strip_diacritics=False keeps breathings, accents, subscripts (vocab ~200-300 for Koine Greek)
-    strip_diacritics=True NFD-normalizes and drops combining marks (vocab ~30-50 for Koine Greek)
+    strip_diacritics=False keeps breathings, accents, subscripts
+    strip_diacritics=True NFD-normalizes and drops combining marks
 
 Round-trip is exact in either mode: decode(encode(t)) == t.
 """
@@ -46,7 +46,9 @@ class CharTokenizer:
     def fit(self, text: str) -> "CharTokenizer":
         normalized = self._norm(text)
         self._chars = sorted(set(normalized))
-        self._char_to_id = {c: i + _NUM_SPECIAL for i, c in enumerate(self._chars)}
+        self._char_to_id = {
+            c: i + _NUM_SPECIAL for i, c in enumerate(self._chars)
+        }
         self._fitted = True
         return self
 
@@ -66,7 +68,9 @@ class CharTokenizer:
             raise IndexError(f"token_id {token_id} out of range")
         return self._chars[idx]
 
-    def encode(self, text: str, add_bos: bool = False, add_eos: bool = False) -> list[int]:
+    def encode(
+        self, text: str, add_bos: bool = False, add_eos: bool = False
+    ) -> list[int]:
         if not self._fitted:
             raise RuntimeError("tokenizer not fitted; call fit() first")
         normalized = self._norm(text)
@@ -95,23 +99,33 @@ class CharTokenizer:
     def encode_batch(self, texts: Iterable[str]) -> list[list[int]]:
         return [self.encode(t) for t in texts]
 
-    def decode_batch(self, batch: Iterable[Iterable[int]], skip_special: bool = True) -> list[str]:
+    def decode_batch(
+        self, batch: Iterable[Iterable[int]], skip_special: bool = True
+    ) -> list[str]:
         return [self.decode(ids, skip_special=skip_special) for ids in batch]
 
     # ── persistence ──────────────────────────────────────────────────
     def save(self, path: str | Path) -> None:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({
-            "strip_diacritics": self.strip_diacritics,
-            "chars": self._chars,
-        }, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(
+                {
+                    "strip_diacritics": self.strip_diacritics,
+                    "chars": self._chars,
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
     @classmethod
     def load(cls, path: str | Path) -> "CharTokenizer":
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
         tok = cls(strip_diacritics=raw["strip_diacritics"])
         tok._chars = list(raw["chars"])
-        tok._char_to_id = {c: i + _NUM_SPECIAL for i, c in enumerate(tok._chars)}
+        tok._char_to_id = {
+            c: i + _NUM_SPECIAL for i, c in enumerate(tok._chars)
+        }
         tok._fitted = True
         return tok
