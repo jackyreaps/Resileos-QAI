@@ -1,10 +1,13 @@
-""" Deterministic character-level tokenizer. No external tokenizer library. 
-Vocab is the sorted set of codepoints in the fitted text, prefixed by special 
-tokens. Indices are stable across machines and Python versions. Greek support: 
-strip_diacritics=False keeps breathings, accents, subscripts (vocab ~200-300 for
-Koine Greek) strip_diacritics=True NFD-normalizes and drops combining marks 
-(vocab ~30-50 for Koine Greek) Round-trip is exact in either mode: 
-decode(encode(t)) == t. 
+"""Deterministic character-level tokenizer. No external tokenizer library.
+
+Vocab is the sorted set of codepoints in the fitted text, prefixed by special
+tokens. Indices are stable across machines and Python versions.
+
+Greek support:
+    strip_diacritics=False keeps breathings, accents, subscripts (vocab ~200-300 for Koine Greek)
+    strip_diacritics=True NFD-normalizes and drops combining marks (vocab ~30-50 for Koine Greek)
+
+Round-trip is exact in either mode: decode(encode(t)) == t.
 """
 from __future__ import annotations
 
@@ -21,13 +24,14 @@ _NUM_SPECIAL = 4
 
 
 class CharTokenizer:
-    """ Character-level tokenizer with deterministic vocab ordering. 
-    Fit once on a training text; encode/decode unlimited times. 
+    """Character-level tokenizer with deterministic vocab ordering.
+
+    Fit once on a training text; encode/decode unlimited times.
     """
 
     def __init__(self, strip_diacritics: bool = False) -> None:
         self.strip_diacritics = bool(strip_diacritics)
-        self._chars: list[str] = []  # sorted codepoints, index
+        self._chars: list[str] = []          # sorted codepoints, index
         self._char_to_id: dict[str, int] = {}
         self._fitted = False
 
