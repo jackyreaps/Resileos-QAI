@@ -1,22 +1,20 @@
----
 doc: RES-313
 title: Composition Capacity Law
 status: draft
 depends_on: RES-310, RES-311, RES-312
 referenced_by: RES-314, RES-315
----
 
 # Composition Capacity Law
 
 RES-310 gives a per-bundle capacity: `C(dim) = floor(dim / (2 ln dim))`. That
 bound is local. It says how many items one bundle can hold before crosstalk
-exceeds cleanup SNR. It says nothing about how capacity behaves when bundles are
-nested to depth `K`, when a streaming state accumulates packets, or when a mask
-stack re-bundles the state.
+exceeds cleanup SNR. It says nothing about how capacity behaves when bundles
+are nested to depth `K`, when a streaming state accumulates packets, or when a
+mask stack re-bundles the state.
 
-This document states the composition law: how capacity scales with depth, stream
-length, and stack height. It is a bound, not a guarantee. It is stated as a
-conjecture with the experiment that would falsify it.
+This document states the composition law: how capacity scales with depth,
+stream length, and stack height. It is a bound, not a guarantee. It is stated
+as a conjecture with the experiment that would falsify it.
 
 ## 1. Per-bundle capacity (restated)
 
@@ -35,15 +33,15 @@ From RES-310 §1:
 This is the number of items a single bundle can hold before the similarity
 between a stored item and its noised recall falls below the cleanup threshold.
 It is derived from the random-phase model in RES-306 §6: `E|noise|^2 = n / D`
-for `n` stored items in `D` components. Setting signal-to-noise to 1 and solving
-for `n` gives the formula above with the `2 ln dim` factor from the SNR
+for `n` stored items in `D` components. Setting signal-to-noise to 1 and
+solving for `n` gives the formula above with the `2 ln dim` factor from the SNR
 threshold.
 
 ## 2. Depth accumulation
 
 A level-`L` packet contains tokens that have been re-bundled `L` times. Each
-re-bundling adds crosstalk. The depth-`L` crosstalk is not `L * (n / D)` — it is
-worse, because each level's bundle contains the crosstalk of its children.
+re-bundling adds crosstalk. The depth-`L` crosstalk is not `L * (n / D)` — it
+is worse, because each level's bundle contains the crosstalk of its children.
 
 Under the random-phase model, the depth-`L` noise variance is:
 
@@ -64,9 +62,9 @@ for large `L`. The factor `(1 - n_max / D)` is the depth penalty. At
 
 ## 3. Stream capacity
 
-The streaming state (RES-311) accumulates packets into a single hypervector. Its
-capacity is `C(dim)` — the flat-bundle bound. At `decay = 1`, every packet ever
-emitted contributes, so the state's effective `n` grows without bound and
+The streaming state (RES-311) accumulates packets into a single hypervector.
+Its capacity is `C(dim)` — the flat-bundle bound. At `decay = 1`, every packet
+ever emitted contributes, so the state's effective `n` grows without bound and
 crosstalk grows without bound. At `decay < 1`, the effective `n` saturates at
 `1 / (1 - decay)` packets.
 
