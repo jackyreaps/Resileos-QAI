@@ -1,0 +1,16 @@
+{
+  "dim": 256,
+  "vocab_size": 64,
+  "max_positions": 64,
+  "m": 16,
+  "n": 16,
+  "r": 8,
+  "n_residual_layers": 4,
+  "reaper_n_saved": 4,
+  "phi_compress_enabled": false,
+  "phi_compress_min_rank": 4,
+  "oscillator_kappa": 1.0,
+  "oscillator_alpha": 0.5,
+  "oscillator_dt": 0.1,
+  "seed": 0
+}
