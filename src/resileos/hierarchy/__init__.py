@@ -1,7 +1,9 @@
-"""Hierarchical encoding for the composition layer (RES-310).
+"""Hierarchical encoding for the composition layer (RES-310, RES-311, RES-312).
 
-Exports the encoder (RES-310), the query descent (RES-310), and the
-streaming state (RES-311).
+Exports:
+    RES-310  HierarchicalEncoder, HierarchicalPacket, HierarchicalQuery
+    RES-311  StreamState, StreamStateConfig
+    RES-312  MaskStack, MaskStackConfig, MaskLayer
 """
 from .encoder import (
     HierarchicalEncoder,
@@ -11,13 +13,32 @@ from .encoder import (
 )
 from .query import HierarchicalQuery
 from .stream import StreamState, StreamStateConfig
+from .mask import (
+    MaskStack,
+    MaskStackConfig,
+    MaskLayer,
+    bit_carrier,
+    FEATURE_BITS,
+    K_MIN,
+    DEFAULT_K,
+)
 
 __all__ = [
+    # RES-310
     "HierarchicalEncoder",
     "HierarchicalPacket",
     "HierarchicalQuery",
-    "StreamState",
-    "StreamStateConfig",
     "default_capacity",
     "level_phasor",
+    # RES-311
+    "StreamState",
+    "StreamStateConfig",
+    # RES-312
+    "MaskStack",
+    "MaskStackConfig",
+    "MaskLayer",
+    "bit_carrier",
+    "FEATURE_BITS",
+    "K_MIN",
+    "DEFAULT_K",
 ]
