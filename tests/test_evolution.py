@@ -85,8 +85,8 @@ def test_random_candidates_deduped():
         budget=10,
         seed=0,
     )
-    # Only one distinct config exists, budget is ignored as duplication.
-    assert / len(loop) == 1
+    # Only one distinct config exists; the budget cannot be exceeded.
+    assert len(loop) == 1
 
 
 def test_unknown_strategy_raises():
@@ -94,7 +94,7 @@ def test_unknown_strategy_raises():
         EvolutionLoop(strategy="nonsense")
 
 
-# ── observe / best history ────────────────────────────────────────────
+# ── observe / best / history ────────────────────────────────────────────
 def test_observe_records():
     loop = EvolutionLoop(
         r_values=(4, 8), n_loops_values=(4,), feature_masks=(("packet",),),
@@ -135,10 +135,10 @@ def test_run_evaluates_all_candidates():
     called = []
     def evaluator(cfg):
         called.append(cfg)
-        return float(cfg.r)  # r is the reward
+        return float(cfg.r)
     loop.run(evaluator)
     assert len(called) == len(loop)
-    assert loop.best().reward == 4.0  # smaller r wins
+    assert loop.best().reward == 4.0
 
 
 def test_run_metadata_passthrough():
@@ -179,7 +179,6 @@ def test_random_strategy_seed_sensitive():
         feature_masks=(("packet",), ("packet", "csi")),
         strategy="random", budget=5, seed=2,
     ))
-    # Different seeds should give different orderings for at least one slot.
     assert a != b
 
 
@@ -206,17 +205,11 @@ def test_summary_empty():
 
 # ── contract: no gradient into substrate ────────────────────────────────
 def test_evolution_does_not_touch_substrate_parameters():
-    """
-    The evolution loop only reads configs. It never instantiates the
-    substrate, so there is nothing to backprop into. This test asserts
-    the loop's public surface does not carry tensors.
-    """
     loop = EvolutionLoop(
         r_values=(4,), n_loops_values=(4,), feature_masks=(("packet",),),
         strategy="grid", budget=1,
     )
     for cfg in loop:
         assert isinstance(cfg, SubstrateConfig)
-        # Config fields are plain Python ints/tuples, not torch.
         assert not isinstance(cfg.r, torch.Tensor)
         assert not isinstance(cfg.n_loops, torch.Tensor)
