@@ -35,17 +35,7 @@ from resileos.corpus import (
 )
 
 
-# ── pipeline import with a clear error ──────────────────────────────────
 def _make_pipeline(m: int, n: int, **kwargs: Any) -> Any:
-    """Load LanguagePipeline from resileos.pipeline.
-
-    The pipeline's dim is set to m * n to satisfy the PipelineConfig
-    validation that requires dim == m * n.
-
-    If the class name differs in your tree, change the import and the
-    constructor call here. Everything else in this runner is decoupled
-    from the pipeline's internal API.
-    """
     try:
         from resileos.pipeline import LanguagePipeline, PipelineConfig
     except ImportError as e:
@@ -54,19 +44,16 @@ def _make_pipeline(m: int, n: int, **kwargs: Any) -> Any:
             "Adjust _make_pipeline() in scripts/run_corpus.py to match "
             "your class name."
         )
-
     config = PipelineConfig(dim=m * n, m=m, n=n, **kwargs)
     return LanguagePipeline(config)
 
 
-# ── tokenizer fit ───────────────────────────────────────────────────────
 def fit_tokenizer(text: str, strip_diacritics: bool) -> CharTokenizer:
     tok = CharTokenizer(strip_diacritics=strip_diacritics)
     tok.fit(text)
     return tok
 
 
-# ── windowing ───────────────────────────────────────────────────────────
 def window_ids(ids: list[int], window: int, stride: int) -> list[list[int]]:
     if window <= 0 or stride <= 0:
         raise ValueError("window and stride must be positive")
@@ -80,7 +67,6 @@ def window_ids(ids: list[int], window: int, stride: int) -> list[list[int]]:
     return out
 
 
-# ── source builder ──────────────────────────────────────────────────────
 def _build_source(args: argparse.Namespace):
     if args.source == "koine":
         return KoineGreekSource()
@@ -99,7 +85,6 @@ def _build_source(args: argparse.Namespace):
     raise SystemExit(f"unknown source: {args.source!r}")
 
 
-# ── main ────────────────────────────────────────────────────────────────
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--source", default="koine",
@@ -117,6 +102,8 @@ def main() -> int:
     p.add_argument("--n", type=int, default=16, help="cols for m*n=dim")
     p.add_argument("--phi-compress", action="store_true",
                    help="enable φ-compress contraction mid-run")
+    p.add_argument("--phi-compress-warmup", type=int, default=32)
+    p.add_argument("--phi-compress-min-R", type=float, default=0.90)
     p.add_argument("--out", default=None,
                    help="optional JSONL path: one row per window")
     args = p.parse_args()
@@ -133,20 +120,27 @@ def main() -> int:
     print(f"[token] vocab_size        = {tok.vocab_size}")
     print(f"[token] strip_diacritics  = {args.strip_diacritics}")
 
-    # 3. Build pipeline
+    # 3. Encode first so vocab_size is known, then build pipeline
+    ids = tok.encode(text)
+    max_pos = max(args.window, 64, 512)
     pipeline = _make_pipeline(
         m=args.m, n=args.n,
+        vocab_size=tok.vocab_size,
+        max_positions=max_pos,
         phi_compress_enabled=args.phi_compress,
+        phi_compress_warmup=args.phi_compress_warmup,
+        phi_compress_min_R=args.phi_compress_min_R,
+        r=min(8, args.m, args.n),
     )
     dim = args.m * args.n
     print(f"[pipe]  dim               = {dim}")
+    print(f"[pipe]  max_positions     = {max_pos}")
 
-    # 4. Encode and window
-    ids = tok.encode(text)
+    # 4. Window
     windows = window_ids(ids, window=args.window, stride=args.stride)
     print(f"[run]   windows           = {len(windows)}")
 
-    # 5. Run each window
+    # 5. Run
     rows: list[dict] = []
     r_values: list[float] = []
     exact_count = 0
@@ -182,7 +176,6 @@ def main() -> int:
     r_arr = np.array(r_values) if r_values else np.array([0.0])
     mean_token_acc = correct_tokens / total_tokens if total_tokens else 0.0
 
-    # φ-compress firing comes from pipeline.stats(), not per-result
     stats = pipeline.stats()
     compressions = stats.get("compressions", [])
 
