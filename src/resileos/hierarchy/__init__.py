@@ -3,7 +3,7 @@
 Exports:
     RES-310  HierarchicalEncoder, HierarchicalPacket, HierarchicalQuery
     RES-311  StreamState, StreamStateConfig
-    RES-312  MaskStack, MaskStackConfig, MaskLayer
+    RES-312  MaskStack, MaskStackConfig, MaskLayer, layer_carrier
 """
 from .encoder import (
     HierarchicalEncoder,
@@ -17,7 +17,8 @@ from .mask import (
     MaskStack,
     MaskStackConfig,
     MaskLayer,
-    bit_carrier,
+    layer_carrier,
+    exponent_for,
     FEATURE_BITS,
     K_MIN,
     DEFAULT_K,
@@ -37,7 +38,8 @@ __all__ = [
     "MaskStack",
     "MaskStackConfig",
     "MaskLayer",
-    "bit_carrier",
+    "layer_carrier",
+    "exponent_for",
     "FEATURE_BITS",
     "K_MIN",
     "DEFAULT_K",
