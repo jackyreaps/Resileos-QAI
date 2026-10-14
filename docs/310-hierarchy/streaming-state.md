@@ -1,10 +1,8 @@
----
 doc: RES-311
 title: Streaming Substrate State
 status: draft
 depends_on: RES-310, RES-200
 referenced_by: RES-313, RES-315
----
 
 # Streaming Substrate State
 
@@ -22,8 +20,8 @@ A window-by-window encoder re-derives its hypervector from scratch every 32 to
 64 tokens. There is no carry-forward context. At trillion scale this is not
 merely inefficient — it is structurally wrong. Language has long-range
 dependence, and a substrate that cannot represent "the current document" or
-"the current discourse segment" cannot modulate a downstream model that
-depends on them.
+"the current discourse segment" cannot modulate a downstream model that depends
+on them.
 
 The streaming state is that representation. It is a single hypervector,
 `stream_hv`, updated once per emitted packet by the hierarchy encoder.
@@ -51,11 +49,11 @@ When the hierarchy encoder emits a packet `p` with hypervector `hv_p`, level
     last_packet_level = L_p
 
 `decay` is a scalar in `(0, 1]`. It controls the effective window of the
-running state. `decay = 1` means every packet ever emitted contributes
-equally — the state is a corpus-wide bundle, and its recall capacity is the
-flat-bundle capacity `C(dim)` from RES-310 §1. `decay < 1` means recent packets
-dominate — the state is a decaying memory with an effective horizon of
-`1 / (1 - decay)` packets.
+running state. `decay = 1` means every packet ever emitted contributes equally —
+the state is a corpus-wide bundle, and its recall capacity is the flat-bundle
+capacity `C(dim)` from RES-310 §1. `decay < 1` means recent packets dominate —
+the state is a decaying memory with an effective horizon of `1 / (1 - decay)`
+packets.
 
 The default is `decay = 1`. Rationale: a decaying state is a lossy state, and
 RES-313's capacity law assumes the non-decaying form. `decay < 1` is an
@@ -133,8 +131,8 @@ the encoder's output. Either can be replaced without touching the other.
 - **Level weighting.** Is `decay**L_p` the right level weight, or should the
   weight be `c_L` (the token count the packet represents)? The two differ when
   capacities are non-uniform.
-- **State size.** A single `dim`-vector is the minimal state. Would a
-  `(dim, r)` matrix — one row per oscillator band — preserve more structure?
-  This is a RES-312 question, since bands are the mask stack.
+- **State size.** A single `dim`-vector is the minimal state. Would a `(dim, r)`
+  matrix — one row per oscillator band — preserve more structure? This is a
+  RES-312 question, since bands are the mask stack.
 - **Reset semantics.** At trillion scale, does the state ever reset? Per
   document? Per epoch? The contract does not decide.
