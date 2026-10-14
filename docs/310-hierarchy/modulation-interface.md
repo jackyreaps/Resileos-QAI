@@ -1,19 +1,20 @@
-doc | RES-315
-title | Modulation Interface
-status | draft
-depends_on | RES-310, RES-311, RES-312, RES-313, RES-314
-referenced_by | (none yet)
+doc: RES-315
+title: Modulation Interface
+status: draft
+depends_on: RES-310, RES-311, RES-312, RES-313, RES-314
+referenced_by: (none yet)
 
 # Modulation Interface
 
-The carrier (`carrier.py`) is a trainable interface between the frozen substrate
-and a downstream model. It emits a "modulation tensor of caller-declared shape."
-That description is a stub. This document is the specification.
+The carrier (`carrier.py`) is a trainable interface between the frozen
+substrate and a downstream model. It emits a "modulation tensor of
+caller-declared shape." That description is a stub. This document is the
+specification.
 
 It defines what the carrier modulates, in which downstream model, under what
 training loop, and what the substrate state contributes. It is the last spec in
-the 310-series because it depends on all five others: the hierarchy supplies the
-packets, the streaming state supplies the running context, the mask stack
+the 310-series because it depends on all five others: the hierarchy supplies
+the packets, the streaming state supplies the running context, the mask stack
 supplies the multi-resolution view, the capacity law says what is
 distinguishable, and the error bound says how often the distinctions are
 correct.
@@ -77,9 +78,10 @@ outputs are treated as fixed features. The loop is:
         loss.backward()
         optimizer.step()   # updates carrier only
 
-The substrate's forward pass is inside `torch.no_grad()`. The encoder, streaming
-state, and mask stack are all non-differentiable with respect to the carrier's
-input. The carrier learns to read the substrate's features, not to change them.
+The substrate's forward pass is inside `torch.no_grad()`. The encoder,
+streaming state, and mask stack are all non-differentiable with respect to the
+carrier's input. The carrier learns to read the substrate's features, not to
+change them.
 
 ## 4. What the modulation means
 
@@ -156,8 +158,8 @@ of whether the modulation path is informative at all.
   projection need a learned dictionary?
 - **The sketch's content.** What does `stream_hv` actually contain after a
   trillion tokens? RES-313 says at most a few hundred distinguishable items.
-  Which items? The most recent? The most frequent? The most task-relevant?
-  The state does not decide. The carrier learns to read whatever is there.
+  Which items? The most recent? The most frequent? The most task-relevant? The
+  state does not decide. The carrier learns to read whatever is there.
 - **The negative result.** If the minimal experiment shows no improvement, the
   modulation interface is not useful. That is a valid outcome. It would mean
   the substrate's state, however well-behaved, does not carry task-relevant
