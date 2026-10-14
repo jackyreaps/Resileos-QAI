@@ -4,17 +4,6 @@ Oscillator-oriented discrete grid search.
 Wraps the same grid as EvolutionLoop. Uses a KuramotoField to bias
 the order in which grid candidates are proposed.
 
-Design decisions forced by the toy carrier search results:
-    - feature_mask is the axis that ordered rewards. Mask bits are
-      biased first.
-    - r is secondary. It steps on the grid by an amount that scales
-      with (1 - R).
-    - n_loops is de-emphasized. Weight defaults to 0.1; it can be
-      varied but does not drive the score.
-    - direction is not privileged. It is one of the three bit
-      oscillators; the search will learn to keep or drop it based on
-      reward.
-
 Orientation:
     - Three oscillators, one per optional mask bit
       (csi, order_parameter, direction).
@@ -22,38 +11,37 @@ Orientation:
     - dtheta_i >= 0 -> prefer keeping mask bit i.
 
 Level:
-    - R (order parameter) sets the target distance from the current
-      best config.
+    - R sets the target distance from the current best config.
     - R = 1 (locked)   -> propose near the best.
     - R = 0 (exploring) -> propose far from the best.
-    - epsilon = best reward so far. Low reward -> high coupling ->
-      R rises -> search locks in as it improves. Wall-clock is not
-      used.
 
-Discrete grid only. The oscillator biases order and locality; it does
-not invent new points. If bias beats pure grid under the same budget,
-the field is orienting search.
+Coupling drive (epsilon_source):
+    - "best_reward" (default): epsilon = best reward so far.
+    - "monitors": epsilon = epsilon_from_monitors(bundle of current best).
+      Requires the evaluator to return (reward, MonitorBundle).
+      If a bundle is not available, falls back to best_reward.
 
-Deterministic given (grid, field config, seed).
+Discrete grid only. Deterministic given (grid, field config, seed).
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional, Union
 
 import numpy as np
 
 from .evolution import SubstrateConfig, EvolutionRecord
+from .monitors import MonitorBundle, epsilon_from_monitors
 from .substrate.oscillator import KuramotoField
 
 
 MASK_BITS = ("csi", "order_parameter", "direction")
 
+# Evaluator may return a float, or (float, MonitorBundle).
+EvalReturn = Union[float, tuple[float, MonitorBundle]]
+Evaluator = Callable[[SubstrateConfig], EvalReturn]
 
-def _all_grid_candidates(
-    r_values: list[int],
-    n_loops_values: list[int],
-    feature_masks: list[tuple],
-) -> list[SubstrateConfig]:
+
+def _all_grid_candidates(r_values, n_loops_values, feature_masks):
     return [
         SubstrateConfig(r=r, n_loops=n, feature_mask=tuple(m))
         for r in r_values
@@ -63,30 +51,6 @@ def _all_grid_candidates(
 
 
 class OscillatorOrientedSearch:
-    """
-    Oscillator-biased discrete grid search.
-
-    Parameters
-    ----------
-    r_values, n_loops_values, feature_masks :
-        Same grid as EvolutionLoop.
-    field : KuramotoField, optional
-        Coupling field. Defaults to r=3 oscillators, golden_powers
-        ladder, kappa=1.0, alpha=0.5, dt=0.1, random_start=True.
-    budget : int
-        Maximum number of evaluations. Grid is exhausted if budget
-        >= len(grid).
-    seed : int
-        Seeds the field and the tie-breaking rng.
-    kappa, omega_base, dt :
-        Used only if `field` is not supplied.
-    mask_weight, r_weight, n_loops_weight :
-        Relative weights in the distance score. Normalized to sum 1.
-        Defaults are mask-first: 0.6 / 0.3 / 0.1.
-    theta_flip_penalty :
-        Cost added per mask bit whose flip state disagrees with the
-        sign of dtheta_i. Default 0.1.
-    """
 
     def __init__(
         self,
@@ -108,21 +72,24 @@ class OscillatorOrientedSearch:
         r_weight: float = 0.3,
         n_loops_weight: float = 0.1,
         theta_flip_penalty: float = 0.1,
+        epsilon_source: str = "best_reward",
     ) -> None:
+        if epsilon_source not in ("best_reward", "monitors"):
+            raise ValueError(f"epsilon_source: {epsilon_source!r}")
+
         self.r_values = sorted(set(int(x) for x in r_values))
         self.n_loops_values = sorted(set(int(x) for x in n_loops_values))
         self.feature_masks = [tuple(m) for m in feature_masks]
         if not self.r_values or not self.n_loops_values or not self.feature_masks:
             raise ValueError("empty search space")
         for m in self.feature_masks:
-            SubstrateConfig(
-                r=self.r_values[0],
-                n_loops=self.n_loops_values[0],
-                feature_mask=m,
-            )
+            SubstrateConfig(r=self.r_values[0],
+                            n_loops=self.n_loops_values[0],
+                            feature_mask=m)
 
         self.budget = int(budget)
         self.seed = int(seed)
+        self.epsilon_source = epsilon_source
 
         if field is None:
             field = KuramotoField(
@@ -137,11 +104,8 @@ class OscillatorOrientedSearch:
             )
         if field.r != len(MASK_BITS):
             raise ValueError(
-                f"field must have {len(MASK_BITS)} oscillators, "
-                f"got {field.r}"
-            )
+                f"field must have {len(MASK_BITS)} oscillators, got {field.r}")
         self.field = field
-        # All-to-all coupling among the 3 mask-bit oscillators.
         self.W = np.ones((len(MASK_BITS), len(MASK_BITS))) - np.eye(len(MASK_BITS))
 
         total = mask_weight + r_weight + n_loops_weight
@@ -153,20 +117,18 @@ class OscillatorOrientedSearch:
         self.theta_flip_penalty = float(theta_flip_penalty)
 
         self._grid = _all_grid_candidates(
-            self.r_values, self.n_loops_values, self.feature_masks
-        )
+            self.r_values, self.n_loops_values, self.feature_masks)
         self._visited: set[SubstrateConfig] = set()
         self._history: list[EvolutionRecord] = []
         self._center: Optional[SubstrateConfig] = None
+        self._bundles: dict[SubstrateConfig, MonitorBundle] = {}
 
     # ── mask bit helpers ────────────────────────────────────────────
     @staticmethod
     def _mask_to_bits(mask: tuple) -> np.ndarray:
         s = set(mask)
-        return np.array(
-            [1.0 if b in s else 0.0 for b in MASK_BITS],
-            dtype=np.float64,
-        )
+        return np.array([1.0 if b in s else 0.0 for b in MASK_BITS],
+                        dtype=np.float64)
 
     @staticmethod
     def _bits_to_mask(bits: np.ndarray) -> tuple:
@@ -185,16 +147,14 @@ class OscillatorOrientedSearch:
         if self._center is None:
             return 0.0
 
-        mask_d = self._mask_distance(
-            cfg.feature_mask, self._center.feature_mask)
+        mask_d = self._mask_distance(cfg.feature_mask,
+                                     self._center.feature_mask)
         r_span = max(max(self.r_values) - min(self.r_values), 1)
         r_d = abs(cfg.r - self._center.r) / float(r_span)
-        nl_span = max(
-            max(self.n_loops_values) - min(self.n_loops_values), 1)
+        nl_span = max(max(self.n_loops_values) - min(self.n_loops_values), 1)
         nl_d = abs(cfg.n_loops - self._center.n_loops) / float(nl_span)
 
         dist = self.w_mask * mask_d + self.w_r * r_d + self.w_nl * nl_d
-        # R = 1 -> target 0 (near). R = 0 -> target 1 (far).
         target = 1.0 - float(R)
         dist_cost = abs(dist - target)
 
@@ -209,24 +169,36 @@ class OscillatorOrientedSearch:
 
         return float(dist_cost + theta_cost)
 
-    # ── proposal ────────────────────────────────────────────────────
-    def _best_cfg(self) -> Optional[SubstrateConfig]:
+    # ── epsilon ─────────────────────────────────────────────────────
+    def _current_epsilon(self) -> float:
+        """
+        Coupling drive for the field.
+
+        "monitors": epsilon from the bundle of the current best
+                    candidate. Falls back to best_reward if no bundle.
+        "best_reward": epsilon = best reward so far, or 1.0 if none.
+        """
         if not self._history:
-            return None
-        return min(self._history, key=lambda r: r.reward).config
+            return 1.0
 
+        best_rec = min(self._history, key=lambda r: r.reward)
+
+        if self.epsilon_source == "monitors":
+            bundle = self._bundles.get(best_rec.config)
+            if bundle is not None:
+                return float(epsilon_from_monitors(bundle))
+
+        return float(best_rec.reward)
+
+    # ── proposal ────────────────────────────────────────────────────
     def _propose(self) -> SubstrateConfig:
-        # epsilon = best reward so far, or 1.0 before the first eval.
-        if self._history:
-            eps = float(min(r.reward for r in self._history))
-        else:
-            eps = 1.0
-
+        eps = self._current_epsilon()
         self.field.step(epsilon=eps, W=self.W)
         R = self.field.order_parameter()
-        dtheta = self.field._dtheta(self.field.theta, eps, self.W)
+        dtheta = self.field.velocity(epsilon=eps, W=self.W)
 
-        best = self._best_cfg()
+        best = (min(self._history, key=lambda r: r.reward).config
+                if self._history else None)
         if best is not None:
             self._center = best
 
@@ -238,11 +210,10 @@ class OscillatorOrientedSearch:
             return unvisited[0]
 
         scores = [self._score(c, R, dtheta) for c in unvisited]
-        best_idx = int(np.argmin(scores))
-        return unvisited[best_idx]
+        return unvisited[int(np.argmin(scores))]
 
     # ── public interface ────────────────────────────────────────────
-    def run(self, evaluate: Callable[[SubstrateConfig], float],
+    def run(self, evaluate: Evaluator,
             iterations: Optional[int] = None,
             **metadata: Any) -> "OscillatorOrientedSearch":
         n = int(iterations) if iterations is not None else self.budget
@@ -250,15 +221,18 @@ class OscillatorOrientedSearch:
             cfg = self._propose()
             if cfg in self._visited:
                 break
-            reward = float(evaluate(cfg))
+            result = evaluate(cfg)
+            if isinstance(result, tuple):
+                reward, bundle = result
+                self._bundles[cfg] = bundle
+            else:
+                reward = result
             self._visited.add(cfg)
             self._history.append(EvolutionRecord(
-                config=cfg,
-                reward=reward,
-                metadata=dict(metadata),
-            ))
+                config=cfg, reward=float(reward), metadata=dict(metadata)))
         return self
 
+    # ── introspection ───────────────────────────────────────────────
     def history(self) -> list[EvolutionRecord]:
         return list(self._history)
 
@@ -277,7 +251,6 @@ class OscillatorOrientedSearch:
         return len(self._visited) / float(len(self._grid))
 
     def best_so_far(self) -> list[float]:
-        """Reward of the best-seen candidate after each evaluation."""
         out: list[float] = []
         cur = float("inf")
         for rec in self._history:
@@ -295,8 +268,7 @@ class OscillatorOrientedSearch:
     def summary(self) -> dict:
         if not self._history:
             return {"n": 0}
-        rewards = np.array(
-            [r.reward for r in self._history], dtype=np.float64)
+        rewards = np.array([r.reward for r in self._history], dtype=np.float64)
         best = self.best()
         return {
             "n_evaluated": len(self._history),
@@ -312,7 +284,9 @@ class OscillatorOrientedSearch:
             },
             "best_reward": float(best.reward),
             "field_R": self.field.order_parameter(),
+            "epsilon_source": self.epsilon_source,
+            "n_bundles": len(self._bundles),
         }
 
 
-__all__ = ["OscillatorOrientedSearch", "MASK_BITS"]
+__all__ = ["OscillatorOrientedSearch", "MASK_BITS", "Evaluator", "EvalReturn"]
