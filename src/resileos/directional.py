@@ -104,7 +104,7 @@ class DirectionalHDRIFT:
         seed: int = 0,
     ) -> None:
         if mode not in ("reconstruction", "trend", "multi_trend", "hybrid"):
-            raise ValueError(mode)
+            raise ValueError(f"mode: {mode!r}")
         if not (0.0 <= hybrid_trend_weight <= 1.0):
             raise ValueError("hybrid_trend_weight must be in [0, 1]")
         if trend_window < 1:
@@ -144,11 +144,11 @@ class DirectionalHDRIFT:
         Ub = np.asarray(self._get(packet, "Ub"), dtype=np.float64)
         Vb = np.asarray(self._get(packet, "Vb"), dtype=np.float64)
         dL = Lam - Lam_prev
-        return embed_block(Vb @ dL @ Ub, self.dim)
+        return embed_block(Ub @ dL @ Vb, self.dim)
 
     def _multi_step_trend(self, packet: Any) -> np.ndarray:
         """
-        (Lambda_t - Lambda_{t-window}) / window, lifted.
+        (Lambda_t - Lambda_{t-window}) / window, lifted via Ub @ dL @ Vb.
         Telescopes the individual step differences.
         """
         if len(self._lambda_history) < 2:
@@ -161,7 +161,7 @@ class DirectionalHDRIFT:
         if Lam_old.shape != Lam.shape:
             return np.zeros(self.dim, dtype=np.float64)
         dL = (Lam - Lam_old) / float(window)
-        return embed_block(Vb @ dL @ Ub, self.dim)
+        return embed_block(Ub @ dL @ Vb, self.dim)
 
     def trend_direction(self, x: np.ndarray, packet: Any,
                         mode: str = "trend") -> np.ndarray:
@@ -171,7 +171,7 @@ class DirectionalHDRIFT:
         elif mode == "multi_trend":
             d = self._multi_step_trend(packet)
         else:
-            raise ValueError(mode)
+            raise ValueError(f"mode: {mode!r}")
         d = _tangent(d, x)
         return _unit(d)
 
@@ -208,7 +208,7 @@ class DirectionalHDRIFT:
                 else:
                     y = x.copy()
         else:
-            raise ValueError(self.mode)
+            raise ValueError(f"mode: {self.mode!r}")
 
         self._lambda_history.append(
             np.asarray(self._get(packet, "Lambda"), dtype=np.float64).copy()
