@@ -1,37 +1,28 @@
 """Layered mask stack (RES-312).
 
-A constructive multi-resolution partition over the substrate's feature set.
-At small scale, a mask is a binary selection over optional feature bits and
-the partition boundary is a curve. At large scale, with layered masks, the
-boundary saturates and becomes a membrane — the mask-to-sheath transition.
+A constructive multi-resolution partition over the substrate's feature
+set. At small scale, a mask is a binary selection over optional feature
+bits and the partition boundary is a curve. At large scale, with layered
+masks, the boundary saturates and becomes a membrane — the mask-to-sheath
+transition.
 
-Local/global orientation (this revision):
-    Layer carriers are ordered along a local-to-global phase axis. Local
-    layers oscillate rapidly across the hypervector dimension; global layers
-    oscillate slowly. Adjacent layers differ in phase frequency by a factor
-    of PHI, which is the most irrational ratio available, so no two layers
-    alias into each other. This ordering is the orientation axis.
+Prime tower carrier (this revision):
+    Layer carriers are ordered along the prime tower's local-to-global
+    axis. Local layers use the smallest primes (highest resolvable
+    frequencies); global layers use the largest primes that fit under
+    Nyquist. Adjacent layers differ by a prime gap, not by a constant
+    log step.
 
-    This replaces the previous design, which seeded each feature bit's
-    carrier independently and bundled the set bits' carriers into one
-    carrier per layer. The bundled design had two defects:
+    This replaces the φ-power ladder, which was an exponential index.
+    An exponential ladder is uniform in log space: log(PHI ** e) = e ·
+    log(PHI). The prime tower is not uniform in log space — consecutive
+    primes have irregular gaps, and the Cipolla normalisation adds a
+    second layer of irregularity. The φ-ladder smoothed over exactly
+    the boundary structure the tower exists to encode.
 
-      (1) Two masks that shared bits produced correlated carriers, which
-          forced a near-orthogonality rejection at add_layer. The rejection
-          threshold was arbitrary and blocked legitimate nested masks.
-
-      (2) The ordering of layers had no representation in carrier space,
-          so downstream consumers (RES-307 agency routing, RES-315
-          modulation) could not read orientation from the stack. A routing
-          agent had to be told the layer index separately; it could not
-          determine its position from the carrier alone.
-
-    The positional design fixes both. Layers are near-orthogonal by
-    construction (pairwise correlation ~1/dim), and the local/global axis
-    is explicit in the phase frequency. The axis orients agency: an agent
-    that reads the mask stack can determine which layer it is operating
-    in from the carrier's phase frequency, without the layer index being
-    passed separately.
+    The tower's domain wall (odd branch forbidden) is the sheath
+    boundary. A layer on the odd branch beyond the wall is in the
+    sheath regime. `is_forbidden(n)` exposes this.
 
 Spec: docs/310-hierarchy/mask-stack.md
 
@@ -39,16 +30,12 @@ Off states (explicit):
     learned structure   off. Masks are supplied by the caller. The stack
                         does not search for optimal masks.
     compression claim   off. The stack is a re-encoding, not a reduction.
-                        Information content is preserved, with crosstalk.
     semantic claim      off. Layer indices are depth-ordered on a
                         local/global axis, not semantically ordered.
-    capacity guarantee  off. The stack's capacity is bounded by RES-313.
+    capacity guarantee  off. Bounded by RES-313.
     sheath as failure   off. The sheath is a regime, not a failure.
-                        Whether it is desirable is a RES-315 decision.
-    bit_derived carrier off. Carriers are not derived from the mask's set
-                        bits. The mask is metadata that describes the
-                        feature selection; the carrier describes the
-                        layer's position on the local/global axis.
+    bit_derived carrier off. Carriers are not derived from mask bits.
+    stochastic carrier  off. Carriers are deterministic (prime tower).
 """
 from __future__ import annotations
 
@@ -57,7 +44,7 @@ from typing import Optional, Sequence
 
 import numpy as np
 
-from ..codex import PHI
+from .prime_tower import PrimeTower
 
 
 # ── feature bit names (RES-312 §1) ──────────────────────────────────────
@@ -70,14 +57,31 @@ K_MIN: int = len(FEATURE_BITS)
 DEFAULT_K: int = 4
 
 
-# ── positional layer carrier ────────────────────────────────────────────
-def exponent_for(
-    layer_index: int,
-    n_layers: int,
-    local_first: bool = True,
-) -> int:
-    """Phase exponent for a layer. Exposed for downstream consumers that
-    need to reason about the axis directly (e.g. RES-307 routing)."""
+# ── tower singleton (lazy) ──────────────────────────────────────────────
+_tower_cache: dict[int, PrimeTower] = {}
+
+
+def _get_tower(max_level: int) -> PrimeTower:
+    key = int(max_level)
+    if key not in _tower_cache:
+        _tower_cache[key] = PrimeTower(max_level=key)
+    return _tower_cache[key]
+
+
+# ── carrier ─────────────────────────────────────────────────────────────
+def tower_level_for(layer_index: int, n_layers: int, local_first: bool) -> int:
+    """Map a stack layer index to a tower level.
+
+    Tower levels start at 2 (T(2) = S_2). Layer 0 maps to level 2,
+    layer 1 to level 3, etc. When local_first=False the mapping is
+    reversed: layer 0 maps to the highest level, layer n_layers-1 to
+    level 2.
+
+    local_first=True  -> layer 0 is local (smallest prime, highest freq)
+                         layer n_layers-1 is global (largest prime)
+    local_first=False -> layer 0 is global (largest prime)
+                         layer n_layers-1 is local (smallest prime)
+    """
     if n_layers < 1:
         raise ValueError("n_layers must be >= 1")
     if not (0 <= layer_index < n_layers):
@@ -85,10 +89,8 @@ def exponent_for(
             f"layer_index {layer_index} out of range [0, {n_layers})"
         )
     if local_first:
-        # layer 0 = local -> highest exponent
-        return n_layers - layer_index + 1
-    # layer 0 = global -> lowest exponent
-    return layer_index + 2
+        return layer_index + 2
+    return (n_layers - 1 - layer_index) + 2
 
 
 def layer_carrier(
@@ -97,22 +99,29 @@ def layer_carrier(
     dim: int,
     local_first: bool = True,
 ) -> np.ndarray:
-    """φ-power positional carrier for a layer.
+    """Prime-tower carrier for a layer.
 
-    multiplier = PHI ** exponent_for(layer_index, n_layers, local_first)
-    phase[d]   = 2π · multiplier · d          for d = 0 .. dim-1
-    carrier[d] = exp(i · phase[d]) / sqrt(dim)
+        n     = tower_level_for(layer_index, n_layers, local_first)
+        p     = prime(n)
+        phase[d] = 2π · p · d / dim       for d = 0 .. dim-1
+        carrier[d] = exp(i · phase[d]) / sqrt(dim)
 
-    Adjacent layers differ in multiplier by a power of PHI, which has
-    irrational fractional part, so the Dirichlet kernel between any two
-    layers is ~1/dim. All pairs are near-orthogonal by construction.
+    The Nyquist bound is p < dim/2. The carrier is deterministic and
+    near-orthogonal to every other layer's carrier by the prime-gap
+    structure of the tower.
     """
-    if dim < 2:
-        raise ValueError("dim must be >= 2")
-    exponent = exponent_for(layer_index, n_layers, local_first)
-    multiplier = float(PHI) ** exponent
+    if dim < 4:
+        raise ValueError("dim must be >= 4")
+    level = tower_level_for(layer_index, n_layers, local_first)
+    tower = _get_tower(level)
+    p = tower.prime(level)
+    if 2 * p >= dim:
+        raise ValueError(
+            f"prime p_{level}={p} exceeds Nyquist at dim={dim} "
+            f"(requires 2p < dim)"
+        )
     d = np.arange(dim, dtype=np.float64)
-    phases = 2.0 * np.pi * multiplier * d
+    phases = 2.0 * np.pi * float(p) * d / float(dim)
     return np.exp(1j * phases) / np.sqrt(dim)
 
 
@@ -129,14 +138,18 @@ class MaskLayer:
     """One layer of the stack (RES-312 §3).
 
     mask       metadata: which feature bits this layer selects.
-    carrier    positional φ-power carrier (local/global axis).
+    carrier    prime-tower carrier (local/global axis).
     weight     contribution to the stack bundle, default 1 / (l + 1).
-    exponent   φ-exponent used to build the carrier, exposed for routing.
+    tower_level  tower level n used to build the carrier (>= 2).
+    prime      prime p_n used as the carrier frequency.
+    branch     'even' or 'odd'.
     """
     mask: tuple[bool, ...]
     carrier: np.ndarray
     weight: float
-    exponent: int
+    tower_level: int
+    prime: int
+    branch: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.mask, tuple):
@@ -144,7 +157,10 @@ class MaskLayer:
         if not all(isinstance(b, (bool, np.bool_)) for b in self.mask):
             raise TypeError("mask must be a tuple of bool")
         self.weight = float(self.weight)
-        self.exponent = int(self.exponent)
+        self.tower_level = int(self.tower_level)
+        self.prime = int(self.prime)
+        if self.branch not in ("even", "odd"):
+            raise ValueError("branch must be 'even' or 'odd'")
 
     @property
     def n_bits(self) -> int:
@@ -158,12 +174,14 @@ class MaskLayer:
         return {
             "mask": list(self.mask),
             "weight": float(self.weight),
-            "exponent": int(self.exponent),
+            "tower_level": int(self.tower_level),
+            "prime": int(self.prime),
+            "branch": self.branch,
             "n_set": self.n_set,
         }
 
 
-# ── stack ───────────────────────────────────────────────────────────────
+# ── config ──────────────────────────────────────────────────────────────
 @dataclass
 class MaskStackConfig:
     """Configuration for a MaskStack.
@@ -171,11 +189,11 @@ class MaskStackConfig:
     dim           hypervector dimension. Must match stream_hv and codex.
     k             number of feature bits per mask. Must be >= K_MIN (3).
     n_layers      expected layer count. add_layer raises past this.
-    local_first   True  -> layer 0 is local (high phase freq),
-                           layer n-1 is global (low phase freq).
+    local_first   True  -> layer 0 is local (smallest prime),
+                           layer n-1 is global (largest prime).
                   False -> layer 0 is global, layer n-1 is local.
-    seed          reserved. Not consumed. The current carrier generation
-                  is deterministic (φ-power ladder, no RNG).
+    seed          reserved. Not consumed. The prime tower is
+                  deterministic.
     """
     dim: int
     k: int = DEFAULT_K
@@ -184,8 +202,8 @@ class MaskStackConfig:
     seed: int = 0
 
     def __post_init__(self) -> None:
-        if self.dim < 2:
-            raise ValueError("dim must be >= 2")
+        if self.dim < 4:
+            raise ValueError("dim must be >= 4")
         if self.k < K_MIN:
             raise ValueError(f"k must be >= {K_MIN}")
         if self.n_layers < 1:
@@ -195,8 +213,16 @@ class MaskStackConfig:
         self.n_layers = int(self.n_layers)
         self.local_first = bool(self.local_first)
         self.seed = int(self.seed)
+        # Validate the tower has enough usable levels at this dim.
+        tower = _get_tower(self.n_layers + 2)
+        if self.n_layers > tower.n_usable(self.dim):
+            raise ValueError(
+                f"n_layers={self.n_layers} exceeds tower's usable "
+                f"levels ({tower.n_usable(self.dim)}) at dim={self.dim}"
+            )
 
 
+# ── stack ───────────────────────────────────────────────────────────────
 class MaskStack:
     """Layered mask stack (RES-312 §5).
 
@@ -207,13 +233,16 @@ class MaskStack:
         stack.add_layer(mask=(True, False, False, False))
         hv = stack.encode(stream_hv)
 
-    The mask passed to add_layer is metadata. It does not influence the
-    carrier; the carrier is determined by the layer's position on the
-    local/global axis. Two stacks with the same config produce the same
-    carriers regardless of the masks supplied.
+    The mask passed to add_layer is metadata. The carrier is determined
+    by the layer's tower level, which is determined by its position.
+    Two stacks with the same config produce the same carriers
+    regardless of the masks supplied.
 
-    is_saturated(codim, depth) returns True when the caller-supplied
+    `is_saturated(codim, depth)` returns True when the caller-supplied
     sheath measurement satisfies the RES-312 §4 criterion.
+
+    `tower_levels()`, `primes()`, `branches()` expose the orientation
+    axis for downstream consumers (RES-307 routing).
     """
 
     def __init__(self, cfg: MaskStackConfig) -> None:
@@ -221,6 +250,7 @@ class MaskStack:
             raise TypeError("cfg must be a MaskStackConfig")
         self.cfg = cfg
         self._layers: list[MaskLayer] = []
+        self._tower = _get_tower(cfg.n_layers + 2)
 
     # ── properties ──────────────────────────────────────────────────
     @property
@@ -243,10 +273,27 @@ class MaskStack:
     def layers(self) -> list[MaskLayer]:
         return list(self._layers)
 
-    def exponents(self) -> list[int]:
-        """φ-exponents of every layer, in layer order. The orientation
-        axis for downstream consumers."""
-        return [l.exponent for l in self._layers]
+    def tower_levels(self) -> list[int]:
+        """Tower levels of every layer, in layer order."""
+        return [l.tower_level for l in self._layers]
+
+    def primes(self) -> list[int]:
+        """Prime frequencies of every layer, in layer order."""
+        return [l.prime for l in self._layers]
+
+    def branches(self) -> list[str]:
+        """Branch labels of every layer, in layer order."""
+        return [l.branch for l in self._layers]
+
+    def is_forbidden(self, layer_index: int) -> bool:
+        """True when the layer is on the domain-forbidden odd branch."""
+        if not (0 <= layer_index < len(self._layers)):
+            raise IndexError(
+                f"layer_index {layer_index} out of range"
+            )
+        return self._tower.is_forbidden(
+            self._layers[layer_index].tower_level
+        )
 
     # ── construction ────────────────────────────────────────────────
     def add_layer(self, mask: Sequence[bool]) -> MaskLayer:
@@ -265,13 +312,20 @@ class MaskStack:
             raise ValueError("mask must set at least one bit")
 
         idx = len(self._layers)
-        exponent = exponent_for(idx, self.cfg.n_layers, self.cfg.local_first)
+        level = tower_level_for(idx, self.cfg.n_layers, self.cfg.local_first)
         carrier = layer_carrier(
             idx, self.cfg.n_layers, self.cfg.dim, self.cfg.local_first
         )
+        p = self._tower.prime(level)
+        branch = self._tower.branch(level)
         weight = 1.0 / (idx + 1)
         layer = MaskLayer(
-            mask=mask_t, carrier=carrier, weight=weight, exponent=exponent
+            mask=mask_t,
+            carrier=carrier,
+            weight=weight,
+            tower_level=level,
+            prime=p,
+            branch=branch,
         )
         self._layers.append(layer)
         return layer
@@ -323,7 +377,9 @@ class MaskStack:
             "n_layers_max": int(self.cfg.n_layers),
             "n_layers": int(len(self._layers)),
             "local_first": bool(self.cfg.local_first),
-            "exponents": self.exponents(),
+            "tower_levels": self.tower_levels(),
+            "primes": self.primes(),
+            "branches": self.branches(),
             "layers": [l.to_dict() for l in self._layers],
         }
 
@@ -340,7 +396,7 @@ __all__ = [
     "MaskStackConfig",
     "MaskLayer",
     "layer_carrier",
-    "exponent_for",
+    "tower_level_for",
     "FEATURE_BITS",
     "K_MIN",
     "DEFAULT_K",
