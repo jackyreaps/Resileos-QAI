@@ -21,19 +21,24 @@ Residual stack:
 Phase wiring (optional):
     If a PhasorGraph is attached, its edge phases are driven by the
     non-conservative operator's theta on every step, and its triangular
-    projection becomes the coupling used by the scar update. This makes
-    the coupling oscillate with the dynamics. It does not affect
-    `_factorize`, so it does not affect the compression number.
+    projection becomes the coupling used by the scar update.
+
+Monitors:
+    core.monitors() returns a MonitorBundle from the last packet and
+    the operator. No new computation. Read-only. The accessor is the
+    public surface for outer loops and carrier features.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 
 from .packet import Packet, encode_exponent, packet_hash
 from .abstention import ParityState
 from .substrate.nonconservative import NonConservativeOperator
+from .monitors import MonitorBundle
 
 
 _PRIMES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47)
@@ -55,8 +60,6 @@ class CoreConfig:
     alpha: float = 0.95
     beta: float = 0.05
     gamma: float = 0.02
-    # Residual stack depth. 1 reproduces the previous single-layer
-    # behavior; 12 matches the earlier compression measurement (~70%).
     n_residual_layers: int = 12
 
 
@@ -70,11 +73,7 @@ class ResidualCore:
         nc_phase_max          max |theta_i| in radians
         nc_decay              smoothing on g
         phasor_graph          optional PhasorGraph whose triangular
-                              projection becomes the coupling. Edge
-                              phases are updated from theta each step.
-                              Graph must be built with non-hermitian
-                              edges (i > j) so triangular_projection()
-                              is strict-lower.
+                              projection becomes the coupling.
     """
 
     def __init__(self, cfg: CoreConfig, seed: int = 0,
@@ -99,7 +98,8 @@ class ResidualCore:
             decay=nc_decay,
         )
         self._phasor_graph = phasor_graph
-        self._last_reconstruction: np.ndarray | None = None
+        self._last_reconstruction: Optional[np.ndarray] = None
+        self._last_packet: Optional[Packet] = None
 
     # ── internals ─────────────────────────────────────────────────────
     def _factorize(self, W):
@@ -110,22 +110,15 @@ class ResidualCore:
         return Ub.astype(np.float32), Vb.astype(np.float32)
 
     def _reconstruct_layer(self, Ub, Vb, R):
-        """Rescale the layer's reconstruction to best fit R in L2."""
         P = Ub @ Vb
         denom = float(np.sum(P * P)) + 1e-12
         s = float(np.sum(R * P)) / denom
         return s * P, s
 
     def _factorize_residual_stack(self, W):
-        """
-        Apply the bipolar factorization n_residual_layers times, each
-        layer fitting the residual of the previous. Returns
-        (layers, W_hat_total). layers[0] is the primary factorization
-        that goes into the packet.
-        """
         R = W.copy()
         W_hat_total = np.zeros_like(W)
-        layers: list[tuple[np.ndarray, np.ndarray, float]] = []
+        layers = []
         for _ in range(self.cfg.n_residual_layers):
             Ub_l, Vb_l = self._factorize(R)
             W_hat_l, s_l = self._reconstruct_layer(Ub_l, Vb_l, R)
@@ -138,15 +131,12 @@ class ResidualCore:
         self._nonconservative.update(F_res=F_res, DeltaS=DeltaS, mu=mu)
         D = self._nonconservative.diagonal()
 
-        # Coupling: either the phasor graph (if attached) or the strict
-        # lower part of the current scar.
         if self._phasor_graph is not None:
             theta = self._nonconservative.theta
             self._phasor_graph.apply_phase_context(theta)
             graph_coupling = self._phasor_graph.triangular_projection()
-            # Element-wise modulate Lambda's strict-lower by the graph's
-            # complex edge weights.
-            coupling = _strict_lower(self._Lambda.astype(np.complex128)) * graph_coupling
+            coupling = (_strict_lower(self._Lambda.astype(np.complex128))
+                        * graph_coupling)
         else:
             coupling = _strict_lower(self._Lambda.astype(np.complex128))
 
@@ -169,10 +159,6 @@ class ResidualCore:
         )
 
     def _volume_guard(self, Lambda):
-        """
-        J = diag(D) + coupling. det(J) = prod(D) = 1 by construction.
-        In conservative mode (D = I), reduces to det(I + strict_lower) = 1.
-        """
         D = self._nonconservative.diagonal()
         if self._phasor_graph is not None:
             graph_coupling = self._phasor_graph.triangular_projection()
@@ -194,7 +180,6 @@ class ResidualCore:
                 f"W must be ({self.cfg.m}, {self.cfg.n}), got {W.shape}")
 
         if factors is not None:
-            # External factors: single-layer override (used by training).
             Ub_ext, Vb_ext = factors
             Ub = np.asarray(Ub_ext, dtype=np.float32)
             Vb = np.asarray(Vb_ext, dtype=np.float32)
@@ -246,8 +231,32 @@ class ResidualCore:
             D=D.astype(np.complex128),
         )
         packet.packet_hash = packet_hash(packet)
+        self._last_packet = packet
         self._step += 1
         return packet
+
+    def monitors(self) -> Optional[MonitorBundle]:
+        """
+        Read-only snapshot of the monitor state after the last step.
+
+        Assembled from the last packet and the non-conservative
+        operator. Returns None before the first step. No new
+        computation; callers read the substrate's own state rather
+        than reconstructing it from packet fields.
+        """
+        if self._last_packet is None:
+            return None
+        p = self._last_packet
+        return MonitorBundle(
+            F_res=float(p.F_res),
+            DeltaS=float(p.DeltaS),
+            mu=int(p.mu),
+            lambda_energy=float(np.linalg.norm(p.Lambda)),
+            anisotropy=self._nonconservative.anisotropy(),
+            volume=float(p.volume),
+            rank=int(p.rank),
+            schedule_index=int(p.schedule_index),
+        )
 
     # ── diagnostics ───────────────────────────────────────────────────
     @property
@@ -267,29 +276,16 @@ class ResidualCore:
         return self._nonconservative.mode == "non-conservative"
 
     @property
-    def last_reconstruction(self) -> np.ndarray | None:
-        """
-        Full reconstruction of the most recent step, including all
-        residual layers. None before the first step.
-
-        The packet emits only layer 0's factors (RES-201 frozen). This
-        property gives access to the stacked approximation the core
-        actually computed, which is what the compression gate measures.
-        """
+    def last_reconstruction(self) -> Optional[np.ndarray]:
         return self._last_reconstruction
 
+    @property
+    def last_packet(self) -> Optional[Packet]:
+        return self._last_packet
 
-# ── helper: build a coupling graph ──────────────────────────────────────
+
 def build_coupling_graph(r: int, seed: int = 0):
-    """
-    Build a non-hermitian PhasorGraph on r nodes with strict-lower
-    edges. Suitable as the `phasor_graph` argument to ResidualCore.
-
-    Import is local so this module does not require the substrate
-    package to be importable.
-    """
     from .substrate.phasor import PhasorGraph
-
     g = PhasorGraph(r, hermitian=False)
     rng = np.random.default_rng(seed)
     for i in range(1, r):
