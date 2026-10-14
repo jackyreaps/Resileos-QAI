@@ -9,6 +9,7 @@ Two-head system for QD-TER bridge integration, plus support utilities:
     fpe.py              FPE backend selector (leCore / in-house)
     rheology.py         interface for the coordinate map (unbound)
     nonconservative.py  non-conservative diagonal operator (RES-200 §ext)
+    oscillator.py       Kuramoto phase field (RES-200 §ext)
     phasor.py           phasor graph, band carriers, banded memory (RES-306)
     sandbox.py          Causal Sandbox Index (RES-305)
     agency.py           heuristic routing layer (RES-307)
@@ -27,6 +28,12 @@ from .reduction import (
 from .spd import assert_spd, is_spd, min_eigenvalue, isotropic_metric
 from .fpe import fpe_encode_bipolar, backend_name, LECORE_AVAILABLE
 from .nonconservative import NonConservativeOperator
+from .oscillator import (
+    KuramotoField,
+    golden_ladder,
+    golden_weyl,
+    coupling_from_graph,
+)
 from .phasor import (
     PhasorGraph,
     BandCarriers,
@@ -63,6 +70,11 @@ __all__ = [
     "LECORE_AVAILABLE",
     # nonconservative
     "NonConservativeOperator",
+    # oscillator
+    "KuramotoField",
+    "golden_ladder",
+    "golden_weyl",
+    "coupling_from_graph",
     # phasor
     "PhasorGraph",
     "BandCarriers",
