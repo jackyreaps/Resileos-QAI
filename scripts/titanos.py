@@ -15,8 +15,10 @@ Storage uses MAP triple binding:
     probe = anchor * r
     retrieved = sign(band) * probe  ~= other_slot + crosstalk
 
-This recovers the object from a forward probe and the subject from an
-inverse probe, without role slots.
+Scoring promotes to float64 before the inner products. np.dot on int8
+inputs uses an int8 accumulator and silently overflows for dim > 127,
+returning wraparound values that have no relation to the true inner
+product.
 
 The "quantum" path is a labeled simulation (QUANTUM_SIM).
 """
@@ -163,7 +165,6 @@ class Titanos:
         self._perm_cache: dict[int, np.ndarray] = {0: np.arange(cfg.dim)}
         self.entities: dict[str, np.ndarray] = {}
         self.relations: dict[str, np.ndarray] = {}
-        # Roles retained for backward compat but unused on the primary path.
         self.roles: dict[str, np.ndarray] = {}
         for name in ("S", "O"):
             self.roles[name] = self._bip()
@@ -341,17 +342,29 @@ class Titanos:
                           acc: np.ndarray | None = None,
                           exclude: set[str] | None = None,
                           ) -> list[tuple[str, float, float]]:
+        """
+        Score each candidate entity against a retrieved vector.
+
+        sim = <vec, anchor> / D   (sign-aware, query-specific)
+        mag = |<acc, anchor>| / D (accumulator magnitude)
+
+        Both dots are promoted to float64. np.dot on int8 inputs uses
+        an int8 accumulator and silently overflows for dim > 127,
+        producing wraparound values that have no relation to the true
+        inner product. Promoting avoids this.
+        """
         exclude = exclude or set()
         D = float(self.cfg.dim)
         if acc is None:
             acc = self._merged_acc()
-        acc_f = acc.astype(np.float64)
+        vec_f = np.asarray(vec, dtype=np.float64)
+        acc_f = np.asarray(acc, dtype=np.float64)
         out: list[tuple[str, float, float]] = []
         for name, anchor in self.entities.items():
             if name in exclude:
                 continue
             a = anchor.astype(np.float64)
-            sim = float(np.dot(vec, anchor)) / D
+            sim = float(np.dot(vec_f, a)) / D
             mag = abs(float(np.dot(acc_f, a))) / D
             out.append((name, sim, mag))
         return out
