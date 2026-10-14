@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-""" Run a real corpus through the composed pipeline. 
+"""Run a real corpus through the composed pipeline.
 
-Loads Koine Greek (default), fits a CharTokenizer, windows the text, and feeds 
+Loads Koine Greek (default), fits a CharTokenizer, windows the text, and feeds
 each window through LanguagePipeline. Reports R trajectory, round-trip accuracy,
-reaper and φ-compress firing rates. 
+reaper and φ-compress firing rates.
 
 Usage:
     python scripts/run_corpus.py
@@ -37,7 +37,7 @@ from resileos.corpus import (
 
 # ── pipeline import with a clear error ──────────────────────────────────
 def _make_pipeline(m: int, n: int, **kwargs: Any) -> Any:
-    """ Load LanguagePipeline from resileos.pipeline. 
+    """Load LanguagePipeline from resileos.pipeline.
 
     The pipeline's dim is set to m * n to satisfy the PipelineConfig
     validation that requires dim == m * n.
@@ -80,7 +80,7 @@ def window_ids(ids: list[int], window: int, stride: int) -> list[list[int]]:
     return out
 
 
-# ── main ────────────────────────────────────────────────────────────────
+# ── source builder ──────────────────────────────────────────────────────
 def _build_source(args: argparse.Namespace):
     if args.source == "koine":
         return KoineGreekSource()
@@ -99,9 +99,11 @@ def _build_source(args: argparse.Namespace):
     raise SystemExit(f"unknown source: {args.source!r}")
 
 
+# ── main ────────────────────────────────────────────────────────────────
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--source", default="koine", choices=["koine", "gutenberg", "synthetic", "plain"])
+    p.add_argument("--source", default="koine",
+                   choices=["koine", "gutenberg", "synthetic", "plain"])
     p.add_argument("--path", default=None, help="path for --source plain")
     p.add_argument("--target-chars", type=int, default=8000)
     p.add_argument("--window", type=int, default=32)
@@ -113,6 +115,10 @@ def main() -> int:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--m", type=int, default=16, help="rows for m*n=dim")
     p.add_argument("--n", type=int, default=16, help="cols for m*n=dim")
+    p.add_argument("--phi-compress", action="store_true",
+                   help="enable φ-compress contraction mid-run")
+    p.add_argument("--out", default=None,
+                   help="optional JSONL path: one row per window")
     args = p.parse_args()
 
     # 1. Load corpus
@@ -128,7 +134,10 @@ def main() -> int:
     print(f"[token] strip_diacritics  = {args.strip_diacritics}")
 
     # 3. Build pipeline
-    pipeline = _make_pipeline(m=args.m, n=args.n)
+    pipeline = _make_pipeline(
+        m=args.m, n=args.n,
+        phi_compress_enabled=args.phi_compress,
+    )
     dim = args.m * args.n
     print(f"[pipe]  dim               = {dim}")
 
@@ -137,37 +146,45 @@ def main() -> int:
     windows = window_ids(ids, window=args.window, stride=args.stride)
     print(f"[run]   windows           = {len(windows)}")
 
-    # 5. Run each window through the pipeline
+    # 5. Run each window
+    rows: list[dict] = []
     r_values: list[float] = []
     exact_count = 0
     total_tokens = 0
     correct_tokens = 0
-    reaper_fired = 0
-    compress_fired = 0
-    reconstructions: list[float] = []
 
-    for w in windows:
+    for i, w in enumerate(windows):
         result = pipeline.step(w)
         recovered = result.recovered
-        r_values.append(float(result.order_parameter))
+        r = float(result.order_parameter)
 
+        r_values.append(r)
         if recovered == w:
             exact_count += 1
-
         total_tokens += len(w)
-        correct_tokens += sum(
-            1 for a, b in zip(recovered, w) if a == b
-        )
+        correct_tokens += sum(1 for a, b in zip(recovered, w) if a == b)
 
-        if getattr(result, "reaper_fired", False):
-            reaper_fired += 1
-        if getattr(result, "compress_fired", False):
-            compress_fired += 1
-        if hasattr(result, "reconstruction"):
-            reconstructions.append(float(result.reconstruction))
+        rows.append({
+            "dim": dim,
+            "window": args.window,
+            "stride": args.stride,
+            "w_idx": i,
+            "R": r,
+            "epsilon": float(result.epsilon),
+            "rank_used": int(result.rank_used),
+            "gate_state": result.gate_state,
+            "reaper_fraction": float(result.reaper_fraction),
+            "recon_rel_error": float(result.reconstruction_rel_error),
+            "exact": int(recovered == w),
+            "token_acc": sum(1 for a, b in zip(recovered, w) if a == b) / len(w),
+        })
 
     r_arr = np.array(r_values) if r_values else np.array([0.0])
     mean_token_acc = correct_tokens / total_tokens if total_tokens else 0.0
+
+    # φ-compress firing comes from pipeline.stats(), not per-result
+    stats = pipeline.stats()
+    compressions = stats.get("compressions", [])
 
     # 6. Report
     print()
@@ -177,10 +194,18 @@ def main() -> int:
     print(f"  mean token accuracy:  {mean_token_acc * 100:.2f}%")
     print(f"  R mean / std:         {r_arr.mean():.4f} / {r_arr.std():.4f}")
     print(f"  R range:              [{r_arr.min():.4f}, {r_arr.max():.4f}]")
-    if reconstructions:
-        print(f"  mean reconstruction:  {np.mean(reconstructions):.4f}")
-    print(f"  reaper fired:         {reaper_fired}/{len(windows)}")
-    print(f"  compress fired:       {compress_fired}/{len(windows)}")
+    print(f"  φ-compress fired:     {len(compressions)} steps")
+    if compressions:
+        print(f"    at step indices:    {compressions[:10]}"
+              f"{'...' if len(compressions) > 10 else ''}")
+
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8") as f:
+            for row in rows:
+                f.write(json.dumps(row) + "\n")
+        print(f"\n[write] {out_path}  rows={len(rows)}")
 
     return 0
 
