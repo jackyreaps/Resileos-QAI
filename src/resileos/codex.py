@@ -1,8 +1,8 @@
-""" φ-phased codex. 
+"""φ-phased codex.
 
-Deterministic token and position encoders built on φ-seeded 
-constant-magnitude phasors. Every code is a unit-norm complex vector of dim 
-components with per-component magnitude 1/sqrt(dim). 
+Deterministic token and position encoders built on φ-seeded
+constant-magnitude phasors. Every code is a unit-norm complex vector of dim
+components with per-component magnitude 1/sqrt(dim).
 
 token t:    phase[d] = 2π · frac(φ · (t+1) · (d+1))
 position p: phase[d] = 2π · frac(φ² · (p+1) · (d+1))
@@ -12,10 +12,10 @@ Bind and unbind are exact under these conventions:
     unbind(c, b)  = c * conj(b) * sqrt(dim)
     unbind(bind(a, b), b) = a
 
-BandCarriers is NOT used here. Its carriers are pure single-frequency Fourier 
-modes; under element-wise bind two carriers can sum to another carrier's 
+BandCarriers is NOT used here. Its carriers are pure single-frequency Fourier
+modes; under element-wise bind two carriers can sum to another carrier's
 frequency, which aliases multi-token cleanup. φ-seeded hash phasors do not alias
-because adjacent token codes have no additive structure. 
+because adjacent token codes have no additive structure.
 """
 from __future__ import annotations
 
