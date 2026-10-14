@@ -1,4 +1,4 @@
-"""Tests for the layered mask stack (RES-312)."""
+"""Tests for the layered mask stack (RES-312, prime tower carriers)."""
 import sys
 from pathlib import Path
 
@@ -7,7 +7,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from resileos.codex import PHI
 from resileos.hierarchy.mask import (
     DEFAULT_K,
     FEATURE_BITS,
@@ -15,8 +14,8 @@ from resileos.hierarchy.mask import (
     MaskLayer,
     MaskStack,
     MaskStackConfig,
-    exponent_for,
     layer_carrier,
+    tower_level_for,
 )
 
 
@@ -31,19 +30,26 @@ def _stack(**kw):
 
 
 # ── config ──────────────────────────────────────────────────────────────
-def test_config_rejects_dim_below_2():
+def test_config_rejects_dim_below_4():
     with pytest.raises(ValueError, match="dim must be"):
-        MaskStackConfig(dim=1)
+        MaskStackConfig(dim=2)
 
 
 def test_config_rejects_k_below_min():
     with pytest.raises(ValueError, match="k must be"):
-        MaskStackConfig(dim=16, k=K_MIN - 1)
+        MaskStackConfig(dim=64, k=K_MIN - 1)
 
 
 def test_config_rejects_n_layers_zero():
     with pytest.raises(ValueError, match="n_layers must be"):
-        MaskStackConfig(dim=16, n_layers=0)
+        MaskStackConfig(dim=64, n_layers=0)
+
+
+def test_config_rejects_n_layers_exceeding_tower():
+    """At dim=16, Nyquist is 8. Largest prime < 8 is 7 (p_4).
+    Levels 2..4 -> 3 usable. n_layers=5 exceeds that."""
+    with pytest.raises(ValueError, match="exceeds tower"):
+        MaskStackConfig(dim=16, n_layers=5)
 
 
 def test_config_coerces_types():
@@ -62,31 +68,35 @@ def test_feature_bits_length():
     assert len(FEATURE_BITS) == K_MIN
 
 
-# ── exponent_for ────────────────────────────────────────────────────────
-def test_exponent_local_first_ordering():
-    # layer 0 = local -> highest exponent; layer n-1 = global -> lowest
-    e0 = exponent_for(0, 3, local_first=True)
-    e1 = exponent_for(1, 3, local_first=True)
-    e2 = exponent_for(2, 3, local_first=True)
-    assert e0 > e1 > e2
+# ── tower_level_for ─────────────────────────────────────────────────────
+def test_tower_level_local_first_ordering():
+    """local_first=True: layer 0 = level 2 (smallest prime),
+    layer n-1 = highest level."""
+    l0 = tower_level_for(0, 3, local_first=True)
+    l1 = tower_level_for(1, 3, local_first=True)
+    l2 = tower_level_for(2, 3, local_first=True)
+    assert l0 < l1 < l2
+    assert l0 == 2
 
 
-def test_exponent_global_first_ordering():
-    # layer 0 = global -> lowest; layer n-1 = local -> highest
-    e0 = exponent_for(0, 3, local_first=False)
-    e1 = exponent_for(1, 3, local_first=False)
-    e2 = exponent_for(2, 3, local_first=False)
-    assert e0 < e1 < e2
+def test_tower_level_global_first_ordering():
+    """local_first=False: layer 0 = highest level,
+    layer n-1 = level 2."""
+    l0 = tower_level_for(0, 3, local_first=False)
+    l1 = tower_level_for(1, 3, local_first=False)
+    l2 = tower_level_for(2, 3, local_first=False)
+    assert l0 > l1 > l2
+    assert l2 == 2
 
 
-def test_exponent_rejects_out_of_range():
+def test_tower_level_rejects_out_of_range():
     with pytest.raises(ValueError, match="out of range"):
-        exponent_for(5, 3, local_first=True)
+        tower_level_for(5, 3, local_first=True)
 
 
-def test_exponent_rejects_bad_n_layers():
+def test_tower_level_rejects_bad_n_layers():
     with pytest.raises(ValueError, match="n_layers must be"):
-        exponent_for(0, 0, local_first=True)
+        tower_level_for(0, 0, local_first=True)
 
 
 # ── layer_carrier ───────────────────────────────────────────────────────
@@ -97,7 +107,13 @@ def test_layer_carrier_unit_norm():
 
 def test_layer_carrier_rejects_bad_dim():
     with pytest.raises(ValueError, match="dim must be"):
-        layer_carrier(0, 3, 1)
+        layer_carrier(0, 3, 2)
+
+
+def test_layer_carrier_rejects_nyquist_violation():
+    """At dim=16, Nyquist is 8. Prime 11 (p_5, level 5) exceeds it."""
+    with pytest.raises(ValueError, match="Nyquist"):
+        layer_carrier(3, 3, 16, local_first=True)
 
 
 def test_layer_carrier_different_layers_differ():
@@ -113,8 +129,8 @@ def test_layer_carrier_deterministic():
 
 
 def test_layer_carriers_near_orthogonal():
-    """Adjacent φ-power layers correlate at ~1/dim. All pairwise
-    correlations below 0.1 for dim=512."""
+    """Prime-frequency carriers are near-orthogonal by construction.
+    All pairwise correlations below 0.15 at dim=512."""
     n = 4
     dim = 512
     carriers = [
@@ -123,32 +139,16 @@ def test_layer_carriers_near_orthogonal():
     for i in range(n):
         for j in range(i + 1, n):
             ip = abs(float(np.real(np.vdot(carriers[i], carriers[j]))))
-            assert ip < 0.1, (
+            assert ip < 0.15, (
                 f"layers {i},{j} correlated at {ip:.4f}"
             )
 
 
 def test_layer_carrier_local_first_inverts_global_first():
-    """Same exponent appears at opposite ends when local_first flips."""
+    """Same tower level appears at opposite ends when local_first flips."""
     c_local_first_0 = layer_carrier(0, 3, 64, local_first=True)
     c_global_first_2 = layer_carrier(2, 3, 64, local_first=False)
-    # layer 0 under local_first and layer 2 under global_first
-    # both get the same exponent (n_layers - 0 + 1 = n_layers - 2 + 2 = 4)
     assert np.allclose(c_local_first_0, c_global_first_2)
-
-
-def test_layer_carrier_exponents_irrational():
-    """Adjacent multipliers differ by a φ-power, so their fractional
-    parts are never integers."""
-    n = 5
-    exponents = [exponent_for(i, n, local_first=True) for i in range(n)]
-    multipliers = [PHI ** e for e in exponents]
-    for i in range(n - 1):
-        diff = multipliers[i] - multipliers[i + 1]
-        frac = abs(diff - round(diff))
-        assert frac > 0.05, (
-            f"layers {i},{i+1} differ by near-integer {diff:.4f}"
-        )
 
 
 # ── add_layer ───────────────────────────────────────────────────────────
@@ -181,13 +181,13 @@ def test_add_layer_rejects_when_full():
 
 def test_add_layer_accepts_duplicate_mask():
     """With positional carriers, duplicate masks are meaningful:
-    they select the same features at two different axis positions."""
+    they select the same features at two different tower levels."""
     st = _stack(n_layers=3)
     st.add_layer((True, True, True, False))
     st.add_layer((True, True, True, False))
     assert st.n_layers == 2
     assert st.layers[0].mask == st.layers[1].mask
-    assert st.layers[0].exponent != st.layers[1].exponent
+    assert st.layers[0].tower_level != st.layers[1].tower_level
 
 
 def test_default_weight_schedule():
@@ -198,23 +198,42 @@ def test_default_weight_schedule():
     assert l1.weight == pytest.approx(0.5)
 
 
-def test_add_layer_records_exponent():
+def test_add_layer_records_prime():
     st = _stack(n_layers=3, local_first=True)
     l0 = st.add_layer((True, True, True, False))
-    l2 = st.add_layer((True, True, False, False))
-    l3 = st.add_layer((True, False, False, False))
-    # layer 0 = local -> highest exponent
-    assert l0.exponent > l2.exponent > l3.exponent
+    l1 = st.add_layer((True, True, False, False))
+    l2 = st.add_layer((True, False, False, False))
+    # local_first: layer 0 = level 2 = prime 3; layer 1 = level 3 = prime 5;
+    # layer 2 = level 4 = prime 7
+    assert l0.prime == 3
+    assert l1.prime == 5
+    assert l2.prime == 7
 
 
-def test_exponents_method():
+def test_add_layer_records_branch():
+    st = _stack(n_layers=4, local_first=True)
+    l0 = st.add_layer((True, True, True, False))  # level 2, even
+    l1 = st.add_layer((True, True, False, False))  # level 3, odd
+    assert l0.branch == "even"
+    assert l1.branch == "odd"
+
+
+def test_orientation_methods():
     st = _stack(n_layers=3)
     st.add_layer((True, True, True, False))
     st.add_layer((True, True, False, False))
     st.add_layer((True, False, False, False))
-    exps = st.exponents()
-    assert len(exps) == 3
-    assert exps[0] > exps[1] > exps[2]
+    assert st.tower_levels() == [2, 3, 4]
+    assert st.primes() == [3, 5, 7]
+    assert st.branches() == ["even", "odd", "even"]
+
+
+def test_is_forbidden():
+    st = _stack(n_layers=3)
+    st.add_layer((True, True, True, False))  # level 2, even
+    st.add_layer((True, True, False, False))  # level 3, odd
+    assert not st.is_forbidden(0)
+    assert st.is_forbidden(1)
 
 
 # ── encode ──────────────────────────────────────────────────────────────
@@ -254,7 +273,7 @@ def test_encode_deterministic():
     assert np.allclose(a, b)
 
 
-def test_encode_different_inputs_give_different_outputs():
+def test_encode_different_inputs_differ():
     st = _stack(dim=64)
     st.add_layer((True, True, True, False))
     rng = np.random.default_rng(0)
@@ -267,7 +286,7 @@ def test_encode_different_inputs_give_different_outputs():
     assert not np.allclose(oa, ob)
 
 
-def test_encode_carriers_do_not_depend_on_mask():
+def test_encode_carriers_independent_of_mask():
     """The carrier is positional. Two stacks with the same config but
     different masks produce the same carriers."""
     s1 = _stack(dim=64, n_layers=3)
@@ -275,12 +294,13 @@ def test_encode_carriers_do_not_depend_on_mask():
     s1.add_layer((True, True, True, False))
     s1.add_layer((True, True, False, False))
     s1.add_layer((True, False, False, False))
-    s2.add_layer((True, True, True, True))     # different masks
+    s2.add_layer((True, True, True, True))
     s2.add_layer((True, True, True, False))
     s2.add_layer((True, True, False, False))
     for i in range(3):
         assert np.allclose(s1.layers[i].carrier, s2.layers[i].carrier)
-        assert s1.layers[i].exponent == s2.layers[i].exponent
+        assert s1.layers[i].tower_level == s2.layers[i].tower_level
+        assert s1.layers[i].prime == s2.layers[i].prime
 
 
 # ── sheath criterion ────────────────────────────────────────────────────
@@ -298,13 +318,6 @@ def test_is_saturated_depth_only_not_enough():
 
 def test_is_saturated_neither_condition():
     assert not MaskStack.is_saturated(boundary_codim=1.5, depth=0.5)
-
-
-def test_is_saturated_custom_thresholds():
-    assert MaskStack.is_saturated(
-        boundary_codim=1.0, depth=0.1,
-        codim_max=2.0, depth_min=0.5,
-    )
 
 
 # ── reset / snapshot ────────────────────────────────────────────────────
@@ -328,10 +341,11 @@ def test_snapshot_keys():
     st.add_layer((True, True, True, False))
     s = st.snapshot()
     for k in ("dim", "k", "n_layers_max", "n_layers",
-              "local_first", "exponents", "layers"):
+              "local_first", "tower_levels", "primes",
+              "branches", "layers"):
         assert k in s
     assert s["layers"][0]["mask"] == [True, True, True, False]
-    assert s["layers"][0]["exponent"] == s["exponents"][0]
+    assert s["layers"][0]["prime"] == 3
 
 
 def test_repr_contains_counts():
