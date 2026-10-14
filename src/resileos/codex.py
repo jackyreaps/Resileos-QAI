@@ -1,21 +1,16 @@
-"""φ-phased codex.
-
-Deterministic token and position encoders built on φ-seeded
-constant-magnitude phasors. Every code is a unit-norm complex vector of dim
-components with per-component magnitude 1/sqrt(dim).
-
-token t:    phase[d] = 2π · frac(φ · (t+1) · (d+1))
-position p: phase[d] = 2π · frac(φ² · (p+1) · (d+1))
+"""φ-phased codex. Deterministic token and position encoders built on
+φ-seeded constant-magnitude phasors. Every code is a unit-norm complex vector
+of dim components with per-component magnitude 1/sqrt(dim).
 
 Bind and unbind are exact under these conventions:
     bind(a, b)    = a * b * sqrt(dim)
     unbind(c, b)  = c * conj(b) * sqrt(dim)
     unbind(bind(a, b), b) = a
 
-BandCarriers is NOT used here. Its carriers are pure single-frequency Fourier
-modes; under element-wise bind two carriers can sum to another carrier's
-frequency, which aliases multi-token cleanup. φ-seeded hash phasors do not alias
-because adjacent token codes have no additive structure.
+The multiplicative φ·id·d schedule aliases under element-wise bind — adjacent
+token codes have additive structure in phase. This implementation uses
+φ-seeded random phasors instead: each token ID hashes to a unique RNG seed,
+which produces incommensurate phase patterns with no additive structure.
 """
 from __future__ import annotations
 
@@ -24,16 +19,20 @@ from typing import Optional, Sequence
 import numpy as np
 
 PHI = (1.0 + np.sqrt(5.0)) / 2.0
-PHI2 = PHI * PHI
 MAX_POSITIONS_DEFAULT = 512
+_SEED_MULT = 2654435761  # Knuth multiplicative hash
+_SEED_MOD = 2**31
 
 
-def _phi_phasor(ids: np.ndarray, dim: int, multiplier: float) -> np.ndarray:
-    """Return a (len(ids), dim) matrix of unit-norm φ-seeded phasors."""
-    ids = np.asarray(ids, dtype=np.float64)
-    d = np.arange(1, dim + 1, dtype=np.float64)
-    phases = 2.0 * np.pi * np.mod(multiplier * ids[:, None] * d[None, :], 1.0)
-    return np.exp(1j * phases) / np.sqrt(dim)
+def _phi_seeded_phasor(ids: np.ndarray, dim: int, salt: int = 0) -> np.ndarray:
+    """Deterministic random phasors, seeded per ID via φ-hash."""
+    out = np.zeros((len(ids), dim), dtype=np.complex128)
+    for i, tid in enumerate(ids):
+        seed = (int(tid) * _SEED_MULT + salt) % _SEED_MOD
+        rng = np.random.default_rng(seed)
+        phases = rng.uniform(-np.pi, np.pi, size=dim)
+        out[i] = np.exp(1j * phases) / np.sqrt(dim)
+    return out
 
 
 class PhiPhaseCodex:
@@ -54,11 +53,11 @@ class PhiPhaseCodex:
         self.max_positions = int(max_positions)
         self._scale = float(np.sqrt(self.dim))
 
-        token_ids = np.arange(1, vocab_size + 1, dtype=np.float64)
-        self.codebook = _phi_phasor(token_ids, self.dim, multiplier=PHI)
+        token_ids = np.arange(1, vocab_size + 1, dtype=np.int64)
+        self.codebook = _phi_seeded_phasor(token_ids, self.dim, salt=0)
 
-        position_ids = np.arange(1, max_positions + 1, dtype=np.float64)
-        self._positions = _phi_phasor(position_ids, self.dim, multiplier=PHI2)
+        position_ids = np.arange(1, max_positions + 1, dtype=np.int64)
+        self._positions = _phi_seeded_phasor(position_ids, self.dim, salt=1)
 
     def phase_code(self, token_id: int) -> np.ndarray:
         if not (0 <= token_id < self.vocab_size):
@@ -79,7 +78,32 @@ class PhiPhaseCodex:
     @staticmethod
     def bundle(codes: Sequence[np.ndarray]) -> np.ndarray:
         if not codes:
-            return np.zeros(1, dtype=np.complex128)
+            raise ValueError("codes must be non-empty")
         s = np.sum(np.stack(codes, axis=0), axis=0)
         n = float(np.linalg.norm(s))
         return s / n if n > 1e-12 else s
+
+    def encode(self, tokens: list[int]) -> np.ndarray:
+        """Bundle token codes bound to position slots."""
+        if not tokens:
+            raise ValueError("tokens must be non-empty")
+        if len(tokens) > self.max_positions:
+            raise ValueError(
+                f"sequence length {len(tokens)} > max_positions {self.max_positions}"
+            )
+        codes = []
+        for p, t in enumerate(tokens):
+            t = int(t)
+            if not (0 <= t < self.vocab_size):
+                raise ValueError(f"token {t} out of vocab range")
+            codes.append(self.bind(self.codebook[t], self._positions[p]))
+        return self.bundle(codes)
+
+    def cleanup(self, hv: np.ndarray, position: int) -> Optional[int]:
+        """Unbind position and return the nearest token ID (or None)."""
+        if not (0 <= position < self.max_positions):
+            raise IndexError(f"position {position} out of range")
+        probe = self.unbind(hv, self._positions[position])
+        sims = np.real(np.conj(self.codebook) @ probe)
+        best = int(np.argmax(sims))
+        return best
