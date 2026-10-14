@@ -1,16 +1,16 @@
-doc | RES-314
-title | Error Accumulation Bound
-status | draft
-depends_on | RES-310, RES-313
-referenced_by | RES-315
+doc: RES-314
+title: Error Accumulation Bound
+status: draft
+depends_on: RES-310, RES-313
+referenced_by: RES-315
 
 # Error Accumulation Bound
 
 A single-window round-trip at `dim = 512`, `window = 64` recovers 91% of tokens
-exactly. At depth, errors compound. This document states the accumulation model,
-the bound it implies, and the redundancy contract that follows from it. It does
-not define an error-correcting code. It defines the bound such a code would
-need to satisfy.
+exactly. At depth, errors compound. This document states the accumulation
+model, the bound it implies, and the redundancy contract that follows from it.
+It does not define an error-correcting code. It defines the bound such a code
+would need to satisfy.
 
 ## 1. Single-level error
 
@@ -47,7 +47,13 @@ The independence assumption is optimistic. In practice, crosstalk at depth `L`
 correlates with crosstalk at depth `L-1` because the bundles share items. The
 true `p_L` is lower.
 
-## 3. The correlated model
+## 3. The correlated model (falsified)
+
+**This model is falsified by the empirical result `p_1 = 0.9143` at
+`dim = 512`, `window = 64`. It is included only to show which standard
+accumulation model does not apply. The derivation below predicts no error at
+depth 16; the measured value at depth 1 is already 0.9143. Do not use this
+section as a bound.**
 
 Under the geometric-sum crosstalk model of RES-313 §2, the SNR at depth `L` is:
 
@@ -91,8 +97,8 @@ The error model that fits is:
 
     p_1(pos) = f(pos / window)
 
-where `f` is a decreasing function, near 1 for `pos << window` and near 0.5 for
-`pos -> window`. The window-length dependence (32 vs 64) is consistent with
+where `f` is a decreasing function, near 1 for `pos << window` and near 0.5
+for `pos -> window`. The window-length dependence (32 vs 64) is consistent with
 this: doubling the window adds positions at the tail where `f` is small.
 
 Under this model, the depth-`L` error is:
