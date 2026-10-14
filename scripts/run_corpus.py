@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""
-Run a real corpus through the composed pipeline.
+""" Run a real corpus through the composed pipeline. 
 
-Loads Koine Greek (default), fits a CharTokenizer, windows the text,
-and feeds each window through LanguagePipeline. Reports R trajectory,
-round-trip accuracy, reaper and φ-compress firing rates.
+Loads Koine Greek (default), fits a CharTokenizer, windows the text, and feeds 
+each window through LanguagePipeline. Reports R trajectory, round-trip accuracy,
+reaper and φ-compress firing rates. 
 
 Usage:
     python scripts/run_corpus.py
@@ -27,29 +26,37 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from resileos.corpus import (
-    CharTokenizer, load_corpus,
-    KoineGreekSource, GutenbergSource, PlainTextSource, SyntheticSource,
+    CharTokenizer,
+    load_corpus,
+    KoineGreekSource,
+    GutenbergSource,
+    PlainTextSource,
+    SyntheticSource,
 )
 
 
 # ── pipeline import with a clear error ──────────────────────────────────
-def _make_pipeline(**kwargs: Any) -> Any:
-    """
-    Load LanguagePipeline from resileos.pipeline.
+def _make_pipeline(m: int, n: int, **kwargs: Any) -> Any:
+    """ Load LanguagePipeline from resileos.pipeline. 
+
+    The pipeline's dim is set to m * n to satisfy the PipelineConfig
+    validation that requires dim == m * n.
 
     If the class name differs in your tree, change the import and the
     constructor call here. Everything else in this runner is decoupled
     from the pipeline's internal API.
     """
     try:
-        from resileos.pipeline import LanguagePipeline  # noqa: F401
+        from resileos.pipeline import LanguagePipeline, PipelineConfig
     except ImportError as e:
         raise SystemExit(
             f"could not import LanguagePipeline from resileos.pipeline: {e}\n"
             "Adjust _make_pipeline() in scripts/run_corpus.py to match "
             "your class name."
         )
-    return LanguagePipeline(**kwargs)
+
+    config = PipelineConfig(dim=m * n, m=m, n=n, **kwargs)
+    return LanguagePipeline(config)
 
 
 # ── tokenizer fit ───────────────────────────────────────────────────────
@@ -60,8 +67,7 @@ def fit_tokenizer(text: str, strip_diacritics: bool) -> CharTokenizer:
 
 
 # ── windowing ───────────────────────────────────────────────────────────
-def window_ids(ids: list[int], window: int, stride: int
-               ) -> list[list[int]]:
+def window_ids(ids: list[int], window: int, stride: int) -> list[list[int]]:
     if window <= 0 or stride <= 0:
         raise ValueError("window and stride must be positive")
     if len(ids) < window:
@@ -69,7 +75,7 @@ def window_ids(ids: list[int], window: int, stride: int
     out = []
     i = 0
     while i + window <= len(ids):
-        out.append(ids[i:i + window])
+        out.append(ids[i : i + window])
         i += stride
     return out
 
@@ -95,168 +101,88 @@ def _build_source(args: argparse.Namespace):
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--source", default="koine",
-                   choices=["koine", "gutenberg", "synthetic", "plain"])
-    p.add_argument("--path", default=None,
-                   help="path for --source plain")
+    p.add_argument("--source", default="koine", choices=["koine", "gutenberg", "synthetic", "plain"])
+    p.add_argument("--path", default=None, help="path for --source plain")
     p.add_argument("--target-chars", type=int, default=8000)
     p.add_argument("--window", type=int, default=32)
     p.add_argument("--stride", type=int, default=16)
     p.add_argument("--strip-diacritics", action="store_true")
     p.add_argument("--gutenberg-index", type=int, default=0)
-    p.add_argument("--alphabet", default="abcdefghijklmnopqrstuvwxyz ")
+    p.add_argument("--alphabet", default="abc ")
     p.add_argument("--length", type=int, default=4000)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--out", default=str(ROOT / "report_corpus.json"))
-
-    # Pipeline kwargs (mirrors PipelineConfig defaults we've seen).
-    p.add_argument("--vocab-override", type=int, default=None,
-                   help="override vocab_size passed to the pipeline; "
-                        "default is tokenizer vocab size")
-    p.add_argument("--dim", type=int, default=512)
-    p.add_argument("--max-positions", type=int, default=512)
+    p.add_argument("--m", type=int, default=16, help="rows for m*n=dim")
+    p.add_argument("--n", type=int, default=16, help="cols for m*n=dim")
     args = p.parse_args()
 
-    # ── load corpus ─────────────────────────────────────────────────
+    # 1. Load corpus
     source = _build_source(args)
-    print(f"[corpus] source           = {args.source}")
     text = load_corpus(source, target_chars=args.target_chars)
+    print(f"[corpus] source           = {args.source}")
     print(f"[corpus] chars            = {len(text)}")
     print(f"[corpus] first 60 chars   = {text[:60]!r}")
 
-    # ── tokenizer ───────────────────────────────────────────────────
+    # 2. Fit tokenizer
     tok = fit_tokenizer(text, strip_diacritics=args.strip_diacritics)
     print(f"[token] vocab_size        = {tok.vocab_size}")
-    print(f"[token] strip_diacritics  = {tok.strip_diacritics}")
-    print(f"[token] first 20 chars    = {''.join(tok._chars[:20])!r}")
+    print(f"[token] strip_diacritics  = {args.strip_diacritics}")
 
+    # 3. Build pipeline
+    pipeline = _make_pipeline(m=args.m, n=args.n)
+    dim = args.m * args.n
+    print(f"[pipe]  dim               = {dim}")
+
+    # 4. Encode and window
     ids = tok.encode(text)
-    print(f"[token] ids               = {len(ids)}")
-
-    # ── pipeline ────────────────────────────────────────────────────
-    vocab_size = args.vocab_override or tok.vocab_size
-    pipe = _make_pipeline(
-        vocab_size=vocab_size,
-        dim=args.dim,
-        max_positions=args.max_positions,
-    )
-    print(f"[pipe]  vocab_size        = {vocab_size}")
-    print(f"[pipe]  dim               = {args.dim}")
-
-    # ── windows ─────────────────────────────────────────────────────
-    windows = window_ids(ids, args.window, args.stride)
+    windows = window_ids(ids, window=args.window, stride=args.stride)
     print(f"[run]   windows           = {len(windows)}")
-    print()
 
-    r_trajectory: list[float] = []
-    token_acc: list[float] = []
-    exact_match: list[bool] = []
+    # 5. Run each window through the pipeline
+    r_values: list[float] = []
+    exact_count = 0
+    total_tokens = 0
+    correct_tokens = 0
     reaper_fired = 0
     compress_fired = 0
-    recon: list[float] = []
+    reconstructions: list[float] = []
 
-    for i, window in enumerate(windows):
-        result = pipe.step(window)
-        recovered = _extract_recovered(result)
-        R = _extract_R(result)
-        rec = _extract_reconstruction(result)
-        reaper = _extract_flag(result, "reaper_fired")
-        comp = _extract_flag(result, "compress_fired")
+    for w in windows:
+        result = pipeline.step(w)
+        recovered = result.recovered
+        r_values.append(float(result.order_parameter))
 
-        r_trajectory.append(R)
-        recon.append(rec)
-        if reaper:
+        if recovered == w:
+            exact_count += 1
+
+        total_tokens += len(w)
+        correct_tokens += sum(
+            1 for a, b in zip(recovered, w) if a == b
+        )
+
+        if getattr(result, "reaper_fired", False):
             reaper_fired += 1
-        if comp:
+        if getattr(result, "compress_fired", False):
             compress_fired += 1
+        if hasattr(result, "reconstruction"):
+            reconstructions.append(float(result.reconstruction))
 
-        n = len(window)
-        match = sum(1 for a, b in zip(window, recovered) if a == b) if recovered else 0
-        token_acc.append(match / float(n))
-        exact_match.append(bool(recovered) and match == n)
+    r_arr = np.array(r_values) if r_values else np.array([0.0])
+    mean_token_acc = correct_tokens / total_tokens if total_tokens else 0.0
 
-        if (i + 1) % max(1, len(windows) // 8) == 0 or i == 0:
-            print(f"  [{i+1:4d}/{len(windows)}] "
-                  f"R={R:.4f}  token_acc={token_acc[-1]:.3f}  "
-                  f"recon={rec:.4f}  reaper={'Y' if reaper else 'n'}  "
-                  f"compress={'Y' if comp else 'n'}")
-
+    # 6. Report
     print()
-    R_mean = float(np.mean(r_trajectory)) if r_trajectory else 0.0
-    R_std = float(np.std(r_trajectory)) if r_trajectory else 0.0
-    R_min = float(np.min(r_trajectory)) if r_trajectory else 0.0
-    R_max = float(np.max(r_trajectory)) if r_trajectory else 0.0
-    tok_mean = float(np.mean(token_acc)) if token_acc else 0.0
-    exact = int(sum(exact_match))
-    rec_mean = float(np.mean(recon)) if recon else 0.0
-
     print("=== summary ===")
     print(f"  windows:              {len(windows)}")
-    print(f"  exact windows:        {exact}/{len(windows)}")
-    print(f"  mean token accuracy:  {100.0*tok_mean:.2f}%")
-    print(f"  R mean / std:         {R_mean:.4f} / {R_std:.4f}")
-    print(f"  R range:              [{R_min:.4f}, {R_max:.4f}]")
-    print(f"  mean reconstruction:  {rec_mean:.4f}")
+    print(f"  exact windows:        {exact_count}/{len(windows)}")
+    print(f"  mean token accuracy:  {mean_token_acc * 100:.2f}%")
+    print(f"  R mean / std:         {r_arr.mean():.4f} / {r_arr.std():.4f}")
+    print(f"  R range:              [{r_arr.min():.4f}, {r_arr.max():.4f}]")
+    if reconstructions:
+        print(f"  mean reconstruction:  {np.mean(reconstructions):.4f}")
     print(f"  reaper fired:         {reaper_fired}/{len(windows)}")
     print(f"  compress fired:       {compress_fired}/{len(windows)}")
 
-    report = {
-        "source": args.source,
-        "target_chars": args.target_chars,
-        "window": args.window,
-        "stride": args.stride,
-        "strip_diacritics": tok.strip_diacritics,
-        "vocab_size": tok.vocab_size,
-        "dim": args.dim,
-        "max_positions": args.max_positions,
-        "n_windows": len(windows),
-        "exact_windows": exact,
-        "mean_token_accuracy": tok_mean,
-        "R_mean": R_mean, "R_std": R_std,
-        "R_min": R_min, "R_max": R_max,
-        "mean_reconstruction": rec_mean,
-        "reaper_fired": reaper_fired,
-        "compress_fired": compress_fired,
-        "R_trajectory": r_trajectory,
-        "token_accuracy": token_acc,
-    }
-    Path(args.out).write_text(json.dumps(report, indent=2))
-    print(f"\nwrote {args.out}")
     return 0
-
-
-# ── pipeline result extraction ──────────────────────────────────────────
-# The pipeline may return a dict, a dataclass, or a namespace. These
-# helpers accept any of them and fall back to sensible defaults.
-def _get(result: Any, *names: str, default: Any = None) -> Any:
-    for n in names:
-        if isinstance(result, dict) and n in result:
-            return result[n]
-        if hasattr(result, n):
-            return getattr(result, n)
-    return default
-
-
-def _extract_recovered(result: Any) -> list[int]:
-    v = _get(result, "recovered", "decoded", "tokens")
-    if v is None:
-        return []
-    return [int(x) for x in v]
-
-
-def _extract_R(result: Any) -> float:
-    v = _get(result, "R", "order_parameter", "r_value")
-    return float(v) if v is not None else 0.0
-
-
-def _extract_reconstruction(result: Any) -> float:
-    v = _get(result, "reconstruction", "recon", "reconstruction_accuracy")
-    return float(v) if v is not None else 0.0
-
-
-def _extract_flag(result: Any, name: str) -> bool:
-    v = _get(result, name, name.replace("_fired", ""), default=False)
-    return bool(v) if v is not None else False
 
 
 if __name__ == "__main__":
