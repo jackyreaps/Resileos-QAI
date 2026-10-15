@@ -9,6 +9,11 @@ Bind and unbind are exact under these conventions:
     unbind(c, b)  = c * conj(b) * sqrt(dim)
     unbind(bind(a, b), b) = a
 
+Row indexing is 0-based and matches token IDs directly:
+`codebook[t]` is the phasor for token ID `t`. Row 0 is reserved for
+token 0. This removes the +1 shift that previously coupled encoding
+and cleanup and made round-trip work only by cancellation.
+
 The multiplicative φ·id·d schedule aliases under element-wise bind —
 adjacent token codes have additive structure in phase. This implementation
 uses φ-seeded random phasors instead: each token ID hashes to a unique RNG
@@ -56,10 +61,12 @@ class PhiPhaseCodex:
         self.max_positions = int(max_positions)
         self._scale = float(np.sqrt(self.dim))
 
-        token_ids = np.arange(1, vocab_size + 1, dtype=np.int64)
+        # 0-based rows: codebook[t] is the phasor for token ID t.
+        token_ids = np.arange(0, vocab_size, dtype=np.int64)
         self.codebook = _phi_seeded_phasor(token_ids, self.dim, salt=0)
 
-        position_ids = np.arange(1, max_positions + 1, dtype=np.int64)
+        # Positions similarly 0-based: _positions[p] is slot p.
+        position_ids = np.arange(0, max_positions, dtype=np.int64)
         self._positions = _phi_seeded_phasor(position_ids, self.dim, salt=1)
 
     def phase_code(self, token_id: int) -> np.ndarray:
@@ -90,8 +97,7 @@ class PhiPhaseCodex:
         """Bundle token codes bound to position slots.
 
         An empty token list returns the zero hypervector. This is the
-        bundling identity and avoids raising on the empty case, which
-        callers can hit when a stream has no tokens to emit yet.
+        bundling identity and avoids raising on the empty case.
         """
         if len(tokens) > self.max_positions:
             raise ValueError(
@@ -111,34 +117,32 @@ class PhiPhaseCodex:
     def cleanup(self, hv: np.ndarray, position: int) -> Optional[int]:
         """Unbind position and return the nearest token ID (or None).
 
-        The codebook is built from `np.arange(1, vocab_size + 1)`, so
-        `codebook[i]` holds the phasor for token ID `i + 1`. The argmax
-        index must be shifted by one to recover the token ID.
+        Row indexing is 0-based and matches token IDs directly, so the
+        argmax is the token ID. No +1 shift.
         """
         if not (0 <= position < self.max_positions):
             raise IndexError(f"position {position} out of range")
         probe = self.unbind(hv, self._positions[position])
         sims = np.real(np.conj(self.codebook) @ probe)
-        best = int(np.argmax(sims))
-        return best + 1
+        return int(np.argmax(sims))
 
     def argmax_coherence(
-        self, hv: np.ndarray, k: int = 1
-    ) -> list[int]:
+        self, hv: np.ndarray, top_k: int = 1
+    ) -> list[tuple[int, float]]:
         """Top-k token IDs by cosine coherence with a query hypervector.
 
-        The codebook is built from `np.arange(1, vocab_size + 1)`, so
-        `codebook[i]` holds the phasor for token ID `i + 1`. The argmax
-        index must be shifted by one to recover token IDs.
+        Returns a list of (token_id, similarity) pairs, ranked by
+        decreasing similarity. Returns an empty list if top_k <= 0.
 
-        Returns a list of token IDs, ranked by decreasing coherence.
-        Returns an empty list if k <= 0.
+        Accepts keyword `top_k` to match the test contract.
         """
-        if k <= 0:
+        if top_k <= 0:
             return []
+        if hv.shape != (self.dim,):
+            raise ValueError(
+                f"hv shape {hv.shape} != (dim,) = ({self.dim},)"
+            )
         sims = np.real(np.conj(self.codebook) @ hv)
-        if k == 1:
-            return [int(np.argmax(sims)) + 1]
-        k = min(int(k), len(sims))
-        idx = np.argsort(sims)[::-1][:k]
-        return [int(i) + 1 for i in idx]
+        top_k = min(int(top_k), len(sims))
+        idx = np.argsort(sims)[::-1][:top_k]
+        return [(int(i), float(sims[i])) for i in idx]
