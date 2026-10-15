@@ -50,7 +50,7 @@ Hierarchy / modulation layer:
 20. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
 
 Titanos application layer:
-21. [Disk-Backed Store](320-titanos/store.md) — RES-320
+21. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
 22. [Dense Entity Index](320-titanos/index.md) — RES-321
 23. [Query Language and Execution](320-titanos/query.md) — RES-322
 
@@ -81,7 +81,7 @@ Reference:
 | 200 | Classical Core | [Classical Core](200-core/classical-core.md) |
 | 300 | Generative Substrate | [HDRIFT Adapter](300-substrate/hdrift-adapter.md) |
 | 310 | Hierarchy / Modulation | [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) |
-| 320 | Titanos Application Layer | [Disk-Backed Store](320-titanos/store.md) |
+| 320 | Titanos Application Layer | [Disk-Backed Band Store](320-titanos/store.md) |
 | 400 | Operations | [Run Config](400-operations/run-config.md) |
 | 500 | Notes & Roadmap | [Behavioral](500-notes/behavioral.md) |
 | 600 | QD-TER Bridge | [Status](600-qdter/status.md) |
@@ -171,7 +171,4 @@ docs state their own scope; the status page aggregates them.
       RES-602 ─▶ RES-603
            │
            ▼
-      RES-604 ─▶ RES-605
-           │
-           ▼
-      RES-606
+      RES-604 ─▶ RES-605 ─▶ RES-606
