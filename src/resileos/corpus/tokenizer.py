@@ -1,7 +1,7 @@
 """Deterministic character-level tokenizer. No external tokenizer library.
 
-Vocab is the sorted set of codepoints in the fitted text, prefixed by special
-tokens. Indices are stable across machines and Python versions.
+Vocab is the sorted set of codepoints in the fitted text, prefixed by
+special tokens. Indices are stable across machines and Python versions.
 
 Greek support:
     strip_diacritics=False keeps breathings, accents, subscripts
@@ -104,7 +104,7 @@ class CharTokenizer:
     ) -> list[str]:
         return [self.decode(ids, skip_special=skip_special) for ids in batch]
 
-    # ── persistence ──────────────────────────────────────────────────
+    # ── persistence ─────────────────────────────────────────────────
     def save(self, path: str | Path) -> None:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -113,6 +113,7 @@ class CharTokenizer:
                 {
                     "strip_diacritics": self.strip_diacritics,
                     "chars": self._chars,
+                    "specials": list(SPECIAL_TOKENS),
                 },
                 ensure_ascii=False,
             ),
@@ -122,6 +123,17 @@ class CharTokenizer:
     @classmethod
     def load(cls, path: str | Path) -> "CharTokenizer":
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
+
+        # Reject saved tokenizers whose special-token set differs from
+        # the current module's. A mismatch silently misaligns every
+        # non-special ID by the length of the delta.
+        saved_specials = tuple(raw.get("specials", ()))
+        if saved_specials and saved_specials != SPECIAL_TOKENS:
+            raise ValueError(
+                f"saved specials {saved_specials} do not match "
+                f"current {SPECIAL_TOKENS}; retrain the tokenizer"
+            )
+
         tok = cls(strip_diacritics=raw["strip_diacritics"])
         tok._chars = list(raw["chars"])
         tok._char_to_id = {
