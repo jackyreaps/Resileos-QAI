@@ -1,10 +1,8 @@
----
 doc: RES-606
 title: Metric Bridge Candidate Derivations
 status: candidate
 depends_on: [RES-600, RES-601, RES-602]
 referenced_by: [RES-604]
----
 
 # Metric Bridge Candidate Derivations
 
