@@ -39,8 +39,8 @@ def test_n_usable_dim_512():
 
 
 def test_n_usable_dim_4096():
-    # P_k < 2048: + 2310 exceeds -> k = 5
-    assert n_usable_primorials(4096) == 5
+    # P_k < 2048: 2, 6, 30, 210 fit; 2310 >= 2048 does not -> k = 4
+    assert n_usable_primorials(4096) == 4
 
 
 def test_n_usable_rejects_small_dim():
