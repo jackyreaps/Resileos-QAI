@@ -49,23 +49,29 @@ Hierarchy / modulation layer:
 19. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
 20. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
 
+Titanos application layer:
+21. [Disk-Backed Store](320-titanos/store.md) — RES-320
+22. [Dense Entity Index](320-titanos/index.md) — RES-321
+23. [Query Language and Execution](320-titanos/query.md) — RES-322
+
 Operations and notes:
-21. [Run Config](400-operations/run-config.md) — RES-400
-22. [Training](400-operations/training.md) — RES-401
-23. [Validation](400-operations/validation.md) — RES-402
-24. [Behavioral Notes](500-notes/behavioral.md) — RES-500
-25. [Roadmap](500-notes/roadmap.md) — RES-501
+24. [Run Config](400-operations/run-config.md) — RES-400
+25. [Training](400-operations/training.md) — RES-401
+26. [Validation](400-operations/validation.md) — RES-402
+27. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+28. [Roadmap](500-notes/roadmap.md) — RES-501
 
 QD-TER bridge:
-26. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-27. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-28. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-29. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
-30. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
-31. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+29. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+30. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+31. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+32. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+33. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+34. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+35. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
 
 Reference:
-32. [Glossary](900-reference/glossary.md) — RES-900
+36. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
@@ -75,6 +81,7 @@ Reference:
 | 200 | Classical Core | [Classical Core](200-core/classical-core.md) |
 | 300 | Generative Substrate | [HDRIFT Adapter](300-substrate/hdrift-adapter.md) |
 | 310 | Hierarchy / Modulation | [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) |
+| 320 | Titanos Application Layer | [Disk-Backed Store](320-titanos/store.md) |
 | 400 | Operations | [Run Config](400-operations/run-config.md) |
 | 500 | Notes & Roadmap | [Behavioral](500-notes/behavioral.md) |
 | 600 | QD-TER Bridge | [Status](600-qdter/status.md) |
@@ -100,6 +107,14 @@ Reference:
 | RES-314 | `error-bound.md` | draft | Empirical error model; redundancy contract |
 | RES-315 | `modulation-interface.md` | draft | Carrier spec; what the modulation does |
 
+## 320-series Titanos modules
+
+| Doc | Module | Status | Notes |
+|-----|--------|--------|-------|
+| RES-320 | `store.py` | stable | Memory-mapped int32 accumulators + WAL |
+| RES-321 | `index.py` | stable | Bidirectional name ↔ id ↔ vector index |
+| RES-322 | `query.py` | draft | SPARQL-like grammar and nested-loop executor |
+
 ## 600-series QD-TER bridge
 
 | Doc | Title | Status |
@@ -110,7 +125,7 @@ Reference:
 | RES-603 | Speculative Cross-Stream | draft |
 | RES-604 | QD-TER Bridge Status | stable |
 | RES-605 | leCore Integration Bridge | stable |
-| RES-606 | Metric Bridge Candidate Derivations | candidate (pending) |
+| RES-606 | Metric Bridge Candidate Derivations | candidate |
 
 The status page (RES-604) is the canonical open/closed inventory. Individual
 docs state their own scope; the status page aggregates them.
@@ -140,6 +155,9 @@ docs state their own scope; the status page aggregates them.
                          RES-315
         │
         ▼
+    RES-320 ─▶ RES-321 ─▶ RES-322
+        │
+        ▼
     RES-400 ─▶ RES-401 ─▶ RES-402
         │
         ▼
@@ -154,3 +172,6 @@ docs state their own scope; the status page aggregates them.
            │
            ▼
       RES-604 ─▶ RES-605
+           │
+           ▼
+      RES-606
