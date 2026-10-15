@@ -1,7 +1,7 @@
 """Oscillator-oriented discrete grid search.
 
-Wraps the same grid as EvolutionLoop. Uses a KuramotoField to bias the order
-in which grid candidates are proposed.
+Wraps the same grid as EvolutionLoop. Uses a KuramotoField to bias the
+order in which grid candidates are proposed.
 
 Orientation:
     - Three oscillators, one per optional mask bit (csi, order_parameter,
@@ -102,9 +102,7 @@ class OscillatorOrientedSearch:
                 f"field must have {len(MASK_BITS)} oscillators, got {field.r}"
             )
         self.field = field
-        self.W = np.ones((len(MASK_BITS), len(MASK_BITS))) - np.eye(
-            len(MASK_BITS)
-        )
+        self.W = np.ones((len(MASK_BITS), len(MASK_BITS))) - np.eye(len(MASK_BITS))
 
         total = mask_weight + r_weight + n_loops_weight
         if total <= 0.0:
@@ -179,3 +177,82 @@ class OscillatorOrientedSearch:
             if bundle is not None:
                 return float(epsilon_from_monitors(bundle))
         return float(best_rec.reward)
+
+    # ── proposal ────────────────────────────────────────────────────
+    def _propose(self) -> Optional[SubstrateConfig]:
+        """Return the next grid candidate to evaluate, or None if exhausted."""
+        if len(self._visited) >= len(self._grid):
+            return None
+        eps = self._current_epsilon()
+        self.field.step(epsilon=eps, W=self.W)
+        R = self.field.order_parameter()
+        theta = self.field.theta
+        dtheta = np.gradient(theta) if len(theta) > 1 else np.zeros_like(theta)
+
+        candidates = [c for c in self._grid if c not in self._visited]
+        if not candidates:
+            return None
+        scored = [(self._score(c, R, dtheta), c) for c in candidates]
+        scored.sort(key=lambda x: x[0])
+        return scored[0][1]
+
+    # ── run ─────────────────────────────────────────────────────────
+    def _center_reward(self) -> float:
+        if self._center is None:
+            return float("inf")
+        for rec in self._history:
+            if rec.config == self._center:
+                return rec.reward
+        return float("inf")
+
+    def run(self, evaluator: Evaluator) -> "OscillatorOrientedSearch":
+        """Evaluate candidates until budget is exhausted or grid is exhausted."""
+        for _ in range(self.budget):
+            cfg = self._propose()
+            if cfg is None:
+                break
+            result = evaluator(cfg)
+            if isinstance(result, tuple):
+                reward, bundle = result
+                self._bundles[cfg] = bundle
+            else:
+                reward = result
+            self._visited.add(cfg)
+            self._history.append(EvolutionRecord(config=cfg, reward=float(reward)))
+            if self._center is None or reward < self._center_reward():
+                self._center = cfg
+        return self
+
+    # ── introspection ───────────────────────────────────────────────
+    def best(self) -> Optional[EvolutionRecord]:
+        """Record with the lowest reward seen so far."""
+        if not self._history:
+            return None
+        return min(self._history, key=lambda r: r.reward)
+
+    def best_so_far(self) -> Optional[EvolutionRecord]:
+        """Alias for best()."""
+        return self.best()
+
+    def history(self) -> list[EvolutionRecord]:
+        """All records in evaluation order."""
+        return list(self._history)
+
+    def coverage(self) -> float:
+        """Fraction of the grid that was evaluated."""
+        return len(self._visited) / max(len(self._grid), 1)
+
+    def summary(self) -> dict:
+        """Compact summary of the search result."""
+        b = self.best()
+        return {
+            "budget": self.budget,
+            "evaluated": len(self._visited),
+            "grid_size": len(self._grid),
+            "coverage": self.coverage(),
+            "best_reward": float(b.reward) if b else None,
+            "best_config": str(b.config) if b else None,
+        }
+
+
+__all__ = ["OscillatorOrientedSearch", "Evaluator", "EvalReturn"]
