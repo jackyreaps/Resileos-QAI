@@ -1,8 +1,6 @@
-"""
-Resileos-QAI substrate package.
+""" Resileos-QAI substrate package.
 
 Two-head system for QD-TER bridge integration, plus support utilities:
-
     geometry.py         Head 1: geometric manifold tracking (RES-601)
     reduction.py        Head 2: FEP reduction tracking (RES-600)
     spd.py              positive-definiteness helpers (RES-601 §7 item 3)
@@ -18,6 +16,8 @@ Two-head system for QD-TER bridge integration, plus support utilities:
 from .geometry import (
     LowRankMetricHead,
     BridgeMetricHead,
+    CandidateBridgeMetricHead,
+    CandidateScalars,
 )
 from .reduction import (
     VerifiableFEPReductionHead,
@@ -54,6 +54,8 @@ __all__ = [
     # geometry
     "LowRankMetricHead",
     "BridgeMetricHead",
+    "CandidateBridgeMetricHead",
+    "CandidateScalars",
     # reduction
     "VerifiableFEPReductionHead",
     "coherence_schedule",
