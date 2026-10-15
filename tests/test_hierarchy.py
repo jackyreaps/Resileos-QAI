@@ -1,5 +1,4 @@
 """Tests for hierarchical encoding (RES-310)."""
-
 import sys
 from pathlib import Path
 
@@ -18,7 +17,7 @@ from resileos.hierarchy import (
 )
 
 
-def _codex(vocab=64, dim=128, max_pos=64):
+def _codex(vocab=128, dim=128, max_pos=64):
     return PhiPhaseCodex(vocab_size=vocab, dim=dim, max_positions=max_pos)
 
 
@@ -102,7 +101,7 @@ def test_encoder_cascade_emits_multiple_packets():
     enc = HierarchicalEncoder(_codex(), capacities=[2, 2, 2])
     packets = enc.push_many(list(range(8)))
     levels = sorted(p.level for p in packets)
-    assert levels == [1, 1, 1, 2, 2, 3]
+    assert levels == [1, 1, 1, 1, 2, 2, 3]
 
 
 def test_encoder_top_level_packet_span():
@@ -186,8 +185,11 @@ def test_query_rejects_bad_path_length():
     enc = HierarchicalEncoder(_codex(), capacities=[4, 4, 4])
     q = HierarchicalQuery(enc)
     packet = HierarchicalPacket(
-        level=2, hv=np.zeros(64, dtype=np.complex128),
-        span_start=0, span_end=4, child_count=2,
+        level=2,
+        hv=np.zeros(64, dtype=np.complex128),
+        span_start=0,
+        span_end=4,
+        child_count=2,
     )
     with pytest.raises(ValueError, match="path length"):
         q.descend_to_token(packet, path=[0, 0, 0])
