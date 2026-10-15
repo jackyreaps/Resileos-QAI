@@ -86,14 +86,19 @@ class PhiPhaseCodex:
         return s / n if n > 1e-12 else s
 
     def encode(self, tokens: list[int]) -> np.ndarray:
-        """Bundle token codes bound to position slots."""
-        if not tokens:
-            raise ValueError("tokens must be non-empty")
+        """Bundle token codes bound to position slots.
+
+        An empty token list returns the zero hypervector. This is the
+        bundling identity and avoids raising on the empty case, which
+        callers can hit when a stream has no tokens to emit yet.
+        """
         if len(tokens) > self.max_positions:
             raise ValueError(
                 f"sequence length {len(tokens)} > max_positions "
                 f"{self.max_positions}"
             )
+        if not tokens:
+            return np.zeros(self.dim, dtype=np.complex128)
         codes = []
         for p, t in enumerate(tokens):
             t = int(t)
@@ -109,4 +114,26 @@ class PhiPhaseCodex:
         probe = self.unbind(hv, self._positions[position])
         sims = np.real(np.conj(self.codebook) @ probe)
         best = int(np.argmax(sims))
-        return best
+        return best + 1
+
+    def argmax_coherence(
+        self, hv: np.ndarray, k: int = 1
+    ) -> list[int]:
+        """Top-k token IDs by cosine coherence with a query hypervector.
+
+        The codebook is built from `np.arange(1, vocab_size + 1)`, so
+        `codebook[i]` holds the phasor for token ID `i + 1`. The argmax
+        index must be shifted by one to recover token IDs, same as
+        `HierarchicalQuery._cleanup_token`.
+
+        Returns a list of token IDs, ranked by decreasing coherence.
+        Returns an empty list if k <= 0.
+        """
+        if k <= 0:
+            return []
+        sims = np.real(np.conj(self.codebook) @ hv)
+        if k == 1:
+            return [int(np.argmax(sims)) + 1]
+        k = min(int(k), len(sims))
+        idx = np.argsort(sims)[::-1][:k]
+        return [int(i) + 1 for i in idx]
