@@ -1,0 +1,22 @@
+# Single-replica topology. The substrate's training state is process-local
+# (SubstrateContainer singleton), so scaling to >1 replica would give each
+# replica its own untrained heads. Keep replicas at 1 until training state
+# is externalized.
+
+services:
+  resileos:
+    build: .
+    image: resileos-qai:latest
+    ports:
+      - "8000:8000"   # FastAPI backend
+      - "8501:8501"   # Streamlit dashboard
+    volumes:
+      # Persist learned Titanos facts across `docker compose down/up`.
+      # `touch titanos_live_state.json` before first `up`, otherwise Docker
+      # creates a *directory* at this path and app.py fails to read it.
+      - ./titanos_live_state.json:/app/titanos_live_state.json
+    environment:
+      RESILEOS_HIDDEN_DIM: "128"
+      RESILEOS_KERNEL_DIM: "1"
+      RESILEOS_MIN_TRAIN_STEPS: "5"
+    restart: unless-stopped
