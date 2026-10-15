@@ -80,13 +80,14 @@ def test_parse_two_clauses():
     assert q.clauses[1].anchor == Var("o")
 
 
-def test_parse_inverse_normalises():
+def test_parse_inverse_swaps_and_sets_flag():
     q = parse("SELECT ?s WHERE ?s <--knows-- alice")
     p = q.clauses[0]
-    # <--knows-- alice from ?s means alice --knows--> ?s
+    # <--rel-- X is normalised to anchor=X with inverse=True so the
+    # executor reads it as an inverse lookup anchored at X.
     assert p.anchor == Name("alice")
     assert p.target == Var("s")
-    assert p.inverse is False
+    assert p.inverse is True
 
 
 def test_parse_multi_target():
