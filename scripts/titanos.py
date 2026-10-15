@@ -488,7 +488,7 @@ class Titanos:
                           csi=self._csi.value(),
                           order_parameter=self._order_parameter())
 
-        self._query_count += 1
+        selfsi._query_count += 1
         probe = self._encode_probe(subject, relation, inverse=inverse)
         current_csi = self._csi.value()
         classical_thresh, abstain_thresh, sigma_eff = \
@@ -522,7 +522,7 @@ class Titanos:
                           anisotropy=anisotropy,
                           band_count=self._counts.get(relation, 0),
                           emergent=self.cfg.emergent,
-                          csi=current_csi,
+                          csi=current_c,
                           fast_confidence=fast_conf_blend,
                           fast_path_used=True, escalated=False,
                           order_parameter=R,
@@ -622,6 +622,14 @@ class Titanos:
 
     def ask_inverse(self, obj: str, relation: str) -> Answer:
         return self._ask(obj, relation, inverse=True)
+
+    def iter_entities(self) -> list[str]:
+        """All entity names, for full-scan queries (RES-322 §5).
+
+        Enables the query executor to answer clauses whose anchor is an
+        unbound variable, e.g. `SELECT ?s, ?o WHERE ?s --knows--> ?o`.
+        """
+        return list(self.entities.keys())
 
     # ── agency layer ─────────────────────────────────────────────────
     def register_child(self, name: str, handler: HandlerFn,
