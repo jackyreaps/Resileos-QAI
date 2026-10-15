@@ -26,14 +26,16 @@ approximants, normalised terms, tower terms, and branch assignment.
 It does not implement any downstream consumer.
 
 Off states (explicit):
-    stochastic extension   off. The tower is deterministic given max_level.
-    semantic claim         off. Tower levels are construction indices, not
-                           semantically ordered.
-    capacity claim         off. The tower's usable layer count is bounded
-                           by the Nyquist limit p_n < dim/2.
-    domain-wall proof      off. The odd branch is domain-forbidden for the
-                           coupled transcendental system. The tower term
-                           T(n) itself is well-defined for both branches.
+    stochastic extension   off. The tower is deterministic given
+                           max_level.
+    semantic claim         off. Tower levels are construction indices,
+                           not semantically ordered.
+    capacity claim         off. The tower's usable layer count is
+                           bounded by the Nyquist limit p_n < dim/2.
+    domain-wall proof      off. The odd branch is domain-forbidden for
+                           the coupled transcendental system. The tower
+                           term T(n) itself is well-defined for both
+                           branches.
 """
 from __future__ import annotations
 
@@ -44,7 +46,7 @@ from typing import Optional
 import numpy as np
 
 
-# ── prime sieve ─────────────────────────────────────────────────────────
+# ── prime sieve ─────────────────────────────────────────────────────
 def _sieve_primes(limit: int) -> list[int]:
     """Return all primes <= limit."""
     if limit < 2:
@@ -76,7 +78,7 @@ def _first_n_primes(n: int) -> list[int]:
     return primes[:n]
 
 
-# ── Cipolla approximant ─────────────────────────────────────────────────
+# ── Cipolla approximant ─────────────────────────────────────────────
 def cipolla(k: int) -> float:
     """Three-term Cipolla approximant D_k for the k-th prime.
 
@@ -98,7 +100,7 @@ def cipolla(k: int) -> float:
     return max(raw, 1e-12)
 
 
-# ── tower ───────────────────────────────────────────────────────────────
+# ── tower ───────────────────────────────────────────────────────────
 class PrimeTower:
     """Prime tower with Cipolla normalisation.
 
@@ -114,9 +116,12 @@ class PrimeTower:
     """
 
     def __init__(self, max_level: int = 128) -> None:
+        # Coerce first, then compare. Comparing before coercion raises
+        # TypeError on string input instead of the intended ValueError.
+        max_level = int(max_level)
         if max_level < 2:
             raise ValueError("max_level must be >= 2")
-        self.max_level = int(max_level)
+        self.max_level = max_level
         # We need primes p_1 .. p_max_level
         self._primes: list[int] = _first_n_primes(max_level)
         # Precompute S_k and T(n) lazily via lru_cache on methods
@@ -198,9 +203,9 @@ class PrimeTower:
         """Number of tower levels whose prime frequency fits under
         the Nyquist bound p_n < dim / 2.
 
-        At dim=64, the largest usable prime is 31 (p_11), so n_usable=10
-        (levels 2..11). At dim=512, the largest usable prime is 251
-        (p_54), so n_usable=53 (levels 2..54).
+        At dim=64, the largest usable prime is 31 (p_11), so
+        n_usable=10 (levels 2..11). At dim=512, the largest usable
+        prime is 251 (p_54), so n_usable=53 (levels 2..54).
         """
         if dim < 4:
             raise ValueError("dim must be >= 4")
