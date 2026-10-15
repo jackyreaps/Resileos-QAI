@@ -111,9 +111,9 @@ def test_layer_carrier_rejects_bad_dim():
 
 
 def test_layer_carrier_rejects_nyquist_violation():
-    """At dim=16, Nyquist is 8. Prime 11 (p_5, level 5) exceeds it."""
+    """Layer 3 of 4 -> tower level 5 -> p_5 = 11 > 16/2 = 8"""
     with pytest.raises(ValueError, match="Nyquist"):
-        layer_carrier(3, 3, 16, local_first=True)
+        layer_carrier(3, 4, 16, local_first=True)
 
 
 def test_layer_carrier_different_layers_differ():
