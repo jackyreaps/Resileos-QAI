@@ -17,8 +17,10 @@ Semantics: each clause is a pattern over the graph. Variables bind to
 entity names. Clauses are joined on shared variables via nested-loop
 evaluation. The result is the list of bindings of the SELECT targets.
 
-Example:
-    SELECT ?o WHERE alice --knows--> ?o AND ?o --works_at--> ?c
+Full scan: when a clause's anchor is an unbound variable, the executor
+iterates every entity in the core (if the core exposes `iter_entities()`)
+and probes each as the anchor. Cores that do not expose `iter_entities()`
+fall back to the v1 behaviour (skip the binding).
 
 Errors:
     QuerySyntaxError   malformed input
@@ -196,6 +198,10 @@ class _Core(Protocol):
         self, anchor: str, relation: str, inverse: bool = False
     ) -> list[str]: ...
 
+    # Optional: cores that support full scan expose this. If absent,
+    # unbound anchors are skipped (v1 behaviour).
+    def iter_entities(self) -> list[str]: ...
+
 
 def _resolve(term: Term, binding: dict[str, str]) -> str:
     if isinstance(term, Name):
@@ -207,35 +213,47 @@ def _resolve(term: Term, binding: dict[str, str]) -> str:
     )
 
 
+def _has_iter_entities(core) -> bool:
+    return callable(getattr(core, "iter_entities", None))
+
+
 def execute(core: _Core, q: Query) -> list[tuple[str, ...]]:
     """Execute a parsed query. Returns a list of tuples, one per row,
-    ordered as in the SELECT clause."""
+    ordered as in the SELECT clause.
+
+    When a clause's anchor is an unbound variable, the executor performs
+    a full scan if the core exposes `iter_entities()`. Otherwise the
+    binding is skipped (v1 behaviour).
+    """
     bindings: list[dict[str, str]] = [{}]
     for clause in q.clauses:
         next_bindings: list[dict[str, str]] = []
         for b in bindings:
             try:
-                anchor_name = _resolve(clause.anchor, b)
+                anchor_names = [_resolve(clause.anchor, b)]
             except QueryBindingError:
-                # Anchor is an unbound variable. v1 does not support
-                # full scans; skip this binding rather than scan.
-                continue
-            results = core.ask(
-                anchor=anchor_name,
-                relation=clause.relation,
-                inverse=clause.inverse,
-            )
-            for r in results:
-                nb = dict(b)
-                if isinstance(clause.target, Var):
-                    existing = nb.get(clause.target.name)
-                    if existing is not None and existing != r:
-                        continue
-                    nb[clause.target.name] = r
+                if _has_iter_entities(core):
+                    anchor_names = core.iter_entities()
                 else:
-                    if clause.target.value != r:
-                        continue
-                next_bindings.append(nb)
+                    # v1 behaviour: skip the binding rather than scan.
+                    continue
+            for anchor_name in anchor_names:
+                results = core.ask(
+                    anchor=anchor_name,
+                    relation=clause.relation,
+                    inverse=clause.inverse,
+                )
+                for r in results:
+                    nb = dict(b)
+                    if isinstance(clause.target, Var):
+                        existing = nb.get(clause.target.name)
+                        if existing is not None and existing != r:
+                            continue
+                        nb[clause.target.name] = r
+                    else:
+                        if clause.target.value != r:
+                            continue
+                    next_bindings.append(nb)
         bindings = next_bindings
         if not bindings:
             break
