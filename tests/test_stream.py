@@ -288,6 +288,7 @@ def test_integration_with_encoder():
     enc = _enc(capacities=(4, 4, 4))
     st = StreamState(StreamStateConfig(dim=enc.codex.dim))
     packets = enc.push_many(list(range(1, 20)))
+    packets += enc.flush()          # <-- tokens 17-19 emit here
     st.update_many(packets)
     assert st.packet_count == len(packets)
     assert st.span[1] == 19
