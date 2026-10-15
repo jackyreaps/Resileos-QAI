@@ -8,6 +8,7 @@ Titanos console (application layer):
     POST /api/v1/learn
     POST /api/v1/learn_batch
     POST /api/v1/query
+    POST /api/v1/sparql              (query language, RES-322)
     POST /api/v1/chain
     POST /api/v1/save
 
@@ -46,6 +47,11 @@ from resileos.substrate.reduction import (  # noqa: E402
     VerifiableFEPReductionHead,
     simulate_axiom_d,
 )
+from resileos.titanos.query import (  # noqa: E402
+    TitanosQueryEngine,
+    QuerySyntaxError,
+    QueryBindingError,
+)
 from titanos import Titanos, TitanosConfig  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -80,6 +86,10 @@ class QueryRequest(BaseModel):
     subject: str
     relation: str
     inverse: bool = False
+
+
+class SparqlRequest(BaseModel):
+    query: str
 
 
 class ChainRequest(BaseModel):
@@ -158,6 +168,39 @@ def titanos_query(payload: QueryRequest):
         }
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@app.post("/api/v1/sparql")
+def titanos_sparql(payload: SparqlRequest):
+    """
+    Execute a query in the RES-322 grammar against the live Titanos state.
+
+    Examples:
+        SELECT ?o WHERE alice --knows--> ?o
+        SELECT ?s WHERE ?s <--knows-- bob
+        SELECT ?o WHERE alice --knows--> ?o AND ?o --works_at--> acme
+        SELECT ?s, ?o WHERE ?s --knows--> ?o
+
+    Full-scan queries (unbound anchor) are supported because the Titanos
+    core exposes iter_entities(). Cores without that method fall back to
+    skipping the binding (v1 behaviour).
+    """
+    q = payload.query.strip()
+    if not q:
+        raise HTTPException(400, "query is required")
+    engine = TitanosQueryEngine(titanos_singleton)
+    try:
+        rows = engine.execute(q)
+    except QuerySyntaxError as e:
+        raise HTTPException(400, f"syntax error: {e}")
+    except QueryBindingError as e:
+        raise HTTPException(400, f"binding error: {e}")
+    except Exception as e:
+        raise HTTPException(500, f"query execution failed: {e}")
+    return {
+        "rows": [list(r) for r in rows],
+        "count": len(rows),
+    }
 
 
 @app.post("/api/v1/chain")
