@@ -1,5 +1,4 @@
 """Tests for the language pipeline."""
-
 import json
 import sys
 from pathlib import Path
@@ -175,6 +174,10 @@ def test_pipeline_phi_compress_fires_after_warmup_and_lock():
         phi_compress_min_R=0.0,
     )
     p.step([1, 2])
+    # Collapse phases so the basin-depth spread gate passes. The
+    # spread veto (RES-304 §2) blocks contraction when the field is
+    # disordered, regardless of injected _last_R.
+    p.field.theta[:] = 0.0
     p._last_R = 0.95
     p.step([1, 2])
     assert len(p.stats()["compressions"]) >= 1
