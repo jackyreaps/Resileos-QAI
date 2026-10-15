@@ -12,7 +12,8 @@ Bind and unbind are exact under these conventions:
 The multiplicative φ·id·d schedule aliases under element-wise bind —
 adjacent token codes have additive structure in phase. This implementation
 uses φ-seeded random phasors instead: each token ID hashes to a unique RNG
-seed, which produces incommensurate phase patterns with no additive structure.
+seed, which produces incommensurate phase patterns with no additive
+structure.
 """
 from __future__ import annotations
 
@@ -108,7 +109,12 @@ class PhiPhaseCodex:
         return self.bundle(codes)
 
     def cleanup(self, hv: np.ndarray, position: int) -> Optional[int]:
-        """Unbind position and return the nearest token ID (or None)."""
+        """Unbind position and return the nearest token ID (or None).
+
+        The codebook is built from `np.arange(1, vocab_size + 1)`, so
+        `codebook[i]` holds the phasor for token ID `i + 1`. The argmax
+        index must be shifted by one to recover the token ID.
+        """
         if not (0 <= position < self.max_positions):
             raise IndexError(f"position {position} out of range")
         probe = self.unbind(hv, self._positions[position])
@@ -123,8 +129,7 @@ class PhiPhaseCodex:
 
         The codebook is built from `np.arange(1, vocab_size + 1)`, so
         `codebook[i]` holds the phasor for token ID `i + 1`. The argmax
-        index must be shifted by one to recover token IDs, same as
-        `HierarchicalQuery._cleanup_token`.
+        index must be shifted by one to recover token IDs.
 
         Returns a list of token IDs, ranked by decreasing coherence.
         Returns an empty list if k <= 0.
