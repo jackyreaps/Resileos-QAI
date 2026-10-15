@@ -1,26 +1,30 @@
 """Streaming substrate state (RES-311).
 
-A reducer over the hierarchy encoder's packet stream. Maintains a single
-running hypervector `stream_hv` that each emitted packet updates. This is
-the persistent context the modulation consumer (RES-315) reads.
+A reducer over the hierarchy encoder's packet stream. Maintains a
+single running hypervector `stream_hv` that each emitted packet
+updates. This is the persistent context the modulation consumer
+(RES-315) reads.
 
 Spec: docs/310-hierarchy/streaming-state.md
 
 Off states (explicit):
-    decay = 1.0       no decay; every packet contributes equally. The state
-                      is a corpus-wide bundle with capacity C(dim) (RES-313 §3).
-    seed              retained for reproducibility of any future stochastic
-                      extension. The current update rule is deterministic and
-                      does not consume the seed. Setting a different seed
-                      produces an identical state from identical input.
+    decay = 1.0       no decay; every packet contributes equally. The
+                      state is a corpus-wide bundle with capacity
+                      C(dim) (RES-313 §3).
+    seed              retained for reproducibility of any future
+                      stochastic extension. The current update rule is
+                      deterministic and does not consume the seed.
+                      Setting a different seed produces an identical
+                      state from identical input.
     learning          off. The state is a pure reducer. No gradients.
-    bidirectional     off. The state is a single hypervector. Recovering an
-                      arbitrary token requires a position path, which this
-                      state does not carry.
-    semantic claim    off. `stream_hv` is a running bundle of packets, not a
-                      representation of meaning.
-    capacity guarantee off. The state's recall capacity is bounded by RES-313,
-                      not by this module. `entropy()` is a diagnostic.
+    bidirectional     off. The state is a single hypervector.
+                      Recovering an arbitrary token requires a position
+                      path, which this state does not carry.
+    semantic claim    off. `stream_hv` is a running bundle of packets,
+                      not a representation of meaning.
+    capacity guarantee off. The state's recall capacity is bounded by
+                      RES-313, not by this module. `entropy()` is a
+                      diagnostic.
 """
 from __future__ import annotations
 
@@ -55,13 +59,16 @@ class StreamStateConfig:
     seed: int = 0
 
     def __post_init__(self) -> None:
-        if self.dim < 2:
-            raise ValueError("dim must be >= 2")
-        if not (0.0 < float(self.decay) <= 1.0):
-            raise ValueError("decay must be in (0, 1]")
+        # Coerce first, then compare. Comparing before coercion raises
+        # TypeError on string input instead of the intended ValueError.
         self.dim = int(self.dim)
         self.decay = float(self.decay)
         self.seed = int(self.seed)
+
+        if self.dim < 2:
+            raise ValueError("dim must be >= 2")
+        if not (0.0 < self.decay <= 1.0):
+            raise ValueError("decay must be in (0, 1]")
 
 
 class StreamState:
@@ -69,9 +76,11 @@ class StreamState:
 
     Fields (spec §2):
         stream_hv           complex128[dim]   running bundle
-        stream_span         (start, end)      token-index interval covered
+        stream_span         (start, end)      token-index interval
+                                              covered
         stream_packet_count int               number of packets folded in
-        last_packet_level   int               level of last packet (0 = none)
+        last_packet_level   int               level of last packet
+                                              (0 = none)
 
     Update rule (spec §3):
         stream_hv = normalize(stream_hv + decay**L_p * hv_p)
@@ -128,8 +137,12 @@ class StreamState:
             self._span_start = int(packet.span_start)
             self._span_end = int(packet.span_end)
         else:
-            self._span_start = min(self._span_start, int(packet.span_start))
-            self._span_end = max(self._span_end, int(packet.span_end))
+            self._span_start = min(
+                self._span_start, int(packet.span_start)
+            )
+            self._span_end = max(
+                self._span_end, int(packet.span_end)
+            )
 
         self._count += 1
         self._last_level = int(packet.level)
