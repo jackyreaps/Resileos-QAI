@@ -124,10 +124,12 @@ class CharTokenizer:
     def load(cls, path: str | Path) -> "CharTokenizer":
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
 
-        # Reject saved tokenizers whose special-token set differs from
-        # the current module's. A mismatch silently misaligns every
-        # non-special ID by the length of the delta.
-        saved_specials = tuple(raw.get("specials", ()))
+        # Accept both "specials" (current writer) and "special_tokens"
+        # (older checkpoints). The tuple is checked against the module's
+        # current SPECIAL_TOKENS; a non-empty mismatch raises.
+        saved_specials = tuple(
+            raw.get("specials") or raw.get("special_tokens") or ()
+        )
         if saved_specials and saved_specials != SPECIAL_TOKENS:
             raise ValueError(
                 f"saved specials {saved_specials} do not match "
