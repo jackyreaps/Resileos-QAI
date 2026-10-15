@@ -14,11 +14,12 @@ Prime tower carrier (this revision):
     log step.
 
     This replaces the φ-power ladder, which was an exponential index.
-    An exponential ladder is uniform in log space: log(PHI ** e) = e ·
-    log(PHI). The prime tower is not uniform in log space — consecutive
-    primes have irregular gaps, and the Cipolla normalisation adds a
-    second layer of irregularity. The φ-ladder smoothed over exactly
-    the boundary structure the tower exists to encode.
+    An exponential ladder is uniform in log space: log(PHI ** e) =
+    e · log(PHI). The prime tower is not uniform in log space —
+    consecutive primes have irregular gaps, and the Cipolla
+    normalisation adds a second layer of irregularity. The φ-ladder
+    smoothed over exactly the boundary structure the tower exists to
+    encode.
 
     The tower's domain wall (odd branch forbidden) is the sheath
     boundary. A layer on the odd branch beyond the wall is in the
@@ -47,7 +48,7 @@ import numpy as np
 from .prime_tower import PrimeTower
 
 
-# ── feature bit names (RES-312 §1) ──────────────────────────────────────
+# ── feature bit names (RES-312 §1) ──────────────────────────────────
 FEATURE_BITS: tuple[str, ...] = (
     "csi",
     "order_parameter",
@@ -57,7 +58,7 @@ K_MIN: int = len(FEATURE_BITS)
 DEFAULT_K: int = 4
 
 
-# ── tower singleton (lazy) ──────────────────────────────────────────────
+# ── tower singleton (lazy) ──────────────────────────────────────────
 _tower_cache: dict[int, PrimeTower] = {}
 
 
@@ -68,8 +69,10 @@ def _get_tower(max_level: int) -> PrimeTower:
     return _tower_cache[key]
 
 
-# ── carrier ─────────────────────────────────────────────────────────────
-def tower_level_for(layer_index: int, n_layers: int, local_first: bool) -> int:
+# ── carrier ─────────────────────────────────────────────────────────
+def tower_level_for(
+    layer_index: int, n_layers: int, local_first: bool
+) -> int:
     """Map a stack layer index to a tower level.
 
     Tower levels start at 2 (T(2) = S_2). Layer 0 maps to level 2,
@@ -77,10 +80,9 @@ def tower_level_for(layer_index: int, n_layers: int, local_first: bool) -> int:
     reversed: layer 0 maps to the highest level, layer n_layers-1 to
     level 2.
 
-    local_first=True  -> layer 0 is local (smallest prime, highest freq)
-                         layer n_layers-1 is global (largest prime)
-    local_first=False -> layer 0 is global (largest prime)
-                         layer n_layers-1 is local (smallest prime)
+    local_first=True  -> layer 0 is local (smallest prime, highest
+                         freq); layer n_layers-1 is global.
+    local_first=False -> layer 0 is global; layer n_layers-1 is local.
     """
     if n_layers < 1:
         raise ValueError("n_layers must be >= 1")
@@ -91,6 +93,19 @@ def tower_level_for(layer_index: int, n_layers: int, local_first: bool) -> int:
     if local_first:
         return layer_index + 2
     return (n_layers - 1 - layer_index) + 2
+
+
+def exponent_for(
+    layer_index: int, n_layers: int, local_first: bool = True
+) -> int:
+    """φ-exponent for a layer.
+
+    The prime tower level IS the φ-exponent: multiplier = PHI ** level.
+    This is an alias for `tower_level_for`, exported because the
+    hierarchy __init__ and downstream consumers (RES-307 routing)
+    refer to it as the orientation axis.
+    """
+    return tower_level_for(layer_index, n_layers, local_first)
 
 
 def layer_carrier(
@@ -132,17 +147,17 @@ def _normalize(hv: np.ndarray) -> np.ndarray:
     return hv / n
 
 
-# ── layer ───────────────────────────────────────────────────────────────
+# ── layer ───────────────────────────────────────────────────────────
 @dataclass
 class MaskLayer:
     """One layer of the stack (RES-312 §3).
 
-    mask       metadata: which feature bits this layer selects.
-    carrier    prime-tower carrier (local/global axis).
-    weight     contribution to the stack bundle, default 1 / (l + 1).
+    mask         metadata: which feature bits this layer selects.
+    carrier      prime-tower carrier (local/global axis).
+    weight       contribution to the stack bundle, default 1 / (l + 1).
     tower_level  tower level n used to build the carrier (>= 2).
-    prime      prime p_n used as the carrier frequency.
-    branch     'even' or 'odd'.
+    prime        prime p_n used as the carrier frequency.
+    branch       'even' or 'odd'.
     """
     mask: tuple[bool, ...]
     carrier: np.ndarray
@@ -181,7 +196,7 @@ class MaskLayer:
         }
 
 
-# ── config ──────────────────────────────────────────────────────────────
+# ── config ──────────────────────────────────────────────────────────
 @dataclass
 class MaskStackConfig:
     """Configuration for a MaskStack.
@@ -202,17 +217,21 @@ class MaskStackConfig:
     seed: int = 0
 
     def __post_init__(self) -> None:
+        # Coerce first, then compare. Comparing before coercion raises
+        # TypeError on string input instead of the intended ValueError.
+        self.dim = int(self.dim)
+        self.k = int(self.k)
+        self.n_layers = int(self.n_layers)
+        self.local_first = bool(self.local_first)
+        self.seed = int(self.seed)
+
         if self.dim < 4:
             raise ValueError("dim must be >= 4")
         if self.k < K_MIN:
             raise ValueError(f"k must be >= {K_MIN}")
         if self.n_layers < 1:
             raise ValueError("n_layers must be >= 1")
-        self.dim = int(self.dim)
-        self.k = int(self.k)
-        self.n_layers = int(self.n_layers)
-        self.local_first = bool(self.local_first)
-        self.seed = int(self.seed)
+
         # Validate the tower has enough usable levels at this dim.
         tower = _get_tower(self.n_layers + 2)
         if self.n_layers > tower.n_usable(self.dim):
@@ -222,7 +241,7 @@ class MaskStackConfig:
             )
 
 
-# ── stack ───────────────────────────────────────────────────────────────
+# ── stack ───────────────────────────────────────────────────────────
 class MaskStack:
     """Layered mask stack (RES-312 §5).
 
@@ -312,7 +331,9 @@ class MaskStack:
             raise ValueError("mask must set at least one bit")
 
         idx = len(self._layers)
-        level = tower_level_for(idx, self.cfg.n_layers, self.cfg.local_first)
+        level = tower_level_for(
+            idx, self.cfg.n_layers, self.cfg.local_first
+        )
         carrier = layer_carrier(
             idx, self.cfg.n_layers, self.cfg.dim, self.cfg.local_first
         )
@@ -337,7 +358,8 @@ class MaskStack:
     def encode(self, stream_hv: np.ndarray) -> np.ndarray:
         """Return the stacked hypervector (RES-312 §3).
 
-            stack_hv = normalize(sum_l weight_l * bind(stream_hv, carrier_l))
+            stack_hv = normalize(sum_l weight_l * bind(stream_hv,
+                            carrier_l))
 
         bind is the codex's exact bind: a * b * sqrt(dim).
         """
@@ -363,7 +385,8 @@ class MaskStack:
         codim_max: float = 0.5,
         depth_min: float = 0.05,
     ) -> bool:
-        """RES-312 §4 criterion. Caller supplies the RES-304 measurement."""
+        """RES-312 §4 criterion. Caller supplies the RES-304
+        measurement."""
         return bool(
             (float(boundary_codim) < float(codim_max))
             and (float(depth) < float(depth_min))
@@ -397,6 +420,7 @@ __all__ = [
     "MaskLayer",
     "layer_carrier",
     "tower_level_for",
+    "exponent_for",
     "FEATURE_BITS",
     "K_MIN",
     "DEFAULT_K",
