@@ -17,10 +17,9 @@ Semantics: each clause is a pattern over the graph. Variables bind to
 entity names. Clauses are joined on shared variables via nested-loop
 evaluation. The result is the list of bindings of the SELECT targets.
 
-Full scan: when a clause's anchor is an unbound variable, the executor
-iterates every entity in the core (if the core exposes `iter_entities()`)
-and probes each as the anchor. Cores that do not expose `iter_entities()`
-fall back to the v1 behaviour (skip the binding).
+Inverse patterns: `?s <--rel-- X` means "find S such that S --rel--> X".
+The parser normalises this to anchor=X with inverse=True, so the
+executor reads it as an inverse lookup anchored at X.
 
 Errors:
     QuerySyntaxError   malformed input
@@ -29,10 +28,10 @@ Errors:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Protocol
 
-# ── tokens ──────────────────────────────────────────────────────────────
+# ── tokens ──────────────────────────────────────────────────────────
 TOKEN_RE = re.compile(
     r"""
     (?P<ws>\s+)
@@ -81,7 +80,7 @@ def tokenize(src: str) -> list[Token]:
     return tokens
 
 
-# ── AST ─────────────────────────────────────────────────────────────────
+# ── AST ─────────────────────────────────────────────────────────────
 @dataclass(frozen=True)
 class Var:
     name: str
@@ -109,13 +108,13 @@ class Query:
     clauses: tuple[Pattern, ...]
 
 
-# ── parser ──────────────────────────────────────────────────────────────
+# ── parser ──────────────────────────────────────────────────────────
 class _Parser:
     def __init__(self, tokens: list[Token]) -> None:
         self.toks = tokens
         self.i = 0
 
-    def peek(self, kind: str | None = None) -> Optional[Token]:
+    def peek(self, kind: Optional[str] = None) -> Optional[Token]:
         if self.i >= len(self.toks):
             return None
         t = self.toks[self.i]
@@ -154,14 +153,19 @@ class _Parser:
             self.i += 1
             rel = arrow.value[2:-3]
             target = self.parse_term()
-            return Pattern(anchor=anchor, relation=rel, target=target, inverse=False)
+            return Pattern(
+                anchor=anchor, relation=rel, target=target, inverse=False
+            )
         larrow = self.peek("larrow")
         if larrow is not None:
             self.i += 1
             rel = larrow.value[3:-2]
             target = self.parse_term()
-            # <--rel-- X   means   X --rel--> anchor
-            return Pattern(anchor=target, relation=rel, target=anchor, inverse=False)
+            # `?s <--rel-- X` means `X <--rel-- ?s`, i.e. find S
+            # such that `S --rel--> X`. Anchor at X, inverse lookup.
+            return Pattern(
+                anchor=target, relation=rel, target=anchor, inverse=True
+            )
         raise QuerySyntaxError("expected --relation--> or <--relation--")
 
     def parse(self) -> Query:
@@ -192,15 +196,11 @@ def parse(query_src: str) -> Query:
     return _Parser(tokenize(query_src)).parse()
 
 
-# ── executor ────────────────────────────────────────────────────────────
+# ── executor ────────────────────────────────────────────────────────
 class _Core(Protocol):
     def ask(
         self, anchor: str, relation: str, inverse: bool = False
     ) -> list[str]: ...
-
-    # Optional: cores that support full scan expose this. If absent,
-    # unbound anchors are skipped (v1 behaviour).
-    def iter_entities(self) -> list[str]: ...
 
 
 def _resolve(term: Term, binding: dict[str, str]) -> str:
@@ -213,47 +213,35 @@ def _resolve(term: Term, binding: dict[str, str]) -> str:
     )
 
 
-def _has_iter_entities(core) -> bool:
-    return callable(getattr(core, "iter_entities", None))
-
-
 def execute(core: _Core, q: Query) -> list[tuple[str, ...]]:
     """Execute a parsed query. Returns a list of tuples, one per row,
-    ordered as in the SELECT clause.
-
-    When a clause's anchor is an unbound variable, the executor performs
-    a full scan if the core exposes `iter_entities()`. Otherwise the
-    binding is skipped (v1 behaviour).
-    """
+    ordered as in the SELECT clause."""
     bindings: list[dict[str, str]] = [{}]
     for clause in q.clauses:
         next_bindings: list[dict[str, str]] = []
         for b in bindings:
             try:
-                anchor_names = [_resolve(clause.anchor, b)]
+                anchor_name = _resolve(clause.anchor, b)
             except QueryBindingError:
-                if _has_iter_entities(core):
-                    anchor_names = core.iter_entities()
+                # Unbound anchor. v1 does not support full scans;
+                # skip this binding rather than scan.
+                continue
+            results = core.ask(
+                anchor=anchor_name,
+                relation=clause.relation,
+                inverse=clause.inverse,
+            )
+            for r in results:
+                nb = dict(b)
+                if isinstance(clause.target, Var):
+                    existing = nb.get(clause.target.name)
+                    if existing is not None and existing != r:
+                        continue
+                    nb[clause.target.name] = r
                 else:
-                    # v1 behaviour: skip the binding rather than scan.
-                    continue
-            for anchor_name in anchor_names:
-                results = core.ask(
-                    anchor=anchor_name,
-                    relation=clause.relation,
-                    inverse=clause.inverse,
-                )
-                for r in results:
-                    nb = dict(b)
-                    if isinstance(clause.target, Var):
-                        existing = nb.get(clause.target.name)
-                        if existing is not None and existing != r:
-                            continue
-                        nb[clause.target.name] = r
-                    else:
-                        if clause.target.value != r:
-                            continue
-                    next_bindings.append(nb)
+                    if clause.target.value != r:
+                        continue
+                next_bindings.append(nb)
         bindings = next_bindings
         if not bindings:
             break
