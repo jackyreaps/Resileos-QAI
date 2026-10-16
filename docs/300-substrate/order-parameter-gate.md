@@ -1,8 +1,8 @@
-doc | RES-316
-title | Order Parameter Gate
-status | proposal
-depends_on | RES-200 RES-302 RES-305
-referenced_by
+doc: RES-316
+title: Order Parameter Gate
+status: proposal
+depends_on: [RES-200, RES-302, RES-305]
+referenced_by: []
 
 # Order Parameter Gate
 
@@ -34,19 +34,19 @@ When `use_order_parameter_gate=True`:
 `scale = 1` and the gate is a no-op. At `R = 0`, `scale = floor` and
 confidence is reduced to `floor · confidence_raw`.
 
-The gate applies in `ask` and `analogy`, after `_cleanup` returns the raw
-confidence and before the abstention thresholds are compared.
+The gate applies in `_ask` and `analogy`, after `_cleanup` returns the
+raw confidence and before the abstention thresholds are compared.
 
 ## 3. Rationale
 
-The non-conservative operator's phase vector `θ` accumulates phase from the
-parity monitor `μ`. When the phases drift apart, the operator's
-`D = exp(i·θ)` diagonal no longer acts as a coherent rotation — it becomes
-a scatter of independent rotations. The Kuramoto order parameter measures
-that coherence directly.
+The non-conservative operator's phase vector `θ` accumulates phase from
+the parity monitor `μ`. When the phases drift apart, the operator's
+`D = exp(i·θ)` diagonal no longer acts as a coherent rotation — it
+becomes a scatter of independent rotations. The Kuramoto order parameter
+measures that coherence directly.
 
-The claim: `R` should gate retrieval confidence. High `R` → trust the top
-match. Low `R` → abstain more readily.
+The claim: `R` should gate retrieval confidence. High `R` → trust the
+top match. Low `R` → abstain more readily.
 
 This is a candidate. Whether the gate improves the abstention/accuracy
 tradeoff on any given corpus is an empirical question, measured by
@@ -73,7 +73,7 @@ The test file `tests/test_order_parameter_gate.py` reports:
 - unknown abstain rate (gate off vs on)
 - `R` at the end of the drive
 
-The test asserts only that the gate changes something when `R < 1`.
+The test asserts only that the gate changes *something* when `R < 1`.
 Whether the change is an improvement is reported, not asserted — a null
 result is a valid outcome.
 
@@ -81,23 +81,25 @@ result is a valid outcome.
 
 Three possible outcomes when the gate is enabled on the Greek corpus:
 
-- Known accept rate unchanged, unknown abstain rate up. The gate improves
-  separation. Keep it.
-- Both rates unchanged. `R` stays near 1 on this corpus (the phase vector
-  does not drift enough to matter at this scale).
-- Known accept rate down, unknown abstain rate up. The gate is too
-  aggressive. Lower `floor` or raise the threshold.
+1. **Known accept rate unchanged, unknown abstain rate up.** The gate
+   improves separation. Keep it.
+2. **Both rates unchanged.** `R` stays near 1 on this corpus (the phase
+   vector does not drift enough to matter at this scale). Neutral
+   result; the gate is real but inactive here.
+3. **Known accept rate down.** The gate is too aggressive. Either raise
+   `order_parameter_floor` or leave the gate off.
 
-The null result (second outcome) is the most likely on short corpora.
-It is not a failure.
+The measurement decides. The gate is not claimed to help.
 
-## 7. Non-claims
+## 7. What this is not
 
-- No claim that `R` is a calibrated probability.
-- No claim that the gate improves accuracy on any specific corpus.
-- No claim that `R` measures semantic coherence. It measures oscillator
-  phase coherence.
-- No claim that the gate is required. It is off by default.
+- Not a quantum operation. `R` is a classical phase-coherence measure.
+- Not a replacement for the sigma gate (RES-303). The two gates compose;
+  the order-parameter gate multiplies the raw confidence before the
+  sigma gate decides the routing.
+- Not a claim that phase coherence correlates with semantic correctness.
+  The claim is narrow: it is a candidate signal, and its utility is
+  measured, not assumed.
 
 ## 8. Read next
 
