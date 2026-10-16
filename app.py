@@ -24,6 +24,7 @@ Integration (leCore capability router):
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
@@ -60,6 +61,7 @@ log = logging.getLogger("resileos.api")
 app = FastAPI(title="Resileos-QAI")
 
 STATE_FILE = ROOT / "titanos_live_state.json"
+SEED_FILE = ROOT / "configs" / "titanos-facts.json"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -74,6 +76,63 @@ if STATE_FILE.exists():
         log.info("Loaded Titanos state from %s", STATE_FILE)
     except Exception as e:
         log.warning("Titanos state unreadable, starting fresh: %s", e)
+
+
+def _maybe_seed_from_bundled_facts() -> int:
+    """Seed the console from configs/titanos-facts.json when the store is
+    empty. Returns the number of facts loaded (0 = no seed performed).
+
+    Runs once at import time. If the store already has facts (from a
+    persisted state file or prior seeding), this is a no-op. If the seed
+    file is missing, the console starts empty; the caller can then POST
+    facts via /api/v1/learn.
+    """
+    try:
+        stats = titanos_singleton.stats()
+    except Exception as e:
+        log.warning("Could not read Titanos stats; skipping seed: %s", e)
+        return 0
+    if int(stats.get("facts", 0)) > 0:
+        return 0
+    if not SEED_FILE.exists():
+        log.info(
+            "Store is empty and no seed file at %s; console starts empty.",
+            SEED_FILE,
+        )
+        return 0
+    try:
+        raw = json.loads(SEED_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.warning("Seed file unreadable: %s", e)
+        return 0
+
+    facts = raw.get("facts", [])
+    loaded = 0
+    for row in facts:
+        if not isinstance(row, (list, tuple)) or len(row) != 3:
+            continue
+        s, r, o = (str(x).strip() for x in row)
+        if not (s and r and o):
+            continue
+        try:
+            titanos_singleton.learn(s, r, o)
+            loaded += 1
+        except Exception as e:
+            log.warning("Failed to learn %r %r %r: %s", s, r, o, e)
+
+    if loaded:
+        try:
+            titanos_singleton.save(STATE_FILE)
+            log.info(
+                "Seeded %d facts from %s; state saved to %s",
+                loaded, SEED_FILE, STATE_FILE,
+            )
+        except Exception as e:
+            log.warning("Seeded %d facts but could not persist: %s", loaded, e)
+    return loaded
+
+
+_seed_count = _maybe_seed_from_bundled_facts()
 
 
 class LearnRequest(BaseModel):
@@ -104,6 +163,25 @@ class BatchLearnRequest(BaseModel):
 @app.get("/api/v1/stats")
 def titanos_stats():
     return titanos_singleton.stats()
+
+
+@app.get("/api/v1/ready")
+def titanos_ready():
+    """Readiness probe. Returns 503 until the Titanos store is open.
+
+    Distinct from /api/v1/stats: stats always returns 200 with whatever
+    the store contains, including zero facts. This endpoint is the one
+    to wire into docker HEALTHCHECK.
+    """
+    try:
+        s = titanos_singleton.stats()
+    except Exception as e:
+        raise HTTPException(503, f"titanos store not ready: {e}")
+    return {
+        "ready": True,
+        "facts": int(s.get("facts", 0)),
+        "seeded_from": str(SEED_FILE) if _seed_count else None,
+    }
 
 
 @app.post("/api/v1/learn")
@@ -180,10 +258,6 @@ def titanos_sparql(payload: SparqlRequest):
         SELECT ?s WHERE ?s <--knows-- bob
         SELECT ?o WHERE alice --knows--> ?o AND ?o --works_at--> acme
         SELECT ?s, ?o WHERE ?s --knows--> ?o
-
-    Full-scan queries (unbound anchor) are supported because the Titanos
-    core exposes iter_entities(). Cores without that method fall back to
-    skipping the binding (v1 behaviour).
     """
     q = payload.query.strip()
     if not q:
@@ -241,7 +315,7 @@ class SubstrateContainer:
     def __init__(self) -> None:
         torch.manual_seed(42)
         kernel = torch.zeros(HIDDEN_DIM, KERNEL_DIM)
-        kernel[0, 0] = 1.0  # span{e_0}: slow axis used by simulate_axiom_d
+        kernel[0, 0] = 1.0
 
         self.hidden_dim = HIDDEN_DIM
         self.kernel_dim = KERNEL_DIM
@@ -463,7 +537,7 @@ def sweep_epsilon(payload: SweepRequest):
 # ═══════════════════════════════════════════════════════════════════════════
 # leCore integration (capability router)
 # ═══════════════════════════════════════════════════════════════════════════
-_lecore = LeCoreClient()   # honours LECORE_URL, LECORE_TOKEN, LECORE_TIMEOUT
+_lecore = LeCoreClient()
 
 
 class LeCoreRouteRequest(BaseModel):
@@ -480,10 +554,6 @@ def lecore_health():
 
 @app.post("/api/v1/lecore/route")
 def lecore_route(payload: LeCoreRouteRequest):
-    """
-    Send a task description to leCore and return ranked capability homes.
-    Soft-fails (returns {available: false}) if leCore is not reachable.
-    """
     query = payload.query.strip()
     if not query:
         raise HTTPException(400, "query is required")
