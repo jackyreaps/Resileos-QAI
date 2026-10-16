@@ -18,10 +18,9 @@ alter the single-channel contract.
 
 ## 2. Residual Ledger Bridge
 
-Map control-packet fields onto a residual ledger (capacity figures and
-ε = 1/64 quantum). This is a downstream re-encoding with its own capacity
-contract. It does not reinterpret the exponent range [-16, +16] frozen in
-RES-200.
+Map control-packet fields onto a residual ledger (capacity figures and ε = 1/64
+quantum). This is a downstream re-encoding with its own capacity contract. It
+does not reinterpret the exponent range [-16, +16] frozen in RES-200.
 
 ## 3. Coherence engine hand-off
 
@@ -31,8 +30,8 @@ coherence claim is made until experimental characterization.
 ## 4. Ghost-peptide / biological write
 
 8 residual channels inherited from a residual V₄ structure as fixed write ports
-for endocrine / microtubule scaffolding. Organizational only. Does not alter
-the algebraic core.
+for endocrine / microtubule scaffolding. Organizational only. Does not alter the
+algebraic core.
 
 ## 5. LASLS integrity guard
 
@@ -61,28 +60,47 @@ items. Every downstream claim must survive that constraint. The modulation
 interface (RES-315) is the only path that does, because it claims a projection,
 not a memory.
 
-Nothing in this series reopens RES-200 through RES-307. The hierarchy is a
+Nothing in this series reopens RES-200 through RES-309. The hierarchy is a
 downstream consumer of the frozen core and substrate contracts.
 
-## 7. Open work (ordered by dependency)
+## 7. Substrate research directions (RES-308, RES-309, RES-316)
+
+Three substrate-level documents sit outside the frozen core and the hierarchy
+series. They are research directions, not components.
+
+| Doc | Title | Status | What it proposes |
+|-----|-------|--------|------------------|
+| RES-308 | Constructive Head | proposal | A third head producing drift direction from core dynamics; quantum-shaped only, no QPU |
+| RES-309 | Entanglement Pipeline Engine | conjectural | Shared-prefix structure as a coarse-grained view of oscillator correlation; CHSH test proposed |
+| RES-316 | Order Parameter Gate | proposal | Confidence gated by Kuramoto order parameter; off by default |
+
+None of these is implemented in the production path. RES-308 is a head (not
+wired into `app.py`'s train loop). RES-309 is a hypothesis with no measurement
+yet. RES-316 is a gate that is disabled by default.
+
+## 8. Open work (ordered by dependency)
 
 | Priority | Item | Depends on |
 |----------|------|------------|
-| 1 | Verify orientation transfer fix for φ-compress | `core.py` `_maybe_contract` |
-| 2 | Implement RES-310 hierarchical encoder | RES-310 spec |
-| 3 | Implement RES-311 streaming state | RES-310 |
-| 4 | Implement RES-312 mask stack | RES-311, RES-306 |
-| 5 | Falsification test for RES-313 capacity law | RES-310, RES-311 |
-| 6 | Measure RES-314 position-error curve | RES-310, RES-311 |
-| 7 | Minimal experiment for RES-315 modulation | RES-310 ... RES-314 |
+| 1 | Verify orientation transfer fix for φ-compress | core.py `_maybe_contract` |
+| 2 | Run CHSH scan for RES-309 | entanglement.py, run_chsh_scan.py |
+| 3 | Falsification test for RES-313 capacity law | RES-310, RES-311 |
+| 4 | Measure RES-314 position-error curve | RES-310, RES-311 |
+| 5 | Minimal experiment for RES-315 modulation | RES-310 ... RES-314 |
+| 6 | Train LowRankMetricHead on real trajectories | geometry.py |
 
-## 8. Non-goals
+The first three items in the prior roadmap (implement RES-310, RES-311,
+RES-312) are complete. The modules exist and their test suites pass.
+
+## 9. Non-goals
 
 - No reopening of the frozen core.
 - No claim of trillion-token recall. RES-313 rules it out.
 - No quantum speedup claim. The quantum backend is gated and downstream.
 - No trained codex. The codex is fixed.
 - No claim that the substrate is a language model. It is a side-channel.
+- No claim that RES-308, RES-309, or RES-316 is production-ready. They are
+  research directions.
 
 ## Read next
 
