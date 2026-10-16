@@ -86,9 +86,17 @@ class PhiPhaseCodex:
         return c * np.conj(b) * self._scale
 
     @staticmethod
-    def bundle(codes: Sequence[np.ndarray]) -> np.ndarray:
+    def bundle(codes: Sequence[np.ndarray], dim: int | None = None) -> np.ndarray:
+        """Bundling operator. Empty input returns the zero vector.
+
+        If codes is empty and dim is None, a length-1 zero vector is
+        returned as a placeholder. Callers that know the target dimension
+        should pass it explicitly; PhiPhaseCodex.encode always does.
+        """
         if not codes:
-            raise ValueError("codes must be non-empty")
+            if dim is None:
+                return np.zeros(1, dtype=np.complex128)
+            return np.zeros(int(dim), dtype=np.complex128)
         s = np.sum(np.stack(codes, axis=0), axis=0)
         n = float(np.linalg.norm(s))
         return s / n if n > 1e-12 else s
@@ -112,7 +120,7 @@ class PhiPhaseCodex:
             if not (0 <= t < self.vocab_size):
                 raise ValueError(f"token {t} out of vocab range")
             codes.append(self.bind(self.codebook[t], self._positions[p]))
-        return self.bundle(codes)
+        return self.bundle(codes, dim=self.dim)
 
     def cleanup(self, hv: np.ndarray, position: int) -> Optional[int]:
         """Unbind position and return the nearest token ID (or None).
@@ -127,22 +135,32 @@ class PhiPhaseCodex:
         return int(np.argmax(sims))
 
     def argmax_coherence(
-        self, hv: np.ndarray, top_k: int = 1
+        self,
+        hv: np.ndarray,
+        position: int,
+        top_k: int = 1,
     ) -> list[tuple[int, float]]:
-        """Top-k token IDs by cosine coherence with a query hypervector.
+        """Top-k token IDs by cosine coherence with the token at `position`.
 
-        Returns a list of (token_id, similarity) pairs, ranked by
+        Signature is (hv, position, top_k=1). The test contract calls
+        argmax_coherence(hv, 0, top_k=3), so `position` is required and
+        `top_k` is keyword. The position slot is unbound before ranking,
+        matching `cleanup`.
+
+        Returns a list of (token_id, similarity) pairs ranked by
         decreasing similarity. Returns an empty list if top_k <= 0.
-
-        Accepts keyword `top_k` to match the test contract.
         """
         if top_k <= 0:
             return []
+        if not (0 <= position < self.max_positions):
+            raise IndexError(f"position {position} out of range")
+        hv = np.asarray(hv)
         if hv.shape != (self.dim,):
             raise ValueError(
                 f"hv shape {hv.shape} != (dim,) = ({self.dim},)"
             )
-        sims = np.real(np.conj(self.codebook) @ hv)
-        top_k = min(int(top_k), len(sims))
-        idx = np.argsort(sims)[::-1][:top_k]
+        probe = self.unbind(hv, self._positions[position])
+        sims = np.real(np.conj(self.codebook) @ probe)
+        k = min(int(top_k), len(sims))
+        idx = np.argsort(sims)[::-1][:k]
         return [(int(i), float(sims[i])) for i in idx]
