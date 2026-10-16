@@ -8,7 +8,7 @@ Layers:
     emergent          non-conservative operator driven by real monitors
     CSI               Causal Sandbox Index over each query (RES-305)
     agency            heuristic routing to registered children (RES-307)
-    order parameter   Kuramoto R from theta gates confidence (RES-309)
+    order parameter   Kuramoto R from theta gates confidence (RES-316)
 
 Storage uses MAP triple binding:
     band += s * r * o               (elementwise, bipolar)
@@ -488,7 +488,7 @@ class Titanos:
                           csi=self._csi.value(),
                           order_parameter=self._order_parameter())
 
-        selfsi._query_count += 1
+        self._query_count += 1
         probe = self._encode_probe(subject, relation, inverse=inverse)
         current_csi = self._csi.value()
         classical_thresh, abstain_thresh, sigma_eff = \
@@ -522,7 +522,7 @@ class Titanos:
                           anisotropy=anisotropy,
                           band_count=self._counts.get(relation, 0),
                           emergent=self.cfg.emergent,
-                          csi=current_c,
+                          csi=current_csi,
                           fast_confidence=fast_conf_blend,
                           fast_path_used=True, escalated=False,
                           order_parameter=R,
