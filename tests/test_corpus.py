@@ -109,7 +109,7 @@ def test_tokenizer_load_rejects_mismatched_specials(tmp_path):
     path = tmp_path / "tok.json"
     path.write_text('{"strip_diacritics": false, "chars": ["a"], '
                     '"special_tokens": ["<x>"]}')
-    with pytest.raises(ValueError, match="special token"):
+    with pytest.raises(ValueError, match="specials"):
         CharTokenizer.load(path)
 
 
