@@ -205,9 +205,17 @@ class OscillatorOrientedSearch:
                 return rec.reward
         return float("inf")
 
-    def run(self, evaluator: Evaluator) -> "OscillatorOrientedSearch":
-        """Evaluate candidates until budget is exhausted or grid is exhausted."""
-        for _ in range(self.budget):
+    def run(
+        self,
+        evaluator: Evaluator,
+        iterations: Optional[int] = None,
+    ) -> "OscillatorOrientedSearch":
+        """Evaluate candidates until the iteration budget is exhausted or
+        the grid is exhausted. `iterations` overrides `self.budget` when
+        given; the tests exercise this.
+        """
+        limit = self.budget if iterations is None else int(iterations)
+        for _ in range(limit):
             cfg = self._propose()
             if cfg is None:
                 break
@@ -230,9 +238,19 @@ class OscillatorOrientedSearch:
             return None
         return min(self._history, key=lambda r: r.reward)
 
-    def best_so_far(self) -> Optional[EvolutionRecord]:
-        """Alias for best()."""
-        return self.best()
+    def best_so_far(self) -> list[float]:
+        """Running minimum of the reward sequence.
+
+        Returns a list of length len(self._history). Entry i is the
+        best reward observed over the first i+1 evaluations. Monotone
+        non-increasing by construction.
+        """
+        out: list[float] = []
+        running = float("inf")
+        for rec in self._history:
+            running = min(running, float(rec.reward))
+            out.append(running)
+        return out
 
     def history(self) -> list[EvolutionRecord]:
         """All records in evaluation order."""
@@ -243,15 +261,28 @@ class OscillatorOrientedSearch:
         return len(self._visited) / max(len(self._grid), 1)
 
     def summary(self) -> dict:
-        """Compact summary of the search result."""
+        """Compact summary of the search result.
+
+        Empty search returns {"n": 0}. Non-empty search returns the keys
+        the test contract expects: n_evaluated, n_grid, coverage,
+        best_config (as a dict), field_R, epsilon_source.
+        """
+        if not self._history:
+            return {"n": 0}
         b = self.best()
+        cfg = b.config
         return {
-            "budget": self.budget,
-            "evaluated": len(self._visited),
-            "grid_size": len(self._grid),
-            "coverage": self.coverage(),
-            "best_reward": float(b.reward) if b else None,
-            "best_config": str(b.config) if b else None,
+            "n_evaluated": int(len(self._visited)),
+            "n_grid": int(len(self._grid)),
+            "coverage": float(self.coverage()),
+            "best_reward": float(b.reward),
+            "best_config": {
+                "r": int(cfg.r),
+                "n_loops": int(cfg.n_loops),
+                "feature_mask": list(cfg.feature_mask),
+            },
+            "field_R": float(self.field.order_parameter()),
+            "epsilon_source": self.epsilon_source,
         }
 
 
