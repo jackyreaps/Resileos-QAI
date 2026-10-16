@@ -166,7 +166,6 @@ def test_decay_less_than_1_entropy_bounded():
         hv = rng.standard_normal(256) + 1j * rng.standard_normal(256)
         hv = hv / np.linalg.norm(hv)
         st.update(_packet(hv=hv, dim=256))
-    # entropy saturates below the packet count
     assert st.entropy() < st.packet_count
 
 
@@ -177,17 +176,15 @@ def test_level_weighting_high_level_downweighted():
     st_3 = StreamState(StreamStateConfig(dim=64, decay=0.5))
     st_1.update(_packet(hv=hv, level=1, dim=64))
     st_3.update(_packet(hv=hv, level=3, dim=64))
-    # both normalized to unit norm; this test documents the weighting
-    # path is exercised without error
     assert abs(float(np.linalg.norm(st_1.readout())) - 1.0) < 1e-9
     assert abs(float(np.linalg.norm(st_3.readout())) - 1.0) < 1e-9
 
 
 # ── determinism ─────────────────────────────────────────────────────────
 def test_determinism_same_seed():
-    a = StreamState(StreamStateConfig(dim=64, decay=1.0, seed=0))
-    b = StreamState(StreamStateConfig(dim=64, decay=1.0, seed=0))
     enc = _enc(capacities=(4, 4, 4))
+    a = StreamState(StreamStateConfig(dim=enc.codex.dim, decay=1.0, seed=0))
+    b = StreamState(StreamStateConfig(dim=enc.codex.dim, decay=1.0, seed=0))
     for t in range(20):
         for p in enc.push(t % 60):
             a.update(p)
@@ -198,9 +195,9 @@ def test_determinism_same_seed():
 
 
 def test_seed_does_not_affect_deterministic_update():
-    a = StreamState(StreamStateConfig(dim=64, decay=1.0, seed=0))
-    b = StreamState(StreamStateConfig(dim=64, decay=1.0, seed=999))
     enc = _enc(capacities=(4, 4, 4))
+    a = StreamState(StreamStateConfig(dim=enc.codex.dim, decay=1.0, seed=0))
+    b = StreamState(StreamStateConfig(dim=enc.codex.dim, decay=1.0, seed=999))
     for t in range(12):
         for p in enc.push(t % 60):
             a.update(p)
@@ -288,7 +285,7 @@ def test_integration_with_encoder():
     enc = _enc(capacities=(4, 4, 4))
     st = StreamState(StreamStateConfig(dim=enc.codex.dim))
     packets = enc.push_many(list(range(1, 20)))
-    packets += enc.flush()          # <-- tokens 17-19 emit here
+    packets += enc.flush()
     st.update_many(packets)
     assert st.packet_count == len(packets)
     assert st.span[1] == 19
