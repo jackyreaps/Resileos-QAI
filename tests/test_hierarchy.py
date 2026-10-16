@@ -196,7 +196,7 @@ def test_query_rejects_bad_path_length():
 
 
 def test_query_descend_single_path():
-    codex = _codex(vocab=32, dim=512)
+    codex = _codex(vocab=128, dim=512)
     enc = HierarchicalEncoder(codex, capacities=[4, 4, 4])
     tokens = list(range(1, 65))
     packets = enc.push_many(tokens)
@@ -207,7 +207,7 @@ def test_query_descend_single_path():
 
 
 def test_query_descend_all_paths_recall():
-    codex = _codex(vocab=64, dim=512)
+    codex = _codex(vocab=128, dim=512)
     cap = 4
     enc = HierarchicalEncoder(codex, capacities=[cap, cap, cap])
     tokens = list(range(1, cap ** 3 + 1))
