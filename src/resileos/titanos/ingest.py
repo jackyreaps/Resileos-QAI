@@ -20,6 +20,19 @@ Each packet's level is a φ-power address. Folding a packet into the
 stream weights it by φ^(-level). The R gate determines how many levels
 are accepted at the current field coherence.
 
+Accumulation policy:
+    _fold accumulates without intermediate renormalization. The stream's
+    _hv is the raw weighted sum Σ w_k · hv_k. Normalization happens at
+    readout() only. This keeps the fold order-independent: the sum is
+    commutative, and normalization is a pure function of the sum.
+    Renormalizing per fold makes the final state depend on arrival
+    order, which is not intended — the ladder is a weighting scheme,
+    not a sequential filter.
+
+    Note: StreamState.update() normalizes per call. SourceIngestor
+    uses _fold() (private) instead, to keep its own accumulation
+    policy. Do not mix the two on the same stream during ingestion.
+
 Off states (explicit):
     generation          off. The ingestor does not generate text.
     lossless claim      off. Ingestion is a projection; the source is
@@ -55,6 +68,13 @@ def phi_weight(level: int) -> float:
     if level < 0:
         raise ValueError("level must be >= 0")
     return float(PHI_INV ** int(level))
+
+
+def _normalize(hv: np.ndarray) -> np.ndarray:
+    n = float(np.linalg.norm(hv))
+    if n < 1e-12:
+        return hv.copy()
+    return hv / n
 
 
 # ── callable types ──────────────────────────────────────────────────────
@@ -161,7 +181,9 @@ class SourceIngestor:
 
     Persistent state lives in the stream and the Titanos store. Two
     ingestor instances sharing the same stream and Titanos behave
-    identically given the same input.
+    identically given the same input, and the order in which packets
+    fold does not affect the final readout (see accumulation policy in
+    the module docstring).
     """
 
     def __init__(
@@ -206,13 +228,19 @@ class SourceIngestor:
     def _fold(self, packet: HierarchicalPacket) -> None:
         """Fold a packet into the stream with φ^(-level) weighting.
 
-        Does not use StreamState.update() because that method applies
-        StreamStateConfig.decay, which is a separate parameter. This
-        path applies the ladder weight directly.
+        Accumulates without intermediate renormalization. The stream's
+        _hv is the raw weighted sum Σ w_k · hv_k; normalization happens
+        at readout() only. This makes the fold order-independent: the
+        sum is commutative and normalization is a pure function of the
+        sum.
+
+        Does not use StreamState.update() because that method
+        normalizes per call. SourceIngestor keeps its own accumulation
+        policy.
         """
         weight = phi_weight(packet.level)
         s = self.stream
-        s._hv = _normalize(s._hv + weight * packet.hv)
+        s._hv = s._hv + weight * packet.hv
         if s._span_start is None:
             s._span_start = int(packet.span_start)
             s._span_end = int(packet.span_end)
@@ -312,7 +340,13 @@ class SourceIngestor:
 
     # ── readout ─────────────────────────────────────────────────────
     def readout(self) -> np.ndarray:
-        return self.stream.readout()
+        """Return a unit-norm view of the accumulated state.
+
+        The stream's _hv is the raw weighted sum; this method
+        normalizes on read without mutating _hv. Subsequent folds
+        accumulate onto the same raw sum.
+        """
+        return _normalize(self.stream.readout())
 
     def snapshot(self) -> dict:
         return {
@@ -331,13 +365,6 @@ class SourceIngestor:
             },
             "phi_inv": float(PHI_INV),
         }
-
-
-def _normalize(hv: np.ndarray) -> np.ndarray:
-    n = float(np.linalg.norm(hv))
-    if n < 1e-12:
-        return hv.copy()
-    return hv / n
 
 
 __all__ = [
