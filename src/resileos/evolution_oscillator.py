@@ -210,9 +210,10 @@ class OscillatorOrientedSearch:
         evaluator: Evaluator,
         iterations: Optional[int] = None,
     ) -> "OscillatorOrientedSearch":
-        """Evaluate candidates until the iteration budget is exhausted or
-        the grid is exhausted. `iterations` overrides `self.budget` when
-        given; the tests exercise this.
+        """Evaluate candidates until budget is exhausted or grid is exhausted.
+
+        `iterations` overrides `self.budget` when given. Tests pass it
+        as a keyword; the default is unchanged.
         """
         limit = self.budget if iterations is None else int(iterations)
         for _ in range(limit):
@@ -241,9 +242,9 @@ class OscillatorOrientedSearch:
     def best_so_far(self) -> list[float]:
         """Running minimum of the reward sequence.
 
-        Returns a list of length len(self._history). Entry i is the
-        best reward observed over the first i+1 evaluations. Monotone
-        non-increasing by construction.
+        Entry i is the best reward observed over the first i+1
+        evaluations. Monotone non-increasing by construction. Empty
+        history returns an empty list.
         """
         out: list[float] = []
         running = float("inf")
@@ -263,9 +264,9 @@ class OscillatorOrientedSearch:
     def summary(self) -> dict:
         """Compact summary of the search result.
 
-        Empty search returns {"n": 0}. Non-empty search returns the keys
-        the test contract expects: n_evaluated, n_grid, coverage,
-        best_config (as a dict), field_R, epsilon_source.
+        Empty search returns {"n": 0}. Otherwise returns the keys the
+        test contract reads: n_evaluated, n_grid, coverage, best_reward,
+        best_config, field_R, epsilon_source.
         """
         if not self._history:
             return {"n": 0}
