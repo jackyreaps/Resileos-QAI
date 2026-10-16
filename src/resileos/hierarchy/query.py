@@ -88,11 +88,9 @@ class HierarchicalQuery:
     def _cleanup_token(self, token_hv: np.ndarray) -> int:
         """Nearest-neighbour token ID for a recovered token hypervector.
 
-        The codex codebook is built from `np.arange(1, vocab_size + 1)`,
-        so `codebook[i]` holds the phasor for token ID `i + 1`. The
-        argmax index must therefore be shifted by one to recover the
-        token ID. Without the shift, cleanup returns an index in
-        [0, vocab_size) that is off by one from every true token ID.
+        The codex codebook is built from `np.arange(0, vocab_size)` and
+        `codebook[t]` holds the phasor for token ID `t`. The argmax is
+        therefore the token ID directly. No shift.
         """
         sims = np.real(np.conj(self.codex.codebook) @ token_hv)
-        return int(np.argmax(sims)) + 1
+        return int(np.argmax(sims))
