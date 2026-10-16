@@ -13,8 +13,13 @@ reported separately as a diagnostic. No claim of prediction. No trained model.
 Orientation contract (RES-304, RES-307):
     The oscillator field's dtheta signs carry directional commitment. When
     phi-compress contracts the rank, surviving oscillators keep their theta,
-    omega, and dtheta sign. The dropped oscillator's coupling weight is
+    omega, and dtheta sign. The dropped oscillators' coupling weight is
     redistributed among survivors. The field is rebuilt with random_start=False.
+
+    The number of oscillators dropped is exactly old_r - new_r, where new_r
+    is whatever contract_rank returns. Dropping a fixed count of one while
+    contract_rank drops more leads to a W slice whose shape disagrees with
+    the rebuilt field's r.
 """
 from __future__ import annotations
 
@@ -181,10 +186,17 @@ class LanguagePipeline:
         )
         dtheta_signs[dtheta_signs == 0] = 1.0  # tie-break like evolution_oscillator
 
-        # 2. Choose which oscillator to drop: the one whose dtheta is weakest
-        #    (closest to zero orientation commitment).
-        drop_idx = int(np.argmin(np.abs(dtheta_signs)))
-        keep = [i for i in range(old_r) if i != drop_idx]
+        # 2. Drop exactly (old_r - new_r) oscillators, weakest orientation
+        #    commitment first. contract_rank may drop more than one rank;
+        #    keep must match new_r or the W slice will not square with the
+        #    rebuilt field.
+        n_drop = old_r - new_r
+        order = np.argsort(np.abs(dtheta_signs))
+        drop_set = set(int(i) for i in order[:n_drop])
+        keep = [i for i in range(old_r) if i not in drop_set]
+        assert len(keep) == new_r, (
+            f"keep size {len(keep)} != new_r {new_r}"
+        )
 
         # 3. Rebuild core and field.
         self.core = ResidualCore(
@@ -205,7 +217,7 @@ class LanguagePipeline:
         )
 
         # 4. Transfer orientation: surviving oscillators keep theta, omega,
-        #    and dtheta sign. Dropped oscillator's coupling weight is
+        #    and dtheta sign. Dropped oscillators' coupling weight is
         #    redistributed to keep mean kappa constant.
         self.field.theta = theta_old[keep].copy()
         self.field.omega = omega_old[keep].copy()
