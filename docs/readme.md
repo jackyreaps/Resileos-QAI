@@ -40,38 +40,40 @@ Recent substrate extensions:
 12. [Causal Sandbox Index](300-substrate/causal-sandbox.md) — RES-305
 13. [Phasor Graph](300-substrate/phasor-graph.md) — RES-306
 14. [Agency Hierarchy](300-substrate/agency-hierarchy.md) — RES-307
+15. [Constructive Head](300-substrate/constructive-head.md) — RES-308
+16. [Entanglement Pipeline Engine](300-substrate/entanglement-pipeline.md) — RES-309
 
 Hierarchy / modulation layer:
-15. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
-16. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
-17. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
-18. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
-19. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
-20. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
+17. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
+18. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
+19. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
+20. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
+21. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
+22. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
 
 Titanos application layer:
-21. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
-22. [Dense Entity Index](320-titanos/index.md) — RES-321
-23. [Query Language and Execution](320-titanos/query.md) — RES-322
+23. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
+24. [Dense Entity Index](320-titanos/index.md) — RES-321
+25. [Query Language and Execution](320-titanos/query.md) — RES-322
 
 Operations and notes:
-24. [Run Config](400-operations/run-config.md) — RES-400
-25. [Training](400-operations/training.md) — RES-401
-26. [Validation](400-operations/validation.md) — RES-402
-27. [Behavioral Notes](500-notes/behavioral.md) — RES-500
-28. [Roadmap](500-notes/roadmap.md) — RES-501
+26. [Run Config](400-operations/run-config.md) — RES-400
+27. [Training](400-operations/training.md) — RES-401
+28. [Validation](400-operations/validation.md) — RES-402
+29. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+30. [Roadmap](500-notes/roadmap.md) — RES-501
 
 QD-TER bridge:
-29. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-30. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-31. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-32. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
-33. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
-34. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
-35. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
+31. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+32. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+33. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+34. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+35. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+36. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+37. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
 
 Reference:
-36. [Glossary](900-reference/glossary.md) — RES-900
+38. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
@@ -95,15 +97,17 @@ Reference:
 | RES-305 | `sandbox.py` | proposal | Causal Sandbox Index; metric defined, not derived |
 | RES-306 | `phasor.py` | stable | Phasor graph, band carriers, banded memory; Lean-backed |
 | RES-307 | `agency.py` | heuristic | Routing layer; thresholds are operational parameters |
+| RES-308 | `constructive-head.md` | proposal | Third head: drift direction from core dynamics; quantum-shaped only |
+| RES-309 | `entanglement-pipeline.md` | conjectural | Shared-prefix structure as coarse-grained correlation; CHSH test proposed |
 
 ## 310-series hierarchy modules
 
 | Doc | Module | Status | Notes |
 |-----|--------|--------|-------|
-| RES-310 | `hierarchical-encoding.md` | draft | Tree of packets; capacity-driven levels |
+| RES-310 | `hierarchical-encoding |.md` | draft | Tree of packets; capacity-driven levels |
 | RES-311 | `streaming-state.md` | draft | Running stream_hv; decay and level weighting |
 | RES-312 | `mask-stack.md` | draft | Layered masks; mask-to-sheath transition |
-| RES-313 | `capacity-law.md` | draft | Composition bound; trillion-token negative result |
+| RES-313 | `capacity-law.md` draft | Composition bound; trillion-token negative result |
 | RES-314 | `error-bound.md` | draft | Empirical error model; redundancy contract |
 | RES-315 | `modulation-interface.md` | draft | Carrier spec; what the modulation does |
 
@@ -141,7 +145,7 @@ docs state their own scope; the status page aggregates them.
     RES-300 ─▶ RES-301 ─▶ RES-302 ─▶ RES-303
         │
         ▼
-    RES-304  RES-305  RES-306 ─▶ RES-307
+    RES-304  RES-305  RES-306 ─▶ RES-307 ─▶ RES-308 ─▶ RES-309
                             │
                             ▼
                 RES-310 ─▶ RES-311 ─▶ RES-312
