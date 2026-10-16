@@ -97,17 +97,17 @@ Reference:
 | RES-305 | `sandbox.py` | proposal | Causal Sandbox Index; metric defined, not derived |
 | RES-306 | `phasor.py` | stable | Phasor graph, band carriers, banded memory; Lean-backed |
 | RES-307 | `agency.py` | heuristic | Routing layer; thresholds are operational parameters |
-| RES-308 | `constructive-head.md` | proposal | Third head: drift direction from core dynamics; quantum-shaped only |
+| RES-308 | `constructive-head.md` | proposal | Directional head; quantum-shaped math, no QPU |
 | RES-309 | `entanglement-pipeline.md` | conjectural | Shared-prefix structure as coarse-grained correlation; CHSH test proposed |
 
 ## 310-series hierarchy modules
 
 | Doc | Module | Status | Notes |
 |-----|--------|--------|-------|
-| RES-310 | `hierarchical-encoding |.md` | draft | Tree of packets; capacity-driven levels |
+| RES-310 | `hierarchical-encoding.md` | draft | Tree of packets; capacity-driven levels |
 | RES-311 | `streaming-state.md` | draft | Running stream_hv; decay and level weighting |
 | RES-312 | `mask-stack.md` | draft | Layered masks; mask-to-sheath transition |
-| RES-313 | `capacity-law.md` draft | Composition bound; trillion-token negative result |
+| RES-313 | `capacity-law.md` | draft | Composition bound; trillion-token negative result |
 | RES-314 | `error-bound.md` | draft | Empirical error model; redundancy contract |
 | RES-315 | `modulation-interface.md` | draft | Carrier spec; what the modulation does |
 
@@ -145,18 +145,22 @@ docs state their own scope; the status page aggregates them.
     RES-300 ─▶ RES-301 ─▶ RES-302 ─▶ RES-303
         │
         ▼
-    RES-304  RES-305  RES-306 ─▶ RES-307 ─▶ RES-308 ─▶ RES-309
+    RES-304  RES-305  RES-306 ─▶ RES-307
                             │
-                            ▼
-                RES-310 ─▶ RES-311 ─▶ RES-312
-                    │         │         │
-                    └────┬────┴────┬────┘
-                         ▼         ▼
-                    RES-313 ─▶ RES-314
-                         │         │
-                         └────┬────┘
-                              ▼
-                         RES-315
+                            ├──▶ RES-308
+                            │
+                            └──▶ RES-309
+        │
+        ▼
+    RES-310 ─▶ RES-311 ─▶ RES-312
+        │         │         │
+        └────┬────┴────┬────┘
+             ▼         ▼
+        RES-313 ─▶ RES-314
+             │         │
+             └────┬────┘
+                  ▼
+             RES-315
         │
         ▼
     RES-320 ─▶ RES-321 ─▶ RES-322
