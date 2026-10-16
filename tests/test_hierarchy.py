@@ -146,25 +146,21 @@ def test_flush_empty_returns_empty_list():
 
 def test_flush_cascades_when_upper_fills():
     enc = HierarchicalEncoder(_codex(), capacities=[4, 4, 4])
-    # push 7 tokens: buffers[0] has 3, no flush
     enc.push_many(list(range(7)))
-    # flush: level 0 has 3, flushes to level 1 (1 item). level 1 has 1.
-    # nothing fills, so we get levels 1, then 2, then 3 (each partial)
     packets = enc.flush()
     assert [p.level for p in packets] == [1, 2, 3]
 
 
 # ── query ───────────────────────────────────────────────────────────────
 def test_query_locate_recovers_position():
-    # capacities=[2,2,2] so 8 tokens cascade fully to a level-3 packet.
-    # With [4,4,4], 8 tokens only fill level 1 twice; level 3 never emits.
     codex = _codex(vocab=32, dim=256)
     enc = HierarchicalEncoder(codex, capacities=[2, 2, 2])
+    # 8 tokens fill level 3 exactly
     packets = enc.push_many([3, 5, 7, 11, 13, 17, 19, 23])
     top = [p for p in packets if p.level == 3][0]
     q = HierarchicalQuery(enc)
     target = q.retrieve(top.hv, pos_level=2, position=0)
-    pos, sim = q.locate(top.hv, pos_level=2, target=target)
+    pos, sim = q.locate(top.hv, pos_level=2, target_hv=target)
     assert pos == 0
     assert sim > 0.5
 
