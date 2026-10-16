@@ -156,8 +156,10 @@ def test_flush_cascades_when_upper_fills():
 
 # ── query ───────────────────────────────────────────────────────────────
 def test_query_locate_recovers_position():
+    # capacities=[2,2,2] so 8 tokens cascade fully to a level-3 packet.
+    # With [4,4,4], 8 tokens only fill level 1 twice; level 3 never emits.
     codex = _codex(vocab=32, dim=256)
-    enc = HierarchicalEncoder(codex, capacities=[4, 4, 4])
+    enc = HierarchicalEncoder(codex, capacities=[2, 2, 2])
     packets = enc.push_many([3, 5, 7, 11, 13, 17, 19, 23])
     top = [p for p in packets if p.level == 3][0]
     q = HierarchicalQuery(enc)
