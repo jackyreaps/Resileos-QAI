@@ -5,9 +5,10 @@ Two endpoint groups on one app:
 
 Titanos console (application layer):
     GET  /api/v1/stats
+    GET  /api/v1/ready
     POST /api/v1/learn
     POST /api/v1/learn_batch
-    POST /api/v1/query
+    POST /api/v1/query               (routed through Zeus with fallthrough)
     POST /api/v1/sparql              (query language, RES-322)
     POST /api/v1/chain
     POST /api/v1/save
@@ -53,6 +54,8 @@ from resileos.titanos.query import (  # noqa: E402
     QuerySyntaxError,
     QueryBindingError,
 )
+from resileos.substrate.agency import AgencyGroup  # noqa: E402
+from resileos.titanos.zeus import make_zeus_handler, run_zeus_query  # noqa: E402
 from titanos import Titanos, TitanosConfig  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -80,13 +83,7 @@ if STATE_FILE.exists():
 
 def _maybe_seed_from_bundled_facts() -> int:
     """Seed the console from configs/titanos-facts.json when the store is
-    empty. Returns the number of facts loaded (0 = no seed performed).
-
-    Runs once at import time. If the store already has facts (from a
-    persisted state file or prior seeding), this is a no-op. If the seed
-    file is missing, the console starts empty; the caller can then POST
-    facts via /api/v1/learn.
-    """
+    empty. Returns the number of facts loaded (0 = no seed performed)."""
     try:
         stats = titanos_singleton.stats()
     except Exception as e:
@@ -135,6 +132,20 @@ def _maybe_seed_from_bundled_facts() -> int:
 _seed_count = _maybe_seed_from_bundled_facts()
 
 
+# ── Zeus wiring ─────────────────────────────────────────────────────────
+# Zeus is registered as an AgencyChild on the parent Titanos. Requests to
+# /api/v1/query pass through run_zeus_query first; if Zeus declines
+# (returns None), the parent Titanos answers directly. This is the
+# "parent falls through when child abstains" doctrine from RES-324.
+_agency = AgencyGroup()
+try:
+    _zeus_handler = make_zeus_handler()
+    _agency.add_child("zeus", _zeus_handler, weight=1.0)
+    log.info("Zeus registered in agency group (weight=1.0)")
+except Exception as e:
+    log.warning("Zeus registration failed; /query will use parent only: %s", e)
+
+
 class LearnRequest(BaseModel):
     subject: str
     relation: str
@@ -167,12 +178,7 @@ def titanos_stats():
 
 @app.get("/api/v1/ready")
 def titanos_ready():
-    """Readiness probe. Returns 503 until the Titanos store is open.
-
-    Distinct from /api/v1/stats: stats always returns 200 with whatever
-    the store contains, including zero facts. This endpoint is the one
-    to wire into docker HEALTHCHECK.
-    """
+    """Readiness probe. Returns 503 until the Titanos store is open."""
     try:
         s = titanos_singleton.stats()
     except Exception as e:
@@ -219,10 +225,34 @@ def titanos_learn_batch(payload: BatchLearnRequest):
 
 @app.post("/api/v1/query")
 def titanos_query(payload: QueryRequest):
+    """Route through Zeus with parent fallthrough.
+
+    Zeus handles structured resolution first (it delegates to the
+    parent's `ask` for simple queries). If Zeus returns None — decline —
+    the parent answers directly. Agency fitness is recorded internally
+    by run_zeus_query.
+    """
     try:
-        ans = (titanos_singleton.ask_inverse(payload.subject, payload.relation)
-               if payload.inverse
-               else titanos_singleton.ask(payload.subject, payload.relation))
+        # Zeus path. If registration failed at import, _agency has no
+        # children and run_zeus_query returns None on empty selection.
+        ans = None
+        if _agency.children:
+            ans = run_zeus_query(
+                _agency,
+                titanos_singleton,
+                payload.subject,
+                payload.relation,
+                inverse=payload.inverse,
+            )
+
+        # Parent fallthrough
+        if ans is None:
+            ans = (titanos_singleton.ask_inverse(
+                       payload.subject, payload.relation)
+                   if payload.inverse
+                   else titanos_singleton.ask(
+                       payload.subject, payload.relation))
+
         return {
             "value": ans.value,
             "confidence": float(ans.confidence),
@@ -231,6 +261,7 @@ def titanos_query(payload: QueryRequest):
             "loops": ans.loops,
             "reason": ans.reason,
             "gate_state": ans.gate_state,
+            "child_name": ans.child_name,
             "trace": [
                 {
                     "loop": h["loop"],
@@ -250,8 +281,7 @@ def titanos_query(payload: QueryRequest):
 
 @app.post("/api/v1/sparql")
 def titanos_sparql(payload: SparqlRequest):
-    """
-    Execute a query in the RES-322 grammar against the live Titanos state.
+    """Execute a query in the RES-322 grammar against the live Titanos state.
 
     Examples:
         SELECT ?o WHERE alice --knows--> ?o
@@ -304,13 +334,13 @@ def titanos_save():
 # ═══════════════════════════════════════════════════════════════════════════
 # Substrate (QD-TER two-head system)
 # ═══════════════════════════════════════════════════════════════════════════
-HIDDEN_DIM = int(os.getenv("RESILEOS_HIDDEN_DIM", "128"))
+HIDDEN_DIM = int(os.getenv("RESILEOS_HIDDEN_DIM", "128 heads"))
 KERNEL_DIM = int(os.getenv("RESILEOS_KERNEL_DIM", "1"))
 MIN_TRAIN_STEPS = int(os.getenv("RESILEOS_MIN_TRAIN_STEPS", "5"))
 
 
 class SubstrateContainer:
-    """Module-level persistent model singleton for the substrate heads."""
+    """Module-level persistent model singleton for the substrate."""
 
     def __init__(self) -> None:
         torch.manual_seed(42)
