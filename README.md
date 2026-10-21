@@ -44,23 +44,27 @@ Two processes. Two terminals.
 
     uvicorn app:app --port 8000 --reload
 
-Endpoints, grouped by layer:
+### Endpoints
 
-*Titanos application layer:*
+Titanos:
+- `GET  /api/v1/stats` — store stats
+- `GET  /api/v1/ready` — readiness probe (503 until store is open)
+- `POST /api/v1/learn` — add one fact
+- `POST /api/v1/learn_batch` — add many facts
+- `POST /api/v1/query` — single-hop query (routed through Zeus; falls through to parent on decline)
+- `POST /api/v1/sparql` — SPARQL-like queries (RES-322)
+- `POST /api/v1/chain` — multi-hop chain
+- `POST /api/v1/save` — persist state to disk
 
-- `GET  /api/v1/stats`        — substrate statistics
-- `POST /api/v1/learn`        — store one `(subject, relation, obj)`
-- `POST /api/v1/learn_batch`  — bulk store
-- `POST /api/v1/query`        — probe (direct or inverse)
-- `POST /api/v1/chain`        — multi-hop traversal
-- `POST /api/v1/save`         — persist state to `titanos_live_state.json`
+Substrate (QD-TER two-head system):
+- `GET  /api/v1/substrate_stats` — head stats and training status
+- `POST /api/v1/train_substrate` — train the two heads
+- `POST /api/v1/verify_manifold` — gated validation (requires is_trained)
+- `POST /api/v1/sweep_epsilon` — ε-sweep diagnostic (ungated)
 
-*Substrate (QD-TER two-head system, RES-600/601/602):*
-
-- `GET  /api/v1/substrate_stats`   — head state, training steps
-- `POST /api/v1/train_substrate`   — optimize heads; flips `is_trained`
-- `POST /api/v1/verify_manifold`   — infer on a trajectory (gated)
-- `POST /api/v1/sweep_epsilon`     — ε-sweep verification (ungated)
+leCore integration (capability router):
+- `GET  /api/v1/lecore/health` — leCore bridge liveness
+- `POST /api/v1/lecore/route` — capability search via leCore
 
 **Terminal 2 — dashboard (Streamlit):**
 
