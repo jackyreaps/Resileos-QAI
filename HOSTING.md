@@ -1,8 +1,10 @@
+---
 doc: RES-800
 title: Hosting Guide
 status: stable
 depends_on: [RES-320, RES-321, RES-322]
 referenced_by: []
+---
 
 # Hosting Guide
 
@@ -28,9 +30,11 @@ must stay at 1 unless the store is externalized.
 
 ### 2.1 Clone and prepare the state file
 
-    git clone https://github.com/jackyreaps/Resileos-QAI.git
-    cd Resileos-QAI
-    touch titanos_live_state.json
+```bash
+git clone https://github.com/jackyreaps/Resileos-QAI.git
+cd Resileos-QAI
+touch titanos_live_state.json
+```
 
 The `touch` matters. Docker creates a **directory** at the mount path
 if the file does not exist. `app.py` expects a file and will fail to
@@ -38,18 +42,24 @@ read it.
 
 ### 2.2 Build
 
-    docker compose build
+```bash
+docker compose build
+```
 
 ### 2.3 Run
 
-    docker compose up -d
-    # API :8000
-    # UI  :8501
+```bash
+docker compose up -d
+# API :8000
+# UI  :8501
+```
 
 ### 2.4 Verify both probes
 
-    curl -sf http://127.0.0.1:8000/api/v1/substrate_stats
-    curl -sf http://127.0.0.1:8000/api/v1/ready
+```bash
+curl -sf http://127.0.0.1:8000/api/v1/substrate_stats
+curl -sf http://127.0.0.1:8000/api/v1/ready
+```
 
 `/substrate_stats` confirms the residual core is loaded.
 `/ready` returns 503 until the Titanos store is open. The container
@@ -63,45 +73,57 @@ store is empty and the live state file is absent. On a clean deploy,
 
 To seed manually (or add to an existing store):
 
-    curl -s -X POST http://127.0.0.1:8000/api/v1/learn \
-      -H "Content-Type: application/json" \
-      -d '{"subject":"alice","relation":"knows","obj":"bob"}'
-    curl -s -X POST http://127.0.0.1:8000/api/v1/save
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/learn \
+  -H "Content-Type: application/json" \
+  -d '{"subject":"alice","relation":"knows","obj":"bob"}'
+curl -s -X POST http://127.0.0.1:8000/api/v1/save
+```
 
 ## 3. Smoke queries
 
 Single hop:
 
-    curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
-      -H "Content-Type: application/json" \
-      -d '{"query":"SELECT ?o WHERE alice --knows--> ?o"}'
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"SELECT ?o WHERE alice --knows--> ?o"}'
+```
 
 Inverse:
 
-    curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
-      -H "Content-Type: application/json" \
-      -d '{"query":"SELECT ?s WHERE ?s <--knows-- bob"}'
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"SELECT ?s WHERE ?s <--knows-- bob"}'
+```
 
 Multi-hop join:
 
-    curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
-      -H "Content-Type: application/json" \
-      -d '{"query":"SELECT ?o WHERE alice --knows--> ?o AND ?o --works_at--> acme"}'
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"SELECT ?o WHERE alice --knows--> ?o AND ?o --works_at--> acme"}'
+```
 
 Full scan (requires `iter_entities` on the core):
 
-    curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
-      -H "Content-Type: application/json" \
-      -d '{"query":"SELECT ?s, ?o WHERE ?s --knows--> ?o"}'
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"SELECT ?s, ?o WHERE ?s --knows--> ?o"}'
+```
 
 Open the dashboard at http://127.0.0.1:8501.
 
 ## 4. Production defaults
 
-    phi_compress_enabled = False       # see docs/400-operations/phi-compress-closed.md
-    replicas             = 1           # single-process store
-    auth                 = required before public exposure
-    healthcheck          = /substrate_stats AND /ready
+```
+phi_compress_enabled = False       # see docs/400-operations/phi-compress-redesign.md (RES-403)
+replicas             = 1           # single-process store
+auth                 = required before public exposure
+healthcheck          = /substrate_stats AND /ready
+```
 
 ## 5. Before public exposure
 
@@ -118,8 +140,10 @@ Internal-only deployments (localhost, LAN) can run without these.
 
 ## 6. Development without Docker
 
-    pip install -e ".[all]"
-    bash run_system.sh
+```bash
+pip install -e ".[all]"
+bash run_system.sh
+```
 
 `run_system.sh` starts uvicorn and Streamlit together and installs the
 package if it is not yet importable.
@@ -128,8 +152,7 @@ package if it is not yet importable.
 
 `titanos_live_state.json` at repo root is the durable state. It is
 written on every `/api/v1/learn` and `/api/v1/save` call. Docker
-compose mounts it as a file (see §2.1). Back it up if the store
-matters.
+compose mounts it as a file (see §2.1). Back it up if the store matters.
 
 ## 8. What this host is not
 
@@ -148,4 +171,4 @@ matters.
 - [Documentation Index](docs/readme.md) — RES-000
 - [Disk-Backed Band Store](docs/320-titanos/store.md) — RES-320
 - [Query Language and Execution](docs/320-titanos/query.md) — RES-322
-- [phi-compress closed](docs/400-operations/phi-compress-closed.md) — RES-401
+- [phi-compress redesign](docs/400-operations/phi-compress-redesign.md) — RES-403
