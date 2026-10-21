@@ -17,16 +17,12 @@ Storage uses MAP triple binding:
 
 MAP binding is symmetric: probe = anchor * r against Σ(s*r*o) returns
 Σ(s*o*anchor), which surfaces whichever slot the anchor occupies. For
-an entity that appears on both sides of a relation (Cronus is a child
-of Uranus and a parent of Zeus), the retrieved vector is a mixture of
-both partners and argmax picks by noise. Cleanup is therefore
-restricted to the queried slot using the fact list, which is
-authoritative for subject/object direction.
+an entity that appears on both sides of a relation, the retrieved
+vector is a mixture. Cleanup is therefore restricted to the queried
+slot using the fact list, which is authoritative for direction.
 
 Scoring promotes to float64 before the inner products. np.dot on int8
-inputs uses an int8 accumulator and silently overflows for dim > 127,
-returning wraparound values that have no relation to the true inner
-product.
+inputs uses an int8 accumulator and silently overflows for dim > 127.
 
 The "quantum" path is a labeled simulation (QUANTUM_SIM).
 """
@@ -203,34 +199,20 @@ class Titanos:
         return np.sum(
             np.stack(list(self._bands.values())), axis=0).astype(np.int32)
 
-    def _slot_candidates(
-        self, relation: str, inverse: bool
-    ) -> set[str]:
-        """Entities that occupy the queried slot for `relation`.
-
-        The MAP probe `anchor * r` against `Σ(s*r*o)` is symmetric: it
-        recovers the anchor's partner whichever slot the anchor occupies.
-        For an anchor that appears on both sides of a relation (Cronus is
-        both a child of Uranus and a parent of Zeus), the retrieved vector
-        is a mixture and argmax picks by noise.
-
-        Restricting cleanup to entities that actually appear in the
-        intended slot removes the mixture. The data is already in
-        `self.facts`; this is a set lookup, not a VSA operation.
-
-        inverse=False -> objects  (forward: anchor points at them)
-        inverse=True  -> subjects (inverse: they point at anchor)
-        """
-        idx = 0 if inverse else 2
-        return {
-            f[idx] for f in self.facts if f[1] == relation
-        }
-
     def _get_band(self, relation: str) -> np.ndarray:
         if relation not in self._bands:
             self._bands[relation] = np.zeros(self.cfg.dim, dtype=np.int32)
             self._counts[relation] = 0
         return self._bands[relation]
+
+    def _slot_candidates(self, relation: str, inverse: bool) -> set[str]:
+        """Entities occupying the queried slot for `relation`.
+
+        inverse=False -> objects  (forward: anchor points at them)
+        inverse=True  -> subjects (inverse: they point at anchor)
+        """
+        idx = 0 if inverse else 2
+        return {f[idx] for f in self.facts if f[1] == relation}
 
     # ── monitors ─────────────────────────────────────────────────────
     def _current_anisotropy(self) -> float:
@@ -344,15 +326,10 @@ class Titanos:
 
     # ── MAP triple binding ───────────────────────────────────────────
     def learn(self, subject: str, relation: str, obj: str) -> None:
-        """
-        band += s * r * o  (elementwise, bipolar).
-
-        Forward probe s * r retrieves o. Inverse probe o * r retrieves s.
-        Because elementwise bind is self-inverse, the probe is symmetric
-        and recovers whichever slot the anchor occupies. Slot restriction
-        in `_slot_candidates` + `_cleanup(restrict_to=...)` disambiguates
-        the direction.
-        """
+        """band += s * r * o. Forward probe s*r retrieves o; inverse
+        probe o*r retrieves s. Because bind is self-inverse, the probe
+        recovers whichever slot the anchor occupies; direction is
+        enforced at cleanup via `_slot_candidates`."""
         s = self._ent(subject)
         r = self._rel(relation)
         o = self._ent(obj)
@@ -363,37 +340,18 @@ class Titanos:
 
     def _encode_probe(self, anchor: str, relation: str,
                       inverse: bool = False) -> np.ndarray:
-        """
-        MAP probe: anchor * relation. Recovers the other slot.
-
-        `inverse` is informational; the probe form is the same. The
-        direction is enforced during cleanup via `_slot_candidates`,
-        which restricts candidates to subjects (inverse) or objects
-        (forward) using `self.facts`.
-        """
+        """MAP probe: anchor * relation. Direction is enforced during
+        cleanup via `_slot_candidates`, not by the probe form."""
         return (self._ent(anchor) * self._rel(relation)).astype(np.int8)
 
     # ── scoring / cleanup ────────────────────────────────────────────
-    def _score_candidates(self, vec: np.ndarray,
-                          acc: np.ndarray | None = None,
-                          exclude: set[str] | None = None,
-                          restrict_to: set[str] | None = None,
-                          ) -> list[tuple[str, float, float]]:
-        """
-        Score each candidate entity against a retrieved vector.
-
-        sim = <vec, anchor> / D   (sign-aware, query-specific)
-        mag = |<acc, anchor>| / D (accumulator magnitude)
-
-        `restrict_to` limits candidates to the queried slot (subjects
-        for inverse, objects for forward). This is what enforces
-        direction; the VSA probe alone cannot.
-
-        Both dots are promoted to float64. np.dot on int8 inputs uses
-        an int8 accumulator and silently overflows for dim > 127,
-        producing wraparound values that have no relation to the true
-        inner product. Promoting avoids this.
-        """
+    def _score_candidates(
+        self,
+        vec: np.ndarray,
+        acc: np.ndarray | None = None,
+        exclude: set[str] | None = None,
+        restrict_to: set[str] | None = None,
+    ) -> list[tuple[str, float, float]]:
         exclude = exclude or set()
         D = float(self.cfg.dim)
         if acc is None:
@@ -404,20 +362,22 @@ class Titanos:
         for name, anchor in self.entities.items():
             if name in exclude:
                 continue
-            if restrict_to is not None and i name not in restrict_to in:
+            if restrict_to is not None and name not in restrict_to:
                 continue
-            a = anchor.astype range(np.float64)
-            sim = float(np.dot(self(vec_f, a)) / D
+            a = anchor.astype(np.float64)
+            sim = float(np.dot(vec_f, a)) / D
             mag = abs(float(np.dot(acc_f, a))) / D
             out.append((name, sim, mag))
         return out
 
-    def _cleanup(self, vec: np.ndarray,
-                 acc: np.ndarray | None = None,
-                 exclude: set[str] | None = None,
-                 mode: str | None = None,
-                 restrict_to: set[str] | None = None,
-                 ) -> tuple[str | None, float]:
+    def _cleanup(
+        self,
+        vec: np.ndarray,
+        acc: np.ndarray | None = None,
+        exclude: set[str] | None = None,
+        mode: str | None = None,
+        restrict_to: set[str] | None = None,
+    ) -> tuple[str | None, float]:
         scores = self._score_candidates(
             vec, acc=acc, exclude=exclude, restrict_to=restrict_to)
         if not scores:
@@ -438,7 +398,7 @@ class Titanos:
         elif mode == "composite":
             smax = s.max() + 1e-12
             mmax = m.max() + 1e-12
-            conf.c = alpha * (fgs / smax) + (1.0 - alpha) * (m / mmax)
+            conf = alpha * (s / smax) + (1.0 - alpha) * (m / mmax)
         else:
             raise ValueError(f"unknown conf_mode: {mode}")
         idx = int(np.argmax(conf))
@@ -450,7 +410,7 @@ class Titanos:
         h = initial_h.copy()
         history: list = []
         sqrt_dim = float(np.sqrt(self.cfg.dim))
-        for.n_loops):
+        for i in range(self.cfg.n_loops):
             W = h.reshape(self.cfg.m, self.cfg.n).astype(np.float64)
             norm_W = float(np.linalg.norm(W)) / sqrt_dim
             DeltaS_local = 0.5 * DeltaS + 0.5 * (1.0 / (1.0 + norm_W))
@@ -490,9 +450,13 @@ class Titanos:
             h = h_c
         return h, history, "MAX_LOOPS", history[-1]["gate_state"]
 
-    def _quantum_sim(self, probe: np.ndarray, acc: np.ndarray,
-                     exclude: set[str],
-                     restrict_to: set[str] | None = None):
+    def _quantum_sim(
+        self,
+        probe: np.ndarray,
+        acc: np.ndarray,
+        exclude: set[str],
+        restrict_to: set[str] | None = None,
+    ) -> tuple[str | None, float]:
         readout = np.where(acc >= 0, 1, -1).astype(np.int8)
         cands = []
         for _ in range(self.cfg.quantum_samples):
@@ -673,12 +637,26 @@ class Titanos:
     def ask_inverse(self, obj: str, relation: str) -> Answer:
         return self._ask(obj, relation, inverse=True)
 
-    def iter_entities(self) -> list[str]:
-        """All entity names, for full-scan queries (RES-322 §5).
+    def ask_list(self, anchor: str, relation: str,
+                 inverse: bool = False) -> list[str]:
+        """All entities in the queried slot relative to `anchor`.
 
-        Enables the query executor to answer clauses whose anchor is an
-        unbound variable, e.g. `SELECT ?s, ?o WHERE ?s --knows--> ?o`.
+        SPARQL adapter (RES-322 Protocol). Forward returns objects;
+        inverse returns subjects. Exact retrieval from the fact list,
+        not VSA cleanup — this is what the query executor wants.
         """
+        if inverse:
+            return sorted({
+                f[0] for f in self.facts
+                if f[1] == relation and f[2] == anchor
+            })
+        return sorted({
+            f[2] for f in self.facts
+            if f[1] == relation and f[0] == anchor
+        })
+
+    def iter_entities(self) -> list[str]:
+        """All entity names, for full-scan queries (RES-322 §5)."""
         return list(self.entities.keys())
 
     # ── agency layer ─────────────────────────────────────────────────
