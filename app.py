@@ -133,17 +133,36 @@ _seed_count = _maybe_seed_from_bundled_facts()
 
 
 # ── Zeus wiring ─────────────────────────────────────────────────────────
-# Zeus is registered as an AgencyChild on the parent Titanos. Requests to
-# /api/v1/query pass through run_zeus_query first; if Zeus declines
-# (returns None), the parent Titanos answers directly. This is the
-# "parent falls through when child abstains" doctrine from RES-324.
-_agency = AgencyGroup()
+# Zeus is registered as an AgencyChild on the Titanos singleton's own
+# AgencyGroup, so that stats()["agency"] reflects the registration. The
+# query route reads from the same group; if Zeus declines (returns None),
+# the parent answers directly (RES-324 doctrine).
 try:
     _zeus_handler = make_zeus_handler()
-    _agency.add_child("zeus", _zeus_handler, weight=1.0)
-    log.info("Zeus registered in agency group (weight=1.0)")
+    titanos_singleton.agency.add_child("zeus", _zeus_handler, weight=1.0)
+    log.info("Zeus registered in Titanos agency group (weight=1.0)")
 except Exception as e:
     log.warning("Zeus registration failed; /query will use parent only: %s", e)
+
+
+# ── SPARQL adapter ──────────────────────────────────────────────────────
+class _SPARQLAdapter:
+    """Bridges Titanos to the RES-322 `_Core` Protocol.
+
+    The query engine calls `core.ask(anchor, relation, inverse=...)` and
+    expects `list[str]`. Titanos exposes `ask_list` which returns exactly
+    that. `iter_entities` passthrough enables full-scan queries.
+    """
+
+    def __init__(self, titanos) -> None:
+        self._t = titanos
+
+    def ask(self, anchor: str, relation: str,
+            inverse: bool = False) -> list[str]:
+        return self._t.ask_list(anchor, relation, inverse=inverse)
+
+    def iter_entities(self) -> list[str]:
+        return self._t.iter_entities()
 
 
 class LearnRequest(BaseModel):
@@ -233,12 +252,11 @@ def titanos_query(payload: QueryRequest):
     by run_zeus_query.
     """
     try:
-        # Zeus path. If registration failed at import, _agency has no
-        # children and run_zeus_query returns None on empty selection.
         ans = None
-        if _agency.children:
+        agency = titanos_singleton.agency
+        if agency.children:
             ans = run_zeus_query(
-                _agency,
+                agency,
                 titanos_singleton,
                 payload.subject,
                 payload.relation,
@@ -292,7 +310,7 @@ def titanos_sparql(payload: SparqlRequest):
     q = payload.query.strip()
     if not q:
         raise HTTPException(400, "query is required")
-    engine = TitanosQueryEngine(titanos_singleton)
+    engine = TitanosQueryEngine(_SPARQLAdapter(titanos_singleton))
     try:
         rows = engine.execute(q)
     except QuerySyntaxError as e:
