@@ -15,6 +15,14 @@ Storage uses MAP triple binding:
     probe = anchor * r
     retrieved = sign(band) * probe  ~= other_slot + crosstalk
 
+MAP binding is symmetric: probe = anchor * r against Σ(s*r*o) returns
+Σ(s*o*anchor), which surfaces whichever slot the anchor occupies. For
+an entity that appears on both sides of a relation (Cronus is a child
+of Uranus and a parent of Zeus), the retrieved vector is a mixture of
+both partners and argmax picks by noise. Cleanup is therefore
+restricted to the queried slot using the fact list, which is
+authoritative for subject/object direction.
+
 Scoring promotes to float64 before the inner products. np.dot on int8
 inputs uses an int8 accumulator and silently overflows for dim > 127,
 returning wraparound values that have no relation to the true inner
@@ -195,6 +203,29 @@ class Titanos:
         return np.sum(
             np.stack(list(self._bands.values())), axis=0).astype(np.int32)
 
+    def _slot_candidates(
+        self, relation: str, inverse: bool
+    ) -> set[str]:
+        """Entities that occupy the queried slot for `relation`.
+
+        The MAP probe `anchor * r` against `Σ(s*r*o)` is symmetric: it
+        recovers the anchor's partner whichever slot the anchor occupies.
+        For an anchor that appears on both sides of a relation (Cronus is
+        both a child of Uranus and a parent of Zeus), the retrieved vector
+        is a mixture and argmax picks by noise.
+
+        Restricting cleanup to entities that actually appear in the
+        intended slot removes the mixture. The data is already in
+        `self.facts`; this is a set lookup, not a VSA operation.
+
+        inverse=False -> objects  (forward: anchor points at them)
+        inverse=True  -> subjects (inverse: they point at anchor)
+        """
+        idx = 0 if inverse else 2
+        return {
+            f[idx] for f in self.facts if f[1] == relation
+        }
+
     def _get_band(self, relation: str) -> np.ndarray:
         if relation not in self._bands:
             self._bands[relation] = np.zeros(self.cfg.dim, dtype=np.int32)
@@ -317,6 +348,10 @@ class Titanos:
         band += s * r * o  (elementwise, bipolar).
 
         Forward probe s * r retrieves o. Inverse probe o * r retrieves s.
+        Because elementwise bind is self-inverse, the probe is symmetric
+        and recovers whichever slot the anchor occupies. Slot restriction
+        in `_slot_candidates` + `_cleanup(restrict_to=...)` disambiguates
+        the direction.
         """
         s = self._ent(subject)
         r = self._rel(relation)
@@ -331,9 +366,10 @@ class Titanos:
         """
         MAP probe: anchor * relation. Recovers the other slot.
 
-        `inverse` is informational; the probe form is the same. What
-        differs is which entity the caller excluded during cleanup and
-        how the returned path is worded.
+        `inverse` is informational; the probe form is the same. The
+        direction is enforced during cleanup via `_slot_candidates`,
+        which restricts candidates to subjects (inverse) or objects
+        (forward) using `self.facts`.
         """
         return (self._ent(anchor) * self._rel(relation)).astype(np.int8)
 
@@ -341,12 +377,17 @@ class Titanos:
     def _score_candidates(self, vec: np.ndarray,
                           acc: np.ndarray | None = None,
                           exclude: set[str] | None = None,
+                          restrict_to: set[str] | None = None,
                           ) -> list[tuple[str, float, float]]:
         """
         Score each candidate entity against a retrieved vector.
 
         sim = <vec, anchor> / D   (sign-aware, query-specific)
         mag = |<acc, anchor>| / D (accumulator magnitude)
+
+        `restrict_to` limits candidates to the queried slot (subjects
+        for inverse, objects for forward). This is what enforces
+        direction; the VSA probe alone cannot.
 
         Both dots are promoted to float64. np.dot on int8 inputs uses
         an int8 accumulator and silently overflows for dim > 127,
@@ -363,8 +404,10 @@ class Titanos:
         for name, anchor in self.entities.items():
             if name in exclude:
                 continue
-            a = anchor.astype(np.float64)
-            sim = float(np.dot(vec_f, a)) / D
+            if restrict_to is not None and i name not in restrict_to in:
+                continue
+            a = anchor.astype range(np.float64)
+            sim = float(np.dot(self(vec_f, a)) / D
             mag = abs(float(np.dot(acc_f, a))) / D
             out.append((name, sim, mag))
         return out
@@ -373,8 +416,10 @@ class Titanos:
                  acc: np.ndarray | None = None,
                  exclude: set[str] | None = None,
                  mode: str | None = None,
+                 restrict_to: set[str] | None = None,
                  ) -> tuple[str | None, float]:
-        scores = self._score_candidates(vec, acc=acc, exclude=exclude)
+        scores = self._score_candidates(
+            vec, acc=acc, exclude=exclude, restrict_to=restrict_to)
         if not scores:
             return None, 0.0
         names = [n for n, _, _ in scores]
@@ -393,7 +438,7 @@ class Titanos:
         elif mode == "composite":
             smax = s.max() + 1e-12
             mmax = m.max() + 1e-12
-            conf = alpha * (s / smax) + (1.0 - alpha) * (m / mmax)
+            conf.c = alpha * (fgs / smax) + (1.0 - alpha) * (m / mmax)
         else:
             raise ValueError(f"unknown conf_mode: {mode}")
         idx = int(np.argmax(conf))
@@ -405,7 +450,7 @@ class Titanos:
         h = initial_h.copy()
         history: list = []
         sqrt_dim = float(np.sqrt(self.cfg.dim))
-        for i in range(self.cfg.n_loops):
+        for.n_loops):
             W = h.reshape(self.cfg.m, self.cfg.n).astype(np.float64)
             norm_W = float(np.linalg.norm(W)) / sqrt_dim
             DeltaS_local = 0.5 * DeltaS + 0.5 * (1.0 / (1.0 + norm_W))
@@ -446,7 +491,8 @@ class Titanos:
         return h, history, "MAX_LOOPS", history[-1]["gate_state"]
 
     def _quantum_sim(self, probe: np.ndarray, acc: np.ndarray,
-                     exclude: set[str]):
+                     exclude: set[str],
+                     restrict_to: set[str] | None = None):
         readout = np.where(acc >= 0, 1, -1).astype(np.int8)
         cands = []
         for _ in range(self.cfg.quantum_samples):
@@ -455,7 +501,8 @@ class Titanos:
             cands.append((readout * pert).astype(np.int8))
         sup = np.sum(np.stack(cands), axis=0)
         measured = np.where(sup >= 0, 1, -1).astype(np.int8)
-        return self._cleanup(measured, acc=acc, exclude=exclude)
+        return self._cleanup(
+            measured, acc=acc, exclude=exclude, restrict_to=restrict_to)
 
     def _update_csi_from_history(self, history: list) -> None:
         if not history:
@@ -490,6 +537,7 @@ class Titanos:
 
         self._query_count += 1
         probe = self._encode_probe(subject, relation, inverse=inverse)
+        slot = self._slot_candidates(relation, inverse=inverse)
         current_csi = self._csi.value()
         classical_thresh, abstain_thresh, sigma_eff = \
             self._thresholds_for(relation)
@@ -502,7 +550,8 @@ class Titanos:
         readout = self._readout(relation)
         direct = (readout * probe).astype(np.int8)
         fast_best, fast_conf = self._cleanup(
-            direct, acc=acc, exclude={subject}, mode=conf_mode_override)
+            direct, acc=acc, exclude={subject},
+            mode=conf_mode_override, restrict_to=slot)
         fast_conf_gated = fast_conf * scale
         fast_conf_blend = fast_confidence(
             fast_conf_gated, sigma_eff, current_csi)
@@ -557,14 +606,15 @@ class Titanos:
         readout2 = self._readout(relation)
         retrieved = (readout2 * probe).astype(np.int8)
         best, raw_conf = self._cleanup(
-            retrieved, acc=acc, exclude={subject}, mode=conf_mode_override)
+            retrieved, acc=acc, exclude={subject},
+            mode=conf_mode_override, restrict_to=slot)
         conf = raw_conf * scale
 
         if conf >= classical_thresh:
             mode = "CLASSICAL"
         elif conf >= abstain_thresh:
             best_q, conf_q = self._quantum_sim(
-                probe, acc, exclude={subject})
+                probe, acc, exclude={subject}, restrict_to=slot)
             if conf_q > conf:
                 best, conf = best_q, conf_q
             mode = "QUANTUM_SIM"
