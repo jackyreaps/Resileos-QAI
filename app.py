@@ -334,7 +334,7 @@ def titanos_save():
 # ═══════════════════════════════════════════════════════════════════════════
 # Substrate (QD-TER two-head system)
 # ═══════════════════════════════════════════════════════════════════════════
-HIDDEN_DIM = int(os.getenv("RESILEOS_HIDDEN_DIM", "128 heads"))
+HIDDEN_DIM = int(os.getenv("RESILEOS_HIDDEN_DIM", "128"))
 KERNEL_DIM = int(os.getenv("RESILEOS_KERNEL_DIM", "1"))
 MIN_TRAIN_STEPS = int(os.getenv("RESILEOS_MIN_TRAIN_STEPS", "5"))
 
