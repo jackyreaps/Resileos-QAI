@@ -22,24 +22,24 @@ def _cfg():
 def _kb():
     t = Titanos(_cfg())
     facts = [
-        ("Uranus",   "parent_of", "Cronus"),
-        ("Cronus",   "parent_of", "Zeus"),
-        ("Cronus",   "parent_of", "Poseidon"),
-        ("Cronus",   "parent_of", "Hades"),
-        ("Zeus",     "parent_of", "Ares"),
-        ("Zeus",     "parent_of", "Athena"),
-        ("Zeus",     "domain",    "sky"),
-        ("Poseidon", "domain",    "sea"),
-        ("Hades",    "domain",    "underworld"),
-        ("Ares",     "domain",    "war"),
-        ("Athena",   "domain",    "wisdom"),
+        ("Uranus", "parent_of", "Cronus"),
+        ("Cronus", "parent_of", "Zeus"),
+        ("Cronus", "parent_of", "Poseidon"),
+        ("Cronus", "parent_of", "Hades"),
+        ("Zeus", "parent_of", "Ares"),
+        ("Zeus", "parent_of", "Athena"),
+        ("Zeus", "domain", "sky"),
+        ("Poseidon", "domain", "sea"),
+        ("Hades", "domain", "underworld"),
+        ("Ares", "domain", "war"),
+        ("Athena", "domain", "wisdom"),
     ]
     for s, r, o in facts:
         t.learn(s, r, o)
     return t
 
 
-# ── Single-hop ────────────────────────────────────────────────────────────
+# ── Single-hop ──────────────────────────────────────────────────────────
 def test_single_hop():
     t = _kb()
     a = t.ask("Zeus", "domain")
@@ -54,12 +54,12 @@ def test_single_hop_loop_history_shape():
     assert a.loops >= 1
     assert len(a.loop_history) == a.loops
     for h in a.loop_history:
-        assert {"loop", "scar_energy", "delta", "mu", "DeltaS",
-                "rank", "volume_ok", "sigma1_action", "gate_state",
+        assert {"loop", "scar_energy", "delta", "mu", "DeltaS", "rank",
+                "volume_ok", "sigma1_action", "gate_state",
                 "packet_hash"} <= set(h.keys())
 
 
-# ── Inverse ───────────────────────────────────────────────────────────────
+# ── Inverse ─────────────────────────────────────────────────────────────
 def test_inverse():
     t = _kb()
     a = t.ask_inverse("Zeus", "parent_of")
@@ -67,12 +67,14 @@ def test_inverse():
     assert a.value in ("Cronus",)
 
 
-# ── Chain ─────────────────────────────────────────────────────────────────
+# ── Chain ───────────────────────────────────────────────────────────────
 def test_chain():
     t = _kb()
     a = t.chain("Uranus", ["parent_of", "parent_of"])
     assert a.status == "ACCEPTED"
-    assert a.value in ("Ares", "Athena", "Poseidon", "Hades")
+    # Uranus -> Cronus (only child) -> {Zeus, Poseidon, Hades}.
+    # Ares and Athena are three hops from Uranus, not two.
+    assert a.value in ("Zeus", "Poseidon", "Hades")
     assert a.confidence > 0.0
 
 
@@ -83,14 +85,14 @@ def test_chain_breaks_on_unknown():
     assert a.reason
 
 
-# ── Analogy ───────────────────────────────────────────────────────────────
+# ── Analogy ─────────────────────────────────────────────────────────────
 def test_analogy():
     t = _kb()
     a = t.analogy("Zeus", "sky", "Poseidon")
     assert a.status in ("ACCEPTED", "ABSTAINED")
 
 
-# ── Abstention ────────────────────────────────────────────────────────────
+# ── Abstention ──────────────────────────────────────────────────────────
 def test_abstain_on_unknown_entity():
     t = _kb()
     a = t.ask("Odin", "parent_of")
@@ -104,7 +106,7 @@ def test_abstain_on_unknown_relation():
     assert a.status == "ABSTAINED"
 
 
-# ── Quantum label ─────────────────────────────────────────────────────────
+# ── Quantum label ───────────────────────────────────────────────────────
 def test_quantum_path_labeled():
     """If mode is QUANTUM_SIM, it must never be reported as CLASSICAL."""
     t = _kb()
@@ -114,7 +116,7 @@ def test_quantum_path_labeled():
     assert a.mode in ("QUANTUM_SIM", "ABSTAIN")
 
 
-# ── Persistence ───────────────────────────────────────────────────────────
+# ── Persistence ─────────────────────────────────────────────────────────
 def test_save_load_roundtrip(tmp_path):
     t = _kb()
     p = tmp_path / "titanos.json"
@@ -126,7 +128,7 @@ def test_save_load_roundtrip(tmp_path):
     assert a1.value == a2.value
 
 
-# ── NLP front-end ─────────────────────────────────────────────────────────
+# ── NLP front-end ───────────────────────────────────────────────────────
 def test_nlp_parser():
     assert parse_query("Who is the parent of Zeus?") == ("Zeus", "parent", True)
     assert parse_query("Who is Zeus's parent?") == ("Zeus", "parent", False)
@@ -134,16 +136,15 @@ def test_nlp_parser():
     assert parse_query("nonsense without structure 123 !!!") is None
 
 
-# ── Frozen-core contract ──────────────────────────────────────────────────
+# ── Frozen-core contract ────────────────────────────────────────────────
 def test_core_is_read_only_from_titanos():
-    """Titanos must not mutate the core's parameters except through its own step()."""
+    """Titanos must not mutate the core's parameters except through its
+    own step()."""
     t = _kb()
     Lambda_before = t.core.Lambda.copy()
     step_before = t.core.schedule_index
-
     # Asking questions triggers core.step(), which advances schedule_index
     # and updates Λ, but only through the documented API.
     t.ask("Zeus", "domain")
-
     assert t.core.schedule_index >= step_before
     assert t.core.Lambda.shape == Lambda_before.shape
