@@ -1,18 +1,16 @@
----
 doc: RES-304
 title: Structure-Flux-Mode Triad
 status: draft
 depends_on: [RES-200, RES-300, RES-302]
-referenced_by: []
----
+referenced_by: [RES-318]
 
 # Structure-Flux-Mode Triad
 
-The residual core already implements three stages: a constraint structure,
-a flux that moves through it, and a discrete mode that emerges. This
-document names those stages, points at the code that realizes them, and
-defines the experiment that would show whether the triad produces good
-basins on a target problem.
+The residual core already implements three stages: a constraint
+structure, a flux that moves through it, and a discrete mode that
+emerges. This document names those stages, points at the code that
+realizes them, and defines the experiment that would show whether the
+triad produces good basins on a target problem.
 
 It does **not** claim that any problem's complexity class changes. It
 does **not** claim a speedup over any specific baseline. It claims that
@@ -28,7 +26,8 @@ measured before any stronger claim is made.
 | **Mode selection** | The discrete outcome among attractors. | `src/resileos/substrate/reduction.py` — wells `φ_A`, `φ_B`; `src/resileos/core.py` — Prime-Tower rank; `src/resileos/sigma.py` — sigma gate regime switch; `src/resileos/abstention.py` — parity `μ` |
 
 The stages are not a new abstraction. They are a description of what the
-existing code does.
+existing code does. §9 extends this to the multi-engine case, where the
+stages become constructive rather than descriptive.
 
 ## 2. Basin metrics
 
@@ -45,17 +44,20 @@ measurable on any instance.
 A good landscape has high volume, high depth, low boundary dimension,
 and low hopping rate. A bad landscape has the opposite.
 
+`src/resileos/substrate/basin.py` implements all four, plus
+`boundary_codim` and `basin_entropy`. Every function takes a `step_fn`
+and a `target_mode`; none is specific to a single `ResidualCore`. §9
+relies on this.
+
 ## 3. Target problem
 
 **Primary: MaxCut.**
 
 - NP-hard in the worst case.
 - Natural energy landscape: `H = -Σ_{(i,j) ∈ E} J_ij · s_i · s_j` with `s_i ∈ {-1, +1}`.
-- Matches the cubic structure of Axiom D's `F(Ψ, f)` after the standard
-  Ising transformation.
+- Matches the cubic structure of Axiom D's `F(Ψ, f)` after the standard Ising transformation.
 - Small instances (n ≤ 30) exactly solvable by brute force.
-- Well-studied baselines: Goemans–Williamson (SDP relaxation), QAOA,
-  simulated annealing, Tabu search.
+- Well-studied baselines: Goemans–Williamson (SDP relaxation), QAOA, simulated annealing, Tabu search.
 
 **Fallback: TSP.** Euclidean instances, 20–40 cities. Exact via
 Held–Karp up to ~25; beyond that, nearest-neighbor + 2-opt as baseline.
@@ -77,8 +79,8 @@ Fit basin volume vs `n`. Three cases:
 - **Volume decays like `1/poly(n)`** — polynomial advantage over random search. Real result.
 - **Volume decays like `exp(-cn)`** — same as any local landscape. No new claim.
 
-The third case is not a failure. It is the honest answer to a falsifiable
-question. Report it either way.
+The third case is not a failure. It is the honest answer to a
+falsifiable question. Report it either way.
 
 ## 5. Baselines (for context only)
 
@@ -89,11 +91,10 @@ Basin volume should be compared against:
 - **Simulated annealing** — standard schedule, same budget.
 
 If the triad's basin volume beats all three at equal budget, that is the
-result. If it beats only random search, that is also the result.
-
-The comparison does not need to include Goemans–Williamson or QAOA.
-Those are separate classes of method with different time budgets. The
-three baselines above are the honest floor.
+result. If it beats only random search, that is also the result. The
+comparison does not need to include Goemans–Williamson or QAOA. Those
+are separate classes of method with different time budgets. The three
+baselines above are the honest floor.
 
 ## 6. What would falsify the strong claim
 
@@ -102,29 +103,20 @@ NP-hard instances, and this good behaviour scales.*
 
 Falsified if:
 
-1. Basin volume decays exponentially with `n` on every structured class
-   attempted.
-2. The observed mode selection is indistinguishable from local search
-   with the same energy landscape.
-3. Solutions found are optimal only for instances that were already easy
-   by a trivial bound.
-4. Scaling past `n = 30` shows no improvement over `n = 20`, then no
-   improvement over `n = 10` — a flat wall.
+1. Basin volume decays exponentially with `n` on every structured class attempted.
+2. The observed mode selection is indistinguishable from local search with the same energy landscape.
+3. Solutions found are optimal only for instances that were already easy by a trivial bound.
+4. Scaling past `n = 30` shows no improvement over `n = 20`, then no improvement over `n = 10` — a flat wall.
 
 Any of these is a valid outcome. The document's purpose is to make them
 reportable.
 
 ## 7. What this is not
 
-- **Not a claim about complexity classes.** Cook–Levin is not affected by
-  any dynamical framing.
-- **Not a claim of quantum speedup.** The quantum band in this repo is
-  labelled `QUANTUM_SIM`. RES-501 still gates any quantum claim behind
-  experimental characterization.
-- **Not a claim about the token path.** The triad describes the classical
-  memory layer. Text modeling is a separate track (RES-502).
-- **Not a claim about the bridge.** RES-601 §7 remains locked; the
-  candidate in RES-606 is a conformal substitute.
+- **Not a claim about complexity classes.** Cook–Levin is not affected by any dynamical framing.
+- **Not a claim of quantum speedup.** The quantum band in this repo is labelled `QUANTUM_SIM`. RES-501 still gates any quantum claim behind experimental characterization.
+- **Not a claim about the token path.** The triad describes the classical memory layer. Text modeling is a separate track (RES-502).
+- **Not a claim about the bridge.** RES-601 §7 remains locked; the candidate in RES-606 is a conformal substitute.
 
 ## 8. Deliverable
 
@@ -137,45 +129,42 @@ A short report at `docs/300-substrate/triad-results.md`, containing:
 - Verdict: one of §4's three cases
 
 Nothing in this document requires the phase-weighted graph, the carrier
-bands, the Lean proofs, or any of the downstream design proposals. Those
-are all separate. This is the minimum experiment that could justify them.
+bands, the Lean proofs, or any of the downstream design proposals.
+Those are all separate. This is the minimum experiment that could
+justify them.
 
 ## 9. Multi-engine extension
 
-The triad as written describes one `ResidualCore`. The three stages
-are properties of a single core's dynamics, and §1 is explicit that
-they are "not a new abstraction" — they describe what the existing
-code does.
+§1 describes a single `ResidualCore`. RES-318 (`engine-group.md`)
+composes N cores into an `EngineGroup` with a shared `CouplingField`.
+At that level the triad shifts from *descriptive* to *constructive*:
+the three stages are chosen by the coupling design rather than observed
+in one core's code.
 
-At the group level, the triad becomes a **construction** rather than a
-description. RES-317 (Engine Group Composition) composes N engines
-with a shared coupling field. There, the three stages are chosen by
-design:
+The mapping and the metric reuse are specified in RES-318 §3. Two
+consequences for this document:
 
-- **Structure** becomes `CouplingField.W` plus each engine's own `Λ`.
-- **Flux** becomes phase differences driving each engine's `F_res`,
-  `ΔS`, `μ`.
-- **Mode** becomes the shared attractor the coupled N-engine system
-  settles into.
+- **The four metrics in §2 apply unchanged.** `basin.py` takes a
+  `step_fn`; a group step function is a valid input. No new metric is
+  needed to measure group-level basins.
+- **The scaling check in §4 becomes a check against N.** The three
+  cases (flat / `1/poly` / `exp`) apply with `n → N`. The third case is
+  still not a failure.
 
-The four basin metrics of §2 apply unchanged at group level, because
-`basin.py` takes any `step_fn`. The triad scaling check of §4 maps
-directly onto N: volume flat in N, `1/poly(N)`, or `exp(−cN)`, with
-the third case remaining the honest non-failure answer.
+RES-318 §11 raises the load-bearing question this section defers:
+*is a group-level triad actually a triad, or does the coupled system
+have only a continuous phase distribution with no discrete modes?* If
+there are no discrete group modes, the third stage does not exist at
+group level and the triad reduces to Structure + Flux. That is an
+empirical question, answered by RES-318 §8 invariant 5.
 
-This section does not change the triad's scope. It notes that RES-317
-exists as the multi-engine realization and that the triad's
-deliverables now split into two:
+This document does not change. §9 is a pointer, not a rewrite.
 
-- `triad-results.md` — single-engine (the original §8 deliverable, not
-  yet written)
-- `triad-multi-engine-results.md` — group-level (RES-317 gate)
+## 10. Read next
 
-If single-engine passes and multi-engine fails, the three stages do
-not compose across engines. If both pass, the triad scales. If both
-fail, the triad does not produce good basins at either level.
-
-The load-bearing open question is named in RES-317 §10: whether the
-group-level system has discrete joint modes at all. If it does not,
-the "Mode" stage does not exist at group level and the triad reduces
-to Structure + Flux. This is answered by measurement, not argument.
+- [Engine Group Composition](engine-group.md) — RES-318
+- [SDM + Hopfield Attractor Memory](sdm-hopfield.md) — RES-317
+- [Classical Core](../200-core/classical-core.md) — RES-200
+- [HDRIFT Adapter](hdrift-adapter.md) — RES-300
+- [Abstention](abstention.md) — RES-302
+- [Documentation Index](../readme.md)
