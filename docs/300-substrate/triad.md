@@ -139,3 +139,43 @@ A short report at `docs/300-substrate/triad-results.md`, containing:
 Nothing in this document requires the phase-weighted graph, the carrier
 bands, the Lean proofs, or any of the downstream design proposals. Those
 are all separate. This is the minimum experiment that could justify them.
+
+## 9. Multi-engine extension
+
+The triad as written describes one `ResidualCore`. The three stages
+are properties of a single core's dynamics, and §1 is explicit that
+they are "not a new abstraction" — they describe what the existing
+code does.
+
+At the group level, the triad becomes a **construction** rather than a
+description. RES-317 (Engine Group Composition) composes N engines
+with a shared coupling field. There, the three stages are chosen by
+design:
+
+- **Structure** becomes `CouplingField.W` plus each engine's own `Λ`.
+- **Flux** becomes phase differences driving each engine's `F_res`,
+  `ΔS`, `μ`.
+- **Mode** becomes the shared attractor the coupled N-engine system
+  settles into.
+
+The four basin metrics of §2 apply unchanged at group level, because
+`basin.py` takes any `step_fn`. The triad scaling check of §4 maps
+directly onto N: volume flat in N, `1/poly(N)`, or `exp(−cN)`, with
+the third case remaining the honest non-failure answer.
+
+This section does not change the triad's scope. It notes that RES-317
+exists as the multi-engine realization and that the triad's
+deliverables now split into two:
+
+- `triad-results.md` — single-engine (the original §8 deliverable, not
+  yet written)
+- `triad-multi-engine-results.md` — group-level (RES-317 gate)
+
+If single-engine passes and multi-engine fails, the three stages do
+not compose across engines. If both pass, the triad scales. If both
+fail, the triad does not produce good basins at either level.
+
+The load-bearing open question is named in RES-317 §10: whether the
+group-level system has discrete joint modes at all. If it does not,
+the "Mode" stage does not exist at group level and the triad reduces
+to Structure + Flux. This is answered by measurement, not argument.
