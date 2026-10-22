@@ -1005,4 +1005,36 @@ if __name__ == "__main__":
         ("Cronus", "parent_of", "Hades"),
         ("Zeus", "parent_of", "Ares"),
         ("Zeus", "parent_of", "Athena"),
-        ("Zeus", "domain", "
+        ("Zeus", "domain", "sky"),
+        ("Poseidon", "domain", "sea"),
+        ("Hades", "domain", "underworld"),
+        ("Ares", "domain", "war"),
+        ("Athena", "domain", "wisdom"),
+        ("Uranus", "is_a", "primordial"),
+        ("Cronus", "is_a", "titan"),
+        ("Zeus", "is_a", "olympian"),
+        ("Poseidon", "is_a", "olympian"),
+        ("Hades", "is_a", "olympian"),
+        ("Ares", "is_a", "olympian"),
+        ("Athena", "is_a", "olympian"),
+    ]
+    for s, r, o in facts:
+        titan.learn(s, r, o)
+
+    drive = [
+        ("Zeus", "parent_of"), ("Cronus", "parent_of"),
+        ("Zeus", "domain"), ("Poseidon", "domain"),
+        ("Hades", "domain"), ("Zeus", "is_a"),
+        ("Cronus", "is_a"), ("Athena", "is_a"),
+    ] * 10
+
+    for subj, rel in drive:
+        titan.ask(subj, rel)
+
+    print("\n--- After drive ---")
+    for subj, rel in [("Zeus", "domain"), ("Poseidon", "domain")]:
+        a = titan.ask(subj, rel)
+        print(titan.explain(a))
+
+    print("\n--- Stats ---")
+    print(json.dumps(titan.stats(), indent=2, default=float))
