@@ -6,30 +6,32 @@ parameter-free layers in sequence:
     noisy query
         │
         ▼
-    Kanerva SDM read      — k-nearest hard locations, contents summed
-        │                    Averages over the query's sparse neighborhood.
-        ▼                    Reduces per-component noise before the snap.
-    Hopfield relaxation   — softmax attention over stored patterns
-        │                    (Ramsauer et al. 2020). Snaps to the nearest
-        ▼                    stored pattern deterministically.
+    Kanerva SDM read — k-nearest hard locations, contents summed
+        │  Averages over the query's sparse neighborhood. Reduces
+        │  per-component noise before the snap.
+        ▼
+    Hopfield relaxation — softmax attention over stored patterns
+        │  (Ramsauer et al. 2020). Snaps to the nearest stored pattern
+        │  deterministically.
+        ▼
     clean vector
 
 No trainable parameters. The SDM addresses are fixed at construction
-(seeded RNG). The Hopfield patterns are whatever was stored. Update rules
-are closed-form.
+(seeded RNG). The Hopfield patterns are whatever was stored. Update
+rules are closed-form.
 
 Off states (explicit):
-    learning           off. No gradients. Addresses are seeded; contents
-                       and patterns are the write history.
-    capacity claim     off. SDM capacity is bounded by n_locations and the
-                       k-nearest activation; it does not extend the
-                       substrate's flat-bundle capacity (RES-313).
-    substitute for     off. This does not replace codex cleanup; it
-    codex cleanup      sits in front of it. The final token-level
-                       argmax is still against the codebook.
-    approximation      off. For clean inputs the pipeline is idempotent
-                       (Hopfield relaxation does not move a stored
-                       pattern). For noisy inputs it is a projection.
+    learning          off. No gradients. Addresses are seeded; contents
+                      and patterns are the write history.
+    capacity claim    off. SDM capacity is bounded by n_locations and
+                      the k-nearest activation; it does not extend the
+                      substrate's flat-bundle capacity (RES-313).
+    substitute for    off. This does not replace codex cleanup; it sits
+    codex cleanup     in front of it. The final token-level argmax is
+                      still against the codebook.
+    approximation     off. For clean inputs the pipeline is idempotent
+                      (Hopfield relaxation does not move a stored
+                      pattern). For noisy inputs it is a projection.
 """
 from __future__ import annotations
 
@@ -39,15 +41,15 @@ from typing import Optional
 import numpy as np
 
 
-# ── config ──────────────────────────────────────────────────────────────
+# ── config ──────────────────────────────────────────────────────────
 @dataclass
 class SDMConfig:
     """Kanerva SDM configuration.
 
-    dim             hypervector dimension
-    n_locations     number of hard locations (typically 10-100x dim)
-    k_activate      how many hard locations activate per read/write
-    seed            RNG for the fixed address matrix
+    dim          hypervector dimension
+    n_locations  number of hard locations (typically 10-100x dim)
+    k_activate   how many hard locations activate per read/write
+    seed         RNG for the fixed address matrix
     """
     dim: int
     n_locations: int = 1024
@@ -73,9 +75,9 @@ class SDMConfig:
 class HopfieldConfig:
     """Modern Hopfield configuration (Ramsauer 2020).
 
-    beta        inverse temperature; higher = sharper snap
-    max_iters   upper bound on relaxation iterations
-    tol         convergence threshold on ||x_new - x||
+    beta       inverse temperature; higher = sharper snap
+    max_iters  upper bound on relaxation iterations
+    tol        convergence threshold on ||x_new - x||
     """
     beta: float = 8.0
     max_iters: int = 8
@@ -93,7 +95,7 @@ class HopfieldConfig:
             raise ValueError("tol must be > 0")
 
 
-# ── Kanerva SDM ─────────────────────────────────────────────────────────
+# ── Kanerva SDM ─────────────────────────────────────────────────────
 class KanervaSDM:
     """Sparse distributed memory with fixed random hard locations.
 
@@ -106,10 +108,11 @@ class KanervaSDM:
         self.cfg = cfg
         rng = np.random.default_rng(cfg.seed)
         self.addresses = rng.choice(
-            [-1.0, 1.0], size=(cfg.n_locations, cfg.dim)
+            [-1.0, 1.0],
+            size=(cfg.n_locations, cfg.dim),
         )
         self.contents = np.zeros(
-            (cfg.n_locations, cfg.dim), dtype=np.float64
+            (cfg.n_locations, cfg.dim), dtype=np.float64,
         )
         self._n_writes = 0
 
@@ -148,14 +151,26 @@ class KanervaSDM:
         return self._n_writes
 
 
-# ── Modern Hopfield ─────────────────────────────────────────────────────
+# ── Modern Hopfield ─────────────────────────────────────────────────
 class ModernHopfield:
     """Continuous Hopfield via softmax attention (Ramsauer 2020).
 
-    Update rule: x <- X^T · softmax(beta · X · x / dim), where X is the
-    (n_patterns, dim) matrix of stored patterns. Converges to a fixed
-    point; for a clean stored pattern the fixed point is the pattern
-    itself (idempotent).
+    Update rule:
+
+        x <- X^T · softmax(beta · X · x)
+
+    where X is the (n_patterns, dim) matrix of stored patterns.
+
+    NOTE: the earlier implementation divided the similarities by `dim`
+    before the softmax. On unit-norm patterns that shrinks every logit
+    toward zero and flattens the softmax into a near-uniform average,
+    so the fixed point becomes the mean of all patterns rather than
+    the nearest one. The division is removed here; the standard
+    Ramsauer update does not include it. `beta` alone controls
+    sharpness.
+
+    Converges to a fixed point; for a clean stored pattern the fixed
+    point is the pattern itself (idempotent).
     """
 
     def __init__(self, cfg: HopfieldConfig) -> None:
@@ -187,7 +202,7 @@ class ModernHopfield:
             )
         beta = self.cfg.beta
         for _ in range(self.cfg.max_iters):
-            sims = (self._patterns @ x) / dim
+            sims = self._patterns @ x  # no /dim; see class docstring
             # numerically stable softmax
             w = np.exp(beta * (sims - sims.max()))
             w = w / (w.sum() + 1e-30)
@@ -198,18 +213,18 @@ class ModernHopfield:
         return x
 
 
-# ── combined pipeline ───────────────────────────────────────────────────
+# ── combined pipeline ───────────────────────────────────────────────
 class AttractorMemory:
     """SDM + Hopfield pipeline for VSA crosstalk reduction.
 
-    Stores fact vectors (or any pattern set). On cleanup, the noisy query
-    is (a) SDM-read for neighborhood averaging, then (b) Hopfield-relaxed
-    to snap to the nearest stored pattern.
+    Stores fact vectors (or any pattern set). On cleanup, the noisy
+    query is (a) SDM-read for neighborhood averaging, then (b)
+    Hopfield-relaxed to snap to the nearest stored pattern.
 
     Parameters
     ----------
-    sdm_cfg : SDMConfig, required
-    hopfield_cfg : HopfieldConfig, optional (defaults)
+    sdm_cfg       : SDMConfig, required
+    hopfield_cfg  : HopfieldConfig, optional (defaults)
     """
 
     def __init__(
