@@ -1,10 +1,8 @@
----
 doc: RES-000
 title: Documentation Index
 status: stable
 depends_on: []
 referenced_by: [RES-100]
----
 
 # Resileos-QAI Documentation
 
@@ -45,49 +43,51 @@ Substrate extensions:
 15. [Constructive Head](300-substrate/constructive-head.md) — RES-308
 16. [Entanglement Pipeline Engine](300-substrate/entanglement-pipeline.md) — RES-309
 17. [Order Parameter Gate](300-substrate/order-parameter-gate.md) — RES-316
+18. [SDM + Hopfield Attractor Memory](300-substrate/sdm-hopfield.md) — RES-317
+19. [Engine Group Composition](300-substrate/engine-group.md) — RES-318
 
 Hierarchy / modulation layer:
-18. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
-19. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
-20. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
-21. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
-22. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
-23. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
+20. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
+21. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
+22. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
+23. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
+24. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
+25. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
 
 Titanos application layer:
-24. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
-25. [Dense Entity Index](320-titanos/index.md) — RES-321
-26. [Query Language and Execution](320-titanos/query.md) — RES-322
-27. [External Ingestion](320-titanos/ingestion.md) — RES-323
-28. [Zeus Child](320-titanos/zeus-child.md) — RES-324
-29. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
+26. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
+27. [Dense Entity Index](320-titanos/index.md) — RES-321
+28. [Query Language and Execution](320-titanos/query.md) — RES-322
+29. [External Ingestion](320-titanos/ingestion.md) — RES-323
+30. [Zeus Child](320-titanos/zeus-child.md) — RES-324
+31. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
 
 Operations and notes:
-30. [Run Config](400-operations/run-config.md) — RES-400
-31. [Training](400-operations/training.md) — RES-401
-32. [Validation](400-operations/validation.md) — RES-402
-33. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
-34. [Behavioral Notes](500-notes/behavioral.md) — RES-500
-35. [Roadmap](500-notes/roadmap.md) — RES-501
+32. [Run Config](400-operations/run-config.md) — RES-400
+33. [Training](400-operations/training.md) — RES-401
+34. [Validation](400-operations/validation.md) — RES-402
+35. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
+36. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+37. [Roadmap](500-notes/roadmap.md) — RES-501
 
 QD-TER bridge:
-36. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-37. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-38. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-39. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
-40. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
-41. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
-42. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
-43. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
-44. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
+38. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+39. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+40. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+41. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+42. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+43. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+44. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
+45. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
+46. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
 
 Reference:
-45. [Glossary](900-reference/glossary.md) — RES-900
+47. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
 | Range | Category | Entry point |
-|-------|----------|-------------|
+|---|---|---|
 | 100 | Foundations | [Overview](100-foundations/overview.md) |
 | 200 | Classical Core | [Classical Core](200-core/classical-core.md) |
 | 300 | Generative Substrate | [HDRIFT Adapter](300-substrate/hdrift-adapter.md) |
@@ -101,19 +101,21 @@ Reference:
 ## 300-series substrate modules
 
 | Doc | Module | Status | Notes |
-|-----|--------|--------|-------|
-| RES-304 | `triad.md` | draft | Structure-Flux-Mode triad |
+|---|---|---|---|
+| RES-304 | `triad.md` | draft | Structure-Flux-Mode triad; basin metrics |
 | RES-305 | `sandbox.py` | proposal | Causal Sandbox Index; metric defined, not derived |
 | RES-306 | `phasor.py` | stable | Phasor graph, band carriers, banded memory; Lean-backed |
 | RES-307 | `agency.py` | heuristic | Routing layer; thresholds are operational parameters |
 | RES-308 | `constructive-head.md` | proposal | Directional head; quantum-shaped math, no QPU |
 | RES-309 | `entanglement-pipeline.md` | conjectural | Shared-prefix structure as coarse-grained correlation; CHSH test proposed |
 | RES-316 | `order-parameter-gate.md` | proposal | Kuramoto-R confidence gate; off by default |
+| RES-317 | `sdm-hopfield.md` | draft | Parameter-free attractor cleanup; reduces chain crosstalk |
+| RES-318 | `engine-group.md` | draft | N-engine composition; triad at group level; prerequisite for multi-stream training |
 
 ## 310-series hierarchy modules
 
 | Doc | Module | Status | Notes |
-|-----|--------|--------|-------|
+|---|---|---|---|
 | RES-310 | `hierarchical-encoding.md` | draft | Tree of packets; capacity-driven levels |
 | RES-311 | `streaming-state.md` | draft | Running stream_hv; decay and level weighting |
 | RES-312 | `mask-stack.md` | draft | Layered masks; mask-to-sheath transition |
@@ -124,7 +126,7 @@ Reference:
 ## 320-series Titanos modules
 
 | Doc | Module | Status | Notes |
-|-----|--------|--------|-------|
+|---|---|---|---|
 | RES-320 | `store.py` | stable | Memory-mapped int32 accumulators + WAL |
 | RES-321 | `index.py` | stable | Bidirectional name ↔ id ↔ vector index |
 | RES-322 | `query.py` | draft | SPARQL-like grammar and nested-loop executor |
@@ -135,7 +137,7 @@ Reference:
 ## 600-series QD-TER bridge
 
 | Doc | Title | Status |
-|-----|-------|--------|
+|---|---|---|
 | RES-600 | FEP Reduction Bridge | conditional |
 | RES-601 | Non-Dual Adaptation Layer | conjectural |
 | RES-602 | Two-Head Integration Note | draft |
@@ -155,23 +157,23 @@ docs state their own scope; the status page aggregates them.
 RES-100 ─▶ RES-101 ─▶ RES-102
     │
     ▼
-RES-200 ─▶ RES-201 ─▶ RES-202
+RES- ▼200 ─▶ RES-201 ─▶ RES-202
     │
     ▼
 RES-300 ─▶ RES-301 ─▶ RES-302 ─▶ RES-303
     │
     ▼
-RES-304  RES-305  RES-306 ─▶ RES-307
-                        │
-                        ├──▶ RES-308
-                        │
-                        └──▶ RES-309
+RES-304 ─▶ RES-318
+RES-305  RES-306 ─▶ RES-307
+    │
+    ├──▶ RES-308
+    └──▶ RES-309
     │
     ▼
 RES-310 ─▶ RES-311 ─▶ RES-312
     │         │         │
     └────┬────┴────┬────┘
-         ▼         ▼
+                 ▼
     RES-313 ─▶ RES-314
          │         │
          └────┬────┘
@@ -179,11 +181,13 @@ RES-310 ─▶ RES-311 ─▶ RES-312
          RES-315
     │
     ▼
-RES-316 ─▶ RES-320 ─▶ RES-321 ─▶ RES-322 ─▶ RES-323
-                                              │
-                                              ├──▶ RES-324
-                                              │
-                                              └──▶ RES-325
+RES-316 ─▶ RES-317
+    │
+    ▼
+RES-320 ─▶ RES-321 ─▶ RES-322 ─▶ RES-323
+                                    │
+                                    ├──▶ RES-324
+                                    └──▶ RES-325
     │
     ▼
 RES-400 ─▶ RES-401 ─▶ RES-402 ─▶ RES-403
@@ -193,7 +197,9 @@ RES-500 ─▶ RES-501
     │
     ▼
 RES-600 ─▶ RES-601 ─▶ RES-602 ─▶ RES-603
-                                  │
-                                  ▼
-                             RES-604 ─▶ RES-605 ─▶ RES-606 ─▶ RES-607 ─▶ RES-608
-```
+                                    │
+                                    ▼
+                               RES-604 ─▶ RES-605 ─▶ RES-606
+                                                          │
+                                                          ▼
+                                                     RES-607 ─▶ RES-608
