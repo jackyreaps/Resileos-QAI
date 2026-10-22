@@ -9,6 +9,7 @@ Layers:
     CSI               Causal Sandbox Index over each query (RES-305)
     agency            heuristic routing to registered children (RES-307)
     order parameter   Kuramoto R from theta gates confidence (RES-316)
+    attractor         SDM + Hopfield denoise on recurrent state (RES-317)
 
 Storage uses MAP triple binding:
     band += s * r * o               (elementwise, bipolar)
@@ -50,6 +51,7 @@ from resileos.substrate.sandbox import (
     CSIState, volume_residual, fast_confidence,
 )
 from resileos.substrate.agency import AgencyGroup, AgencyChild, HandlerFn
+from resileos.substrate.sdm import AttractorMemory, SDMConfig
 
 
 @dataclass
@@ -99,6 +101,11 @@ class TitanosConfig:
 
     use_order_parameter_gate: bool = False
     order_parameter_floor: float = 0.5
+
+    # Attractor (RES-317). When True and at least one fact is stored,
+    # the recurrent loop denoises its hidden state through SDM +
+    # Hopfield between iterations. Empty store -> no-op.
+    use_attractor: bool = True
 
     X: float = 70.0
     Y: int = 3
@@ -187,6 +194,15 @@ class Titanos:
             living_sharpness=cfg.csi_living_sharpness,
         )
         self.agency = AgencyGroup()
+
+        # Attractor (RES-317). Optional; failures fall back to None and
+        # the recurrent loop behaves exactly as before.
+        self._attractor: AttractorMemory | None = None
+        if cfg.use_attractor:
+            try:
+                self._attractor = AttractorMemory(SDMConfig(dim=cfg.dim))
+            except Exception:
+                self._attractor = None
 
     # ── accumulators ─────────────────────────────────────────────────
     @property
@@ -337,6 +353,15 @@ class Titanos:
         band += (s * r * o).astype(np.int32)
         self._counts[relation] += 1
         self.facts.append((subject, relation, obj))
+        # Attractor (RES-317): store the bound triple so the recurrent
+        # loop snaps toward known facts, not toward arbitrary noise.
+        if self._attractor is not None:
+            try:
+                self._attractor.store(
+                    (s * r * o).astype(np.float64)
+                )
+            except Exception:
+                pass
 
     def _encode_probe(self, anchor: str, relation: str,
                       inverse: bool = False) -> np.ndarray:
@@ -448,6 +473,15 @@ class Titanos:
             if delta < self.cfg.convergence_threshold:
                 return h_c, history, "CONVERGED", state
             h = h_c
+            # Attractor denoise (RES-317). Snap the next iterate toward
+            # the nearest stored fact vector before it feeds the next
+            # core.step. Skipped when the store is empty.
+            if (self._attractor is not None
+                    and self._attractor.n_patterns > 0):
+                try:
+                    h = self._attractor.cleanup(h)
+                except Exception:
+                    pass
         return h, history, "MAX_LOOPS", history[-1]["gate_state"]
 
     def _quantum_sim(
@@ -815,6 +849,10 @@ class Titanos:
                 "classical_threshold": float(classical),
                 "abstain_threshold": float(abstain),
             }
+        attractor_snapshot = (
+            self._attractor.snapshot()
+            if self._attractor is not None else None
+        )
         return {
             "dim": self.cfg.dim,
             "core_matrix": f"{self.cfg.m}x{self.cfg.n}",
@@ -833,6 +871,8 @@ class Titanos:
             "order_parameter": self._order_parameter(),
             "use_order_parameter_gate": bool(self.cfg.use_order_parameter_gate),
             "order_parameter_floor": float(self.cfg.order_parameter_floor),
+            "use_attractor": bool(self.cfg.use_attractor),
+            "attractor": attractor_snapshot,
             "query_count": int(self._query_count),
             "fast_path_count": int(self._fast_path_count),
             "escalation_count": int(self._escalation_count),
@@ -894,6 +934,19 @@ class Titanos:
             obj.core._nonconservative.load_state_dict(raw["nc_state"])
         if "csi_state" in raw:
             obj._csi.load_state_dict(raw["csi_state"])
+        # Rebuild the attractor from the loaded facts. The store is not
+        # serialized; deriving it from `facts` keeps the two in sync.
+        if cfg.use_attractor and obj._attractor is not None:
+            for s, r, o in obj.facts:
+                try:
+                    sv = obj._ent(s)
+                    rv = obj._rel(r)
+                    ov = obj._ent(o)
+                    obj._attractor.store(
+                        (sv * rv * ov).astype(np.float64)
+                    )
+                except Exception:
+                    pass
         return obj
 
 
@@ -925,6 +978,7 @@ if __name__ == "__main__":
     p.add_argument("--conservative", action="store_true")
     p.add_argument("--csi-fast-path", action="store_true")
     p.add_argument("--order-parameter-gate", action="store_true")
+    p.add_argument("--no-attractor", action="store_true")
     args = p.parse_args()
 
     cfg = (TitanosConfig.from_json(args.config)
@@ -935,11 +989,14 @@ if __name__ == "__main__":
         cfg.csi_fast_path = True
     if args.order_parameter_gate:
         cfg.use_order_parameter_gate = True
+    if args.no_attractor:
+        cfg.use_attractor = False
 
     titan = Titanos(cfg)
     print(f"emergent = {cfg.emergent}  "
           f"csi_fast_path = {cfg.csi_fast_path}  "
-          f"order_parameter_gate = {cfg.use_order_parameter_gate}")
+          f"order_parameter_gate = {cfg.use_order_parameter_gate}  "
+          f"use_attractor = {cfg.use_attractor}")
 
     facts = [
         ("Uranus", "parent_of", "Cronus"),
@@ -948,36 +1005,4 @@ if __name__ == "__main__":
         ("Cronus", "parent_of", "Hades"),
         ("Zeus", "parent_of", "Ares"),
         ("Zeus", "parent_of", "Athena"),
-        ("Zeus", "domain", "sky"),
-        ("Poseidon", "domain", "sea"),
-        ("Hades", "domain", "underworld"),
-        ("Ares", "domain", "war"),
-        ("Athena", "domain", "wisdom"),
-        ("Uranus", "is_a", "primordial"),
-        ("Cronus", "is_a", "titan"),
-        ("Zeus", "is_a", "olympian"),
-        ("Poseidon", "is_a", "olympian"),
-        ("Hades", "is_a", "olympian"),
-        ("Ares", "is_a", "olympian"),
-        ("Athena", "is_a", "olympian"),
-    ]
-    for s, r, o in facts:
-        titan.learn(s, r, o)
-
-    drive = [
-        ("Zeus", "parent_of"), ("Cronus", "parent_of"),
-        ("Zeus", "domain"), ("Poseidon", "domain"),
-        ("Hades", "domain"), ("Zeus", "is_a"),
-        ("Cronus", "is_a"), ("Athena", "is_a"),
-    ] * 10
-
-    for subj, rel in drive:
-        titan.ask(subj, rel)
-
-    print("\n--- After drive ---")
-    for subj, rel in [("Zeus", "domain"), ("Poseidon", "domain")]:
-        a = titan.ask(subj, rel)
-        print(titan.explain(a))
-
-    print("\n--- Stats ---")
-    print(json.dumps(titan.stats(), indent=2, default=float))
+        ("Zeus", "domain", "
