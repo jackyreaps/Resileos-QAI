@@ -1,7 +1,7 @@
-doc: RES-317
+doc: RES-318
 title: Engine Group Composition
 status: draft
-depends_on: [RES-200, RES-201, RES-304, RES-306, RES-310, RES-311, RES-312]
+depends_on: [RES-200, RES-201, RES-304, RES-306, RES-310, RES-311, RES-317]
 referenced_by: []
 
 # Engine Group Composition
@@ -11,25 +11,20 @@ framework-native objective (recovery, coherence, residue) was designed
 for *correlated* multi-stream state: N engines whose monitors are partly
 driven by their relation to each other, not just by their own dynamics.
 
-This document specifies the composition layer that produces that state,
-and it names the connection to the RES-304 triad. The triad currently
-describes one engine's dynamics. At the group level, the triad's three
-stages become a *construction* rather than a *description*, and the
-triad's four basin metrics become the acceptance test for the coupling.
-
-This is interfaces only. It defines what must exist for the framework-
+This document specifies the composition layer that produces that state.
+It is interfaces only. It defines what must exist for the framework-
 native objective to have a non-degenerate training signal.
+
+It does not implement the composition and does not re-open any training
+question. The single-engine `k = 0.9` measurement is a measurement of a
+degenerate configuration; this document is the prerequisite for
+measuring the non-degenerate one.
 
 ## 0. Status
 
 Draft. No implementation exists. First `N = 3` engines. Scale to `N = 8`
 is the sector-bus-aligned target (RES-312) and is deferred until `N = 3`
 is verified.
-
-The single-engine `k = 0.9` measurement (report_efficiency_ablation,
-2026-10-22) is a measurement of a degenerate configuration. It is not a
-verdict on the framework-native objective. This document is the
-prerequisite for measuring the non-degenerate one.
 
 ## 1. Why single-engine is degenerate
 
@@ -45,84 +40,7 @@ None of these can show efficiency gains because none has anything to
 correlate *against*. The objective is not wrong; the substrate was too
 small for it to have signal.
 
-## 2. Relationship to the RES-304 triad
-
-RES-304 §1 defines three stages — Structure, Flux, Mode — and is explicit
-that they describe what the existing single-engine code already does. At
-the single-engine level the triad is **descriptive**: the stages are
-properties of one `ResidualCore`'s dynamics.
-
-At the group level the triad is **constructive**. The coupling matrix,
-the drive rule, and the per-engine cross terms are design choices, not
-emergent properties of a single core. The triad changes status when N > 1.
-
-### 2.1 Stage mapping
-
-| Triad stage (RES-304 §1) | Single-engine artifact | EngineGroup artifact |
-|---|---|---|
-| **Structure** | strictly-lower `Λ` in `core.py`; packet schema | `CouplingField.W` (N×N) + each engine's own `Λ` |
-| **Flux** | `holographic_drift`, `_scar_update`, Axiom D `F(Ψ, f)` | phase differences driving each engine's `F_res`, `ΔS`, `μ` |
-| **Mode** | wells `φ_A`/`φ_B`; prime-tower rank; sigma gate; parity `μ` | the shared attractor the coupled N-engine system settles into |
-
-The Mode row is the one that changes character. In the single-engine
-case, `φ_A`/`φ_B` are two wells in the reduction module. At group level,
-the attractor is a *joint* state across N engines. Whether that joint
-state is well-defined — whether the coupled system has discrete modes
-at all — is the load-bearing question (see §10).
-
-### 2.2 The triad's basin metrics are the acceptance test
-
-`basin.py` implements the four metrics of RES-304 §2 (volume, depth,
-boundary dimension, hopping rate) plus `boundary_codim` and
-`basin_entropy`. The functions take a `step_fn` and a `target_mode`;
-they do not care whether the step function advances one core or a
-coupled group.
-
-Therefore the group-level landscape is **measurable today**, using the
-existing `basin.py`. The `step_fn` is "advance the group one step,
-return the joint mode," and the four metrics compute without a new
-module.
-
-### 2.3 Triad scaling check maps to N
-
-RES-304 §4 names three scaling cases and explicitly says the third is
-not a failure:
-
-| Triad case (per `n`) | EngineGroup analogue (per `N`) | Meaning |
-|---|---|---|
-| Volume flat in `n` | Volume flat in N | Coupling produces scale-invariant reachability |
-| Volume ~ `1/poly(n)` | Volume ~ `1/poly(N)` | Polynomial advantage over uncoupled |
-| Volume ~ `exp(−cn)` | Volume ~ `exp(−cN)` | No emergent group structure — reportable, not a bug |
-
-The third case is the honest answer if the coupling does not produce
-good group basins. The EngineGroup spec does not assume the coupling
-will pass; it requires the triad test to decide.
-
-### 2.4 Sheath at group level
-
-`sheath.py` (RES-304 extension) detects boundary saturation via
-`boundary_codim` and depth. At high N with strong coupling, the
-group-level boundary can saturate into a sheath — the same phase
-transition RES-312 documents for the mask stack, observed at the
-*engine* level rather than the *layer* level. This is the second place
-to observe the mask→sheath regime change, and the metric is already
-built.
-
-### 2.5 SDM/Hopfield uses the group basin
-
-`sdm.py` and `docs/300-substrate/sdm-hopfield.md` are on main. Once the
-group settles into a mode, SDM/Hopfield does attractor cleanup on the
-group state. The full chain becomes:
-
-    EngineGroup produces group-level basins
-        → triad metrics measure them (basin.py, sheath.py)
-        → SDM/Hopfield cleans up within a basin (sdm.py)
-        → carrier reads the cleaned state (RES-315)
-
-Without the EngineGroup, SDM has no group state to clean up. It is
-currently wired only to single-engine state.
-
-## 3. Composition
+## 2. Composition
 
     EngineGroup
       ├── ResidualCore_0   (seed 0)
@@ -136,6 +54,80 @@ them together. The coupling is what makes the streams correlated.
 
 N is a constructor argument. `N = 3` is the first target. N is fixed at
 construction; engines are not added or removed after `__init__`.
+
+## 3. Triad correspondence
+
+RES-304 defines the Structure-Flux-Mode triad as a *description* of what
+a single `ResidualCore` already does. §1 of that document is explicit:
+"the stages are not a new abstraction. They are a description of what
+the existing code does."
+
+At group level that changes. The coupling matrix, the drive rule, and
+the per-engine cross terms are **design decisions**, not inherited
+behaviour. The triad shifts from *descriptive* (one engine) to
+*constructive* (N engines): the same three stages, but chosen rather
+than observed.
+
+### 3.1 Stage mapping
+
+| Triad stage (RES-304 §1) | Single-engine realization | Group-level realization |
+|---|---|---|
+| **Structure** | strictly-lower `Λ` in `core.py`; `packet.py` schema | `CouplingField.W` (N×N) plus each engine's own `Λ` |
+| **Flux** | `holographic_drift`; `_scar_update`; Axiom D `F(Ψ, f)` | phase differences driving each engine's `F_res`, `ΔS`, `μ` (§5) |
+| **Mode selection** | wells `φ_A`/`φ_B`; Prime-Tower rank; sigma gate; parity `μ` | the joint attractor the coupled N-engine system settles into |
+
+The third row is the one that needs work. In the single-engine case,
+`φ_A`/`φ_B` are two wells in `reduction.py`. At group level the
+attractor is a *joint* state across N engines — and whether that joint
+state is discrete at all is an open question (§11).
+
+### 3.2 Basin metrics are already the acceptance test
+
+RES-304 §2 defines four metrics: basin volume, depth, boundary
+dimension, hopping rate. `src/resileos/substrate/basin.py` implements
+all four plus `boundary_codim` and `basin_entropy`. Every one of those
+functions takes a `step_fn` and a `target_mode`. They do not care
+whether the step function wraps one core or a coupled group.
+
+That means the group-level landscape is measurable **without writing a
+new metric**. The `step_fn` is "advance the group one step and return
+the joint mode." Everything downstream — volume, depth, boundary
+dimension, hopping, codimension, entropy — works unchanged.
+
+### 3.3 The scaling check maps n → N
+
+RES-304 §4 fits basin volume against problem size `n` and classifies
+the result into three cases. At group level the independent variable
+becomes engine count `N`:
+
+| Triad §4 case (per `n`) | EngineGroup analogue (per `N`) |
+|---|---|
+| Volume flat in `n` | Group basin volume flat in N — coupling produces scale-invariant reachability |
+| Volume ~ `1/poly(n)` | Group basin volume ~ `1/poly(N)` — polynomial advantage over uncoupled engines |
+| Volume ~ `exp(−cn)` | Group basin volume ~ `exp(−cN)` — no emergent group structure |
+
+The third case is **not a failure** in RES-304 §4 ("It is the honest
+answer to a falsifiable question. Report it either way."). The same
+applies here: exponential decay in N means the coupling does not
+produce good group-level basins, and that is a reportable result.
+
+### 3.4 Sheath at group level
+
+`basin_boundary_dim` and `boundary_codim` already report the
+mask→sheath regime change that RES-312 documents for the mask stack.
+The same transition can occur at the *engine* level: with high N and
+strong coupling, the group-level boundary saturates into a membrane.
+That is a second place to observe the regime change, using the same
+metrics, with no new code.
+
+### 3.5 What the group adds to SDM/Hopfield
+
+RES-317 (SDM + Hopfield Attractor Memory) cleans up crosstalk between
+VSA unbinding and codex lookup. It operates on whatever vector it is
+given. With an `EngineGroup`, the vector it is given can be the *group*
+state rather than a single-engine state — which is a wider address space
+and a richer attractor landscape. Without the group, SDM has no group
+state to clean.
 
 ## 4. CouplingField
 
@@ -218,8 +210,8 @@ Each underlying packet is a standard `HierarchicalPacket` from RES-310.
 The `CoupledPacket` adds the cross-engine fields; nothing in the
 single-engine packet format changes.
 
-`coupling_matrix[i,j]` is `phase_difference(i, j)` at emission time. The
-diagonal is zero. The matrix is antisymmetric.
+`coupling_matrix[i,j]` is `phase_difference(i, j)` at emission time.
+The diagonal is zero. The matrix is antisymmetric.
 
 `residue_history[i]` is the last `K` values of `ΔS` for engine `i`,
 where `K` is a config parameter (default 8).
@@ -252,10 +244,9 @@ would be the residual stream from an actual data source, split N ways.
 The generator is deterministic given a seed. Two generators with the
 same seed and the same `drive_source` produce identical streams.
 
-## 8. Invariants (the gate)
+## 8. Invariants
 
-What must hold before any training measurement downstream is meaningful.
-Items 1–4 are correlation invariants. Item 5 is the triad gate.
+What must hold for the composition to be useful:
 
 1. **Phase differences are informative.** If `phase_difference(i, j)` is
    always near zero, the engines are synchronized and there is no
@@ -269,88 +260,44 @@ Items 1–4 are correlation invariants. Item 5 is the triad gate.
 
 3. **Residue histories diverge.** `residue_history[i]` and
    `residue_history[j]` should be distinguishable. If they are
-   identical, the XOR parity and the `ΔS` cross term are both
+   identical, the XOR parity and the `DeltaS` cross term are both
    degenerate.
 
 4. **The coupling field converges.** If `kappa > 0`, the coupling field
    should reach a stable orbit within `n_warm` steps. If it does not,
    `κ` is too high for the number of engines.
 
-5. **Group basins are measurable (triad gate).** With `step_fn` =
-   "advance the group one step, return the joint mode," the four
-   RES-304 §2 metrics must be computable via `basin.py`. If they are,
-   the triad's scaling check runs against N. If they are not — because
-   the group does not settle into a discrete joint mode — the coupling
-   is too weak or the drive is too noisy, and **no training measurement
-   downstream is meaningful**. This is the same gate the single-engine
-   ablation failed by not existing: without a measurable group
-   landscape, aux losses will show k ≈ 1 for the same reason.
+5. **Group basins are measurable.** With `step_fn` = "advance the group
+   one step, return the joint mode," the four RES-304 §2 metrics must
+   be computable using `basin.py` unchanged. If they are, the triad's
+   scaling check runs against N (§3.3). If they are not — because the
+   group does not settle into a mode — the coupling is too weak or the
+   drive is too noisy, and no training measurement downstream will be
+   meaningful.
 
-Invariants 1–4 are correlation checks that can run before the group is
-placed in a landscape. Invariant 5 is the triad measurement and it is
-the gate.
+These invariants are testable before any training happens. If any fails,
+the training measurement will be degenerate for the same reason the
+single-engine ablation was.
 
 ## 9. Non-claims
 
-- Not a training implementation. No loss function, no training loop, no
-  optimizer.
+- Not a training implementation. No loss function, no training loop,
+  no optimizer.
 - Not a claim that the framework-native objective will show `k > 1` on
   this composition. It might, it might not. The composition is the
   prerequisite for asking, not the answer.
-- Not a claim that the group-level triad has discrete modes. §10 names
-  this as the load-bearing open question. If it does not, the triad
-  reduces to Structure + Flux with no third stage, and the group-level
-  objective loses its mode-selection component.
 - Not a claim about scale. `N = 3` is a toy. `N = 8` is the next step.
   Neither is 1T-parameter scale.
 - Not a replacement for `AgencyGroup` (RES-307). Agency is heuristic
   routing over registered handlers. `EngineGroup` is substrate
   composition. They are orthogonal.
-- Not a change to `KuramotoField`, `ResidualCore`, `basin.py`, or
-  `sheath.py`. All keep their existing contracts. `CouplingField` is a
-  new type that sits between the N engines.
+- Not a change to `KuramotoField` or `ResidualCore`. Both keep their
+  existing contracts. `CouplingField` is a new type that sits between
+  the N engines.
+- Not a redefinition of the triad. RES-304 remains the single-engine
+  description. §3 here is the group-level extension, not a rewrite.
 
-## 10. Open questions
-
-- **Is the group-level triad a triad at all?** The single-engine triad
-  has well-defined `φ_A`/`φ_B` wells. The group-level analogue would be
-  a joint mode across N engines. Whether the coupled system has
-  discrete joint modes — or only a continuous phase distribution — is
-  the load-bearing question. If there are no discrete group modes, the
-  "mode selection" stage does not exist at group level and the triad
-  reduces to Structure + Flux. This question is answered by invariant 5,
-  not by argument.
-- **Is the composition necessary?** A single `ResidualCore` with `r = 24`
-  has as many latent dimensions as three cores with `r = 8`. Is
-  cross-engine coupling fundamentally different from a larger single
-  engine, or is it a computational convenience for the same thing? If
-  the answer is "convenience," the composition is expensive and buys
-  nothing. If "fundamentally different," the composition is load-
-  bearing. Not answered here; testable via invariant 2 (if ρ between
-  engines is high, they are redundant and the composition is
-  convenience).
-- **Coupling topology at N > 3.** All-to-all with N = 8 is 28 pairs.
-  Does sparse coupling (grid, ring, hub-and-spoke) preserve the
-  correlation structure while reducing coupling cost? Not specified.
-- **Drive source at real scale.** The synthetic `drive_source` is white
-  noise plus drift. At real scale it would be the token embedding
-  stream or the packet stream from a lower layer. The interface accepts
-  either; the choice is deferred to the first real training run.
-- **The `j̄` selection rule.** §5 uses "the engine with the largest
-  phase difference from `i`". Alternatives: mean phase difference, or
-  weighted by `W`. Not tested.
-- **Residue window length.** `K = 8` is a placeholder. The right value
-  depends on the timescale over which residue correlates across
-  engines. Not measured.
-- **Interaction with `triad-results.md`.** That file does not yet exist
-  (RES-304 §8 deliverable). The group-level triad report would be
-  `triad-multi-engine-results.md`. Two reports, same format, single-
-  engine and multi-engine. If single-engine passes and multi-engine
-  fails, the three stages do not compose. If both pass, the triad
-  scales. If both fail, the triad does not produce good basins at
-  either level.
-
-## 11. Implementation order
+## 10. Implementation order
 
 1. **`CouplingField`** — new module `src/resileos/substrate/coupling.py`.
    Testable in isolation (phases step, R behaves, phase differences are
@@ -362,26 +309,52 @@ the gate.
    Emits `CoupledPacket`.
 4. **`CoupledStreamGenerator`** — in the same module. Produces the
    training stream. Testable with a synthetic `drive_source`.
-5. **Invariant tests 1–4** — correlation checks. Run before the group
-   is placed in a landscape.
-6. **Invariant test 5 (triad gate)** — build a `step_fn` around the
-   group and run `basin.measure_basin` plus `sheath.sheath_metrics`.
-   Produce `triad-multi-engine-results.md`. **This is the gate.**
-7. **Only then** — carrier training on `CoupledPacket`. The framework-
-   native objective re-enters as a real question, on non-degenerate
-   data, after the triad has decided whether the group has structure
-   to learn from.
+5. **Invariant tests** — §8 as test cases, including the group-level
+   basin measurement via `basin.py` unchanged. Run before any training.
+6. **Only then** — carrier training on `CoupledPacket`. The framework-
+   native objective re-enters as a real question.
 
-Steps 1–3 are the composition. Step 4 is the data path. Steps 5–6 are
-the gate. Step 7 is the question. Do not skip to 7.
+Steps 1–3 are the composition. Step 4 is the data path. Step 5 is the
+gate. Step 6 is the question. Do not skip to 6.
+
+## 11. Open questions
+
+- **Is the group-level triad actually a triad?** The single-engine triad
+  has well-defined `φ_A`/`φ_B` wells. The group-level analogue would be
+  a joint mode across N engines. Whether the coupled system has discrete
+  joint modes — or only a continuous phase distribution — is the
+  load-bearing question. If there are no discrete group modes, the
+  "mode selection" stage does not exist at group level, and the triad
+  reduces to Structure + Flux with no third stage. The §8 invariant 5
+  test answers this empirically.
+- **Is coupling fundamentally different from a larger single engine?**
+  A single `ResidualCore` with `r = 24` has as many latent dimensions as
+  three cores with `r = 8`. Is cross-engine coupling fundamentally
+  different from one larger core, or is it a computational trick for
+  the same thing? The composition only matters if it is fundamentally
+  different. Not answered here.
+- **Coupling topology at N > 3.** All-to-all with N = 8 is 28 pairs.
+  Does sparse coupling (grid, ring, or hub-and-spoke) preserve the
+  correlation structure while reducing coupling cost? Not specified.
+- **Drive source at real scale.** The synthetic `drive_source` is
+  white noise plus drift. At real scale it would be the token embedding
+  stream or the packet stream from a lower layer. The interface accepts
+  either; the choice is deferred to the first real training run.
+- **The `j̄` selection rule.** §5 uses "the engine with the largest
+  phase difference from `i`". Is that the right choice? Alternatives:
+  mean phase difference, or weighted by coupling matrix `W`. Not
+  tested.
+- **Residue window length.** `K = 8` is a placeholder. The right value
+  depends on the timescale over which residue correlates across engines.
+  Not measured.
 
 ## 12. Read next
 
 - [Structure-Flux-Mode Triad](triad.md) — RES-304
+- [SDM + Hopfield Attractor Memory](sdm-hopfield.md) — RES-317
 - [Classical Core](../200-core/classical-core.md) — RES-200
 - [Control Packet](../200-core/control-packet.md) — RES-201
 - [Phasor Graph](phasor-graph.md) — RES-306
-- [SDM / Hopfield Attractor](sdm-hopfield.md)
 - [Hierarchical Encoding](../310-hierarchy/hierarchical-encoding.md) — RES-310
 - [Streaming Substrate State](../310-hierarchy/streaming-state.md) — RES-311
 - [Documentation Index](../readme.md)
