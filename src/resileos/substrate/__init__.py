@@ -94,4 +94,39 @@ __all__ = [
     "HandlerFn",
     # constructive
     "ConstructiveHead",
+    # SDM / Hopfield (RES-317)
+    "AttractorMemory",
+    "HopfieldConfig",
+    "KanervaSDM",
+    "ModernHopfield",
+    "SDMConfig",
+    # Multi-engine composition (RES-318)
+    "CoupledPacket",
+    "CouplingField",
+    "CoupledStreamGenerator",
+    "EngineGroup",
 ]
+
+# Lazy exports avoid circular imports (core ↔ engine_group).
+_LAZY = {
+    "AttractorMemory": (".sdm", "AttractorMemory"),
+    "HopfieldConfig": (".sdm", "HopfieldConfig"),
+    "KanervaSDM": (".sdm", "KanervaSDM"),
+    "ModernHopfield": (".sdm", "ModernHopfield"),
+    "SDMConfig": (".sdm", "SDMConfig"),
+    "CoupledPacket": (".coupling", "CoupledPacket"),
+    "CouplingField": (".coupling", "CouplingField"),
+    "CoupledStreamGenerator": (".engine_group", "CoupledStreamGenerator"),
+    "EngineGroup": (".engine_group", "EngineGroup"),
+}
+
+
+def __getattr__(name: str):
+    if name in _LAZY:
+        import importlib
+        mod_name, attr = _LAZY[name]
+        mod = importlib.import_module(mod_name, __name__)
+        val = getattr(mod, attr)
+        globals()[name] = val
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
