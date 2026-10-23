@@ -2,7 +2,7 @@ doc: RES-318
 title: Engine Group Composition
 status: draft
 depends_on: [RES-200, RES-201, RES-304, RES-306, RES-310, RES-311, RES-317]
-referenced_by: []
+referenced_by: [RES-319]
 
 # Engine Group Composition
 
@@ -22,9 +22,10 @@ measuring the non-degenerate one.
 
 ## 0. Status
 
-Draft. No implementation exists. First `N = 3` engines. Scale to `N = 8`
-is the sector-bus-aligned target (RES-312) and is deferred until `N = 3`
-is verified.
+Draft. Implementation exists (`coupling.py`, `engine_group.py`), tests
+pass, first signal probe measured in RES-319. First `N = 3` engines.
+Scale to `N = 8` is the sector-bus-aligned target (RES-312) and is
+deferred until `N = 3` is verified.
 
 ## 1. Why single-engine is degenerate
 
@@ -193,6 +194,12 @@ phase-difference sign is the cross term. XOR is the minimal way to
 encode "engine says A, coupling says B" as a single parity flip. The
 exact form is a design choice; `β_F` and `β_S` are tunable.
 
+**Known limitation (measured: RES-319 §3a).** The cross terms adjust
+each engine's *monitors* (`F_res`, `ΔS`, `μ`). They do not write to
+`lat_s_k`, which is a constant vector under the current
+`EngineGroup → ControlPacket` path. Per-engine propagation therefore
+does not occur under this drive rule. See RES-319 §3a.
+
 ## 6. Coupled packet
 
 A new type. It wraps N single-engine packets and the coupling state at
@@ -257,6 +264,7 @@ What must hold for the composition to be useful:
    `F_res_j` should have nonzero Pearson correlation across the stream
    (target `0.2 < ρ < 0.8`). At `ρ = 1` the engines are redundant; at
    `ρ = 0` they are independent and there is nothing to learn.
+   *(Measured: see RES-319 §6.)*
 
 3. **Residue histories diverge.** `residue_history[i]` and
    `residue_history[j]` should be distinguishable. If they are
@@ -268,12 +276,12 @@ What must hold for the composition to be useful:
    `κ` is too high for the number of engines.
 
 5. **Group basins are measurable.** With `step_fn` = "advance the group
-   one step, return the joint mode," the four RES-304 §2 metrics must
-   be computable using `basin.py` unchanged. If they are, the triad's
+   one step, return the joint mode," the four RES-304 §2 metrics must be
+   computable using `basin.py` unchanged. If they are, the triad's
    scaling check runs against N (§3.3). If they are not — because the
    group does not settle into a mode — the coupling is too weak or the
    drive is too noisy, and no training measurement downstream will be
-   meaningful.
+   meaningful. *(Measured: see RES-319 §6.)*
 
 These invariants are testable before any training happens. If any fails,
 the training measurement will be degenerate for the same reason the
@@ -296,6 +304,8 @@ single-engine ablation was.
   the N engines.
 - Not a redefinition of the triad. RES-304 remains the single-engine
   description. §3 here is the group-level extension, not a rewrite.
+- Not a claim that the drive rule propagates into per-engine latents.
+  It does not (RES-319 §3a). Monitors only.
 
 ## 10. Implementation order
 
@@ -311,6 +321,7 @@ single-engine ablation was.
    training stream. Testable with a synthetic `drive_source`.
 5. **Invariant tests** — §8 as test cases, including the group-level
    basin measurement via `basin.py` unchanged. Run before any training.
+   Results are recorded in RES-319 (`engine-group-results.md`).
 6. **Only then** — carrier training on `CoupledPacket`. The framework-
    native objective re-enters as a real question.
 
@@ -330,8 +341,8 @@ gate. Step 6 is the question. Do not skip to 6.
 - **Is coupling fundamentally different from a larger single engine?**
   A single `ResidualCore` with `r = 24` has as many latent dimensions as
   three cores with `r = 8`. Is cross-engine coupling fundamentally
-  different from one larger core, or is it a computational trick for
-  the same thing? The composition only matters if it is fundamentally
+  different from one larger core, or is it a computational trick for the
+  same thing? The composition only matters if it is fundamentally
   different. Not answered here.
 - **Coupling topology at N > 3.** All-to-all with N = 8 is 28 pairs.
   Does sparse coupling (grid, ring, or hub-and-spoke) preserve the
@@ -351,6 +362,7 @@ gate. Step 6 is the question. Do not skip to 6.
 ## 12. Read next
 
 - [Structure-Flux-Mode Triad](triad.md) — RES-304
+- [Engine Group Signal Probe Results](engine-group-results.md) — RES-319
 - [SDM + Hopfield Attractor Memory](sdm-hopfield.md) — RES-317
 - [Classical Core](../200-core/classical-core.md) — RES-200
 - [Control Packet](../200-core/control-packet.md) — RES-201
