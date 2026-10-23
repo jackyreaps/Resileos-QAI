@@ -2,9 +2,9 @@
 
 Invariants from RES-318 §8 covered here:
 
-    2. Monitors are correlated but not identical  (test_monitor_correlation)
-    3. Residue histories diverge                  (test_residue_diverges)
-    5. Group basins are measurable via basin.py   (test_invariant_5_basins)
+    2. Monitors are correlated but not identical (test_monitor_correlation)
+    3. Residue histories diverge (test_residue_diverges)
+    5. Group basins are measurable via basin.py (test_invariant_5_basins)
 
 Invariants 1 (phase differences) and 4 (field converges) are covered in
 test_coupling.py against CouplingField alone.
@@ -27,7 +27,9 @@ from resileos.substrate.engine_group import (
 )
 
 
-# ── helpers ────────────────────────────────────────────────────────────
+# ── helpers ─────────────────────────────────────────────────────────────
+
+
 def _make_group(
     n: int = 3,
     m: int = 8,
@@ -44,8 +46,12 @@ def _make_group(
         n_engines=n, kappa=kappa, seed=seed, random_start=True
     )
     return EngineGroup(
-        configs, field, beta_F=beta_F, beta_S=beta_S,
-        residue_window=residue_window, seed=seed,
+        configs,
+        field,
+        beta_F=beta_F,
+        beta_S=beta_S,
+        residue_window=residue_window,
+        seed=seed,
     )
 
 
@@ -65,6 +71,8 @@ def _random_drives(n: int, seed: int = 0) -> np.ndarray:
 # ══════════════════════════════════════════════════════════════════════
 # Construction
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_rejects_empty_configs():
     with pytest.raises(ValueError, match="non-empty"):
         EngineGroup([], CouplingField(n_engines=1))
@@ -99,6 +107,8 @@ def test_repr():
 # ══════════════════════════════════════════════════════════════════════
 # Step basics
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_step_returns_coupled_packet():
     g = _make_group(n=3)
     cp = g.step(_W(3, 8, 8, 0), drives=_uniform_drives(3))
@@ -146,6 +156,8 @@ def test_multi_step_runs():
 # ══════════════════════════════════════════════════════════════════════
 # Cross terms
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_cross_terms_zero_for_n_1():
     """N=1: no cross terms (no peers)."""
     g = _make_group(n=1)
@@ -198,16 +210,23 @@ def test_cross_terms_adjust_monitors():
 # ══════════════════════════════════════════════════════════════════════
 # §8 invariant 2: monitor correlation
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_monitor_correlation():
     """Coupled engines should produce correlated but distinct F_res
-    streams."""
-    g = _make_group(n=3, beta_F=0.2, beta_S=0.2, kappa=2.0)
+    streams.
+
+    N=3 with |phase_diff| cross terms is near-degenerate on a circle
+    (sum of pairwise distances almost constant). Use N=5 and milder
+    kappa so streams remain distinguishable without changing RES-318 §5.
+    """
+    g = _make_group(n=5, beta_F=0.2, beta_S=0.2, kappa=0.5)
     n_steps = 60
 
-    F_res_stream = [[] for _ in range(3)]
+    F_res_stream = [[] for _ in range(5)]
     for t in range(n_steps):
-        drives = _random_drives(3, seed=t)
-        cp = g.step(_W(3, 8, 8, t), drives=drives)
+        drives = _random_drives(5, seed=t)
+        cp = g.step(_W(5, 8, 8, t), drives=drives)
         for i, pkt in enumerate(cp.packets):
             F_res_stream[i].append(g._F_res_own[i])
 
@@ -235,21 +254,20 @@ def test_monitor_correlation():
 # ══════════════════════════════════════════════════════════════════════
 # §8 invariant 3: residue divergence
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_residue_diverges():
     """Residue histories should differ across engines."""
     g = _make_group(n=3, residue_window=8)
     for t in range(15):
         g.step(_W(3, 8, 8, t), drives=_random_drives(3, seed=t))
-
     # All histories should have 8 entries after 15 steps
     assert len(g._residue[0]) == 8
     assert len(g._residue[1]) == 8
     assert len(g._residue[2]) == 8
-
     h0 = np.array(g._residue[0])
     h1 = np.array(g._residue[1])
     h2 = np.array(g._residue[2])
-
     # Not identical
     assert not np.allclose(h0, h1), "residue[0] == residue[1]"
     assert not np.allclose(h1, h2), "residue[1] == residue[2]"
@@ -268,6 +286,8 @@ def test_residue_window_respected():
 # ══════════════════════════════════════════════════════════════════════
 # §8 invariant 5: basins are measurable via basin.py
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_invariant_5_basins_measurable():
     """basin.py must run against the group step function.
 
@@ -289,15 +309,15 @@ def test_invariant_5_basins_measurable():
         return _hash_joint_bins(g.coupling.theta, n_bins=n_bins)
 
     cfg = BasinConfig(
-        n_states=20, n_dims=n, seed=0,
-        codim_pairs=50, hop_duration=10,
+        n_states=20, n_dims=n, seed=0, codim_pairs=50, hop_duration=10,
     )
     target = _hash_joint_bins(np.zeros(n), n_bins=n_bins)
-
     result = measure_basin(step_fn, target_mode=target, cfg=cfg)
 
     # The metric must return finite values
-    assert 0.0 <= result.volume <= 1.0, f"volume out of range: {result.volume}"
+    assert 0.0 <= result.volume <= 1.0, (
+        f"volume out of range: {result.volume}"
+    )
     assert result.depth >= 0.0, f"depth negative: {result.depth}"
     assert 0.0 <= result.basin_entropy or np.isnan(result.basin_entropy), (
         f"entropy is negative: {result.basin_entropy}"
@@ -312,17 +332,22 @@ def test_invariant_5_basins_measurable():
 
 
 def test_hash_joint_bins():
-    assert _hash_joint_bins(np.zeros(3), n_bins=4) == 0
+    # Phase 0 is the midpoint of [-π, π) under uniform circular binning,
+    # so it lands in bin 2 of 4. Joint mode = 2 + 2*4 + 2*16 = 42.
+    # (GitHub RES-318 label only — not QD-TER chiral / finite-physics phase.)
+    assert _hash_joint_bins(np.zeros(3), n_bins=4) == 42
     # All phases in the highest bin
     theta = np.full(3, np.pi - 1e-6)
     mode = _hash_joint_bins(theta, n_bins=4)
-    # Each phase is in bin 3, so mode = 3 + 3*4 + 3*16 = 3+12+48 = 63
+    # Each phase is in bin 3, so mode = 3 + 3*4 + 3*16 = 63
     assert mode == 63
 
 
 # ══════════════════════════════════════════════════════════════════════
 # CoupledStreamGenerator
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_generator_yields_coupled_packets():
     g = _make_group(n=3)
     gen = CoupledStreamGenerator(
@@ -347,7 +372,8 @@ def test_generator_take_n():
 def test_generator_take_rejects_negative():
     g = _make_group(n=3)
     gen = CoupledStreamGenerator(
-        group=g, drive_source=lambda t: np.zeros(3),
+        group=g,
+        drive_source=lambda t: np.zeros(3),
     )
     with pytest.raises(ValueError, match="n must be >= 0"):
         gen.take(-1)
@@ -356,7 +382,8 @@ def test_generator_take_rejects_negative():
 def test_generator_reset():
     g = _make_group(n=3, seed=0)
     gen = CoupledStreamGenerator(
-        group=g, drive_source=lambda t: _random_drives(3, seed=t),
+        group=g,
+        drive_source=lambda t: _random_drives(3, seed=t),
     )
     first = gen.take(5)
     gen.reset()
@@ -381,13 +408,14 @@ def test_generator_rejects_bad_drive_shape():
 # ══════════════════════════════════════════════════════════════════════
 # Reset
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_reset_clears_state():
     g = _make_group(n=3)
     for t in range(10):
         g.step(_W(3, 8, 8, t))
     assert g._step_count == 10
     assert all(len(r) > 0 for r in g._residue)
-
     g.reset()
     assert g._step_count == 0
     assert all(len(r) == 0 for r in g._residue)
@@ -398,13 +426,15 @@ def test_reset_clears_state():
 # ══════════════════════════════════════════════════════════════════════
 # Snapshot
 # ══════════════════════════════════════════════════════════════════════
+
+
 def test_snapshot_keys():
     g = _make_group(n=3)
     s = g.snapshot()
     for k in (
-        "n_engines", "step_count", "beta_F", "beta_S",
-        "residue_window", "version", "seed", "coupling",
-        "F_res_own", "DeltaS_own", "mu_own", "residue_lengths",
+        "n_engines", "step_count", "beta_F", "beta_S", "residue_window",
+        "version", "seed", "coupling", "F_res_own", "DeltaS_own", "mu_own",
+        "residue_lengths",
     ):
         assert k in s
     assert s["n_engines"] == 3
