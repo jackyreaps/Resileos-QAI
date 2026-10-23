@@ -1,0 +1,29 @@
+{
+  "probe": "coupled_signal_presence",
+  "n_engines": 3,
+  "steps": 2000,
+  "kappa_on": 2.0,
+  "kappa_off": 0.0,
+  "feature_dim": 25,
+  "n_topics": 4,
+  "MI_coupled_nats": 0.1849303137203056,
+  "MI_uncoupled_nats": 0.00013022236180129396,
+  "delta_MI_nats": 0.1848000913585043,
+  "MI_R_coupled_nats": 1.2459739656153286,
+  "MI_R_uncoupled_nats": 0.0028067541593011407,
+  "delta_MI_R_nats": 1.2431672114560275,
+  "MI_lat_coupled_nats": 0.0,
+  "MI_lat_uncoupled_nats": 0.0,
+  "delta_MI_lat_nats": 0.0,
+  "MI_M_coupled_nats": 1.1256972917814199,
+  "MI_M_uncoupled_nats": 8.560094589292434e-05,
+  "delta_MI_M_nats": 1.125611690835527,
+  "carrier_input_recommendation": "aggregate R_shared (and optionally M)",
+  "verdict": "coupled carries more task signal — training probe justified",
+  "notes": [
+    "Ablation is kappa only; input dimension matched.",
+    "No carrier, no decoder — signal presence only.",
+    "Target label = topic index used to schedule drives.",
+    "Disaggregated MI: lat=propagation, R=aggregation, M=cross-state."
+  ]
+}
