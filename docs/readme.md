@@ -45,44 +45,45 @@ Substrate extensions:
 17. [Order Parameter Gate](300-substrate/order-parameter-gate.md) — RES-316
 18. [SDM + Hopfield Attractor Memory](300-substrate/sdm-hopfield.md) — RES-317
 19. [Engine Group Composition](300-substrate/engine-group.md) — RES-318
+20. [Engine Group Signal Probe Results](300-substrate/engine-group-results.md) — RES-319
 
 Hierarchy / modulation layer:
-20. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
-21. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
-22. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
-23. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
-24. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
-25. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
+21. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
+22. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
+23. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
+24. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
+25. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
+26. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
 
 Titanos application layer:
-26. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
-27. [Dense Entity Index](320-titanos/index.md) — RES-321
-28. [Query Language and Execution](320-titanos/query.md) — RES-322
-29. [External Ingestion](320-titanos/ingestion.md) — RES-323
-30. [Zeus Child](320-titanos/zeus-child.md) — RES-324
-31. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
+27. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
+28. [Dense Entity Index](320-titanos/index.md) — RES-321
+29. [Query Language and Execution](320-titanos/query.md) — RES-322
+30. [External Ingestion](320-titanos/ingestion.md) — RES-323
+31. [Zeus Child](320-titanos/zeus-child.md) — RES-324
+32. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
 
 Operations and notes:
-32. [Run Config](400-operations/run-config.md) — RES-400
-33. [Training](400-operations/training.md) — RES-401
-34. [Validation](400-operations/validation.md) — RES-402
-35. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
-36. [Behavioral Notes](500-notes/behavioral.md) — RES-500
-37. [Roadmap](500-notes/roadmap.md) — RES-501
+33. [Run Config](400-operations/run-config.md) — RES-400
+34. [Training](400-operations/training.md) — RES-401
+35. [Validation](400-operations/validation.md) — RES-402
+36. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
+37. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+38. [Roadmap](500-notes/roadmap.md) — RES-501
 
 QD-TER bridge:
-38. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-39. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-40. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-41. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
-42. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
-43. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
-44. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
-45. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
-46. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
+39. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+40. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+41. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+42. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+43. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+44. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+45. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
+46. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
+47. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
 
 Reference:
-47. [Glossary](900-reference/glossary.md) — RES-900
+48. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
@@ -111,6 +112,7 @@ Reference:
 | RES-316 | `order-parameter-gate.md` | proposal | Kuramoto-R confidence gate; off by default |
 | RES-317 | `sdm-hopfield.md` | draft | Parameter-free attractor cleanup; reduces chain crosstalk |
 | RES-318 | `engine-group.md` | draft | N-engine composition; triad at group level; prerequisite for multi-stream training |
+| RES-319 | `engine-group-results.md` | draft | First measured result: aggregate ΔMI +1.24 nats; per-engine ΔMI 0 (Cause A) |
 
 ## 310-series hierarchy modules
 
@@ -157,13 +159,13 @@ docs state their own scope; the status page aggregates them.
 RES-100 ─▶ RES-101 ─▶ RES-102
     │
     ▼
-RES- ▼200 ─▶ RES-201 ─▶ RES-202
+RES-200 ─▶ RES-201 ─▶ RES-202
     │
     ▼
 RES-300 ─▶ RES-301 ─▶ RES-302 ─▶ RES-303
     │
     ▼
-RES-304 ─▶ RES-318
+RES-304 ─▶ RES-318 ─▶ RES-319
 RES-305  RES-306 ─▶ RES-307
     │
     ├──▶ RES-308
@@ -173,7 +175,7 @@ RES-305  RES-306 ─▶ RES-307
 RES-310 ─▶ RES-311 ─▶ RES-312
     │         │         │
     └────┬────┴────┬────┘
-                 ▼
+         ▼         ▼
     RES-313 ─▶ RES-314
          │         │
          └────┬────┘
