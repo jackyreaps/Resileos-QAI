@@ -5,11 +5,14 @@ Same N engines, same concatenated feature dimension, same seeds.
 Only difference: kappa=0 (uncoupled) vs kappa>0 (coupled).
 
 Disaggregates MI by feature group:
-  lat_s_k (propagation) | R_shared (aggregation) | coupling_matrix (cross-state)
+    lat_s_k (propagation) | R_shared (aggregation) | coupling_matrix (cross-state)
+
+Also reports the §3a mechanism check: is lat_s_k constant, topic-clustered,
+or noisy under the current drive schedule?
 
 Usage:
-  PYTHONPATH=src python scripts/run_coupled_signal_probe.py
-  PYTHONPATH=src python scripts/run_coupled_signal_probe.py --steps 2000 --n 3
+    PYTHONPATH=src python scripts/run_coupled_signal_probe.py
+    PYTHONPATH=src python scripts/run_coupled_signal_probe.py --steps 2000 --n 3
 """
 from __future__ import annotations
 
@@ -81,6 +84,39 @@ def _make_group(n: int, kappa: float, seed: int, m: int, r: int) -> EngineGroup:
     return EngineGroup(configs, field, seed=seed)
 
 
+def _mechanism_stats(lat_streams: list, n_topics: int) -> dict:
+    """§3a diagnostic: is lat_s_k constant, topic-clustered, or noisy?
+
+    Cause A — std≈0, unique_rows=1: drive does not reach lat_s_k.
+    Cause B — std>0, unique_rows≈T: latents vary, independent of topic.
+    Cause C — std>0, unique_rows≈n_topics: cluster by topic; probe bug
+              (MI estimator or bin count).
+    """
+    arr = np.array(lat_streams)  # (T, N, r)
+    T = arr.shape[0]
+    per_engine = []
+    for i in range(arr.shape[1]):
+        block = arr[:, i, :]
+        std = float(block.std(axis=0).mean())
+        uniq = int(len(np.unique(block, axis=0)))
+        per_engine.append({"engine": i, "mean_std": std, "unique_rows": uniq})
+    if all(e["mean_std"] < 1e-9 and e["unique_rows"] == 1 for e in per_engine):
+        cause = "A"
+        reading = "latents constant; drive does not reach lat_s_k"
+    elif all(e["unique_rows"] > 0.9 * T for e in per_engine):
+        cause = "B"
+        reading = "latents vary but independent of topic"
+    elif all(
+        2 <= e["unique_rows"] <= max(16, 2 * n_topics) for e in per_engine
+    ):
+        cause = "C"
+        reading = "latents clusterreading by topic; probe likely buggy"
+    else:
+        cause = "mixed"
+        reading = "per-engine": behaviour differs; inspect per_engine reading list"
+    return {",cause": cause, " "per_engine": per_engine}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Coupled vs uncoupled MI probe")
     ap.add_argument("--n", type=int, default=3)
@@ -100,6 +136,8 @@ def main() -> int:
 
     feats_on = []
     feats_off = []
+    lat_streams_on: list[list[np.ndarray]] = []
+    lat_streams_off: list[list[np.ndarray]] = []
     labels = []
 
     for t in range(args.steps):
@@ -115,6 +153,18 @@ def main() -> int:
         cp_off = g_off.step([w.copy() for w in W], drives=drives.copy())
         feats_on.append(_feat_from_coupled(cp_on))
         feats_off.append(_feat_from_coupled(cp_off))
+        lat_streams_on.append(
+            [
+                np.asarray(p.lat_s_k, dtype=np.float64).ravel()
+                for p in cp_on.packets
+            ]
+        )
+        lat_streams_off.append(
+            [
+                np.asarray(p.lat_s_k, dtype=np.float64).ravel()
+                for p in cp_off.packets
+            ]
+        )
         labels.append(topic)
 
     X_on = np.stack(feats_on)
@@ -126,6 +176,7 @@ def main() -> int:
     eng_dim = n * (r + 3)
     r_idx = eng_dim
     n_pairs = n * (n - 1) // 2
+
     lat_cols = []
     for i in range(n):
         base = i * (r + 3)
@@ -167,6 +218,9 @@ def main() -> int:
     else:
         rec = "no clear coupled advantage"
 
+    mech_on = _mechanism_stats(lat_streams_on, args.n_topics)
+    mech_off = _mechanism_stats(lat_streams_off, args.n_topics)
+
     report = {
         "probe": "coupled_signal_presence",
         "n_engines": args.n,
@@ -187,6 +241,8 @@ def main() -> int:
         "MI_M_coupled_nats": mi_M_on,
         "MI_M_uncoupled_nats": mi_M_off,
         "delta_MI_M_nats": delta_M,
+        "lat_mechanism_coupled": mech_on,
+        "lat_mechanism_uncoupled": mech_off,
         "carrier_input_recommendation": rec,
         "verdict": verdict,
         "notes": [
@@ -194,8 +250,10 @@ def main() -> int:
             "No carrier, no decoder — signal presence only.",
             "Target label = topic index used to schedule drives.",
             "Disaggregated MI: lat=propagation, R=aggregation, M=cross-state.",
+            "§3a mechanism check: see lat_mechanism_coupled.cause (A/B/C).",
         ],
     }
+
     out = (
         Path(args.out)
         if args.out
@@ -205,12 +263,21 @@ def main() -> int:
     out.write_text(json.dumps(report, indent=2))
 
     print(f"feature_dim (matched): {X_on.shape[1]}")
-    print(f"MI coupled:   {mi_on:.4f} nats")
+    print(f"MI coupled: {mi_on:.4f} nats")
     print(f"MI uncoupled: {mi_off:.4f} nats")
-    print(f"ΔMI mean-dim:  {delta:+.4f}")
-    print(f"ΔMI lat_s_k:   {delta_lat:+.4f}  (propagation)")
-    print(f"ΔMI R_shared:  {delta_R:+.4f}  (aggregation)")
-    print(f"ΔMI M matrix:  {delta_M:+.4f}  (cross-state)")
+    print(f"ΔMI mean-dim: {delta:+.4f}")
+    print(f"ΔMI lat_s_k: {delta_lat:+.4f} (propagation)")
+    print(f"ΔMI R_shared: {delta_R:+.4f} (aggregation)")
+    print(f"ΔMI M matrix: {delta_M:+.4f} (cross-state)")
+    print(
+        f"§3a mechanism (coupled): cause={mech_on['cause']} "
+        f"— {mech_on['reading']}"
+    )
+    for e in mech_on["per_engine"]:
+        print(
+            f"  engine {e['engine']}: mean_std={e['mean_std']:.6f} "
+            f"unique_rows={e['unique_rows']}"
+        )
     print(f"verdict: {verdict}")
     print(f"carrier input: {rec}")
     print(f"wrote {out}")
