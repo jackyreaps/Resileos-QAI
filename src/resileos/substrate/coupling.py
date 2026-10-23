@@ -1,32 +1,32 @@
 """Coupling field and coupled packet for EngineGroup composition (RES-318).
 
-The single-engine substrate (RES-200) couples the r oscillators within
-one residual core. `KuramotoField` handles that and its contract is
-stable. At group level (RES-318), N residual cores produce N packet
-streams, and their monitors are coupled through an N-engine phase
-lattice. That lattice is `CouplingField`.
+The single-engine substrate (RES-200) couples the r oscillators within one
+residual core. `KuramotoField` handles that and its contract is stable. At
+group level (RES-318), N residual cores produce N packet streams, and their
+monitors are coupled through an N-engine phase lattice. That lattice is
+`CouplingField`.
 
 Two types:
 
-    CouplingField  — (N,) phases, one per engine, stepped together.
-    CoupledPacket  — N single-engine packets plus cross-engine state at
-                     the moment they were emitted.
+    CouplingField — (N,) phases, one per engine, stepped together.
+    CoupledPacket — N single-engine packets plus cross-engine state at the
+                    moment they were emitted.
 
-Both are self-contained. Neither imports `ResidualCore`, `KuramotoField`,
-or the hierarchy encoder. The `EngineGroup` in `engine_group.py` uses
-both, but they can be tested without it.
+Both are self-contained. Neither imports `ResidualCore`, `KuramotoField`, or
+the hierarchy encoder. The `EngineGroup` in `engine_group.py` uses both, but
+they can be tested without it.
 
-CoupledPacket is packet-type agnostic: it holds whatever the engines
-emit. `ResidualCore.step()` returns a `ControlPacket`; the hierarchy
-encoder emits `HierarchicalPacket`. `to_dict()` inspects the packet and
-serializes what it can.
+CoupledPacket is packet-type agnostic: it holds whatever the engines emit.
+`ResidualCore.step()` returns a `ControlPacket`; the hierarchy encoder emits
+`HierarchicalPacket`. `to_dict()` inspects the packet and serializes what it
+can.
 
 Off states (explicit):
-    trainable              off. No parameters, no gradients.
-    cross-engine residue   off. CoupledPacket stores residue history;
-                           the field does not compute or propagate it.
-    packet-format change   off. The N underlying packets are whatever
-                           each engine emits.
+    trainable off. No parameters, no gradients.
+    cross-engine residue off. CoupledPacket stores residue history; the field
+        does not compute or propagate it.
+    packet-format change off. The N underlying packets are whatever each
+        engine emits.
 """
 from __future__ import annotations
 
@@ -35,23 +35,25 @@ from typing import Any, Optional
 
 import numpy as np
 
-
 PHI = (1.0 + np.sqrt(5.0)) / 2.0
 TWO_PI = 2.0 * np.pi
 
 
 # ── coupling field ──────────────────────────────────────────────────────
+
+
 class CouplingField:
     """N-engine phase lattice. One phase per engine.
 
     Construction:
+
         field = CouplingField(n_engines=3, kappa=1.0, seed=0)
         field.step(drives=np.array([0.1, -0.2, 0.3]))
         R = field.order_parameter()
         d = field.phase_difference(0, 1)
 
-    The field does not know about residual cores, packets, or monitors.
-    It holds N phases, steps them under a Kuramoto update with external
+    The field does not know about residual cores, packets, or monitors. It
+    holds N phases, steps them under a Kuramoto update with external
     per-engine drive, and exposes the order parameter and pairwise phase
     differences.
     """
@@ -75,7 +77,6 @@ class CouplingField:
             raise ValueError("dt must be > 0")
         if ladder not in ("uniform", "golden_powers"):
             raise ValueError(f"unknown ladder: {ladder!r}")
-
         self.n_engines = int(n_engines)
         self.kappa = float(kappa)
         self.alpha = float(alpha)  # reserved
@@ -84,13 +85,11 @@ class CouplingField:
         self.ladder = ladder
         self.random_start = bool(random_start)
         self.seed = int(seed)
-
         self._rng = np.random.default_rng(self.seed)
         if self.random_start:
             self._theta = self._rng.uniform(-np.pi, np.pi, self.n_engines)
         else:
             self._theta = np.zeros(self.n_engines, dtype=np.float64)
-
         self._omega = self._compute_omega()
 
     def _compute_omega(self) -> np.ndarray:
@@ -114,13 +113,12 @@ class CouplingField:
     ) -> None:
         """Advance one step.
 
-        dtheta_i = omega_i
-                 + (kappa / N) * sum_j W[i,j] * sin(theta_j - theta_i)
-                 + drives[i]
-        theta_i += dt * dtheta_i  (wrapped to (-pi, pi])
+            dtheta_i = omega_i
+                     + (kappa / N) * sum_j W[i,j] * sin(theta_j - theta_i)
+                     + drives[i]
+            theta_i += dt * dtheta_i   (wrapped to (-pi, pi])
         """
         N = self.n_engines
-
         if drives is None:
             drives_arr = np.zeros(N, dtype=np.float64)
         else:
@@ -129,7 +127,6 @@ class CouplingField:
                 raise ValueError(
                     f"drives shape {drives_arr.shape} != ({N},)"
                 )
-
         if W is None:
             W_arr = np.ones((N, N), dtype=np.float64) - np.eye(N)
         else:
@@ -138,11 +135,9 @@ class CouplingField:
                 raise ValueError(
                     f"W shape {W_arr.shape} != ({N}, {N})"
                 )
-
         theta = self._theta
         sin_diff = np.sin(theta[None, :] - theta[:, None])
         coupling = (self.kappa / N) * np.sum(W_arr * sin_diff, axis=1)
-
         dtheta = self._omega + coupling + drives_arr
         new_theta = theta + self.dt * dtheta
         self._theta = np.mod(new_theta + np.pi, TWO_PI) - np.pi
@@ -193,15 +188,16 @@ class CouplingField:
 
 
 # ── coupled packet ──────────────────────────────────────────────────────
+
+
 @dataclass(frozen=True)
 class CoupledPacket:
     """N single-engine packets plus cross-engine state at emission time.
 
-    packets         — tuple of whatever each engine emitted (ControlPacket
-                      from ResidualCore, HierarchicalPacket from the
-                      encoder, or any object).
-    phases          — (N,) phase per engine at emission time.
-    R_shared        — coupling order parameter at emission time, [0, 1].
+    packets — tuple of whatever each engine emitted (ControlPacket from
+        ResidualCore, HierarchicalPacket from the encoder, or any object).
+    phases — (N,) phase per engine at emission time.
+    R_shared — coupling order parameter at emission time, [0, 1].
     coupling_matrix — (N, N) antisymmetric wrapped phase differences.
     residue_history — (N,) tuple of (K,) ΔS histories.
     """
@@ -224,7 +220,6 @@ class CoupledPacket:
         n = len(self.packets)
         if n < 1:
             raise ValueError("packets must contain at least one engine")
-
         if len(self.phases) != n:
             raise ValueError(
                 f"len(phases)={len(self.phases)} != len(packets)={n}"
@@ -246,10 +241,10 @@ class CoupledPacket:
             )
         if not np.allclose(np.diag(M), 0.0, atol=1e-9):
             raise ValueError("coupling_matrix diagonal must be zero")
-        if not np.allclose(np.abs(M), np.abs(M.T), atol=1e-6):
+        if not np.allclose(M, -M.T, atol=1e-6):
             raise ValueError(
                 "coupling_matrix must be antisymmetric "
-                "(|M| == |M.T| within wrap tolerance)"
+                "(M == -M.T within tolerance)"
             )
         object.__setattr__(self, "coupling_matrix", M)
 
@@ -260,8 +255,9 @@ class CoupledPacket:
                     f"residue_history[{i}] must be 1-D, got shape {arr.shape}"
                 )
             object.__setattr__(
-                self, "residue_history",
-                self.residue_history[:i] + (arr,) + self.residue_history[i+1:]
+                self,
+                "residue_history",
+                self.residue_history[:i] + (arr,) + self.residue_history[i + 1:],
             )
 
     @property
@@ -300,7 +296,6 @@ class CoupledPacket:
                     "kind": "unknown",
                     "repr": repr(p)[:80],
                 })
-
         return {
             "n_engines": self.n_engines,
             "packets": packets_info,
