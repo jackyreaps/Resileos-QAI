@@ -149,3 +149,23 @@ caller.
 - [Disk-Backed Band Store](store.md) — RES-320
 - [Dense Entity Index](index.md) — RES-321
 - [Documentation Index](../readme.md)
+
+## 11. Endpoint cardinality
+
+`/api/v1/query` and its inverse return a single `Answer.value`.
+That is correct for one-to-one relations (`domain`, `is_a`,
+`roman_name`) where the question has exactly one answer.
+
+`/api/v1/sparql` returns rows and is the correct endpoint for
+one-to-many relations (`parent_of`, `sibling_of`, `symbol_of`,
+`spouse_of`). `SELECT ?o WHERE Cronus --parent_of--> ?o` returns all
+six children.
+
+The Python API mirrors this: `ask()` / `ask_inverse()` return one
+value; `ask_list()` returns all values for a `(subject, relation)`
+pair.
+
+Strict single-object recall on a one-to-many relation is not a
+correctness metric — it measures the endpoint against the wrong gold.
+The 65.8% strict figure in `report_operate_smoke.json` is that
+mismatch, not a defect.
