@@ -26,6 +26,11 @@ Scoring promotes to float64 before the inner products. np.dot on int8
 inputs uses an int8 accumulator and silently overflows for dim > 127.
 
 The "quantum" path is a labeled simulation (QUANTUM_SIM).
+
+Attractor writes are deferred: `learn()` and `learn_many()` write to
+the SDM without rebuilding the Hopfield matrix. The rebuild happens
+once, on the first cleanup or on an explicit `flush()`. Bulk seeding
+uses `learn_many()`, which does one flush at the end.
 """
 from __future__ import annotations
 
@@ -36,6 +41,7 @@ import re
 import sys
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 
@@ -194,7 +200,6 @@ class Titanos:
             living_sharpness=cfg.csi_living_sharpness,
         )
         self.agency = AgencyGroup()
-
         # Attractor (RES-317). Optional; failures fall back to None and
         # the recurrent loop behaves exactly as before.
         self._attractor: AttractorMemory | None = None
@@ -224,7 +229,7 @@ class Titanos:
     def _slot_candidates(self, relation: str, inverse: bool) -> set[str]:
         """Entities occupying the queried slot for `relation`.
 
-        inverse=False -> objects  (forward: anchor points at them)
+        inverse=False -> objects (forward: anchor points at them)
         inverse=True  -> subjects (inverse: they point at anchor)
         """
         idx = 0 if inverse else 2
@@ -341,27 +346,71 @@ class Titanos:
         return np.where(acc >= 0, 1, -1).astype(np.int8)
 
     # ── MAP triple binding ───────────────────────────────────────────
-    def learn(self, subject: str, relation: str, obj: str) -> None:
-        """band += s * r * o. Forward probe s*r retrieves o; inverse
-        probe o*r retrieves s. Because bind is self-inverse, the probe
-        recovers whichever slot the anchor occupies; direction is
-        enforced at cleanup via `_slot_candidates`."""
+    def _learn_bands(self, subject: str, relation: str, obj: str) -> np.ndarray:
+        """Band update + fact log. No attractor write."""
         s = self._ent(subject)
         r = self._rel(relation)
         o = self._ent(obj)
         band = self._get_band(relation)
-        band += (s * r * o).astype(np.int32)
+        bound = (s * r * o).astype(np.int32)
+        band += bound
         self._counts[relation] += 1
         self.facts.append((subject, relation, obj))
-        # Attractor (RES-317): store the bound triple so the recurrent
-        # loop snaps toward known facts, not toward arbitrary noise.
-        if self._attractor is not None:
+        return bound
+
+    def learn(self, subject: str, relation: str, obj: str,
+              update_attractor: bool = True) -> None:
+        """band += s * r * o. Forward probe s*r retrieves o; inverse
+        probe o*r retrieves s. Because bind is self-inverse, the probe
+        recovers whichever slot the anchor occupies; direction is
+        enforced at cleanup via `_slot_candidates`.
+
+        `update_attractor=False` skips the SDM write. The Hopfield
+        matrix is rebuilt lazily on the first cleanup or explicit
+        flush, so individual `learn()` calls do not pay the O(N)
+        restack cost.
+        """
+        bound = self._learn_bands(subject, relation, obj)
+        if self._attractor is not None and update_attractor:
             try:
-                self._attractor.store(
-                    (s * r * o).astype(np.float64)
-                )
+                self._attractor.store(bound.astype(np.float64))
             except Exception:
                 pass
+
+    def learn_many(
+        self,
+        facts: Iterable[tuple[str, str, str]],
+        update_attractor: bool = True,
+    ) -> int:
+        """Batch learn. One attractor flush at the end.
+
+        Equivalent to calling `learn()` for each fact followed by one
+        `self._attractor.flush()`. Use this for bulk seeding: it avoids
+        the per-call Hopfield rebuild without changing semantics.
+        """
+        n = 0
+        for subject, relation, obj in facts:
+            s = str(subject).strip()
+            r = str(relation).strip()
+            o = str(obj).strip()
+            if not (s and r and o):
+                continue
+            try:
+                bound = self._learn_bands(s, r, o)
+            except Exception:
+                continue
+            if self._attractor is not None and update_attractor:
+                try:
+                    self._attractor.store(bound.astype(np.float64))
+                except Exception:
+                    pass
+            n += 1
+        if self._attractor is not None and update_attractor:
+            try:
+                self._attractor.flush()
+            except Exception:
+                pass
+        return n
 
     def _encode_probe(self, anchor: str, relation: str,
                       inverse: bool = False) -> np.ndarray:
@@ -473,9 +522,10 @@ class Titanos:
             if delta < self.cfg.convergence_threshold:
                 return h_c, history, "CONVERGED", state
             h = h_c
-            # Attractor denoise (RES-317). Snap the next iterate toward
-            # the nearest stored fact vector before it feeds the next
-            # core.step. Skipped when the store is empty.
+            # Attractor denoise (RES-317). Snap the next iterate
+            # toward the nearest stored fact vector before it feeds the
+            # next core.step. Skipped when the store is empty. The
+            # first cleanup triggers the deferred Hopfield rebuild.
             if (self._attractor is not None
                     and self._attractor.n_patterns > 0):
                 try:
@@ -805,7 +855,8 @@ class Titanos:
             head += f" child={ans.child_name}"
         if ans.fast_path_used:
             head += f" fast_conf={ans.fast_confidence:.4f}"
-        if self.cfg.use_order_parameter_gate and ans.order_parameter_scale != 1.0:
+        if (self.cfg.use_order_parameter_gate
+                and ans.order_parameter_scale != 1.0):
             head += (f" R={ans.order_parameter:.3f} "
                      f"scale={ans.order_parameter_scale:.3f}")
         if ans.emergent:
@@ -821,8 +872,10 @@ class Titanos:
     def loop_trace(self, ans: Answer) -> str:
         if not ans.loop_history:
             return "(no loop history)"
-        lines = ["loop | scar | delta | mu | DeltaS | rank | vol | v_t | R | gate",
-                 "-" * 84]
+        lines = [
+            "loop | scar | delta | mu | DeltaS | rank | vol | v_t | R | gate",
+            "-" * 84,
+        ]
         for h in ans.loop_history:
             lines.append(
                 f"  {h['loop']:2d} | {h['scar_energy']:.4f} | "
@@ -849,10 +902,6 @@ class Titanos:
                 "classical_threshold": float(classical),
                 "abstain_threshold": float(abstain),
             }
-        attractor_snapshot = (
-            self._attractor.snapshot()
-            if self._attractor is not None else None
-        )
         return {
             "dim": self.cfg.dim,
             "core_matrix": f"{self.cfg.m}x{self.cfg.n}",
@@ -869,16 +918,21 @@ class Titanos:
             "emergent": bool(self.cfg.emergent),
             "anisotropy": self._current_anisotropy(),
             "order_parameter": self._order_parameter(),
-            "use_order_parameter_gate": bool(self.cfg.use_order_parameter_gate),
+            "use_order_parameter_gate": bool(
+                self.cfg.use_order_parameter_gate
+            ),
             "order_parameter_floor": float(self.cfg.order_parameter_floor),
-            "use_attractor": bool(self.cfg.use_attractor),
-            "attractor": attractor_snapshot,
             "query_count": int(self._query_count),
             "fast_path_count": int(self._fast_path_count),
             "escalation_count": int(self._escalation_count),
             "csi": self._csi.value(),
             "csi_samples": self._csi.samples(),
             "csi_fast_path_enabled": bool(self.cfg.csi_fast_path),
+            "attractor": (
+                self._attractor.snapshot()
+                if self._attractor is not None
+                else None
+            ),
             "agency": self.agency.snapshot(),
             "per_band": per_band,
         }
@@ -886,7 +940,10 @@ class Titanos:
     # ── persistence ──────────────────────────────────────────────────
     def save(self, path) -> None:
         Path(path).write_text(json.dumps({
-            "cfg": {**asdict(self.cfg), "seed_list": list(self.cfg.seed_list)},
+            "cfg": {
+                **asdict(self.cfg),
+                "seed_list": list(self.cfg.seed_list),
+            },
             "bands": {k: v.tolist() for k, v in self._bands.items()},
             "counts": dict(self._counts),
             "entities": {k: v.tolist() for k, v in self.entities.items()},
@@ -900,8 +957,14 @@ class Titanos:
             "nc_state": self.core._nonconservative.state_dict(),
             "csi_state": self._csi.state_dict(),
             "agency_state": {
-                "weights": {n: c.weight for n, c in self.agency.children.items()},
-                "active": {n: c.active for n, c in self.agency.children.items()},
+                "weights": {
+                    n: c.weight
+                    for n, c in self.agency.children.items()
+                },
+                "active": {
+                    n: c.active
+                    for n, c in self.agency.children.items()
+                },
                 "eaten": list(self.agency.eaten),
             },
         }))
@@ -912,18 +975,28 @@ class Titanos:
         cfg = TitanosConfig(**raw["cfg"])
         obj = cls(cfg)
         if "bands" in raw:
-            obj._bands = {k: np.array(v, dtype=np.int32)
-                          for k, v in raw["bands"].items()}
+            obj._bands = {
+                k: np.array(v, dtype=np.int32)
+                for k, v in raw["bands"].items()
+            }
             obj._counts = dict(raw.get("counts", {}))
         elif "acc" in raw:
-            obj._bands = {"_legacy": np.array(raw["acc"], dtype=np.int32)}
+            obj._bands = {
+                "_legacy": np.array(raw["acc"], dtype=np.int32)
+            }
             obj._counts = {"_legacy": 1}
-        obj.entities = {k: np.array(v, dtype=np.int8)
-                        for k, v in raw["entities"].items()}
-        obj.relations = {k: np.array(v, dtype=np.int8)
-                         for k, v in raw["relations"].items()}
-        obj.roles = {k: np.array(v, dtype=np.int8)
-                     for k, v in raw["roles"].items()}
+        obj.entities = {
+            k: np.array(v, dtype=np.int8)
+            for k, v in raw["entities"].items()
+        }
+        obj.relations = {
+            k: np.array(v, dtype=np.int8)
+            for k, v in raw["relations"].items()
+        }
+        obj.roles = {
+            k: np.array(v, dtype=np.int8)
+            for k, v in raw["roles"].items()
+        }
         obj.facts = [tuple(t) for t in raw["facts"]]
         obj._perm = np.array(raw["perm"])
         obj._perm_cache = {0: np.arange(cfg.dim)}
@@ -934,19 +1007,23 @@ class Titanos:
             obj.core._nonconservative.load_state_dict(raw["nc_state"])
         if "csi_state" in raw:
             obj._csi.load_state_dict(raw["csi_state"])
-        # Rebuild the attractor from the loaded facts. The store is not
-        # serialized; deriving it from `facts` keeps the two in sync.
-        if cfg.use_attractor and obj._attractor is not None:
-            for s, r, o in obj.facts:
-                try:
-                    sv = obj._ent(s)
-                    rv = obj._rel(r)
-                    ov = obj._ent(o)
-                    obj._attractor.store(
-                        (sv * rv * ov).astype(np.float64)
-                    )
-                except Exception:
-                    pass
+
+        # Rebuild the attractor from facts without the per-store
+        # Hopfield restack. Deferred store + one flush; no giant
+        # intermediate stack.
+        if obj._attractor is not None and obj.facts:
+            try:
+                for s_name, r_name, o_name in obj.facts:
+                    s_vec = obj.entities.get(s_name)
+                    r_vec = obj.relations.get(r_name)
+                    o_vec = obj.entities.get(o_name)
+                    if s_vec is None or r_vec is None or o_vec is None:
+                        continue
+                    bound = (s_vec * r_vec * o_vec).astype(np.float64)
+                    obj._attractor.store(bound)
+                obj._attractor.flush()
+            except Exception:
+                pass
         return obj
 
 
@@ -978,7 +1055,6 @@ if __name__ == "__main__":
     p.add_argument("--conservative", action="store_true")
     p.add_argument("--csi-fast-path", action="store_true")
     p.add_argument("--order-parameter-gate", action="store_true")
-    p.add_argument("--no-attractor", action="store_true")
     args = p.parse_args()
 
     cfg = (TitanosConfig.from_json(args.config)
@@ -989,14 +1065,11 @@ if __name__ == "__main__":
         cfg.csi_fast_path = True
     if args.order_parameter_gate:
         cfg.use_order_parameter_gate = True
-    if args.no_attractor:
-        cfg.use_attractor = False
 
     titan = Titanos(cfg)
     print(f"emergent = {cfg.emergent}  "
           f"csi_fast_path = {cfg.csi_fast_path}  "
-          f"order_parameter_gate = {cfg.use_order_parameter_gate}  "
-          f"use_attractor = {cfg.use_attractor}")
+          f"order_parameter_gate = {cfg.use_order_parameter_gate}")
 
     facts = [
         ("Uranus", "parent_of", "Cronus"),
@@ -1018,8 +1091,7 @@ if __name__ == "__main__":
         ("Ares", "is_a", "olympian"),
         ("Athena", "is_a", "olympian"),
     ]
-    for s, r, o in facts:
-        titan.learn(s, r, o)
+    titan.learn_many(facts)
 
     drive = [
         ("Zeus", "parent_of"), ("Cronus", "parent_of"),
