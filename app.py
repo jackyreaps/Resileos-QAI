@@ -55,7 +55,10 @@ from resileos.titanos.query import (  # noqa: E402
     QueryBindingError,
 )
 from resileos.substrate.agency import AgencyGroup  # noqa: E402
-from resileos.titanos.zeus import make_zeus_handler, run_zeus_query  # noqa: E402
+from resileos.titanos.zeus import (  # noqa: E402
+    make_zeus_handler,
+    run_zeus_query,
+)
 from titanos import Titanos, TitanosConfig  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -83,7 +86,12 @@ if STATE_FILE.exists():
 
 def _maybe_seed_from_bundled_facts() -> int:
     """Seed the console from configs/titanos-facts.json when the store is
-    empty. Returns the number of facts loaded (0 = no seed performed)."""
+    empty. Returns the number of facts loaded (0 = no seed performed).
+
+    Uses `learn_many()` so the attractor's Hopfield matrix is rebuilt
+    once at the end of the batch, not per fact. Falls back to per-fact
+    `learn()` if the batch path raises.
+    """
     try:
         stats = titanos_singleton.stats()
     except Exception as e:
@@ -103,19 +111,34 @@ def _maybe_seed_from_bundled_facts() -> int:
         log.warning("Seed file unreadable: %s", e)
         return 0
 
-    facts = raw.get("facts", [])
-    loaded = 0
-    for row in facts:
+    batch: list[tuple[str, str, str]] = []
+    for row in raw.get("facts", []):
         if not isinstance(row, (list, tuple)) or len(row) != 3:
             continue
         s, r, o = (str(x).strip() for x in row)
         if not (s and r and o):
             continue
-        try:
-            titanos_singleton.learn(s, r, o)
-            loaded += 1
-        except Exception as e:
-            log.warning("Failed to learn %r %r %r: %s", s, r, o, e)
+        batch.append((s, r, o))
+
+    if not batch:
+        return 0
+
+    loaded = 0
+    try:
+        loaded = int(titanos_singleton.learn_many(batch))
+    except Exception as e:
+        log.warning(
+            "learn_many failed, falling back to per-fact learn: %s", e
+        )
+        loaded = 0
+        for s, r, o in batch:
+            try:
+                titanos_singleton.learn(s, r, o)
+                loaded += 1
+            except Exception as e2:
+                log.warning(
+                    "Failed to learn %r %r %r: %s", s, r, o, e2
+                )
 
     if loaded:
         try:
@@ -125,7 +148,9 @@ def _maybe_seed_from_bundled_facts() -> int:
                 loaded, SEED_FILE, STATE_FILE,
             )
         except Exception as e:
-            log.warning("Seeded %d facts but could not persist: %s", loaded, e)
+            log.warning(
+                "Seeded %d facts but could not persist: %s", loaded, e
+            )
     return loaded
 
 
@@ -134,15 +159,17 @@ _seed_count = _maybe_seed_from_bundled_facts()
 
 # ── Zeus wiring ─────────────────────────────────────────────────────────
 # Zeus is registered as an AgencyChild on the Titanos singleton's own
-# AgencyGroup, so that stats()["agency"] reflects the registration. The
-# query route reads from the same group; if Zeus declines (returns None),
-# the parent answers directly (RES-324 doctrine).
+# AgencyGroup, so stats()["agency"] reflects the registration. The
+# query route reads from the same group; if Zeus declines (returns
+# None), the parent answers directly (RES-324 doctrine).
 try:
     _zeus_handler = make_zeus_handler()
     titanos_singleton.agency.add_child("zeus", _zeus_handler, weight=1.0)
     log.info("Zeus registered in Titanos agency group (weight=1.0)")
 except Exception as e:
-    log.warning("Zeus registration failed; /query will use parent only: %s", e)
+    log.warning(
+        "Zeus registration failed; /query will use parent only: %s", e
+    )
 
 
 # ── SPARQL adapter ──────────────────────────────────────────────────────
@@ -150,8 +177,8 @@ class _SPARQLAdapter:
     """Bridges Titanos to the RES-322 `_Core` Protocol.
 
     The query engine calls `core.ask(anchor, relation, inverse=...)` and
-    expects `list[str]`. Titanos exposes `ask_list` which returns exactly
-    that. `iter_entities` passthrough enables full-scan queries.
+    expects `list[str]`. Titanos exposes `ask_list` which returns
+    exactly that. `iter_entities` passthrough enables full-scan queries.
     """
 
     def __init__(self, titanos) -> None:
@@ -211,14 +238,17 @@ def titanos_ready():
 
 @app.post("/api/v1/learn")
 def titanos_learn(payload: LearnRequest):
-    s, r, o = payload.subject.strip(), payload.relation.strip(), payload.obj.strip()
+    s, r, o = (payload.subject.strip(), payload.relation.strip(),
+               payload.obj.strip())
     if not (s and r and o):
         raise HTTPException(400, "subject/relation/obj must be non-empty")
     try:
         titanos_singleton.learn(s, r, o)
         titanos_singleton.save(STATE_FILE)
-        return {"status": "SUCCESS",
-                "records": titanos_singleton.stats()["facts"]}
+        return {
+            "status": "SUCCESS",
+            "records": titanos_singleton.stats()["facts"],
+        }
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -227,19 +257,33 @@ def titanos_learn(payload: LearnRequest):
 def titanos_learn_batch(payload: BatchLearnRequest):
     if not payload.facts:
         raise HTTPException(400, "facts list is empty")
-    added = 0
+    batch: list[tuple[str, str, str]] = []
     for row in payload.facts:
         if len(row) != 3:
             continue
         s, r, o = (x.strip() for x in row)
         if not (s and r and o):
             continue
-        titanos_singleton.learn(s, r, o)
-        added += 1
+        batch.append((s, r, o))
+    added = 0
+    if batch:
+        try:
+            added = int(titanos_singleton.learn_many(batch))
+        except Exception:
+            added = 0
+            for s, r, o in batch:
+                try:
+                    titanos_singleton.learn(s, r, o)
+                    added += 1
+                except Exception:
+                    continue
     if added:
         titanos_singleton.save(STATE_FILE)
-    return {"status": "SUCCESS", "added": added,
-            "records": titanos_singleton.stats()["facts"]}
+    return {
+        "status": "SUCCESS",
+        "added": added,
+        "records": titanos_singleton.stats()["facts"],
+    }
 
 
 @app.post("/api/v1/query")
@@ -247,9 +291,9 @@ def titanos_query(payload: QueryRequest):
     """Route through Zeus with parent fallthrough.
 
     Zeus handles structured resolution first (it delegates to the
-    parent's `ask` for simple queries). If Zeus returns None — decline —
-    the parent answers directly. Agency fitness is recorded internally
-    by run_zeus_query.
+    parent's `ask` for simple queries). If Zeus returns None — decline
+    — the parent answers directly. Agency fitness is recorded
+    internally by run_zeus_query.
     """
     try:
         ans = None
@@ -262,7 +306,6 @@ def titanos_query(payload: QueryRequest):
                 payload.relation,
                 inverse=payload.inverse,
             )
-
         # Parent fallthrough
         if ans is None:
             ans = (titanos_singleton.ask_inverse(
@@ -270,7 +313,6 @@ def titanos_query(payload: QueryRequest):
                    if payload.inverse
                    else titanos_singleton.ask(
                        payload.subject, payload.relation))
-
         return {
             "value": ans.value,
             "confidence": float(ans.confidence),
@@ -299,7 +341,7 @@ def titanos_query(payload: QueryRequest):
 
 @app.post("/api/v1/sparql")
 def titanos_sparql(payload: SparqlRequest):
-    """Execute a query in the RES-322 grammar against the live Titanos state.
+    """Execute a query in the RES-322 grammar against the live state.
 
     Examples:
         SELECT ?o WHERE alice --knows--> ?o
@@ -364,18 +406,19 @@ class SubstrateContainer:
         torch.manual_seed(42)
         kernel = torch.zeros(HIDDEN_DIM, KERNEL_DIM)
         kernel[0, 0] = 1.0
-
         self.hidden_dim = HIDDEN_DIM
         self.kernel_dim = KERNEL_DIM
-
         self.geo_head = LowRankMetricHead(hidden_dim=HIDDEN_DIM)
         self.fep_head = VerifiableFEPReductionHead(
-            hidden_dim=HIDDEN_DIM, L_H_kernel=kernel, rank=1,
+            hidden_dim=HIDDEN_DIM,
+            L_H_kernel=kernel,
+            rank=1,
         )
-        trainable = (list(self.geo_head.parameters())
-                     + list(self.fep_head.parameters()))
+        trainable = (
+            list(self.geo_head.parameters())
+            + list(self.fep_head.parameters())
+        )
         self.optimizer = torch.optim.AdamW(trainable, lr=1e-3)
-
         self.is_trained = False
         self.training_steps = 0
         self.last_train_metrics: dict | None = None
@@ -391,13 +434,11 @@ class SubstrateContainer:
         X[:, :-1] = trunk[:, 1:] - trunk[:, :-1]
         X[:, -1] = X[:, -2]
         G = torch.ones(1, seq_len, 1)
-
         _, geo_loss = self.geo_head(trunk, X)
         _, fep_loss = self.fep_head(trunk, G)
         total = geo_loss + fep_loss
         total.backward()
         self.optimizer.step()
-
         self.training_steps += 1
         metrics = {
             "geo": float(geo_loss.item()),
@@ -414,8 +455,10 @@ substrate_singleton = SubstrateContainer()
 class VerificationRequest(BaseModel):
     hierarchical_states: list = Field(
         ..., description="[1, T, L, D] hierarchy of hidden states")
-    velocity_direction: list = Field(..., description="[1, T, D] velocity")
-    g_field_sequence: list = Field(..., description="[1, T, 1] coherence")
+    velocity_direction: list = Field(
+        ..., description="[1, T, D] velocity")
+    g_field_sequence: list = Field(
+        ..., description="[1, T, 1] coherence")
 
 
 class TrainRequest(BaseModel):
@@ -457,18 +500,20 @@ def train_substrate(payload: TrainRequest):
         eps = payload.base_epsilon / (1.0 + 0.3 * i)
         try:
             metrics = substrate_singleton.train_step(
-                seq_len=payload.seq_len, g_field=payload.g_field,
-                epsilon=eps, seed=payload.seed + i,
+                seq_len=payload.seq_len,
+                g_field=payload.g_field,
+                epsilon=eps,
+                seed=payload.seed + i,
             )
         except Exception as e:
             raise HTTPException(500, f"training step {i} failed: {e}")
         history.append({"step": i, "epsilon": eps, **metrics})
-
     if substrate_singleton.training_steps >= MIN_TRAIN_STEPS:
         substrate_singleton.is_trained = True
-
     return {
-        "status": "trained" if substrate_singleton.is_trained else "partial",
+        "status": (
+            "trained" if substrate_singleton.is_trained else "partial"
+        ),
         "total_steps": substrate_singleton.training_steps,
         "is_trained": substrate_singleton.is_trained,
         "history": history,
@@ -482,31 +527,34 @@ def verify_manifold(payload: VerificationRequest):
             400,
             "Substrate is UNTRAINED. "
             f"completed_steps={substrate_singleton.training_steps}, "
-            f"min={MIN_TRAIN_STEPS}. Call POST /api/v1/train_substrate first.",
+            f"min={MIN_TRAIN_STEPS}. "
+            "Call POST /api/v1/train_substrate first.",
         )
     try:
         h = torch.tensor(payload.hierarchical_states, dtype=torch.float32)
         x = torch.tensor(payload.velocity_direction, dtype=torch.float32)
         g = torch.tensor(payload.g_field_sequence, dtype=torch.float32)
-
         if h.dim() != 4 or h.size(0) != 1:
             raise ValueError(
-                f"hierarchical_states must be [1, T, L, D], got {tuple(h.shape)}")
+                "hierarchical_states must be [1, T, L, D], "
+                f"got {tuple(h.shape)}"
+            )
         if h.size(-1) != substrate_singleton.hidden_dim:
             raise ValueError(
-                f"last dim must equal hidden_dim "
-                f"({substrate_singleton.hidden_dim}), got {h.size(-1)}")
+                "last dim must equal hidden_dim "
+                f"({substrate_singleton.hidden_dim}), got {h.size(-1)}"
+            )
         trunk = h.mean(dim=2)
-
         with torch.no_grad():
             _, geo_loss = substrate_singleton.geo_head(trunk, x)
             psi_s, fep_loss = substrate_singleton.fep_head(trunk, g)
-
         return {
             "status": "verified",
             "parallel_transport_penalty": float(geo_loss.item()),
             "fep_ode_alignment_loss": float(fep_loss.item()),
-            "slow_subspace_trajectory": psi_s.squeeze(0).squeeze(-1).tolist(),
+            "slow_subspace_trajectory": (
+                psi_s.squeeze(0).squeeze(-1).tolist()
+            ),
         }
     except HTTPException:
         raise
@@ -517,14 +565,15 @@ def verify_manifold(payload: VerificationRequest):
 @app.post("/api/v1/sweep_epsilon")
 def sweep_epsilon(payload: SweepRequest):
     if payload.metric not in ("rmse", "mse"):
-        raise HTTPException(400, f"metric must be 'rmse' | 'mse', got {payload.metric!r}")
+        raise HTTPException(
+            400,
+            f"metric must be 'rmse' | 'mse', got {payload.metric!r}",
+        )
     if len(payload.epsilons) < 2:
         raise HTTPException(400, "at least two epsilon values required")
     if any(e <= 0.0 for e in payload.epsilons):
         raise HTTPException(400, "epsilons must all be > 0")
-
     dim = substrate_singleton.hidden_dim
-
     if payload.mode == "simulate":
         def factory(eps: float) -> torch.Tensor:
             return simulate_axiom_d(
@@ -533,23 +582,35 @@ def sweep_epsilon(payload: SweepRequest):
             )
     elif payload.mode == "data":
         if payload.trajectory is None:
-            raise HTTPException(400, "mode='data' requires a trajectory array")
+            raise HTTPException(
+                400, "mode='data' requires a trajectory array"
+            )
         arr = np.asarray(payload.trajectory, dtype=np.float32)
         if arr.ndim == 2:
             arr = arr[None, ...]
         if arr.ndim != 3:
-            raise HTTPException(400, f"trajectory must be [T, D] or [K, T, D], got {arr.shape}")
+            raise HTTPException(
+                400,
+                f"trajectory must be [T, D] or [K, T, D], got {arr.shape}",
+            )
         if arr.shape[-1] != dim:
-            raise HTTPException(400, f"trajectory last dim {arr.shape[-1]} != hidden_dim {dim}")
-        trunk_ref = torch.tensor(arr.mean(axis=0)[None, ...], dtype=torch.float32)
+            raise HTTPException(
+                400,
+                f"trajectory last dim {arr.shape[-1]} != hidden_dim {dim}",
+            )
+        trunk_ref = torch.tensor(
+            arr.mean(axis=0)[None, ...], dtype=torch.float32
+        )
 
         def factory(eps: float) -> torch.Tensor:
             t = trunk_ref.clone()
             t[:, 0, 0] = 1.5 + eps
             return t
     else:
-        raise HTTPException(400, f"mode must be 'simulate' | 'data', got {payload.mode!r}")
-
+        raise HTTPException(
+            400,
+            f"mode must be 'simulate' | 'data', got {payload.mode!r}",
+        )
     try:
         sample = factory(payload.epsilons[0])
         G = torch.ones(1, sample.shape[1], 1)
@@ -558,21 +619,23 @@ def sweep_epsilon(payload: SweepRequest):
         )
     except Exception as e:
         raise HTTPException(500, f"sweep failed: {e}")
-
     slope = result["slope"]
     if payload.metric == "rmse":
         if 0.85 <= slope <= 1.15:
-            verdict = "consistent with linear O(ε) residual (RES-600 §4)"
+            verdict = (
+                "consistent with linear O(ε) residual (RES-600 §4)"
+            )
         elif slope < 0.85:
             verdict = "sub-linear; check trajectory or discretization"
         else:
             verdict = "super-linear; check discretization error dominance"
     else:
         if 1.85 <= slope <= 2.15:
-            verdict = "consistent with O(ε) residual under MSE metric"
+            verdict = (
+                "consistent with O(ε) residual under MSE metric"
+            )
         else:
             verdict = "unexpected MSE scaling"
-
     return {
         "source": payload.mode,
         "dim": dim,
@@ -613,7 +676,11 @@ def lecore_route(payload: LeCoreRouteRequest):
         "available": True,
         "query": query,
         "capabilities": [
-            {"name": c.name, "description": c.description, "score": c.score}
+            {
+                "name": c.name,
+                "description": c.description,
+                "score": c.score,
+            }
             for c in caps
         ],
     }
