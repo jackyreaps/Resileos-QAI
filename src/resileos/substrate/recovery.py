@@ -1,33 +1,10 @@
 """Recovery product (F2) — ℛ / synchron as a measured quantity.
 
-This is not the toy e_0 bias from the single-engine efficiency ablation.
-It measures whether a Kuramoto phase field returns to a synchron target
-after a perturbation, in finite steps.
-
-Assumptions (explicit — thread ℛ may refine these later):
-
-  A1. Target kinds
-      - "order": recover high global order R = |mean exp(i θ)|
-        (synchron lock, R → 1). Default product metric.
-      - "phase": recover toward a stored reference phase vector θ*
-        (circular mean distance). Used when a specific configuration
-        matters, not only coherence.
-
-  A2. "Recovered" means both (when target is phase+order hybrid checks
-      are optional):
-      - order target: R >= r_min
-      - phase target: mean circular distance to θ* <= eps
-
-  A3. Dynamics: existing KuramotoField.step (RK4). No new integrator.
-
-  A4. Private/thread ℛ (chiral / continuum-from-finite) is NOT encoded
-      here. This module is the operational stand-in until that operator
-      is ported. Marked in RecoveryTarget.kind and module docstring.
-
-Off states:
-  trainable          off
-  GPU                off
-  packet coupling    off (field-only; EngineGroup can wrap later)
+Assumptions (explicit):
+  A1. Target kinds: "order" (R>=r_min) or "phase" (ref vector)
+  A2. Recovered iff recovery_loss <= tolerance
+  A3. KuramotoField RK4 dynamics
+  A4. Thread chiral ℛ not encoded; operational stand-in
 """
 from __future__ import annotations
 
@@ -41,17 +18,10 @@ from .oscillator import KuramotoField
 
 @dataclass(frozen=True)
 class RecoveryTarget:
-    """Synchron / phase target the field is expected to return to.
-
-    kind:
-      "order" — lock on order parameter R (default product claim)
-      "phase" — lock on a reference phase vector
-    """
-
     kind: str = "order"
     r_min: float = 0.85
     phase_ref: Optional[np.ndarray] = None
-    eps_phase: float = 0.35  # rad, mean circular distance
+    eps_phase: float = 0.35
 
     def __post_init__(self) -> None:
         if self.kind not in ("order", "phase"):
@@ -63,18 +33,12 @@ class RecoveryTarget:
 
 
 def circular_distance(theta: np.ndarray, ref: np.ndarray) -> float:
-    """Mean absolute wrapped phase distance (radians)."""
     d = np.asarray(theta, dtype=np.float64) - np.asarray(ref, dtype=np.float64)
     d = ((d + np.pi) % (2.0 * np.pi)) - np.pi
     return float(np.mean(np.abs(d)))
 
 
 def recovery_loss(field_state: np.ndarray, target: RecoveryTarget) -> float:
-    """Scalar loss: 0 = fully recovered under the chosen target.
-
-    order:  loss = max(0, r_min - R)
-    phase:  loss = max(0, mean_circ_dist - eps_phase)
-    """
     theta = np.asarray(field_state, dtype=np.float64)
     if target.kind == "order":
         z = np.exp(1j * theta)
@@ -95,22 +59,14 @@ def recovery_time(
     epsilon: float = 0.0,
     W: Optional[np.ndarray] = None,
 ) -> Optional[int]:
-    """Steps until recovery_loss <= tolerance; None if not recovered.
-
-    Applies perturbation additively to field.theta (wrapped), then steps
-    the Kuramoto dynamics. This is the product metric: recovery as a
-    measured step count, not only a loss value.
-    """
     pert = np.asarray(perturbation, dtype=np.float64)
     if pert.shape != field.theta.shape:
         raise ValueError(
             f"perturbation shape {pert.shape} != theta {field.theta.shape}"
         )
     field.theta = ((field.theta + pert + np.pi) % (2.0 * np.pi)) - np.pi
-
     if recovery_loss(field.theta, target) <= tolerance:
         return 0
-
     for t in range(1, max_steps + 1):
         field.step(epsilon=epsilon, W=W)
         if recovery_loss(field.theta, target) <= tolerance:
@@ -128,24 +84,11 @@ def measure_recovery_product(
     seed: int = 0,
     r_min: float = 0.85,
 ) -> dict:
-    """Monte Carlo recovery times under order-target (default product).
-
-    Protocol:
-      1. Build KuramotoField with coupling kappa * ones, golden ladder.
-      2. Relax unperturbed until R >= r_min (or max_steps).
-      3. Snapshot θ* as optional phase_ref for secondary stats.
-      4. For each trial: copy field, apply random phase kick, measure
-         recovery_time under order target.
-    """
     rng = np.random.default_rng(seed)
     W = (kappa / max(r - 1, 1)) * (np.ones((r, r)) - np.eye(r))
     field = KuramotoField(r=r, kappa=1.0, alpha=0.5, ladder="golden_powers", seed=seed)
-    # Identical natural frequencies so global lock is attainable.
-    # Golden ladder is incommensurate by design and only partially
-    # synchronizes; the product metric still uses order-parameter R.
     field.omega = np.full(r, field.omega_base / 4.0, dtype=np.float64)
     field.theta = rng.uniform(-np.pi, np.pi, size=r)
-    # Burn-in toward synchron
     for _ in range(max_steps):
         field.step(epsilon=0.0, W=W)
         if field.order_parameter() >= r_min:
