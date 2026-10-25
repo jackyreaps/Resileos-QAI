@@ -1,0 +1,20 @@
+{
+  "mode": "feature_only",
+  "n_engines": 3,
+  "kappa_on": 2.0,
+  "kappa_off": 0.0,
+  "steps": 500,
+  "n_facts": 120,
+  "n_classes": 120,
+  "feature_dim": 4,
+  "centroid_acc_coupled": 0.706,
+  "centroid_acc_uncoupled": 0.032,
+  "conditioning_delta": 0.6739999999999999,
+  "verdict": "aggregate separates facts better under coupling",
+  "notes": [
+    "Feature-only probe: nearest-centroid accuracy on aggregate features.",
+    "Input is R_shared + upper-tri M (RES-319 §5). Not per-engine lat_s_k.",
+    "conditioning_delta = coupled_acc - uncoupled_acc. Positive means coupling helps.",
+    "A decoder path is the next step only if this gate passes."
+  ]
+}
