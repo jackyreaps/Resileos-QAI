@@ -1,0 +1,46 @@
+{
+  "product": "path_b_mechanism_3seed",
+  "n_seeds": 3,
+  "seeds": [
+    {
+      "seed": 0,
+      "baseline_nll": 4.369446277618408,
+      "baseline_acc": 0.0,
+      "nll_kappa0": 0.7515954375267029,
+      "acc_kappa0": 0.875,
+      "nll_kappa2": 0.6598155498504639,
+      "acc_kappa2": 0.8916666507720947,
+      "improvement_kappa_nll": 0.09177988767623901,
+      "improvement_kappa_acc": 0.016666650772094727
+    },
+    {
+      "seed": 1,
+      "baseline_nll": 4.369446277618408,
+      "baseline_acc": 0.0,
+      "nll_kappa0": 0.9193084836006165,
+      "acc_kappa0": 0.7916666865348816,
+      "nll_kappa2": 0.8359605073928833,
+      "acc_kappa2": 0.7749999761581421,
+      "improvement_kappa_nll": 0.08334797620773315,
+      "improvement_kappa_acc": -0.016666710376739502
+    },
+    {
+      "seed": 2,
+      "baseline_nll": 4.369446277618408,
+      "baseline_acc": 0.0,
+      "nll_kappa0": 0.9914838075637817,
+      "acc_kappa0": 0.7749999761581421,
+      "nll_kappa2": 0.9180617928504944,
+      "acc_kappa2": 0.7583333253860474,
+      "improvement_kappa_nll": 0.07342201471328735,
+      "improvement_kappa_acc": -0.016666650772094727
+    }
+  ],
+  "improvement_kappa_nll_mean": 0.08284995953241985,
+  "improvement_kappa_nll_std": 0.009189063629534594,
+  "improvement_kappa_acc_mean": -0.005555570125579834,
+  "improvement_kappa_acc_std": 0.01924500782591868,
+  "acc_kappa2_mean": 0.8083333174387614,
+  "sign_stable": true,
+  "verdict": "mechanism confirmed"
+}
