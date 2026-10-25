@@ -1,0 +1,11 @@
+{
+  "seed": 0,
+  "baseline_nll": 4.369446277618408,
+  "baseline_acc": 0.0,
+  "nll_kappa0": 0.7515954375267029,
+  "acc_kappa0": 0.875,
+  "nll_kappa2": 0.6598155498504639,
+  "acc_kappa2": 0.8916666507720947,
+  "improvement_kappa_nll": 0.09177988767623901,
+  "improvement_kappa_acc": 0.016666650772094727
+}
