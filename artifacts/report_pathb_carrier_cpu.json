@@ -1,0 +1,18 @@
+{
+  "mode": "path_b_carrier_cpu_closed_vocab",
+  "note": "No HF decoder (RAM). AggregateCarrier CE on 68 object IDs. Full Path B = frozen LM + logit bias.",
+  "n_facts": 120,
+  "n_classes": 68,
+  "feature_dim": 7,
+  "centroid_acc_kappa0": 0.4666666666666667,
+  "centroid_acc_kappa2": 0.4666666666666667,
+  "carrier_kappa0": {"name": "kappa0", "acc": 0.8166666626930237, "nll": 0.8161908984184265, "steps": 400},
+  "carrier_kappa2": {"name": "kappa2", "acc": 0.8916666507720947, "nll": 0.6424180269241333, "steps": 400},
+  "improvement_kappa_acc": 0.07499998807907104,
+  "improvement_kappa_nll": 0.1737728714942932,
+  "coupled_feature_gate": {
+    "centroid_coupled": 0.706,
+    "centroid_uncoupled": 0.032,
+    "delta": 0.674
+  }
+}
