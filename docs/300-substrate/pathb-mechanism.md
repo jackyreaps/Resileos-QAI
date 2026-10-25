@@ -220,20 +220,48 @@ aggregate-carrier path.
 
 ## 9. Reproduce
 
+Feature-only gate (linear, 120 facts):
+
 ```bash
-# Feature-only gate (linear, 120 facts)
 PYTHONPATH=src python scripts/run_coupled_training_probe.py \
   --feature-only --facts configs/titanos-facts.json \
   --steps 2400 --seed 0
+```
 
-# Three-seed mini-transformer (CPU)
+Three-seed mini-transformer (CPU):
+
+```bash
 for seed in 0 1 2; do
   PYTHONPATH=src python scripts/run_pathb_cpu_probes.py \
     --seed $seed \
     --out artifacts/report_pathb_mini_seed${seed}.json
 done
+```
 
-# Pretrained decoder (needs ≥8 GB; not run for this doc)
+Pretrained decoder (needs ≥8 GB; not run for this doc):
+
+```bash
 python scripts/run_aggregate_training_probe.py \
   --decoder Qwen/Qwen2.5-0.5B --n-steps 500 \
   --out artifacts/report_aggregate_training.json
+```
+
+Probes B (closed-vocab carrier) and C (mini-transformer logit bias) are
+implemented in scripts/run_pathb_cpu_probes.py and consume
+build_aggregate_features from
+src/resileos/substrate/aggregate_carrier.py plus the same
+AggregateCarrier class.
+
+10. Read next
+
+· Engine Group Signal Probe Results — RES-319
+· Engine Group Composition — RES-318
+· Modulation Interface — RES-315
+· Documentation Index
+
+```
+
+---
+
+Drop that as the complete replacement for `docs/300-substrate/pathb-mechanism.md`. The only changes vs. what's on main are: §3 gains the 3-seed row, §3a is entirely new, §5 replaces "not measured: multi-seed stability" with "not measured: accuracy variance (resolved)", §8 strikes the resolved open question, and §9 updates the reproduce commands to point at `run_pathb_cpu_probes.py`.
+```
