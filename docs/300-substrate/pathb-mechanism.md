@@ -220,43 +220,32 @@ aggregate-carrier path.
 
 ## 9. Reproduce
 
-Feature-only gate (linear, 120 facts):
+    # Feature-only gate (linear, 120 facts)
+    PYTHONPATH=src python scripts/run_coupled_training_probe.py \
+      --feature-only --facts configs/titanos-facts.json \
+      --steps 2400 --seed 0
 
-```bash
-PYTHONPATH=src python scripts/run_coupled_training_probe.py \
-  --feature-only --facts configs/titanos-facts.json \
-  --steps 2400 --seed 0
-```
+    # Three-seed mini-transformer (CPU)
+    for seed in 0 1 2; do
+      PYTHONPATH=src python scripts/run_pathb_cpu_probes.py \
+        --seed $seed \
+        --out artifacts/report_pathb_mini_seed${seed}.json
+    done
 
-Three-seed mini-transformer (CPU):
-
-```bash
-for seed in 0 1 2; do
-  PYTHONPATH=src python scripts/run_pathb_cpu_probes.py \
-    --seed $seed \
-    --out artifacts/report_pathb_mini_seed${seed}.json
-done
-```
-
-Pretrained decoder (needs ≥8 GB; not run for this doc):
-
-```bash
-python scripts/run_aggregate_training_probe.py \
-  --decoder Qwen/Qwen2.5-0.5B --n-steps 500 \
-  --out artifacts/report_aggregate_training.json
-```
+    # Pretrained decoder (needs ≥8 GB; not run for this doc)
+    python scripts/run_aggregate_training_probe.py \
+      --decoder Qwen/Qwen2.5-0.5B --n-steps 500 \
+      --out artifacts/report_aggregate_training.json
 
 Probes B (closed-vocab carrier) and C (mini-transformer logit bias) are
-implemented in scripts/run_pathb_cpu_probes.py and consume
-build_aggregate_features from
-src/resileos/substrate/aggregate_carrier.py plus the same
-AggregateCarrier class.
+implemented in `scripts/run_pathb_cpu_probes.py` and consume
+`build_aggregate_features` from
+`src/resileos/substrate/aggregate_carrier.py` plus the same
+`AggregateCarrier` class.
 
-10. Read next
+## 10. Read next
 
-· Engine Group Signal Probe Results — RES-319
-· Engine Group Composition — RES-318
-· Modulation Interface — RES-315
-· Documentation Index
-
-```
+- [Engine Group Signal Probe Results](engine-group-results.md) — RES-319
+- [Engine Group Composition](engine-group.md) — RES-318
+- [Modulation Interface](../310-hierarchy/modulation-interface.md) — RES-315
+- [Documentation Index](../readme.md)
