@@ -260,8 +260,3 @@ AggregateCarrier class.
 · Documentation Index
 
 ```
-
----
-
-Drop that as the complete replacement for `docs/300-substrate/pathb-mechanism.md`. The only changes vs. what's on main are: §3 gains the 3-seed row, §3a is entirely new, §5 replaces "not measured: multi-seed stability" with "not measured: accuracy variance (resolved)", §8 strikes the resolved open question, and §9 updates the reproduce commands to point at `run_pathb_cpu_probes.py`.
-```
