@@ -10,6 +10,7 @@ Layers:
     agency            heuristic routing to registered children (RES-307)
     order parameter   Kuramoto R from theta gates confidence (RES-316)
     attractor         SDM + Hopfield denoise on recurrent state (RES-317)
+    recovery          F2 phase recovery gate (RES-326 / recovery_gate.py)
 
 Storage uses MAP triple binding:
     band += s * r * o               (elementwise, bipolar)
@@ -31,6 +32,15 @@ Attractor writes are deferred: `learn()` and `learn_many()` write to
 the SDM without rebuilding the Hopfield matrix. The rebuild happens
 once, on the first cleanup or on an explicit `flush()`. Bulk seeding
 uses `learn_many()`, which does one flush at the end.
+
+Recovery gate (F2 / RES-326) is an additive veto alongside the RES-302
+sigma gate. It checks whether the non-conservative phase field is near
+its synchron target after the recurrent loop; if the field cannot
+recover, the query abstains even when per-step sigma and confidence
+would otherwise pass. Disabled by default on config-level opt-in; see
+`TitanosConfig.use_recovery_gate`. The fast path (`csi_fast_path=True`)
+bypasses this gate by design; disable the fast path if the gate must
+apply to all queries.
 """
 from __future__ import annotations
 
@@ -58,6 +68,8 @@ from resileos.substrate.sandbox import (
 )
 from resileos.substrate.agency import AgencyGroup, AgencyChild, HandlerFn
 from resileos.substrate.sdm import AttractorMemory, SDMConfig
+from resileos.substrate.recovery import RecoveryTarget
+from resileos.substrate.recovery_gate import evaluate_recovery_gate
 
 
 @dataclass
@@ -113,6 +125,15 @@ class TitanosConfig:
     # Hopfield between iterations. Empty store -> no-op.
     use_attractor: bool = True
 
+    # Recovery gate (F2 / RES-326). Additive veto alongside RES-302:
+    # ABSTAIN if the non-conservative phase field cannot recover to
+    # its synchron target, regardless of sigma / confidence. Uses
+    # recovery_loss only (no perturb probe) — the per-query cost is
+    # one |mean(exp(iθ))| evaluation.
+    use_recovery_gate: bool = False
+    recovery_loss_max: float = 0.15
+    recovery_r_min: float = 0.85
+
     X: float = 70.0
     Y: int = 3
     seed_list: tuple[int, ...] = (0, 1, 2)
@@ -125,6 +146,10 @@ class TitanosConfig:
             self.sigma1_k = int(self.sigma_k)
         if not (0.0 <= self.order_parameter_floor <= 1.0):
             raise ValueError("order_parameter_floor must be in [0, 1]")
+        if not (0.0 <= self.recovery_r_min <= 1.0):
+            raise ValueError("recovery_r_min must be in [0, 1]")
+        if self.recovery_loss_max < 0.0:
+            raise ValueError("recovery_loss_max must be >= 0")
 
     @classmethod
     def from_json(cls, path) -> "TitanosConfig":
@@ -159,6 +184,7 @@ class Answer:
     order_parameter: float = 1.0
     raw_confidence: float = 0.0
     order_parameter_scale: float = 1.0
+    recovery_loss: float = 0.0
 
 
 class Titanos:
@@ -192,6 +218,7 @@ class Titanos:
         self._query_count = 0
         self._fast_path_count = 0
         self._escalation_count = 0
+        self._recovery_veto_count = 0
         self._csi = CSIState(
             window=cfg.csi_window,
             external_term=cfg.csi_external_term,
@@ -307,6 +334,45 @@ class Titanos:
         mu = int(np.sum(sims) >= 0.0)
         return float(F_res), float(DeltaS), int(mu)
 
+    # ── recovery gate (F2 / RES-326) ────────────────────────────────
+    def _evaluate_recovery_gate(self) -> tuple[str, float, str]:
+        """Evaluate the F2 recovery gate on the live phase field.
+
+        Returns (action, recovery_loss, reason) where action is
+        "CONTINUE" or "ABSTAIN". Uses `evaluate_recovery_gate` from
+        `recovery_gate.py` with `perturb_probe=None`: only the
+        `recovery_loss` check runs, not the `recovery_time` probe.
+        The per-query cost is one |mean(exp(i*theta))| evaluation.
+
+        The non-conservative operator is duck-typed through `.theta`.
+        With `perturb_probe=None` the gate never touches `.r`, `.kappa`,
+        or `.omega`, so passing the operator directly is safe. If
+        `emergent=False`, no non-conservative operator exists and the
+        gate is a no-op.
+        """
+        if not self.cfg.use_recovery_gate:
+            return ("CONTINUE", 0.0, "")
+        op = getattr(self.core, "_nonconservative", None)
+        if op is None:
+            return ("CONTINUE", 0.0, "")
+        try:
+            decision = evaluate_recovery_gate(
+                op,
+                target=RecoveryTarget(
+                    kind="order", r_min=self.cfg.recovery_r_min,
+                ),
+                loss_max=self.cfg.recovery_loss_max,
+                perturb_probe=None,
+            )
+            return (
+                decision.action,
+                float(decision.recovery_loss),
+                decision.reason,
+            )
+        except Exception:
+            # The recovery gate is additive; never break the query path.
+            return ("CONTINUE", 0.0, "")
+
     # ── learned primitives ───────────────────────────────────────────
     def _bip(self) -> np.ndarray:
         return self.rng.choice([-1, 1], size=self.cfg.dim).astype(np.int8)
@@ -346,7 +412,8 @@ class Titanos:
         return np.where(acc >= 0, 1, -1).astype(np.int8)
 
     # ── MAP triple binding ───────────────────────────────────────────
-    def _learn_bands(self, subject: str, relation: str, obj: str) -> np.ndarray:
+    def _learn_bands(self, subject: str, relation: str,
+                     obj: str) -> np.ndarray:
         """Band update + fact log. No attractor write."""
         s = self._ent(subject)
         r = self._rel(relation)
@@ -635,6 +702,28 @@ class Titanos:
         self._update_csi_from_history(history)
         updated_csi = self._csi.value()
 
+        # Recovery gate (F2 / RES-326). Additive veto: if the phase
+        # field is not near its synchron target after the recurrent
+        # loop, abstain even when sigma / confidence would pass.
+        rec_action, rec_loss, rec_reason = self._evaluate_recovery_gate()
+        if rec_action == "ABSTAIN":
+            self._recovery_veto_count += 1
+            return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", len(history),
+                          loop_history=history, gate_state=gate_state,
+                          noise_sigma=sigma_eff,
+                          noise_sigma_base=sigma_base,
+                          anisotropy=anisotropy,
+                          band_count=self._counts.get(relation, 0),
+                          emergent=self.cfg.emergent,
+                          csi=updated_csi,
+                          fast_confidence=fast_conf_blend,
+                          fast_path_used=False, escalated=True,
+                          order_parameter=R,
+                          raw_confidence=fast_conf,
+                          order_parameter_scale=scale,
+                          recovery_loss=rec_loss,
+                          reason=f"recovery gate: {rec_reason}")
+
         if exit_reason == "ABSTAIN":
             return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", len(history),
                           loop_history=history, gate_state=gate_state,
@@ -649,6 +738,7 @@ class Titanos:
                           order_parameter=R,
                           raw_confidence=fast_conf,
                           order_parameter_scale=scale,
+                          recovery_loss=rec_loss,
                           reason="sigma-1 gate routed to ABSTAIN")
 
         readout2 = self._readout(relation)
@@ -680,6 +770,7 @@ class Titanos:
                           order_parameter=R,
                           raw_confidence=raw_conf,
                           order_parameter_scale=scale,
+                          recovery_loss=rec_loss,
                           reason=(f"gated confidence {conf:.4f} < abstain "
                                   f"{abstain_thresh:.4f}"))
 
@@ -697,6 +788,7 @@ class Titanos:
                           order_parameter=R,
                           raw_confidence=raw_conf,
                           order_parameter_scale=scale,
+                          recovery_loss=rec_loss,
                           reason=f"post-quantum gated conf {conf:.4f} "
                                  f"< {abstain_thresh:.4f}")
 
@@ -713,7 +805,8 @@ class Titanos:
                       fast_path_used=False, escalated=True,
                       order_parameter=R,
                       raw_confidence=raw_conf,
-                      order_parameter_scale=scale)
+                      order_parameter_scale=scale,
+                      recovery_loss=rec_loss)
 
     def ask(self, subject: str, relation: str) -> Answer:
         return self._ask(subject, relation, inverse=False)
@@ -859,6 +952,8 @@ class Titanos:
                 and ans.order_parameter_scale != 1.0):
             head += (f" R={ans.order_parameter:.3f} "
                      f"scale={ans.order_parameter_scale:.3f}")
+        if self.cfg.use_recovery_gate and ans.recovery_loss > 0.0:
+            head += f" recovery_loss={ans.recovery_loss:.4f}"
         if ans.emergent:
             head += (f" sigma_eff={ans.noise_sigma:.4f} "
                      f"aniso={ans.anisotropy:.3f}")
@@ -922,6 +1017,10 @@ class Titanos:
                 self.cfg.use_order_parameter_gate
             ),
             "order_parameter_floor": float(self.cfg.order_parameter_floor),
+            "use_recovery_gate": bool(self.cfg.use_recovery_gate),
+            "recovery_loss_max": float(self.cfg.recovery_loss_max),
+            "recovery_r_min": float(self.cfg.recovery_r_min),
+            "recovery_veto_count": int(self._recovery_veto_count),
             "query_count": int(self._query_count),
             "fast_path_count": int(self._fast_path_count),
             "escalation_count": int(self._escalation_count),
@@ -954,6 +1053,7 @@ class Titanos:
             "query_count": int(self._query_count),
             "fast_path_count": int(self._fast_path_count),
             "escalation_count": int(self._escalation_count),
+            "recovery_veto_count": int(self._recovery_veto_count),
             "nc_state": self.core._nonconservative.state_dict(),
             "csi_state": self._csi.state_dict(),
             "agency_state": {
@@ -1003,6 +1103,7 @@ class Titanos:
         obj._query_count = int(raw.get("query_count", 0))
         obj._fast_path_count = int(raw.get("fast_path_count", 0))
         obj._escalation_count = int(raw.get("escalation_count", 0))
+        obj._recovery_veto_count = int(raw.get("recovery_veto_count", 0))
         if "nc_state" in raw:
             obj.core._nonconservative.load_state_dict(raw["nc_state"])
         if "csi_state" in raw:
@@ -1055,6 +1156,7 @@ if __name__ == "__main__":
     p.add_argument("--conservative", action="store_true")
     p.add_argument("--csi-fast-path", action="store_true")
     p.add_argument("--order-parameter-gate", action="store_true")
+    p.add_argument("--recovery-gate", action="store_true")
     args = p.parse_args()
 
     cfg = (TitanosConfig.from_json(args.config)
@@ -1065,11 +1167,14 @@ if __name__ == "__main__":
         cfg.csi_fast_path = True
     if args.order_parameter_gate:
         cfg.use_order_parameter_gate = True
+    if args.recovery_gate:
+        cfg.use_recovery_gate = True
 
     titan = Titanos(cfg)
     print(f"emergent = {cfg.emergent}  "
           f"csi_fast_path = {cfg.csi_fast_path}  "
-          f"order_parameter_gate = {cfg.use_order_parameter_gate}")
+          f"order_parameter_gate = {cfg.use_order_parameter_gate}  "
+          f"recovery_gate = {cfg.use_recovery_gate}")
 
     facts = [
         ("Uranus", "parent_of", "Cronus"),
