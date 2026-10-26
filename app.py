@@ -11,6 +11,8 @@ Titanos console (application layer):
     POST /api/v1/query               (routed through Zeus with fallthrough)
     POST /api/v1/sparql              (query language, RES-322)
     POST /api/v1/chain
+    POST /api/v1/answer              (retrieve + render, RES-327)
+    GET  /api/v1/answer/backends     (backend availability report)
     POST /api/v1/save
 
 Substrate (QD-TER two-head system, RES-600/601/602):
@@ -41,6 +43,13 @@ for p in (ROOT, ROOT / "src", ROOT / "scripts"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
+from resileos.answer import (  # noqa: E402
+    AnswerBackend,
+    AnswerContext,
+    StructuredBackend,
+    list_backends,
+    select_backend,
+)
 from resileos.integration.lecore_client import (  # noqa: E402
     LeCoreClient, LeCoreUnreachable, LeCoreError,
 )
@@ -73,7 +82,17 @@ SEED_FILE = ROOT / "configs" / "titanos-facts.json"
 # ═══════════════════════════════════════════════════════════════════════════
 # Titanos console
 # ═══════════════════════════════════════════════════════════════════════════
-_tcfg = TitanosConfig(dim=10000, m=100, n=100, r=8, n_loops=12, seed=1337)
+_tcfg = TitanosConfig(
+    dim=10000,
+    m=100,
+    n=100,
+    r=8,
+    n_loops=12,
+    seed=1337,
+    use_recovery_gate=(
+        os.getenv("RESILEOS_USE_RECOVERY_GATE", "0") == "1"
+    ),
+)
 titanos_singleton = Titanos(_tcfg)
 
 if STATE_FILE.exists():
@@ -172,6 +191,23 @@ except Exception as e:
     )
 
 
+# ── Answer backend (RES-327) ───────────────────────────────────────────
+# Selected once at first use from RESILEOS_ANSWER_BACKEND (default auto:
+# local_hf -> hosted -> structured). The structured backend is always
+# available; the others depend on transformers / an API key.
+_answer_backend_singleton: AnswerBackend | None = None
+
+
+def _answer_backend() -> AnswerBackend:
+    global _answer_backend_singleton
+    if _answer_backend_singleton is None:
+        _answer_backend_singleton = select_backend()
+        log.info(
+            "Answer backend: %s", _answer_backend_singleton.name
+        )
+    return _answer_backend_singleton
+
+
 # ── SPARQL adapter ──────────────────────────────────────────────────────
 class _SPARQLAdapter:
     """Bridges Titanos to the RES-322 `_Core` Protocol.
@@ -217,6 +253,49 @@ class BatchLearnRequest(BaseModel):
     facts: list[list[str]]
 
 
+class AnswerRequest(BaseModel):
+    """Either free-text `question`, or structured `subject`+`relation`.
+
+    If both are provided, the structured fields win and `question` is
+    used only for display. If only `question` is provided, the parser
+    in scripts/titanos.py is used to extract (subject, relation,
+    inverse). If neither resolves, the route returns 400.
+    """
+    question: str | None = None
+    subject: str | None = None
+    relation: str | None = None
+    inverse: bool = False
+
+
+def _resolve_answer_input(
+    payload: AnswerRequest,
+) -> tuple[str | None, str | None, bool, str]:
+    """Return (subject, relation, inverse, question_for_display)."""
+    subject = (payload.subject or "").strip()
+    relation = (payload.relation or "").strip()
+    question = (payload.question or "").strip()
+
+    if subject and relation:
+        display = question or f"{subject} {relation}"
+        return subject, relation, bool(payload.inverse), display
+
+    if question:
+        try:
+            from titanos import parse_query as _parse_free_text
+        except Exception:
+            _parse_free_text = None
+        if _parse_free_text is not None:
+            try:
+                parsed = _parse_free_text(question)
+            except Exception:
+                parsed = None
+            if parsed is not None:
+                s, r, inv = parsed
+                return str(s), str(r), bool(inv), question
+
+    return None, None, bool(payload.inverse), question
+
+
 @app.get("/api/v1/stats")
 def titanos_stats():
     return titanos_singleton.stats()
@@ -233,13 +312,113 @@ def titanos_ready():
         "ready": True,
         "facts": int(s.get("facts", 0)),
         "seeded_from": str(SEED_FILE) if _seed_count else None,
+        "answer_backend": _answer_backend().name,
+    }
+
+
+@app.get("/api/v1/answer/backends")
+def titanos_answer_backends():
+    """Availability report for the three answer backends."""
+    return {
+        "configured": os.getenv("RESILEOS_ANSWER_BACKEND", "auto"),
+        "active": _answer_backend().name,
+        "backends": list_backends(),
+    }
+
+
+@app.post("/api/v1/answer")
+def titanos_answer(payload: AnswerRequest):
+    """Retrieve exact rows, render one sentence.
+
+    Fast path: no recurrent loop, no sigma gate. Uses ``ask_list`` so
+    multi-valued relations return every row. The F2 recovery gate, if
+    enabled on the singleton, is checked once against the live phase
+    field; if the field has decohered, the route abstains before
+    rendering. See ``docs/320-titanos/answer.md`` (RES-327) for the
+    contract.
+    """
+    subject, relation, inverse, question = _resolve_answer_input(payload)
+    if not subject or not relation:
+        raise HTTPException(
+            400,
+            "provide either `subject` + `relation`, or a `question` the "
+            "built-in parser can resolve",
+        )
+
+    rows = titanos_singleton.ask_list(
+        subject, relation, inverse=inverse
+    )
+    confidence = 1.0 if rows else 0.0
+
+    recovery_loss = 0.0
+    if getattr(titanos_singleton.cfg, "use_recovery_gate", False):
+        try:
+            action, loss, reason = (
+                titanos_singleton._evaluate_recovery_gate()
+            )
+        except Exception as e:
+            log.warning("recovery gate failed in /answer: %s", e)
+            action, loss, reason = ("CONTINUE", 0.0, "")
+        recovery_loss = float(loss)
+        if action == "ABSTAIN":
+            return {
+                "question": question or f"{subject} {relation}",
+                "subject": subject,
+                "relation": relation,
+                "inverse": inverse,
+                "rows": [],
+                "answer_text": "",
+                "backend": _answer_backend().name,
+                "status": "ABSTAINED",
+                "confidence": 0.0,
+                "recovery_loss": recovery_loss,
+                "reason": f"recovery gate: {reason}",
+            }
+
+    ctx = AnswerContext(
+        question=question or f"{subject} {relation}",
+        subject=subject,
+        relation=relation,
+        inverse=inverse,
+        rows=tuple(rows),
+        confidence=confidence,
+        recovery_loss=recovery_loss,
+    )
+
+    backend = _answer_backend()
+    try:
+        text = backend.render(ctx)
+    except Exception as e:
+        log.warning(
+            "answer backend %s failed: %s; falling back to structured",
+            backend.name, e,
+        )
+        backend = StructuredBackend()
+        text = backend.render(ctx)
+
+    status = "ANSWERED" if rows else "NO_ROWS"
+    return {
+        "question": ctx.question,
+        "subject": subject,
+        "relation": relation,
+        "inverse": inverse,
+        "rows": list(rows),
+        "answer_text": text,
+        "backend": backend.name,
+        "status": status,
+        "confidence": confidence,
+        "recovery_loss": recovery_loss,
+        "reason": "",
     }
 
 
 @app.post("/api/v1/learn")
 def titanos_learn(payload: LearnRequest):
-    s, r, o = (payload.subject.strip(), payload.relation.strip(),
-               payload.obj.strip())
+    s, r, o = (
+        payload.subject.strip(),
+        payload.relation.strip(),
+        payload.obj.strip(),
+    )
     if not (s and r and o):
         raise HTTPException(400, "subject/relation/obj must be non-empty")
     try:
@@ -306,13 +485,14 @@ def titanos_query(payload: QueryRequest):
                 payload.relation,
                 inverse=payload.inverse,
             )
-        # Parent fallthrough
         if ans is None:
-            ans = (titanos_singleton.ask_inverse(
-                       payload.subject, payload.relation)
-                   if payload.inverse
-                   else titanos_singleton.ask(
-                       payload.subject, payload.relation))
+            ans = (
+                titanos_singleton.ask_inverse(
+                    payload.subject, payload.relation)
+                if payload.inverse
+                else titanos_singleton.ask(
+                    payload.subject, payload.relation)
+            )
         return {
             "value": ans.value,
             "confidence": float(ans.confidence),
@@ -322,6 +502,7 @@ def titanos_query(payload: QueryRequest):
             "reason": ans.reason,
             "gate_state": ans.gate_state,
             "child_name": ans.child_name,
+            "recovery_loss": float(getattr(ans, "recovery_loss", 0.0)),
             "trace": [
                 {
                     "loop": h["loop"],
@@ -372,7 +553,9 @@ def titanos_chain(payload: ChainRequest):
     if not payload.relations:
         raise HTTPException(400, "relations must be non-empty")
     try:
-        ans = titanos_singleton.chain(payload.start, payload.relations)
+        ans = titanos_singleton.chain(
+            payload.start, payload.relations
+        )
         return {
             "value": ans.value,
             "confidence": float(ans.confidence),
@@ -423,8 +606,9 @@ class SubstrateContainer:
         self.training_steps = 0
         self.last_train_metrics: dict | None = None
 
-    def train_step(self, seq_len: int, g_field: float,
-                   epsilon: float, seed: int) -> dict:
+    def train_step(
+        self, seq_len: int, g_field: float, epsilon: float, seed: int
+    ) -> dict:
         self.optimizer.zero_grad()
         trunk = simulate_axiom_d(
             dim=self.hidden_dim, seq_len=seq_len,
