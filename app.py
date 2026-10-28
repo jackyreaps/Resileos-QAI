@@ -48,6 +48,7 @@ from resileos.answer import (  # noqa: E402
     AnswerBackend,
     AnswerContext,
     StructuredBackend,
+    context_from_answer,
     list_backends,
     select_backend,
 )
@@ -90,9 +91,9 @@ SUBSTRATE_STATE_PATH = Path(
 )
 
 # Serializes writes to the substrate checkpoint. Training itself is not
-# fully locked — concurrent training calls can interleave optimizer steps.
-# The single-worker single-replica deployment invariant (see HOSTING.md)
-# is what keeps training coherent in production.
+# fully locked — concurrent training calls can interleave optimizer
+# steps. The single-worker single-replica deployment invariant (see
+# HOSTING.md) is what keeps training coherent in production.
 _substrate_lock = threading.Lock()
 
 
@@ -255,6 +256,7 @@ class QueryRequest(BaseModel):
     subject: str
     relation: str
     inverse: bool = False
+    render: bool = False
 
 
 class SparqlRequest(BaseModel):
@@ -490,6 +492,11 @@ def titanos_query(payload: QueryRequest):
     parent's `ask` for simple queries). If Zeus returns None — decline
     — the parent answers directly. Agency fitness is recorded
     internally by run_zeus_query.
+
+    When ``render=true``, the active answer backend produces
+    ``answer_text`` from the full ``Answer`` (path, loop_history,
+    gate_state). Default ``render=false`` preserves the previous
+    response shape exactly.
     """
     try:
         ans = None
@@ -510,7 +517,7 @@ def titanos_query(payload: QueryRequest):
                 else titanos_singleton.ask(
                     payload.subject, payload.relation)
             )
-        return {
+        out = {
             "value": ans.value,
             "confidence": float(ans.confidence),
             "status": ans.status,
@@ -533,6 +540,27 @@ def titanos_query(payload: QueryRequest):
                 for h in ans.loop_history
             ],
         }
+        if payload.render:
+            ctx = context_from_answer(
+                ans,
+                subject=payload.subject,
+                relation=payload.relation,
+                inverse=payload.inverse,
+            )
+            backend = _answer_backend()
+            try:
+                text = backend.render(ctx)
+            except Exception as e:
+                log.warning(
+                    "answer backend %s failed on /query render: %s; "
+                    "falling back to structured",
+                    backend.name, e,
+                )
+                backend = StructuredBackend()
+                text = backend.render(ctx)
+            out["answer_text"] = text
+            out["backend"] = backend.name
+        return out
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -702,8 +730,7 @@ class SubstrateContainer:
             self.last_train_metrics = ckpt.get("last_train_metrics")
             log.info(
                 "Substrate restored: trained=%s steps=%d",
-                self.is_trained,
-                self.training_steps,
+                self.is_trained, self.training_steps,
             )
             return True
         except Exception as e:
