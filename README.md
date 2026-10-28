@@ -61,9 +61,7 @@ Titanos:
 - `GET  /api/v1/ready` — readiness probe (503 until store is open)
 - `POST /api/v1/learn` — add one fact
 - `POST /api/v1/learn_batch` — add many facts
-- `POST /api/v1/query` — single-hop query (routed through Zeus; falls
-  through to parent on decline). Optional `render=true` attaches
-  `answer_text` from the mouth backend.
+- `POST /api/v1/query` — single-hop query (routed through Zeus; falls through to parent on decline). Optional `render=true` attaches `answer_text` from the mouth backend.
 - `POST /api/v1/sparql` — SPARQL-like queries (RES-322)
 - `POST /api/v1/chain` — multi-hop chain
 - `POST /api/v1/answer` — retrieve + render (RES-327)
