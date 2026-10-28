@@ -5,8 +5,21 @@ services:
     restart: unless-stopped
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}
-      - RESILEOS_HIDDEN_DIM=128
-      - RESILEOS_KERNEL_DIM=1
-      - RESILEOS_MIN_TRAIN_STEPS=5
+      - RESILEOS_BACKEND_URL=http://127.0.0.1:8000/api/v1
+      - RESILEOS_API_KEYS=${RESILEOS_API_KEYS:-}
+      - RESILEOS_RATE_LIMIT_PER_MIN=${RESILEOS_RATE_LIMIT_PER_MIN:-60}
+      - RESILEOS_CORS_ORIGINS=${RESILEOS_CORS_ORIGINS:-}
+      - RESILEOS_HIDDEN_DIM=${RESILEOS_HIDDEN_DIM:-128}
+      - RESILEOS_KERNEL_DIM=${RESILEOS_KERNEL_DIM:-1}
+      - RESILEOS_MIN_TRAIN_STEPS=${RESILEOS_MIN_TRAIN_STEPS:-5}
+      - RESILEOS_USE_RECOVERY_GATE=${RESILEOS_USE_RECOVERY_GATE:-0}
+      - RESILEOS_SUBSTRATE_STATE=/app/data/substrate_state.pt
+      - USAGE_PATH=/app/data/usage.json
+      - API_KEYS_PATH=/app/configs/api_keys.json
     volumes:
       - ./titanos_live_state.json:/app/titanos_live_state.json
+      - resileos_substrate:/app/data
+      - ./configs:/app/configs:ro
+
+volumes:
+  resileos_substrate:
