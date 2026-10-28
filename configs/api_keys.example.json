@@ -1,0 +1,7 @@
+{
+  "REPLACE_WITH_SHA256_HEX": {
+    "name": "bootstrap",
+    "tier": "enterprise",
+    "quota": 0
+  }
+}
