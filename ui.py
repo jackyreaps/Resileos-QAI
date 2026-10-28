@@ -1,10 +1,12 @@
-"""
-Streamlit dashboard for the Resileos-QAI console.
+"""Streamlit dashboard for the Resileos-QAI console.
 
-Run (after app.py is up on :8000):
-    streamlit run ui.py --server.port 8501
+Run after the backend is up on :8000:
+  streamlit run ui.py --server.port 8501 --server.address 127.0.0.1
 """
+from __future__ import annotations
+
 import json
+import os
 
 import numpy as np
 import pandas as pd
@@ -14,7 +16,8 @@ import streamlit as st
 st.set_page_config(page_title="Resileos-QAI Console", layout="wide")
 st.title("Resileos-QAI Console")
 
-BACKEND_URL = "http://localhost:8000/api/v1"
+BACKEND_URL = os.getenv("RESILEOS_BACKEND_URL", "http://127.0.0.1:8000/api/v1")
+API_KEY = st.sidebar.text_input("API Key", type="password")
 
 MYTHOS_SEED = [
     ["Uranus", "parent_of", "Cronus"],
@@ -38,73 +41,78 @@ MYTHOS_SEED = [
 ]
 
 
-# ── sweep renderer (used by both live run and file load) ────────────────
+def _headers() -> dict[str, str]:
+    return {"X-API-Key": API_KEY} if API_KEY else {}
+
+
+def _get(path: str, timeout: int = 5) -> requests.Response:
+    return requests.get(f"{BACKEND_URL}{path}", headers=_headers(), timeout=timeout)
+
+
+def _post(path: str, payload: dict, timeout: int = 30) -> requests.Response:
+    return requests.post(
+        f"{BACKEND_URL}{path}", json=payload, headers=_headers(), timeout=timeout
+    )
+
+
 def render_sweep(sw: dict) -> None:
     m1, m2, m3 = st.columns(3)
     m1.metric("Fitted slope", f"{sw.get('slope', float('nan')):.4f}")
     m2.metric("r²", f"{sw.get('r_squared', float('nan')):.6f}")
     m3.metric("Metric", str(sw.get("metric", "?")))
-
     verdict = sw.get("verdict", "—")
     if "consistent" in verdict and "not" not in verdict:
         st.success(f"Verdict: {verdict}")
     else:
         st.warning(f"Verdict: {verdict}")
-
     try:
         eps = np.asarray(sw["epsilons"], dtype=float)
         errs = np.asarray(sw["errors"], dtype=float)
-
         st.caption("Raw: residual vs ε")
-        st.line_chart(
-            pd.DataFrame({"epsilon": eps, "residual": errs}).set_index("epsilon")
-        )
-
+        st.line_chart(pd.DataFrame({"epsilon": eps, "residual": errs}).set_index("epsilon"))
         log_eps = np.log(eps)
         log_err = np.log(errs)
         fit = sw["slope"] * log_eps + sw["intercept"]
         st.caption("Log-log: log(residual) vs log(ε), with fitted line")
         st.line_chart(
-            pd.DataFrame({
-                "log_eps": log_eps,
-                "log_residual": log_err,
-                "fit": fit,
-            }).set_index("log_eps")
+            pd.DataFrame(
+                {"log_eps": log_eps, "log_residual": log_err, "fit": fit}
+            ).set_index("log_eps")
         )
-
         with st.expander("Raw values"):
             st.dataframe(
-                pd.DataFrame({
-                    "epsilon": eps,
-                    "residual": errs,
-                    "log_epsilon": log_eps,
-                    "log_residual": log_err,
-                })
+                pd.DataFrame(
+                    {
+                        "epsilon": eps,
+                        "residual": errs,
+                        "log_epsilon": log_eps,
+                        "log_residual": log_err,
+                    }
+                )
             )
     except (KeyError, TypeError, ValueError) as e:
         st.error(f"Could not render sweep result: {e}")
 
 
-# ── sidebar ─────────────────────────────────────────────────────────────
+# ── sidebar ───────────────────────────────────────────────────────────────
 st.sidebar.header("Titanos Topology")
-try:
-    stats = requests.get(f"{BACKEND_URL}/stats", timeout=5).json()
-    st.sidebar.metric("Total Learned Facts", stats.get("facts", 0))
-    st.sidebar.metric("Active Entities", stats.get("entities", 0))
-    st.sidebar.text(f"Core Dim: {stats.get('core_matrix', '-')}")
-    st.sidebar.text(f"Latent Rank: {stats.get('latent_rank', '-')}")
-    st.sidebar.text(f"Packet Protocol: v{stats.get('packet_version', '-')}")
-    st.sidebar.text(f"Confidence Mode: {stats.get('conf_mode', 'sim')}")
-except Exception:
-    st.sidebar.error("Cannot reach Titanos backend.")
+if not API_KEY:
+    st.sidebar.warning("Enter an API key to query the backend.")
+else:
+    try:
+        stats = _get("/stats").json()
+        st.sidebar.metric("Total Learned Facts", stats.get("facts", 0))
+        st.sidebar.metric("Active Entities", stats.get("entities", 0))
+        st.sidebar.text(f"Core Dim: {stats.get('core_matrix', '-')}")
+        st.sidebar.text(f"Latent Rank: {stats.get('latent_rank', '-')}")
+        st.sidebar.text(f"Packet Protocol: v{stats.get('packet_version', '-')}")
+        st.sidebar.text(f"Confidence Mode: {stats.get('conf_mode', 'sim')}")
+    except Exception:
+        st.sidebar.error("Cannot reach Titanos backend (check API key).")
 
 if st.sidebar.button("Seed Greek mythos corpus"):
     try:
-        res = requests.post(
-            f"{BACKEND_URL}/learn_batch",
-            json={"facts": MYTHOS_SEED},
-            timeout=60,
-        ).json()
+        res = _post("/learn_batch", {"facts": MYTHOS_SEED}, timeout=60).json()
         st.sidebar.success(
             f"Added {res.get('added', 0)} facts. Total: {res.get('records')}."
         )
@@ -114,7 +122,7 @@ if st.sidebar.button("Seed Greek mythos corpus"):
 st.sidebar.divider()
 st.sidebar.header("Substrate")
 try:
-    sub = requests.get(f"{BACKEND_URL}/substrate_stats", timeout=5).json()
+    sub = _get("/substrate_stats").json()
     st.sidebar.metric("Training Steps", sub.get("training_steps", 0))
     st.sidebar.text(f"hidden_dim: {sub.get('hidden_dim', '-')}")
     st.sidebar.text(f"kernel_dim: {sub.get('kernel_dim', '-')}")
@@ -123,13 +131,10 @@ try:
 except Exception:
     st.sidebar.error("Cannot reach substrate backend.")
 
-
-# ── tabs ────────────────────────────────────────────────────────────────
+# ── tabs ──────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Fact Ingestion", "Batch Upload", "Substrate Query",
-     "Multi-Hop Chain", "ε-Sweep"]
+    ["Fact Ingestion", "Batch Upload", "Substrate Query", "Multi-Hop Chain", "ε-Sweep"]
 )
-
 
 with tab1:
     st.subheader("Memory Matrix Ingestion")
@@ -142,76 +147,57 @@ with tab1:
         with col3:
             o = st.text_input("Object", placeholder="Ares")
         submitted = st.form_submit_button("Commit to Substrate")
-
     if submitted:
         if s and r and o:
-            res = requests.post(
-                f"{BACKEND_URL}/learn",
-                json={"subject": s, "relation": r, "obj": o},
-                timeout=30,
-            ).json()
+            res = _post("/learn", {"subject": s, "relation": r, "obj": o}).json()
             if res.get("status") == "SUCCESS":
                 st.success(f"Fact committed. Database size: {res['records']} facts.")
                 st.rerun()
         else:
             st.warning("Fill all three fields.")
 
-
 with tab2:
     st.subheader("Batch Ingestion")
     st.caption("CSV with columns: subject, relation, obj")
     uploaded = st.file_uploader("Upload CSV", type=["csv"])
-
     if uploaded is not None:
         try:
             df = pd.read_csv(uploaded)
             st.dataframe(df.head(20))
             if st.button("Commit all rows"):
                 facts = df[["subject", "relation", "obj"]].astype(str).values.tolist()
-                res = requests.post(
-                    f"{BACKEND_URL}/learn_batch",
-                    json={"facts": facts},
-                    timeout=120,
-                ).json()
-                st.success(
-                    f"Added {res.get('added', 0)} facts. Total: {res.get('records')}."
-                )
+                res = _post("/learn_batch", {"facts": facts}, timeout=120).json()
+                st.success(f"Added {res.get('added', 0)} facts. Total: {res.get('records')}.")
                 st.rerun()
         except Exception as e:
             st.error(f"Failed to parse CSV: {e}")
-
 
 with tab3:
     st.subheader("Substrate Probing & Abstention")
     q_s = st.text_input("Target Entity/Value")
     q_r = st.text_input("Target Relation Type")
     q_inv = st.checkbox("Inverse query")
-
     if st.button("Query Residual Matrix"):
         if q_s and q_r:
-            ans = requests.post(
-                f"{BACKEND_URL}/query",
-                json={"subject": q_s, "relation": q_r, "inverse": q_inv},
-                timeout=30,
+            ans = _post(
+                "/query",
+                {"subject": q_s, "relation": q_r, "inverse": q_inv},
             ).json()
-
             if ans.get("status") == "ABSTAINED":
                 st.warning(f"Engine abstained: {ans.get('reason')}")
             else:
                 badge = "CLASSICAL" if ans.get("mode") == "CLASSICAL" else "QUANTUM_SIM"
                 st.success(
-                    f"[{badge}] {ans.get('value')}  "
+                    f"[{badge}] {ans.get('value')} "
                     f"(confidence {ans.get('confidence', 0):.4f})"
                 )
-
-            if ans.get("trace"):
-                st.subheader("Core Convergence Telemetry")
-                df = pd.DataFrame(ans["trace"])
-                st.dataframe(df)
-                numeric_cols = [c for c in ("scar", "delta", "deltas") if c in df.columns]
-                if numeric_cols and len(df) > 1:
-                    st.line_chart(df.set_index("loop")[numeric_cols])
-
+                if ans.get("trace"):
+                    st.subheader("Core Convergence Telemetry")
+                    df = pd.DataFrame(ans["trace"])
+                    st.dataframe(df)
+                    numeric_cols = [c for c in ("scar", "delta", "deltas") if c in df.columns]
+                    if numeric_cols and len(df) > 1:
+                        st.line_chart(df.set_index("loop")[numeric_cols])
 
 with tab4:
     st.subheader("Recursive Depth Chain")
@@ -219,21 +205,15 @@ with tab4:
     c_rels = st.text_input(
         "Comma-separated relations", placeholder="parent_of,parent_of"
     )
-
     if st.button("Execute Chain"):
         if c_start and c_rels:
             relations = [t.strip() for t in c_rels.split(",") if t.strip()]
-            ans = requests.post(
-                f"{BACKEND_URL}/chain",
-                json={"start": c_start, "relations": relations},
-                timeout=30,
-            ).json()
+            ans = _post("/chain", {"start": c_start, "relations": relations}).json()
             if ans.get("status") == "ACCEPTED":
                 st.success(f"Chain resolved: {ans['value']}")
                 st.json(ans["path"])
             else:
                 st.error(f"Chain broke: {ans.get('reason')}")
-
 
 with tab5:
     st.subheader("QD-TER ε-Sweep Verification")
@@ -248,7 +228,6 @@ with tab5:
         "only. This does not establish that Axiom D describes a real "
         "physical medium."
     )
-
     col_a, col_b, col_c, col_d = st.columns(4)
     with col_a:
         sw_mode = st.selectbox("Mode", ["simulate", "data"])
@@ -260,19 +239,15 @@ with tab5:
         sw_gfield = st.number_input(
             "G field", min_value=0.0, max_value=5.0, value=0.85, step=0.05
         )
-
     sw_eps_str = st.text_input(
-        "ε values (comma-separated)",
-        value="0.1,0.05,0.02,0.01,0.005,0.001",
+        "ε values (comma-separated)", value="0.1,0.05,0.02,0.01,0.005,0.001"
     )
-
     if st.button("Run ε-sweep", key="run_sweep"):
         try:
             eps_list = [float(x.strip()) for x in sw_eps_str.split(",") if x.strip()]
         except ValueError:
             st.error("Could not parse ε values.")
             eps_list = []
-
         if len(eps_list) < 2:
             st.error("At least two ε values required.")
         elif any(e <= 0 for e in eps_list):
@@ -286,16 +261,13 @@ with tab5:
                 "epsilons": eps_list,
             }
             try:
-                r = requests.post(
-                    f"{BACKEND_URL}/sweep_epsilon", json=payload, timeout=60
-                )
+                r = _post("/sweep_epsilon", payload, timeout=60)
                 if r.status_code != 200:
                     st.error(f"Sweep failed ({r.status_code}): {r.text[:300]}")
                 else:
                     render_sweep(r.json())
             except requests.exceptions.RequestException as e:
                 st.error(f"Cannot reach backend: {e}")
-
     with st.expander("Or load a saved sweep report"):
         up = st.file_uploader("report_sweep.json", type=["json"], key="sweep_json")
         if up is not None:
