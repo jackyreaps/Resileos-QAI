@@ -2,7 +2,7 @@
 
 Three backends, selected at boot by ``RESILEOS_ANSWER_BACKEND`` (or by
 explicit name). Each takes an ``AnswerContext`` (question + retrieved
-rows) and returns a single string.
+rows + optional recurrent-path metadata) and returns a single string.
 
     structured  — template renderer, no model, ships everywhere
     local_hf    — frozen HF decoder + retrieved-rows prompt, needs
@@ -10,11 +10,12 @@ rows) and returns a single string.
     hosted      — OpenAI-compatible chat completion, needs
                   ``RESILEOS_ANSWER_API_KEY``
 
-``/answer`` is *not* the full recurrent pipeline. It is the
-exact-retrieval + rendering path: ``Titanos.ask_list`` returns every
-row for a ``(subject, relation)`` pair, and the backend renders them.
-For recurrent-loop semantics (sigma gate, CSI fast path,
-order-parameter gate), use ``/api/v1/query``.
+``/answer`` is the exact-retrieval + rendering path: ``Titanos.ask_list``
+returns every row for a ``(subject, relation)`` pair, and the backend
+renders them. For recurrent-loop semantics (sigma gate, CSI fast path,
+order-parameter gate), use ``/api/v1/query``. When ``render=true`` is
+passed to ``/query``, the same mouth is applied to the full ``Answer``
+(path, loop_history, gate_state).
 
 Environment
 -----------
@@ -47,13 +48,22 @@ log = logging.getLogger("resileos.answer")
 class AnswerContext:
     """Inputs to a backend's ``render``.
 
-    ``rows`` is the exact-retrieval result from ``Titanos.ask_list``.
-    Empty tuple means "no facts stored for this pair" — the backend
-    should say so plainly rather than guess.
+    ``rows`` is the exact-retrieval result from ``Titanos.ask_list``
+    (or a single-element tuple derived from ``Answer.value`` when the
+    context is built from a recurrent ``Answer``). Empty tuple means
+    "no facts stored for this pair" — the backend should say so plainly
+    rather than guess.
 
     ``recovery_loss`` is the F2 phase-recovery loss at render time if
     the recovery gate is enabled; otherwise 0.0. Backends may ignore it;
     the route uses it as a status field.
+
+    Framework fields (populated only when the context is built from a
+    full ``Answer`` produced by ``_ask`` / ``/api/v1/query``):
+
+    - ``path``          — the chain of entities, not just the leaf
+    - ``loop_history``  — recurrent-trace records (depth = len)
+    - ``gate_state``    — final gate state string (e.g. LOCKED / MIXED)
     """
 
     question: str
@@ -63,6 +73,9 @@ class AnswerContext:
     rows: tuple[str, ...]
     confidence: float = 1.0
     recovery_loss: float = 0.0
+    path: tuple[str, ...] = ()
+    loop_history: tuple = ()
+    gate_state: str = ""
 
     @property
     def n_rows(self) -> int:
@@ -124,6 +137,38 @@ def build_prompt(ctx: AnswerContext) -> str:
     )
 
 
+def context_from_answer(
+    ans,
+    *,
+    subject: str,
+    relation: str,
+    inverse: bool = False,
+    question: str = "",
+) -> AnswerContext:
+    """Build an ``AnswerContext`` from a recurrent ``Answer``.
+
+    Used by ``/api/v1/query?render=true``. Maps ``Answer.value`` into
+    ``rows`` (single element or empty) so every backend can render
+    without special-casing the recurrent path.
+    """
+    value = getattr(ans, "value", None)
+    rows: tuple[str, ...] = (str(value),) if value else ()
+    path_raw = getattr(ans, "path", None) or []
+    hist_raw = getattr(ans, "loop_history", None) or []
+    return AnswerContext(
+        question=question or f"{subject} {relation}",
+        subject=subject,
+        relation=relation,
+        inverse=inverse,
+        rows=rows,
+        confidence=float(getattr(ans, "confidence", 0.0)),
+        recovery_loss=float(getattr(ans, "recovery_loss", 0.0)),
+        path=tuple(str(p) for p in path_raw),
+        loop_history=tuple(hist_raw),
+        gate_state=str(getattr(ans, "gate_state", "") or ""),
+    )
+
+
 # ── structured (template) backend ─────────────────────────────────────
 
 
@@ -142,6 +187,13 @@ class StructuredBackend:
     single-valued facts the sentence is the answer; for multi-valued
     facts it is a list. Never invents; empty rows produce an explicit
     "no record" sentence.
+
+    When framework fields are present (path / loop_history / gate_state)
+    the sentence is enriched:
+
+    - multi-hop ``path``  → "Starting from A, via B and C, we reach D."
+    - deep recurrent loop → "(resolved after N recurrent steps)" when N > 5
+    - non-LOCKED gate     → "with partial confidence"
     """
 
     name = "structured"
@@ -153,24 +205,51 @@ class StructuredBackend:
         rel = humanize_relation(ctx.relation)
         s = ctx.subject
 
-        if ctx.n_rows == 0:
+        # ── path-aware multi-hop rendering ──────────────────────────
+        if len(ctx.path) >= 2:
+            start = ctx.path[0]
+            end = ctx.path[-1]
+            if len(ctx.path) == 2:
+                base = f"Starting from {start}, we reach {end}."
+            else:
+                via = ", ".join(ctx.path[1:-1])
+                base = (
+                    f"Starting from {start}, via {via}, "
+                    f"we reach {end}."
+                )
+        elif ctx.n_rows == 0:
             if ctx.inverse:
-                return (
+                base = (
                     f"I have no record of anything with {rel} "
                     f"pointing at {s}."
                 )
-            return f"I have no record of a {rel} for {s}."
-
-        if ctx.n_rows == 1:
+            else:
+                base = f"I have no record of a {rel} for {s}."
+        elif ctx.n_rows == 1:
             value = ctx.rows[0]
             if ctx.inverse:
-                return f"{value}'s {rel} is {s}."
-            return f"{s}'s {rel} is {value}."
+                base = f"{value}'s {rel} is {s}."
+            else:
+                base = f"{s}'s {rel} is {value}."
+        else:
+            values = _join_rows(ctx.rows)
+            if ctx.inverse:
+                base = f"Entities with {rel} pointing at {s}: {values}."
+            else:
+                base = f"{s}'s {rel}: {values}."
 
-        values = _join_rows(ctx.rows)
-        if ctx.inverse:
-            return f"Entities with {rel} pointing at {s}: {values}."
-        return f"{s}'s {rel}: {values}."
+        # ── framework annotations (only when data is present) ───────
+        notes: list[str] = []
+        n_loops = len(ctx.loop_history)
+        if n_loops > 5:
+            notes.append(f"resolved after {n_loops} recurrent steps")
+        gs = (ctx.gate_state or "").upper()
+        if gs and gs != "LOCKED":
+            notes.append("with partial confidence")
+
+        if not notes:
+            return base
+        return f"{base.rstrip('.')} ({'; '.join(notes)})."
 
 
 # ── local HF backend ──────────────────────────────────────────────────
