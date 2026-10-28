@@ -31,6 +31,7 @@ import json
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -77,6 +78,22 @@ app = FastAPI(title="Resileos-QAI")
 
 STATE_FILE = ROOT / "titanos_live_state.json"
 SEED_FILE = ROOT / "configs" / "titanos-facts.json"
+
+# Substrate state persistence path. In Docker, set
+# RESILEOS_SUBSTRATE_STATE=/app/data/substrate_state.pt so the volume
+# mount catches it. Local dev falls back to ./data/substrate_state.pt.
+SUBSTRATE_STATE_PATH = Path(
+    os.getenv(
+        "RESILEOS_SUBSTRATE_STATE",
+        str(ROOT / "data" / "substrate_state.pt"),
+    )
+)
+
+# Serializes writes to the substrate checkpoint. Training itself is not
+# fully locked — concurrent training calls can interleave optimizer steps.
+# The single-worker single-replica deployment invariant (see HOSTING.md)
+# is what keeps training coherent in production.
+_substrate_lock = threading.Lock()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -632,8 +649,72 @@ class SubstrateContainer:
         self.last_train_metrics = metrics
         return metrics
 
+    def save(self, path: Path) -> None:
+        """Persist head weights, optimizer state, and training flags.
+
+        The checkpoint is written atomically: a sibling .tmp file is
+        written first, then renamed. A crash mid-write leaves the
+        previous checkpoint intact.
+        """
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        torch.save(
+            {
+                "geo_head": self.geo_head.state_dict(),
+                "fep_head": self.fep_head.state_dict(),
+                "optimizer": self.optimizer.state_dict(),
+                "is_trained": self.is_trained,
+                "training_steps": self.training_steps,
+                "last_train_metrics": self.last_train_metrics,
+                "hidden_dim": self.hidden_dim,
+                "kernel_dim": self.kernel_dim,
+            },
+            tmp,
+        )
+        tmp.replace(path)
+
+    def load(self, path: Path) -> bool:
+        """Restore state if present. Returns True on success.
+
+        Fails gracefully and logs a warning if the checkpoint is
+        missing, corrupt, or incompatible with the current
+        HIDDEN_DIM/KERNEL_DIM (e.g. after an env-var change).
+        """
+        if not path.exists():
+            return False
+        try:
+            ckpt = torch.load(
+                path, map_location="cpu", weights_only=False
+            )
+            ckpt_hidden = int(ckpt.get("hidden_dim", self.hidden_dim))
+            if ckpt_hidden != self.hidden_dim:
+                log.warning(
+                    "Substrate checkpoint hidden_dim=%d != current %d; "
+                    "ignoring checkpoint and starting fresh",
+                    ckpt_hidden, self.hidden_dim,
+                )
+                return False
+            self.geo_head.load_state_dict(ckpt["geo_head"])
+            self.fep_head.load_state_dict(ckpt["fep_head"])
+            self.optimizer.load_state_dict(ckpt["optimizer"])
+            self.is_trained = bool(ckpt.get("is_trained", False))
+            self.training_steps = int(ckpt.get("training_steps", 0))
+            self.last_train_metrics = ckpt.get("last_train_metrics")
+            log.info(
+                "Substrate restored: trained=%s steps=%d",
+                self.is_trained,
+                self.training_steps,
+            )
+            return True
+        except Exception as e:
+            log.warning(
+                "Substrate state unreadable, starting fresh: %s", e
+            )
+            return False
+
 
 substrate_singleton = SubstrateContainer()
+substrate_singleton.load(SUBSTRATE_STATE_PATH)
 
 
 class VerificationRequest(BaseModel):
@@ -672,6 +753,7 @@ def substrate_stats():
         "min_train_steps": MIN_TRAIN_STEPS,
         "last_train_metrics": substrate_singleton.last_train_metrics,
         "bridge_locked": True,
+        "state_path": str(SUBSTRATE_STATE_PATH),
     }
 
 
@@ -694,6 +776,11 @@ def train_substrate(payload: TrainRequest):
         history.append({"step": i, "epsilon": eps, **metrics})
     if substrate_singleton.training_steps >= MIN_TRAIN_STEPS:
         substrate_singleton.is_trained = True
+    with _substrate_lock:
+        try:
+            substrate_singleton.save(SUBSTRATE_STATE_PATH)
+        except Exception as e:
+            log.warning("Substrate save failed: %s", e)
     return {
         "status": (
             "trained" if substrate_singleton.is_trained else "partial"
