@@ -402,34 +402,4 @@ def select_backend(name: str | None = None) -> AnswerBackend:
         name or os.getenv("RESILEOS_ANSWER_BACKEND", "auto")
     ).strip().lower()
 
-    if requested and requested != "auto":
-        try:
-            b = build_backend(requested)
-        except ValueError:
-            log.warning(
-                "Unknown RESILEOS_ANSWER_BACKEND=%r; falling back to auto",
-                requested,
-            )
-            b = None
-        if b is not None and b.available():
-            return b
-        if b is not None:
-            log.warning(
-                "Backend %r requested but not available; falling back",
-                requested,
-            )
-
-    for candidate in ("local_hf", "hosted", "structured"):
-        b = build_backend(candidate)
-        if b.available():
-            return b
-    return StructuredBackend()
-
-
-def list_backends() -> list[dict]:
-    """Availability report for ``GET /api/v1/answer/backends``."""
-    out = []
-    for name in _BACKEND_NAMES:
-        b = build_backend(name)
-        out.append({"name": name, "available": bool(b.available())})
-    return out
+    if
