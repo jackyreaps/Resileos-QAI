@@ -18,3 +18,10 @@
 pip install -e ".[all]"
 pytest
 python scripts/run_fep_sweep.py --simulate
+```
+
+## Code style
+
+- Python 3.11+, type hints on public functions.
+- Keep the substrate store as a module-level singleton unless you also update RES-320 §6.
+- No new runtime dependencies without discussion in an issue first.
