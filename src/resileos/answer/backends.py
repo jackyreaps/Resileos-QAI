@@ -76,6 +76,7 @@ class AnswerContext:
     path: tuple[str, ...] = ()
     loop_history: tuple = ()
     gate_state: str = ""
+    sector: str = ""  # "gbx_like" | "otx_like" | "" (Part V dual residue label)
 
     @property
     def n_rows(self) -> int:
@@ -166,6 +167,7 @@ def context_from_answer(
         path=tuple(str(p) for p in path_raw),
         loop_history=tuple(hist_raw),
         gate_state=str(getattr(ans, "gate_state", "") or ""),
+        sector=str(getattr(ans, "sector", "") or ""),
     )
 
 
@@ -239,6 +241,8 @@ class StructuredBackend:
                 base = f"{s}'s {rel}: {values}."
 
         # ── framework annotations (only when data is present) ───────
+        # Part V: gating is transient; residue writing is persistent (LI1).
+        # Mouth only annotates; it never invents rows.
         notes: list[str] = []
         n_loops = len(ctx.loop_history)
         if n_loops > 5:
@@ -246,6 +250,12 @@ class StructuredBackend:
         gs = (ctx.gate_state or "").upper()
         if gs and gs != "LOCKED":
             notes.append("with partial confidence")
+        # Dual residue label (Part V §2.5): rigid exact vs flexible path
+        sec = (ctx.sector or "").lower()
+        if sec == "otx_like" and len(ctx.path) >= 2:
+            notes.append("flexible path")
+        elif sec == "gbx_like" and ctx.n_rows == 1:
+            notes.append("exact band")
 
         if not notes:
             return base
@@ -402,4 +412,34 @@ def select_backend(name: str | None = None) -> AnswerBackend:
         name or os.getenv("RESILEOS_ANSWER_BACKEND", "auto")
     ).strip().lower()
 
-    if
+    if requested and requested != "auto":
+        try:
+            b = build_backend(requested)
+        except ValueError:
+            log.warning(
+                "Unknown RESILEOS_ANSWER_BACKEND=%r; falling back to auto",
+                requested,
+            )
+            b = None
+        if b is not None and b.available():
+            return b
+        if b is not None:
+            log.warning(
+                "Backend %r requested but not available; falling back",
+                requested,
+            )
+
+    for candidate in ("local_hf", "hosted", "structured"):
+        b = build_backend(candidate)
+        if b.available():
+            return b
+    return StructuredBackend()
+
+
+def list_backends() -> list[dict]:
+    """Availability report for ``GET /api/v1/answer/backends``."""
+    out = []
+    for name in _BACKEND_NAMES:
+        b = build_backend(name)
+        out.append({"name": name, "available": bool(b.available())})
+    return out
