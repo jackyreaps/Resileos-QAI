@@ -69,12 +69,21 @@ ssh -L 8501:127.0.0.1:8501 user@host
 
 ## 3. Probes
 
+There is **no** `/healthz` route. A 404 on `/healthz` does not mean the
+process is down.
+
 ```bash
-curl -sf http://127.0.0.1:8000/healthz
-curl -sf http://127.0.0.1:8000/api/v61/ready
+curl -sf http://127.0.0.1:8000/api/v1/ready
+curl -sf http://127.0.0.1:8000/api/v1/substrate_stats
+# optional, if leCore is configured:
+curl -sf http://127.0.0.1:8000/api/v1/lecore/health
 ```
 
-`/healthz` is public. `/api/v1/ready` is public and returns 503 until the Titanos store is open. The container healthcheck hits both.
+- `GET /api/v1/ready` — readiness; **503** until the Titanos store is open
+- `GET /api/v1/substrate_stats` — head state / bridge lock
+- `GET /api/v1/lecore/health` — leCore bridge liveness (when configured)
+
+Point container healthchecks at `/api/v1/ready`, not `/healthz`.
 
 ## 4. Auth, rate limits, CORS
 
