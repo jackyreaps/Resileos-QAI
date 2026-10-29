@@ -1,5 +1,6 @@
 """Answer backends for /api/v1/answer (RES-327)."""
 
+from .native_encode import GateSelection, encode_gate, encode_question
 from .backends import (
     AnswerBackend,
     AnswerContext,
@@ -28,4 +29,7 @@ __all__ = [
     "list_backends",
     "question_from_context",
     "select_backend",
+    "encode_question",
+    "encode_gate",
+    "GateSelection",
 ]
