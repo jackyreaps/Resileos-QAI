@@ -127,3 +127,4 @@ reconstruction uses `state_dict` to rebuild the index.
 
 - [gate-encoder.md](gate-encoder.md) — framework-native gate encoder and dual-sector mouth (RES-327-gate)
 - [answer.md](answer.md) — `/api/v1/answer` contract (RES-327)
+- [tools-and-frames.md](tools-and-frames.md) — tool schemas + Human-Medium frame tags
