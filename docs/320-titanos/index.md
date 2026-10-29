@@ -124,3 +124,6 @@ reconstruction uses `state_dict` to rebuild the index.
 - [Disk-Backed Band Store](store.md) — RES-320
 - [Query Language](query.md) — RES-322
 - [Documentation Index](../readme.md)
+
+- [gate-encoder.md](gate-encoder.md) — framework-native gate encoder and dual-sector mouth (RES-327-gate)
+- [answer.md](answer.md) — `/api/v1/answer` contract (RES-327)
