@@ -1,6 +1,8 @@
 """Answer backends for /api/v1/answer (RES-327)."""
 
 from .native_encode import GateSelection, encode_gate, encode_question
+from .tools_schema import list_tool_schemas, openai_tools, frame_index
+from .policy import prefer_child, gbx_bypass_recurrent
 from .backends import (
     AnswerBackend,
     AnswerContext,
@@ -32,4 +34,9 @@ __all__ = [
     "encode_question",
     "encode_gate",
     "GateSelection",
+    "list_tool_schemas",
+    "openai_tools",
+    "frame_index",
+    "prefer_child",
+    "gbx_bypass_recurrent",
 ]
