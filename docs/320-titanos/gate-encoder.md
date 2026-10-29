@@ -44,6 +44,13 @@ Output: `GateSelection` or `None`.
 
 Sector is a **routing label**, not a biological claim.
 
+**Zeus scope.** `/query` sets `prefer_zeus` only when sector is `otx_like` or unset.
+Forward attribute queries resolve as `gbx_like` and skip Zeus, so agency
+fitness accumulates on the inverse / `_of` subset only. Zeus is the
+`otx_like` specialist under this policy, not the general child. Fitness
+and EAT thresholds should be read with that bias in mind.
+
+
 ## 3. Mouth: `StructuredBackend`
 
 Same backend for `/api/v1/answer` and `/api/v1/query?render=true`.
@@ -63,6 +70,17 @@ Same backend for `/api/v1/answer` and `/api/v1/query?render=true`.
 
 `NONE_CHANNEL` is the operational form of the eighth syndrome outcome:
 no channel selected, nothing written.
+
+`/api/v1/answer` also returns:
+
+| Field | Meaning |
+|---|---|
+| `symbol_index` | Index into live relation alphabet, or `-1` |
+| `sector` | `gbx_like` / `otx_like` / `""` |
+| `gate_capacity_bits` | `log2(|Σ|)` for the live relation alphabet (0.0 on none/abstain) |
+
+That capacity number is the Part V §7.1 bound made operational.
+
 
 ## 5. Environment
 
