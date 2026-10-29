@@ -330,7 +330,27 @@ def _resolve_answer_input(
 
 @app.get("/api/v1/stats")
 def titanos_stats():
-    return titanos_singleton.stats()
+    base = dict(titanos_singleton.stats())
+    rels = list(titanos_singleton.relations.keys())
+    n = len(rels)
+    import math
+    base["gate"] = {
+        "n_relations": n,
+        "gate_capacity_bits": (math.log2(n) if n > 0 else 0.0),
+        "relation_alphabet": rels,
+        "frames": frame_index(),
+    }
+    return base
+
+
+@app.get("/api/v1/tools")
+def list_tools():
+    """Tool schemas for external frontier mouths + frame tags."""
+    return {
+        "tools": list_tool_schemas(),
+        "openai": openai_tools(),
+        "frames": frame_index(),
+    }
 
 
 @app.get("/api/v1/ready")
@@ -560,11 +580,28 @@ def titanos_query(payload: QueryRequest):
                 sector = g.sector
         except Exception:
             sector = ""
-        # otx_like → prefer Zeus (flexible); gbx_like → parent exact path.
+
+        # Publish sector for Zeus cheap-decline (fitness still updates).
+        titanos_singleton._route_sector = sector
+        first = prefer_child(sector=sector)
+
         ans = None
         agency = titanos_singleton.agency
-        prefer_zeus = (sector == "otx_like") or (sector == "")
-        if agency.children and prefer_zeus:
+
+        # gbx_like fast path: exact ask_list confidence, skip long
+        # recurrent when the band already has a unique row.
+        if gbx_bypass_recurrent(sector) and not payload.inverse:
+            rows = titanos_singleton.ask_list(
+                payload.subject, payload.relation, inverse=False
+            )
+            if len(rows) == 1:
+                ans = titanos_singleton.ask(
+                    payload.subject, payload.relation
+                )
+
+        # Always invoke Zeus when present so fitness tracks full mix.
+        # Zeus declines on gbx_like via parent._route_sector.
+        if ans is None and agency.children:
             ans = run_zeus_query(
                 agency,
                 titanos_singleton,
