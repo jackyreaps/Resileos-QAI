@@ -44,11 +44,11 @@ Output: `GateSelection` or `None`.
 
 Sector is a **routing label**, not a biological claim.
 
-**Zeus scope.** `/query` sets `prefer_zeus` only when sector is `otx_like` or unset.
-Forward attribute queries resolve as `gbx_like` and skip Zeus, so agency
-fitness accumulates on the inverse / `_of` subset only. Zeus is the
-`otx_like` specialist under this policy, not the general child. Fitness
-and EAT thresholds should be read with that bias in mind.
+**Zeus scope (Tier A).** `/query` always invokes Zeus when registered.
+Zeus declines cheaply on `gbx_like` (via `parent._route_sector`) so
+fitness tracks the full query mix. Parent exact-band path handles
+`gbx_like` after decline. Optional fast path: unique `ask_list` row
+skips long recurrent loops on `gbx_like`.
 
 
 ## 3. Mouth: `StructuredBackend`
