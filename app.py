@@ -387,6 +387,7 @@ def titanos_answer(payload: AnswerRequest):
             "reason": "gate unresolved: no subject/relation",
             "symbol_index": -1,
             "sector": "",
+            "gate_capacity_bits": 0.0,
         }
 
     rows = titanos_singleton.ask_list(
@@ -419,19 +420,30 @@ def titanos_answer(payload: AnswerRequest):
                 "reason": f"recovery gate: {reason}",
                 "symbol_index": -1,
                 "sector": "",
+                "gate_capacity_bits": 0.0,
             }
 
-    sector = ""
+    # Single gate encode: sector + symbol_index + capacity (consistent).
+    g = None
     try:
         g = encode_gate(
             question or f"{subject} {relation}",
             entities=list(titanos_singleton.entities.keys()),
             relations=list(titanos_singleton.relations.keys()),
         )
-        if g is not None and g.subject == subject and g.relation == relation:
-            sector = g.sector
     except Exception:
-        sector = ""
+        g = None
+
+    sector = ""
+    sym = -1
+    cap = 0.0
+    if g is not None:
+        if g.subject == subject and g.relation == relation:
+            sector = g.sector
+        if g.relation == relation:
+            sym = int(g.symbol_index)
+        cap = float(g.gate_capacity_bits)
+
     ctx = AnswerContext(
         question=question or f"{subject} {relation}",
         subject=subject,
@@ -455,17 +467,6 @@ def titanos_answer(payload: AnswerRequest):
         text = backend.render(ctx)
 
     status = "ANSWERED" if rows else "NO_ROWS"
-    sym = -1
-    try:
-        g = encode_gate(
-            question or f"{subject} {relation}",
-            entities=list(titanos_singleton.entities.keys()),
-            relations=list(titanos_singleton.relations.keys()),
-        )
-        if g is not None and g.relation == relation:
-            sym = int(g.symbol_index)
-    except Exception:
-        pass
     return {
         "question": ctx.question,
         "subject": subject,
@@ -480,6 +481,7 @@ def titanos_answer(payload: AnswerRequest):
         "reason": "",
         "symbol_index": sym,
         "sector": sector,
+        "gate_capacity_bits": cap,
     }
 
 
