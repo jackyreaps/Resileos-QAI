@@ -49,6 +49,8 @@ from resileos.answer import (  # noqa: E402
     AnswerContext,
     StructuredBackend,
     context_from_answer,
+    encode_question,
+    encode_gate,
     list_backends,
     select_backend,
 )
@@ -91,9 +93,9 @@ SUBSTRATE_STATE_PATH = Path(
 )
 
 # Serializes writes to the substrate checkpoint. Training itself is not
-# fully locked — concurrent training calls can interleave optimizer
-# steps. The single-worker single-replica deployment invariant (see
-# HOSTING.md) is what keeps training coherent in production.
+# fully locked — concurrent training calls can interleave optimizer steps.
+# The single-worker single-replica deployment invariant (see HOSTING.md)
+# is what keeps training coherent in production.
 _substrate_lock = threading.Lock()
 
 
@@ -311,6 +313,17 @@ def _resolve_answer_input(
             if parsed is not None:
                 s, r, inv = parsed
                 return str(s), str(r), bool(inv), question
+        # Framework-native fallback: resolve against live store vocab
+        # (no HF / external LLM).
+        try:
+            ents = list(titanos_singleton.entities.keys())
+            rels = list(titanos_singleton.relations.keys())
+            parsed = encode_question(question, entities=ents, relations=rels)
+            if parsed is not None:
+                s, r, inv = parsed
+                return str(s), str(r), bool(inv), question
+        except Exception:
+            pass
 
     return None, None, bool(payload.inverse), question
 
@@ -358,11 +371,23 @@ def titanos_answer(payload: AnswerRequest):
     """
     subject, relation, inverse, question = _resolve_answer_input(payload)
     if not subject or not relation:
-        raise HTTPException(
-            400,
-            "provide either `subject` + `relation`, or a `question` the "
-            "built-in parser can resolve",
-        )
+        # None channel: gate did not select a symbol (unresolved free-text
+        # or missing structured fields). Do not invent a triple.
+        return {
+            "question": question or (payload.question or ""),
+            "subject": subject or "",
+            "relation": relation or "",
+            "inverse": inverse,
+            "rows": [],
+            "answer_text": "",
+            "backend": _answer_backend().name,
+            "status": "NONE_CHANNEL",
+            "confidence": 0.0,
+            "recovery_loss": 0.0,
+            "reason": "gate unresolved: no subject/relation",
+            "symbol_index": -1,
+            "sector": "",
+        }
 
     rows = titanos_singleton.ask_list(
         subject, relation, inverse=inverse
@@ -392,8 +417,21 @@ def titanos_answer(payload: AnswerRequest):
                 "confidence": 0.0,
                 "recovery_loss": recovery_loss,
                 "reason": f"recovery gate: {reason}",
+                "symbol_index": -1,
+                "sector": "",
             }
 
+    sector = ""
+    try:
+        g = encode_gate(
+            question or f"{subject} {relation}",
+            entities=list(titanos_singleton.entities.keys()),
+            relations=list(titanos_singleton.relations.keys()),
+        )
+        if g is not None and g.subject == subject and g.relation == relation:
+            sector = g.sector
+    except Exception:
+        sector = ""
     ctx = AnswerContext(
         question=question or f"{subject} {relation}",
         subject=subject,
@@ -402,6 +440,7 @@ def titanos_answer(payload: AnswerRequest):
         rows=tuple(rows),
         confidence=confidence,
         recovery_loss=recovery_loss,
+        sector=sector,
     )
 
     backend = _answer_backend()
@@ -416,6 +455,17 @@ def titanos_answer(payload: AnswerRequest):
         text = backend.render(ctx)
 
     status = "ANSWERED" if rows else "NO_ROWS"
+    sym = -1
+    try:
+        g = encode_gate(
+            question or f"{subject} {relation}",
+            entities=list(titanos_singleton.entities.keys()),
+            relations=list(titanos_singleton.relations.keys()),
+        )
+        if g is not None and g.relation == relation:
+            sym = int(g.symbol_index)
+    except Exception:
+        pass
     return {
         "question": ctx.question,
         "subject": subject,
@@ -428,6 +478,8 @@ def titanos_answer(payload: AnswerRequest):
         "confidence": confidence,
         "recovery_loss": recovery_loss,
         "reason": "",
+        "symbol_index": sym,
+        "sector": sector,
     }
 
 
@@ -492,16 +544,25 @@ def titanos_query(payload: QueryRequest):
     parent's `ask` for simple queries). If Zeus returns None — decline
     — the parent answers directly. Agency fitness is recorded
     internally by run_zeus_query.
-
-    When ``render=true``, the active answer backend produces
-    ``answer_text`` from the full ``Answer`` (path, loop_history,
-    gate_state). Default ``render=false`` preserves the previous
-    response shape exactly.
     """
     try:
+        # Sector from gate encoder (routing label only).
+        sector = ""
+        try:
+            g = encode_gate(
+                f"{payload.subject} {payload.relation}",
+                entities=list(titanos_singleton.entities.keys()),
+                relations=list(titanos_singleton.relations.keys()),
+            )
+            if g is not None and g.relation == payload.relation:
+                sector = g.sector
+        except Exception:
+            sector = ""
+        # otx_like → prefer Zeus (flexible); gbx_like → parent exact path.
         ans = None
         agency = titanos_singleton.agency
-        if agency.children:
+        prefer_zeus = (sector == "otx_like") or (sector == "")
+        if agency.children and prefer_zeus:
             ans = run_zeus_query(
                 agency,
                 titanos_singleton,
@@ -540,6 +601,7 @@ def titanos_query(payload: QueryRequest):
                 for h in ans.loop_history
             ],
         }
+        out["sector"] = sector
         if payload.render:
             ctx = context_from_answer(
                 ans,
@@ -547,6 +609,21 @@ def titanos_query(payload: QueryRequest):
                 relation=payload.relation,
                 inverse=payload.inverse,
             )
+            # Prefer gate sector on the mouth context when present.
+            if sector:
+                ctx = AnswerContext(
+                    question=ctx.question,
+                    subject=ctx.subject,
+                    relation=ctx.relation,
+                    inverse=ctx.inverse,
+                    rows=ctx.rows,
+                    confidence=ctx.confidence,
+                    recovery_loss=ctx.recovery_loss,
+                    path=ctx.path,
+                    loop_history=ctx.loop_history,
+                    gate_state=ctx.gate_state,
+                    sector=sector,
+                )
             backend = _answer_backend()
             try:
                 text = backend.render(ctx)
@@ -730,7 +807,8 @@ class SubstrateContainer:
             self.last_train_metrics = ckpt.get("last_train_metrics")
             log.info(
                 "Substrate restored: trained=%s steps=%d",
-                self.is_trained, self.training_steps,
+                self.is_trained,
+                self.training_steps,
             )
             return True
         except Exception as e:
