@@ -110,11 +110,11 @@ def _mechanism_stats(lat_streams: list, n_topics: int) -> dict:
         2 <= e["unique_rows"] <= max(16, 2 * n_topics) for e in per_engine
     ):
         cause = "C"
-        reading = "latents clusterreading by topic; probe likely buggy"
+        reading = "latents cluster by topic; probe likely buggy"
     else:
         cause = "mixed"
-        reading = "per-engine": behaviour differs; inspect per_engine reading list"
-    return {",cause": cause, " "per_engine": per_engine}
+        reading = "per-engine behaviour differs; inspect per_engine reading list"
+    return {"cause": cause, "reading": reading, "per_engine": per_engine}
 
 
 def main() -> int:
