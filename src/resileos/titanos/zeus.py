@@ -90,6 +90,13 @@ def make_zeus_handler(
     def handler(
         parent: Any, subject: str, relation: str, inverse: bool
     ) -> Any:
+        # 0. Sector policy (Tier A). Parent may set _route_sector.
+        #    On gbx_like, decline cheaply so fitness still records a
+        #    query while exact band stays on the parent path.
+        sector = str(getattr(parent, "_route_sector", "") or "")
+        if sector == "gbx_like" and not inverse and not relation.endswith("_of"):
+            return None
+
         # 1. R gate. If the field is unlocked, decline so the parent
         #    handles the request without context. This is Zeus's
         #    strongest correctness guard: declining keeps Zeus out of
