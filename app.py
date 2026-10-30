@@ -65,7 +65,6 @@ from resileos.answer import (  # noqa: E402
     list_backends,
     list_tool_schemas,
     openai_tools,
-    prefer_child,
     select_backend,
 )
 from resileos.integration.lecore_client import (  # noqa: E402
@@ -86,7 +85,7 @@ from resileos.titanos.zeus import (  # noqa: E402
     make_zeus_handler,
     run_zeus_query,
 )
-from titanos import Titanos, TitanosConfig  # noqa: E402
+from titanos import Answer, Titanos, TitanosConfig  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("resileos.api")
@@ -639,10 +638,15 @@ def titanos_learn_batch(payload: BatchLearnRequest):
 def titanos_query(payload: QueryRequest):
     """Route through Zeus with parent fallthrough.
 
-    Zeus handles structured resolution first (it delegates to the
-    parent's `ask` for simple queries). If Zeus returns None — decline
-    — the parent answers directly. Agency fitness is recorded
-    internally by run_zeus_query.
+    Sector policy (dual-sector, RES-326):
+
+      - gbx_like + exactly one row in the band  -> synthetic Answer,
+        mode="FAST", loops=0, no recurrent pass, no Zeus.
+      - gbx_like + 0 or >1 rows                 -> fall through to Zeus
+        and the recurrent path (multi-valued relations and empty bands
+        need abstention / multi-row logic).
+      - otx_like / unset                        -> Zeus with parent
+        fallthrough, full recurrent path.
     """
     try:
         # Sector from gate encoder (routing label only).
@@ -658,26 +662,43 @@ def titanos_query(payload: QueryRequest):
         except Exception:
             sector = ""
 
-        # Publish sector for Zeus cheap-decline (fitness still updates).
+        # Publish sector for Zeus cheap-decline on otx fall-through.
         titanos_singleton._route_sector = sector
-        _ = prefer_child(sector=sector)
 
         ans = None
         agency = titanos_singleton.agency
 
-        # gbx_like fast path: exact ask_list confidence, skip long
-        # recurrent when the band already has a unique row.
+        # gbx_like fast path: exactly one row in the band -> synthesise
+        # the Answer directly. No recurrent loop, no Zeus. mode="FAST"
+        # and loops=0 make the fast path observable in the response and
+        # in /stats. The len(rows) == 1 guard is load-bearing: 0 rows
+        # (nothing stored) and >1 rows (multi-valued relation) both fall
+        # through to the recurrent path.
         if gbx_bypass_recurrent(sector) and not payload.inverse:
             rows = titanos_singleton.ask_list(
                 payload.subject, payload.relation, inverse=False
             )
             if len(rows) == 1:
-                ans = titanos_singleton.ask(
-                    payload.subject, payload.relation
+                ans = Answer(
+                    value=rows[0],
+                    confidence=1.0,
+                    status="ACCEPTED",
+                    mode="FAST",
+                    loops=0,
+                    path=[
+                        (payload.subject, payload.relation, rows[0])
+                    ],
+                    gate_state="LOCKED",
+                    reason=(
+                        "gbx sector: exact retrieval, no recurrent pass"
+                    ),
                 )
 
-        # Always invoke Zeus when present so fitness tracks full mix.
-        # Zeus declines on gbx_like via parent._route_sector.
+        # Zeus is invoked only when the fast path did not resolve. On
+        # fall-through gbx (0 or >1 rows) and on otx_like, Zeus runs with
+        # full fitness tracking. On fast-path gbx, Zeus is skipped by
+        # design — the whole point is not paying recurrent / Zeus
+        # overhead on the cheap path. See gate-encoder.md §2.
         if ans is None and agency.children:
             ans = run_zeus_query(
                 agency,
