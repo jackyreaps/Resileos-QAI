@@ -6,6 +6,7 @@ Two endpoint groups on one app:
 Titanos console (application layer):
     GET  /api/v1/stats
     GET  /api/v1/ready
+    GET  /api/v1/tools
     POST /api/v1/learn
     POST /api/v1/learn_batch
     POST /api/v1/query               (routed through Zeus with fallthrough)
@@ -24,9 +25,15 @@ Substrate (QD-TER two-head system, RES-600/601/602):
 Integration (leCore capability router):
     POST /api/v1/lecore/route
     GET  /api/v1/lecore/health
+
+Auth: if RESILEOS_API_KEY is set, every route except
+/api/v1/ready, /api/v1/substrate_stats, and /api/v1/lecore/health
+requires a matching X-API-Key header. If unset, the check bypasses
+(dev default).
 """
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
@@ -36,8 +43,10 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
+from starlette.status import HTTP_403_FORBIDDEN
 
 ROOT = Path(__file__).resolve().parent
 for p in (ROOT, ROOT / "src", ROOT / "scripts"):
@@ -49,9 +58,14 @@ from resileos.answer import (  # noqa: E402
     AnswerContext,
     StructuredBackend,
     context_from_answer,
-    encode_question,
     encode_gate,
+    encode_question,
+    frame_index,
+    gbx_bypass_recurrent,
     list_backends,
+    list_tool_schemas,
+    openai_tools,
+    prefer_child,
     select_backend,
 )
 from resileos.integration.lecore_client import (  # noqa: E402
@@ -97,6 +111,41 @@ SUBSTRATE_STATE_PATH = Path(
 # The single-worker single-replica deployment invariant (see HOSTING.md)
 # is what keeps training coherent in production.
 _substrate_lock = threading.Lock()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# API key auth (constant-time; bypassed when RESILEOS_API_KEY is unset)
+# ═══════════════════════════════════════════════════════════════════════════
+_API_KEY_NAME = "X-API-Key"
+_api_key_header = APIKeyHeader(name=_API_KEY_NAME, auto_error=False)
+_EXPECTED_API_KEY = os.getenv("RESILEOS_API_KEY", "").strip()
+
+
+async def verify_api_key(
+    api_key: str | None = Depends(_api_key_header),
+) -> None:
+    """Constant-time API key check.
+
+    - If RESILEOS_API_KEY is empty (dev default), the check bypasses.
+    - If set, the header must match exactly (timing-safe comparison).
+    - Missing header + set key -> 403.
+
+    Applied via ``dependencies=[Depends(verify_api_key)]`` on every
+    non-health route. Health endpoints (/api/v1/ready,
+    /api/v1/substrate_stats, /api/v1/lecore/health) stay open so that
+    the Docker HEALTHCHECK and any liveness probe work without
+    credentials.
+    """
+    if not _EXPECTED_API_KEY:
+        return
+    if api_key is not None and hmac.compare_digest(
+        api_key, _EXPECTED_API_KEY
+    ):
+        return
+    raise HTTPException(
+        status_code=HTTP_403_FORBIDDEN,
+        detail="Unauthorized: invalid or missing X-API-Key",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -318,7 +367,9 @@ def _resolve_answer_input(
         try:
             ents = list(titanos_singleton.entities.keys())
             rels = list(titanos_singleton.relations.keys())
-            parsed = encode_question(question, entities=ents, relations=rels)
+            parsed = encode_question(
+                question, entities=ents, relations=rels
+            )
             if parsed is not None:
                 s, r, inv = parsed
                 return str(s), str(r), bool(inv), question
@@ -328,7 +379,10 @@ def _resolve_answer_input(
     return None, None, bool(payload.inverse), question
 
 
-@app.get("/api/v1/stats")
+@app.get(
+    "/api/v1/stats",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_stats():
     base = dict(titanos_singleton.stats())
     rels = list(titanos_singleton.relations.keys())
@@ -343,7 +397,10 @@ def titanos_stats():
     return base
 
 
-@app.get("/api/v1/tools")
+@app.get(
+    "/api/v1/tools",
+    dependencies=[Depends(verify_api_key)],
+)
 def list_tools():
     """Tool schemas for external frontier mouths + frame tags."""
     return {
@@ -355,7 +412,11 @@ def list_tools():
 
 @app.get("/api/v1/ready")
 def titanos_ready():
-    """Readiness probe. Returns 503 until the Titanos store is open."""
+    """Readiness probe. Returns 503 until the Titanos store is open.
+
+    Open (no auth): the Docker HEALTHCHECK and any liveness probe
+    depend on this endpoint being reachable without credentials.
+    """
     try:
         s = titanos_singleton.stats()
     except Exception as e:
@@ -365,10 +426,14 @@ def titanos_ready():
         "facts": int(s.get("facts", 0)),
         "seeded_from": str(SEED_FILE) if _seed_count else None,
         "answer_backend": _answer_backend().name,
+        "auth_required": bool(_EXPECTED_API_KEY),
     }
 
 
-@app.get("/api/v1/answer/backends")
+@app.get(
+    "/api/v1/answer/backends",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_answer_backends():
     """Availability report for the three answer backends."""
     return {
@@ -378,7 +443,10 @@ def titanos_answer_backends():
     }
 
 
-@app.post("/api/v1/answer")
+@app.post(
+    "/api/v1/answer",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_answer(payload: AnswerRequest):
     """Retrieve exact rows, render one sentence.
 
@@ -505,7 +573,10 @@ def titanos_answer(payload: AnswerRequest):
     }
 
 
-@app.post("/api/v1/learn")
+@app.post(
+    "/api/v1/learn",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_learn(payload: LearnRequest):
     s, r, o = (
         payload.subject.strip(),
@@ -525,7 +596,10 @@ def titanos_learn(payload: LearnRequest):
         raise HTTPException(500, str(e))
 
 
-@app.post("/api/v1/learn_batch")
+@app.post(
+    "/api/v1/learn_batch",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_learn_batch(payload: BatchLearnRequest):
     if not payload.facts:
         raise HTTPException(400, "facts list is empty")
@@ -558,7 +632,10 @@ def titanos_learn_batch(payload: BatchLearnRequest):
     }
 
 
-@app.post("/api/v1/query")
+@app.post(
+    "/api/v1/query",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_query(payload: QueryRequest):
     """Route through Zeus with parent fallthrough.
 
@@ -583,7 +660,7 @@ def titanos_query(payload: QueryRequest):
 
         # Publish sector for Zeus cheap-decline (fitness still updates).
         titanos_singleton._route_sector = sector
-        first = prefer_child(sector=sector)
+        _ = prefer_child(sector=sector)
 
         ans = None
         agency = titanos_singleton.agency
@@ -681,7 +758,10 @@ def titanos_query(payload: QueryRequest):
         raise HTTPException(500, str(e))
 
 
-@app.post("/api/v1/sparql")
+@app.post(
+    "/api/v1/sparql",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_sparql(payload: SparqlRequest):
     """Execute a query in the RES-322 grammar against the live state.
 
@@ -709,7 +789,10 @@ def titanos_sparql(payload: SparqlRequest):
     }
 
 
-@app.post("/api/v1/chain")
+@app.post(
+    "/api/v1/chain",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_chain(payload: ChainRequest):
     if not payload.relations:
         raise HTTPException(400, "relations must be non-empty")
@@ -729,7 +812,10 @@ def titanos_chain(payload: ChainRequest):
         raise HTTPException(500, str(e))
 
 
-@app.post("/api/v1/save")
+@app.post(
+    "/api/v1/save",
+    dependencies=[Depends(verify_api_key)],
+)
 def titanos_save():
     titanos_singleton.save(STATE_FILE)
     return {"status": "SAVED", "path": str(STATE_FILE)}
@@ -889,6 +975,7 @@ class SweepRequest(BaseModel):
 
 @app.get("/api/v1/substrate_stats")
 def substrate_stats():
+    """Health endpoint. Open (no auth): Docker HEALTHCHECK depends on it."""
     return {
         "hidden_dim": substrate_singleton.hidden_dim,
         "kernel_dim": substrate_singleton.kernel_dim,
@@ -901,7 +988,10 @@ def substrate_stats():
     }
 
 
-@app.post("/api/v1/train_substrate")
+@app.post(
+    "/api/v1/train_substrate",
+    dependencies=[Depends(verify_api_key)],
+)
 def train_substrate(payload: TrainRequest):
     if payload.steps < 1 or payload.steps > 500:
         raise HTTPException(400, "steps must be in [1, 500]")
@@ -935,7 +1025,10 @@ def train_substrate(payload: TrainRequest):
     }
 
 
-@app.post("/api/v1/verify_manifold")
+@app.post(
+    "/api/v1/verify_manifold",
+    dependencies=[Depends(verify_api_key)],
+)
 def verify_manifold(payload: VerificationRequest):
     if not substrate_singleton.is_trained:
         raise HTTPException(
@@ -977,7 +1070,10 @@ def verify_manifold(payload: VerificationRequest):
         raise HTTPException(500, f"manifold error: {e}")
 
 
-@app.post("/api/v1/sweep_epsilon")
+@app.post(
+    "/api/v1/sweep_epsilon",
+    dependencies=[Depends(verify_api_key)],
+)
 def sweep_epsilon(payload: SweepRequest):
     if payload.metric not in ("rmse", "mse"):
         raise HTTPException(
@@ -1072,13 +1168,17 @@ class LeCoreRouteRequest(BaseModel):
 
 @app.get("/api/v1/lecore/health")
 def lecore_health():
+    """Health endpoint. Open (no auth): liveness probe depends on it."""
     try:
         return {"available": True, **_lecore.health()}
     except (LeCoreUnreachable, LeCoreError) as e:
         return {"available": False, "error": str(e)}
 
 
-@app.post("/api/v1/lecore/route")
+@app.post(
+    "/api/v1/lecore/route",
+    dependencies=[Depends(verify_api_key)],
+)
 def lecore_route(payload: LeCoreRouteRequest):
     query = payload.query.strip()
     if not query:
