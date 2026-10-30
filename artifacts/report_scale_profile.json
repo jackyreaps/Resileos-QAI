@@ -1,0 +1,38 @@
+{
+  "product": "scale_profile",
+  "sizes": [
+    200,
+    500
+  ],
+  "rows": [
+    {
+      "n_facts": 200,
+      "n_entities": 100,
+      "n_relations": 12,
+      "t_learn_use_attractor_false_s": 0.0064,
+      "t_learn_default_s": 1.7471,
+      "t_query_sample_s": 0.0001,
+      "query_sample_n": 10,
+      "query_hit_rate": 1.0,
+      "t_save_s": 0.9077,
+      "state_bytes": 4475805,
+      "t_load_s": 0.0,
+      "stats_facts": 200
+    },
+    {
+      "n_facts": 500,
+      "n_entities": 250,
+      "n_relations": 12,
+      "t_learn_use_attractor_false_s": 0.0146,
+      "t_learn_default_s": 1.8078,
+      "t_query_sample_s": 0.0002,
+      "query_sample_n": 25,
+      "query_hit_rate": 1.0,
+      "t_save_s": 0.7058,
+      "state_bytes": 9509000,
+      "t_load_s": 0.0,
+      "stats_facts": 500
+    }
+  ],
+  "note": "Compare t_learn_use_attractor_false_s vs t_learn_default_s. If default grows superlinear, deferred attractor / DiskBandStore."
+}
