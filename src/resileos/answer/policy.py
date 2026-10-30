@@ -1,21 +1,64 @@
-"""Sector × gate_state routing policy (Tier A).
+"""Sector × gate_state × status frame system and routing policy.
 
-Maps (sector, gate_state, confidence) to a preferred child name. Used by
-/query after encode_gate. Does not replace recovery abstain.
+The four-axis epistemic system (sector, gate_state, status, capacity)
+selects what *kind of truth claim* an answer is making. The LLM, when
+used at all, only renders; it does not determine the frame.
 
-Two functions:
-
-    prefer_child(...)           -> "zeus" | "parent" | "none"
-    gbx_bypass_recurrent(...)   -> bool   (predicate; does not resolve)
-
-The second is a *predicate*, not a resolver. It answers "should this
-query skip the recurrent loop?" — nothing more. The caller is
-responsible for what "skip" means: in /query that means building a
-synthetic Answer from ask_list and bypassing both Zeus and the
-recurrent pass. Calling it and then still running ask() defeats the
-sector policy; see the gbx fast-path block in app.py.
+GPU finding (RAG bridge): structured mouth at 100% store fidelity vs
+small decoder RAG ~0.4 — failure mode is the model overriding retrieved
+rows. Explicit frames make that division of labor citable and enforceable.
 """
 from __future__ import annotations
+
+from typing import Optional
+
+# Truth-frame labels (derived; not Human-Medium prose frames)
+FRAME_EXACT = "exact"                 # gbx + answered, field coherent
+FRAME_RECONSTRUCTED = "reconstructed"  # otx / path / multi-row
+FRAME_ABSTAINED = "abstained"          # recovery / field veto
+FRAME_UNRESOLVED = "unresolved"        # none-channel
+
+
+def derive_frame(
+    *,
+    sector: str = "",
+    gate_state: str = "",
+    status: str = "",
+    n_rows: int = 0,
+) -> str:
+    """Map axis values to a single truth-frame label.
+
+    | Condition | Frame |
+    |---|---|
+    | status NONE_CHANNEL | unresolved |
+    | status ABSTAINED | abstained |
+    | gbx_like + ANSWERED (+ optional LOCKED) | exact |
+    | otx_like or multi-row / path | reconstructed |
+    | else ANSWERED | exact if single row else reconstructed |
+    """
+    st = (status or "").upper()
+    sec = (sector or "").lower()
+    gs = (gate_state or "").upper()
+
+    if st == "NONE_CHANNEL":
+        return FRAME_UNRESOLVED
+    if st == "ABSTAINED":
+        return FRAME_ABSTAINED
+    if st in {"ANSWERED", "NO_ROWS", "ACCEPTED", ""}:
+        if st == "NO_ROWS":
+            return FRAME_UNRESOLVED if not sec else (
+                FRAME_EXACT if sec == "gbx_like" else FRAME_RECONSTRUCTED
+            )
+        if sec == "otx_like" or n_rows > 1:
+            return FRAME_RECONSTRUCTED
+        if sec == "gbx_like" or n_rows == 1:
+            # REPULSE still allowed as exact if store returned a row;
+            # confidence is separate from frame type.
+            return FRAME_EXACT
+        if n_rows > 1:
+            return FRAME_RECONSTRUCTED
+        return FRAME_EXACT if n_rows == 1 else FRAME_UNRESOLVED
+    return FRAME_UNRESOLVED
 
 
 def prefer_child(
@@ -24,42 +67,42 @@ def prefer_child(
     gate_state: str = "",
     confidence: float = 1.0,
     abstain_threshold: float = 0.03,
+    gate_capacity_bits: float = 0.0,
+    capacity_floor: float = 1.0,
 ) -> str:
     """Return preferred child key: ``zeus`` | ``parent`` | ``none``.
 
-    - ``none`` — caller should abstain / NONE_CHANNEL behaviour
-    - ``zeus`` — always allowed to run; may still decline
-    - ``parent`` — exact Titanos ask path
+    - ``none`` — abstain path
+    - ``zeus`` — flexible / otx
+    - ``parent`` — exact Titanos ask
+
+    If ``gate_capacity_bits`` is positive and below ``capacity_floor``,
+    prefer parent (low-capacity gate → do not trust flexible path or HF).
     """
     sec = (sector or "").lower()
     gs = (gate_state or "").upper()
-    if confidence < abstain_threshold and gs in {"REPULSE", "UNLOCKED", ""}:
-        if gs == "REPULSE" and confidence <= 0.0:
+    if confidence < abstain_threshold and gs in {"REPULSE", "UNLOCKED"}:
+        if confidence <= 0.0:
             return "none"
-    # Dual-sector default: both may run Zeus first; gbx prefers parent
-    # after Zeus declines. Policy name is the *first* preference.
+    if gate_capacity_bits > 0.0 and gate_capacity_bits < capacity_floor:
+        return "parent"
     if sec == "gbx_like":
         return "parent"
     if sec == "otx_like":
         return "zeus"
-    return "zeus"  # unset → try Zeus, fall through parent
+    return "zeus"
 
 
 def gbx_bypass_recurrent(sector: str) -> bool:
-    """True when single-hop exact band should skip long recurrent loops.
-
-    Predicate only. The caller decides what "skip" means:
-
-      - gbx_like  -> resolve from ask_list when exactly one row exists,
-                     build a synthetic Answer (mode="FAST", loops=0,
-                     gate_state="LOCKED"), and do not invoke Zeus.
-      - anything else -> the normal Zeus-with-fallthrough path.
-
-    Calling this and then running ask() anyway makes the sector policy
-    decorative: the recurrent loop runs, the sector annotation is
-    accurate, and the promised cost saving never materialises.
-    """
+    """True when single-hop exact band should skip long recurrent loops."""
     return (sector or "").lower() == "gbx_like"
 
 
-__all__ = ["prefer_child", "gbx_bypass_recurrent"]
+def frame_to_tool_tag(frame: str) -> str:
+    """Map truth-frame → Human-Medium / tools_schema tag when useful."""
+    return {
+        FRAME_EXACT: "operational",
+        FRAME_RECONSTRUCTED: "gnosis",
+        FRAME_ABSTAINED: "abstain",
+        FRAME_UNRESOLVED: "abstain",
+    }.get(frame, "operational")
