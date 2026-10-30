@@ -35,6 +35,34 @@ Output: `GateSelection` or `None`.
 `encode_question(...)` is a thin wrapper that returns only the triple
 (or `None`) for older call sites.
 
+
+## 1.1 Truth-frame system (four axes)
+
+The encoder does not only resolve a triple. Together with gate state and
+status it selects **what kind of truth claim** the answer is making.
+GPU RAG probes (store accuracy 1.00 vs small-decoder RAG ~0.4) show the
+failure mode is the model overriding retrieved rows — so the substrate
+must own the frame and the model may only render.
+
+| Axis | Values | Decides |
+|---|---|---|
+| Sector | `gbx_like` / `otx_like` | Exact band vs reconstructed path |
+| Gate state | `LOCKED` / `REPULSE` / `MIXED` / … | Whether the field is coherent enough to trust |
+| Status | `ANSWERED` / `NO_ROWS` / `ABSTAINED` / `NONE_CHANNEL` | What kind of answer is possible |
+| Capacity | `log2|Σ|` | Bits the channel selection conveys |
+
+**Derived `frame` field** (see `policy.derive_frame`):
+
+| Frame | Typical axes |
+|---|---|
+| `exact` | gbx_like + ANSWERED + single row |
+| `reconstructed` | otx_like or multi-row / path |
+| `abstained` | ABSTAINED (recovery / field veto) |
+| `unresolved` | NONE_CHANNEL or empty resolve |
+
+`prefer_child` may use `gate_capacity_bits` below a floor to force the
+parent/exact path (low-capacity gate → do not trust flexible or HF paths).
+
 ## 2. Sector policy
 
 | Sector | When | Preferred path |
