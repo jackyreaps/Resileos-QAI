@@ -46,44 +46,46 @@ Substrate extensions:
 18. [SDM + Hopfield Attractor Memory](300-substrate/sdm-hopfield.md) — RES-317
 19. [Engine Group Composition](300-substrate/engine-group.md) — RES-318
 20. [Engine Group Signal Probe Results](300-substrate/engine-group-results.md) — RES-319
+21. [Path B Mechanism Confirmation](300-substrate/pathb-mechanism.md) — RES-326
 
 Hierarchy / modulation layer:
-21. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
-22. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
-23. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
-24. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
-25. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
-26. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
+22. [Hierarchical Encoding](310-hierarchy/hierarchical-encoding.md) — RES-310
+23. [Streaming Substrate State](310-hierarchy/streaming-state.md) — RES-311
+24. [Layered Mask Stack](310-hierarchy/mask-stack.md) — RES-312
+25. [Composition Capacity Law](310-hierarchy/capacity-law.md) — RES-313
+26. [Error Accumulation Bound](310-hierarchy/error-bound.md) — RES-314
+27. [Modulation Interface](310-hierarchy/modulation-interface.md) — RES-315
 
 Titanos application layer:
-27. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
-28. [Dense Entity Index](320-titanos/index.md) — RES-321
-29. [Query Language and Execution](320-titanos/query.md) — RES-322
-30. [External Ingestion](320-titanos/ingestion.md) — RES-323
-31. [Zeus Child](320-titanos/zeus-child.md) — RES-324
-32. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
+28. [Disk-Backed Band Store](320-titanos/store.md) — RES-320
+29. [Dense Entity Index](320-titanos/index.md) — RES-321
+30. [Query Language and Execution](320-titanos/query.md) — RES-322
+31. [External Ingestion](320-titanos/ingestion.md) — RES-323
+32. [Zeus Child](320-titanos/zeus-child.md) — RES-324
+33. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
+34. [Answer Route and Pluggable Backends](320-titanos/answer.md) — RES-327
 
 Operations and notes:
-33. [Run Config](400-operations/run-config.md) — RES-400
-34. [Training](400-operations/training.md) — RES-401
-35. [Validation](400-operations/validation.md) — RES-402
-36. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
-37. [Behavioral Notes](500-notes/behavioral.md) — RES-500
-38. [Roadmap](500-notes/roadmap.md) — RES-501
+35. [Run Config](400-operations/run-config.md) — RES-400
+36. [Training](400-operations/training.md) — RES-401
+37. [Validation](400-operations/validation.md) — RES-402
+38. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
+39. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+40. [Roadmap](500-notes/roadmap.md) — RES-501
 
 QD-TER bridge:
-39. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-40. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-41. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-42. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
-43. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
-44. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
-45. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
-46. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
-47. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
+41. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+42. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+43. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+44. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+45. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+46. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+47. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
+48. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
+49. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
 
 Reference:
-48. [Glossary](900-reference/glossary.md) — RES-900
+50. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
@@ -113,6 +115,7 @@ Reference:
 | RES-317 | `sdm-hopfield.md` | draft | Parameter-free attractor cleanup; reduces chain crosstalk |
 | RES-318 | `engine-group.md` | draft | N-engine composition; triad at group level; prerequisite for multi-stream training |
 | RES-319 | `engine-group-results.md` | draft | First measured result: aggregate ΔMI +1.24 nats; per-engine ΔMI 0 (Cause A) |
+| RES-326 | `pathb-mechanism.md` | stable | Path B confirmed across 4 readouts; pretrained transfer +0.0996 NLL (3 seeds, t=5.91) |
 
 ## 310-series hierarchy modules
 
@@ -135,6 +138,7 @@ Reference:
 | RES-323 | `ingest.py` | draft | External ingestion; φ-ladder, R-gate, filter |
 | RES-324 | `zeus-child.md` | draft | AgencyChild residual specialist; declines when unfit |
 | RES-325 | `eat-strategy.md` | draft | Titanos vs transformers: A/B achievable, C not |
+| RES-327 | `answer.md` | stable | `/answer` route; pluggable backends; RAG scaling measured |
 
 ## 600-series QD-TER bridge
 
@@ -165,7 +169,7 @@ RES-200 ─▶ RES-201 ─▶ RES-202
 RES-300 ─▶ RES-301 ─▶ RES-302 ─▶ RES-303
     │
     ▼
-RES-304 ─▶ RES-318 ─▶ RES-319
+RES-304 ─▶ RES-318 ─▶ RES-319 ─▶ RES-326
 RES-305  RES-306 ─▶ RES-307
     │
     ├──▶ RES-308
@@ -189,7 +193,8 @@ RES-316 ─▶ RES-317
 RES-320 ─▶ RES-321 ─▶ RES-322 ─▶ RES-323
                                     │
                                     ├──▶ RES-324
-                                    └──▶ RES-325
+                                    ├──▶ RES-325
+                                    └──▶ RES-327
     │
     ▼
 RES-400 ─▶ RES-401 ─▶ RES-402 ─▶ RES-403
@@ -205,3 +210,4 @@ RES-600 ─▶ RES-601 ─▶ RES-602 ─▶ RES-603
                                                           │
                                                           ▼
                                                      RES-607 ─▶ RES-608
+```
