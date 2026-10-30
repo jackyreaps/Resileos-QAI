@@ -26,14 +26,14 @@ Path B (RES-315 §2) specifies a small trainable carrier between the
 substrate and a frozen decoder:
 
     aggregate_features (7-dim for N=3)
-        │
-        ▼
+        |
+        v
     AggregateCarrier (MLP)
-        │
-        ▼
+        |
+        v
     modulation (vocab,) — logit bias
-        │
-        ▼
+        |
+        v
     frozen decoder logits + modulation
 
 The carrier trains; the decoder is frozen; the substrate is frozen. The
@@ -64,10 +64,10 @@ decoder.
 
 ## 3. CPU results
 
-| Probe | κ=0 | κ=2 | Δ |
+| Probe | k=0 | k=2 | Delta |
 |---|---|---|---|
 | A. Feature-only accuracy (seed 0) | 0.032 | 0.706 | +0.674 |
-| A. Feature-only accuracy (earlier run) | 0.015 | 0.803 | +0.788 |
+| A. Feature-only accuracy (earlier) | 0.015 | 0.803 | +0.788 |
 | B. Closed-vocab accuracy | 0.817 | 0.892 | +0.075 |
 | B. Closed-vocab NLL | 0.816 | 0.642 | +0.174 |
 | C. Mini-transformer accuracy | 0.79 | 0.90 | +0.108 |
@@ -95,40 +95,40 @@ because there is none.
 
 ### 3a. Three-seed mini-transformer (NLL is load-bearing)
 
-| Seed | improvement_κ NLL | acc κ=2 |
+| Seed | improvement_k NLL | acc k=2 |
 |---|---|---|
 | 0 | +0.092 | 0.892 |
 | 1 | +0.083 | 0.775 |
 | 2 | +0.073 | 0.758 |
-| **mean ± std** | **+0.083 ± 0.009** | **0.808 ± 0.073** |
+| **mean +/- std** | **+0.083 +/- 0.009** | **0.808 +/- 0.073** |
 
 NLL delta is tight and sign-stable across seeds. Accuracy spreads ~13
 percentage points (0.758 to 0.892) — the carrier's decision boundary is
 sensitive to initialization on 120 facts with a small readout. Quote
-accuracy only with the ±0.07 interval; never as a single "0.81". The NLL
-result is the load-bearing number: same frozen block, same carrier
-architecture, same 7-dim features, κ=2 beats κ=0 with low variance.
+accuracy only with the +/- 0.07 interval; never as a single "0.81". The
+NLL result is the load-bearing number: same frozen block, same carrier
+architecture, same 7-dim features, k=2 beats k=0 with low variance.
 
 ### 3b. Pretrained transfer (GPU, 2026-10-30)
 
 `run_aggregate_training_probe.py --decoder Qwen/Qwen2.5-0.5B`, 3 seeds,
 120 facts, 500 steps each:
 
-| Seed | improvement_κ NLL |
+| Seed | improvement_k NLL |
 |---|---|
 | 0 | +0.0677 |
 | 1 | +0.1249 |
 | 2 | +0.1063 |
-| **mean ± std** | **+0.0996 ± 0.0292** |
+| **mean +/- std** | **+0.0996 +/- 0.0292** |
 
 `t = 5.91`, sign-stable across 3 seeds. The CPU mini-transformer result
-(+0.083 ± 0.009) transfers to a pretrained 151,936-vocab decoder.
+(+0.083 +/- 0.009) transfers to a pretrained 151,936-vocab decoder.
 
-**Absolute NLL is not the result.** Baseline (no carrier) 6.43 → κ=0
-0.985 → κ=2 0.885. The carrier drops NLL by 5.45 nats, almost entirely
+**Absolute NLL is not the result.** Baseline (no carrier) 6.43 -> k=0
+0.985 -> k=2 0.885. The carrier drops NLL by 5.45 nats, almost entirely
 by memorizing the 120 facts in its 151k output space. Coupling
 contributes ~0.10 nats of that, ~1.8% of the total. The load-bearing
-number is the matched-capacity delta `κ=2 − κ=0 = +0.0996`, not the
+number is the matched-capacity delta `k=2 - k=0 = +0.0996`, not the
 absolute NLL.
 
 **Effect size, honestly.** The mechanism transfers. The effect is modest.
@@ -138,23 +138,23 @@ survives a pretrained base at all.
 ## 4. What the numbers say
 
 **Nonlinearity matters.** Feature-only (linear) gives 0.706 accuracy at
-κ=2. Closed-vocab (MLP) gives 0.892. That is +0.186 from nonlinearity on
+k=2. Closed-vocab (MLP) gives 0.892. That is +0.186 from nonlinearity on
 the same 7-dim features. The aggregate carries nonlinear structure a
 linear readout underuses.
 
-**The mechanism works.** A 7-dim aggregate → MLP → logit bias into a
+**The mechanism works.** A 7-dim aggregate -> MLP -> logit bias into a
 frozen transformer produces a usable signal. In probe C, the
 transformer's random block is essentially uniform (4.51 NLL) and the
-carrier alone drives accuracy from 0 to 0.90. The aggregation →
-projection → injection path is functional.
+carrier alone drives accuracy from 0 to 0.90. The aggregation ->
+projection -> injection path is functional.
 
-**Coupling helps across readouts.** The κ=2 vs κ=0 delta is +0.075 to
+**Coupling helps across readouts.** The k=2 vs k=0 delta is +0.075 to
 +0.108 accuracy across probes B, C, and D. It is not specific to one
 readout mechanism. Three different task framings (68-way, 79-token,
 151,936-token) all show the same effect.
 
-**The NLL delta is seed-stable.** +0.083 ± 0.009 on CPU, +0.0996 ± 0.0292
-on GPU, both across three seeds. This is not a single lucky draw.
+**The NLL delta is seed-stable.** +0.083 +/- 0.009 on CPU, +0.0996 +/-
+0.0292 on GPU, both across three seeds. This is not a single lucky draw.
 
 ## 5. What the numbers do not say
 
@@ -169,14 +169,14 @@ Qwen2.5-0.5B. Whether the +0.0996 NLL delta grows, shrinks, or holds at
 at scale is not.
 
 **Not measured: accuracy variance across seeds on GPU.** The NLL delta is
-seed-stable (±0.0292). Accuracy was not measured per-seed in probe D
-because the absolute NLL drop (6.43 → 0.89) is dominated by the carrier's
-memorization capacity, not by task accuracy.
+seed-stable (+/- 0.0292). Accuracy was not measured per-seed in probe D
+because the absolute NLL drop (6.43 -> 0.89) is dominated by the
+carrier's memorization capacity, not by task accuracy.
 
 ## 6. What this closes
 
-**The "does the mechanism work" question.** Yes. Aggregate → carrier →
-logit bias → frozen decoder produces task-relevant signal.
+**The "does the mechanism work" question.** Yes. Aggregate -> carrier ->
+logit bias -> frozen decoder produces task-relevant signal.
 
 **The "is coupling decorative" question, confirmed at readout.** Already
 answered at the feature level (RES-319), now confirmed at the readout
@@ -185,8 +185,8 @@ level and on a pretrained decoder.
 **The "does nonlinearity help" question.** Yes. +0.186 accuracy from
 linear to nonlinear readout on the same features.
 
-**The "is the NLL delta seed-stable" question.** Yes. +0.083 ± 0.009 on
-CPU, +0.0996 ± 0.0292 on GPU.
+**The "is the NLL delta seed-stable" question.** Yes. +0.083 +/- 0.009
+on CPU, +0.0996 +/- 0.0292 on GPU.
 
 **The "does the delta transfer to pretrained embeddings" question.** Yes.
 See §3b.
@@ -205,17 +205,17 @@ path. Recorded in RES-327 §2.
 
 ## 8. Open questions
 
-- ~~**Does the delta transfer to pretrained embeddings?**~~ Resolved:
-  +0.0996 ± 0.0292 NLL, t = 5.91, sign-stable. See §3b.
-- **Does the delta scale with fact count?** Test at 500, 1000, 2000.
-- **Does the delta scale with parameter count?** Test at Qwen2.5-1.5B, 7B.
-- **Is the coupling effect the same size in the logit-bias path as in the
-  closed-vocab path?** Probes B, C, D show +0.075, +0.108, +0.0996
+- ~~Does the delta transfer to pretrained embeddings?~~ Resolved:
+  +0.0996 +/- 0.0292 NLL, t = 5.91, sign-stable. See §3b.
+- Does the delta scale with fact count? Test at 500, 1000, 2000.
+- Does the delta scale with parameter count? Test at Qwen2.5-1.5B, 7B.
+- Is the coupling effect the same size in the logit-bias path as in the
+  closed-vocab path? Probes B, C, D show +0.075, +0.108, +0.0996
   respectively. The consistency across 68 / 79 / 151,936 vocabularies
   suggests the effect is not projection-dimension-dependent, but this is
   not isolated from task differences.
-- ~~**Is the +0.10 accuracy delta stable across seeds?**~~ Resolved: NLL
-  delta is stable on both CPU (±0.009) and GPU (±0.0292).
+- ~~Is the +0.10 accuracy delta stable across seeds?~~ Resolved: NLL
+  delta is stable on both CPU (+/- 0.009) and GPU (+/- 0.0292).
 
 ## 9. Reproduce
 
@@ -232,7 +232,7 @@ for seed in 0 1 2; do
         --out artifacts/report_pathb_mini_seed${seed}.json
 done
 
-# Pretrained decoder (needs ≥8 GB; measured on a T4 GPU 2026-10-30)
+# Pretrained decoder (needs >=8 GB; measured on a T4 GPU 2026-10-30)
 for seed in 0 1 2; do
     python scripts/run_aggregate_training_probe.py \
         --decoder Qwen/Qwen2.5-0.5B \
@@ -244,3 +244,18 @@ python scripts/aggregate_seed_reports.py \
               artifacts/report_aggregate_seed1.json \
               artifacts/report_aggregate_seed2.json \
     --out artifacts/report_aggregate_multi_seed.json
+```
+
+Probes B and C are implemented in `scripts/run_pathb_cpu_probes.py` and
+consume `build_aggregate_features` from
+`src/resileos/substrate/aggregate_carrier.py` plus the same
+`AggregateCarrier` class. Probe D uses the same `AggregateCarrier` but
+against a pretrained decoder via `run_aggregate_training_probe.py`.
+
+## 10. Read next
+
+- [Engine Group Signal Probe Results](engine-group-results.md) — RES-319
+- [Engine Group Composition](engine-group.md) — RES-318
+- [Modulation Interface](../310-hierarchy/modulation-interface.md) — RES-315
+- [Answer Route and Pluggable Backends](../320-titanos/answer.md) — RES-327
+- [Documentation Index](../readme.md)
