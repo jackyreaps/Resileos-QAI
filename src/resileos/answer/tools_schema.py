@@ -20,9 +20,11 @@ FRAME_ABSTAIN = "abstain"        # none-channel / recovery refusal
 TOOL_ASK: dict[str, Any] = {
     "name": "resileos_ask",
     "description": (
-        "Exact relational lookup against the Titanos band store. "
-        "Returns stored object(s) for (subject, relation) or the inverse. "
-        "Does not invent facts. Prefer this for single-hop attributes."
+        "Query the Resileos Oracle (VSA band store) for an exact relational "
+        "fact. Returns stored object(s) for (subject, relation) or inverse. "
+        "If status is NONE_CHANNEL, ABSTAINED, or rows are empty, inform the "
+        "user the information is unavailable. Never invent or statistically "
+        "infer an answer."
     ),
     "frame": FRAME_OPERATIONAL,
     "sector_hint": "gbx_like",
