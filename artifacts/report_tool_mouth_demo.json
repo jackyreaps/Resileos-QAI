@@ -1,0 +1,63 @@
+{
+  "transcript": [
+    {
+      "tool": "resileos_ask",
+      "arguments": {
+        "subject": "Zeus",
+        "relation": "domain"
+      },
+      "oracle": {
+        "status": "ANSWERED",
+        "frame": "exact",
+        "rows": [
+          "sky"
+        ],
+        "value": "sky"
+      },
+      "mouth": "Store (exact): sky"
+    },
+    {
+      "tool": "resileos_ask",
+      "arguments": {
+        "subject": "Nobody",
+        "relation": "domain"
+      },
+      "oracle": {
+        "status": "NO_ROWS",
+        "frame": "exact",
+        "rows": [],
+        "value": null
+      },
+      "mouth": "Store returned no rows (NO_ROWS). Answer only from rows. If empty, say the store has no fact."
+    },
+    {
+      "tool": "resileos_abstain",
+      "arguments": {
+        "reason": "user asked to speculate beyond store"
+      },
+      "oracle": {
+        "status": "ABSTAINED",
+        "frame": "abstained",
+        "rows": [],
+        "value": null
+      },
+      "mouth": "I don't have a verified fact for that in the store. (ABSTAINED/abstained) Do not invent an answer. Inform the user the information is unavailable or refused by the store."
+    },
+    {
+      "tool": "resileos_ask",
+      "arguments": {
+        "subject": "alice",
+        "relation": "prefers"
+      },
+      "oracle": {
+        "status": "ANSWERED",
+        "frame": "exact",
+        "rows": [
+          "exact_answers"
+        ],
+        "value": "exact_answers"
+      },
+      "mouth": "Store (exact): exact_answers"
+    }
+  ]
+}
