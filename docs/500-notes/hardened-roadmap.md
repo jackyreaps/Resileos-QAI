@@ -13,30 +13,27 @@ a plan.
 
 ## 1.0.x — Baseline grounding and sequential mechanics
 
-### 1.1 The load-bearing ablation — BLOCKING
+### 1.1 The Load-Bearing Ablation (CLOSED)
 
-`scripts/run_efficiency_ablation.py` measures three k factors:
+**Status: closed 2026-10-22. Verdict: k <= 1. Pivot executed.**
 
-| Factor | Definition | Reliability |
-|---|---|---|
-| `k_steps` | steps_NLL / steps_framework | Reliable at toy scale |
-| `k_flops_est` | total_flops_NLL / total_flops_framework | Analytic; use for projections |
-| `k_wall_toy` | wall_NLL / wall_framework | Python-bound; trends to 1.0; do not use |
+`k_flops_est = 0.90` on 120 facts, 2000-step budget. The
+framework-native objective (RES-326) is not more compute-efficient
+than standard NLL on the same substrate.
 
-Target accuracy is fixed before the run: `target_nll = baseline_nll − Δ`,
-where `baseline_nll` is the no-modulation decoder on the held-out set.
-Δ defaults to 0.05.
+Per the pre-registered rule in this section's original form:
+`k <= 1` is a first-class result. It fired. §4 has been excised from
+active development streams. The framework pivots to low-compute
+high-dimensional relational tracking — the dense VSA optimization
+path — rather than the sparse-MoE scaling path.
 
-**Three outcomes, all written down before the run:**
-
-| `k_flops_est` | Verdict | Consequence |
-|---|---|---|
-| ≥ 3 | viable | v2.0.0 proceeds |
-| 1 < k < 3 | marginal | savings do not justify framework complexity; v2.0.0 on hold |
-| ≤ 1 | falsified | framework-native objective is not a scaling lever; revert to MoE-only |
-
-`k ≤ 1` is a first-class result, not a failure to be explained away. If the
-ablation returns it, §4 is deleted from the roadmap and the project pivots.
+The measurement was taken on a single-engine configuration that
+RES-319 §3a later characterized as degenerate (per-engine latents
+constant under the current drive rule). This is noted for the record.
+The gate fired on the number the roadmap pre-registered, not on a
+post-hoc reinterpretation. If multi-engine coupled data is later
+measured and returns `k > 3`, §4 can be reintroduced under a new gate.
+That is cheaper than retroactively weakening a fired gate.
 
 ### 1.2 Sequential chain retention
 
@@ -93,6 +90,29 @@ formalises sector partitioning as an extension of the existing
 
 **Do not start until `k_flops_est` is measured.** The numbers below are
 projections under a specific assumption about `k`.
+
+## 4. Sparse MoE framework (CLOSED — not pursued)
+
+**Status: closed 2026-10-22. No active development.**
+
+The 1T-parameter MoE architecture that appeared here in earlier
+revisions is not pursued. It was gated on `k_flops_est > 3` from the
+framework-native objective ablation (§1.1), which measured 0.90. The
+gate fired; the architecture is excised.
+
+What remains in scope for scaling:
+
+- **Data-path scale** — 2k → 5k → 10k facts with `DiskBandStore`
+  (RES-320) taking over from the in-memory band dict when state
+  serialization crosses ~500 MB.
+- **Model-path scale** — RAG at >=1.5B parameters as prose mode
+  (RES-327 §2). `structured` at 100% remains default for
+  machine-consumed exact match.
+- **Substrate scale** — multi-engine coupling (RES-318) continues as
+  a research direction. Whether `k > 3` at multi-engine is unmeasured;
+  if measured and positive, §4 can be reintroduced under a new gate.
+
+Nothing in the above requires a 1T-parameter training run.
 
 ### 4.1 Sparsity, not VSA math
 
