@@ -2,7 +2,14 @@
 
 from .native_encode import GateSelection, encode_gate, encode_question
 from .tools_schema import list_tool_schemas, openai_tools, frame_index
-from .policy import prefer_child, gbx_bypass_recurrent
+from .policy import (
+    prefer_child,
+    gbx_bypass_recurrent,
+    derive_frame,
+    frame_to_tool_tag,
+)
+from .frame_telemetry import frame_histogram, record_frame
+from .tool_execute import execute_tool
 from .backends import (
     AnswerBackend,
     AnswerContext,
@@ -39,4 +46,9 @@ __all__ = [
     "frame_index",
     "prefer_child",
     "gbx_bypass_recurrent",
+    "derive_frame",
+    "frame_to_tool_tag",
+    "frame_histogram",
+    "record_frame",
+    "execute_tool",
 ]
