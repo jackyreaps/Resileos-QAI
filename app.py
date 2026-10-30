@@ -67,6 +67,10 @@ from resileos.answer import (  # noqa: E402
     openai_tools,
     select_backend,
 )
+from resileos.answer.policy import (  # noqa: E402
+    derive_frame,
+    prefer_child,
+)
 from resileos.integration.lecore_client import (  # noqa: E402
     LeCoreClient, LeCoreUnreachable, LeCoreError,
 )
@@ -475,6 +479,10 @@ def titanos_answer(payload: AnswerRequest):
             "symbol_index": -1,
             "sector": "",
             "gate_capacity_bits": 0.0,
+            # Truth-frame only (exact|reconstructed|abstained|unresolved).
+            # Not Human-Medium prose frames; Gnosis is the sole finished
+            # medium frame and is not required for this axis.
+            "frame": derive_frame(status="NONE_CHANNEL"),
         }
 
     rows = titanos_singleton.ask_list(
@@ -508,6 +516,7 @@ def titanos_answer(payload: AnswerRequest):
                 "symbol_index": -1,
                 "sector": "",
                 "gate_capacity_bits": 0.0,
+                "frame": derive_frame(status="ABSTAINED"),
             }
 
     # Single gate encode: sector + symbol_index + capacity (consistent).
@@ -569,6 +578,11 @@ def titanos_answer(payload: AnswerRequest):
         "symbol_index": sym,
         "sector": sector,
         "gate_capacity_bits": cap,
+        "frame": derive_frame(
+            sector=sector,
+            status=status,
+            n_rows=len(rows),
+        ),
     }
 
 
@@ -651,6 +665,7 @@ def titanos_query(payload: QueryRequest):
     try:
         # Sector from gate encoder (routing label only).
         sector = ""
+        g = None
         try:
             g = encode_gate(
                 f"{payload.subject} {payload.relation}",
@@ -661,6 +676,7 @@ def titanos_query(payload: QueryRequest):
                 sector = g.sector
         except Exception:
             sector = ""
+            g = None
 
         # Publish sector for Zeus cheap-decline on otx fall-through.
         titanos_singleton._route_sector = sector
@@ -739,6 +755,22 @@ def titanos_query(payload: QueryRequest):
             ],
         }
         out["sector"] = sector
+        out["frame"] = derive_frame(
+            sector=sector,
+            gate_state=str(getattr(ans, "gate_state", "") or ""),
+            status=str(getattr(ans, "status", "") or ""),
+            n_rows=1 if ans.value else 0,
+        )
+        # Capacity-aware first preference (does not change Zeus-always-on
+        # fitness tracking; used when routing without agency children).
+        _ = prefer_child(
+            sector=sector,
+            gate_state=str(getattr(ans, "gate_state", "") or ""),
+            confidence=float(ans.confidence),
+            gate_capacity_bits=float(
+                getattr(g, "gate_capacity_bits", 0.0) if g is not None else 0.0
+            ),
+        )
         if payload.render:
             ctx = context_from_answer(
                 ans,
