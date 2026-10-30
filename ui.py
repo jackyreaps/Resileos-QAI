@@ -41,6 +41,7 @@ MYTHOS_SEED = [
 ]
 
 
+# ── raw HTTP helpers ───────────────────────────────────────────────────────
 def _headers() -> dict[str, str]:
     return {"X-API-Key": API_KEY} if API_KEY else {}
 
@@ -55,6 +56,63 @@ def _post(path: str, payload: dict, timeout: int = 30) -> requests.Response:
     )
 
 
+# ── session cache ──────────────────────────────────────────────────────────
+# Bounded per-session cache for GET and POST read paths. Cleared whenever
+# the UI issues a write, so stale reads don't survive mutations, and
+# whenever the API key changes, so auth-error bodies don't persist.
+_CACHE_MAX_ENTRIES = 64
+
+if "response_cache" not in st.session_state:
+    st.session_state["response_cache"] = {}
+
+if st.session_state.get("_last_api_key") != API_KEY:
+    st.session_state["_last_api_key"] = API_KEY
+    st.session_state["response_cache"].clear()
+
+
+def _cache_key(method: str, path: str, payload: dict | None = None) -> str:
+    if payload is None:
+        return f"{method}:{path}"
+    return f"{method}:{path}:{json.dumps(payload, sort_keys=True)}"
+
+
+def _cache_put(key: str, response: requests.Response) -> None:
+    cache = st.session_state["response_cache"]
+    if len(cache) >= _CACHE_MAX_ENTRIES:
+        cache.pop(next(iter(cache)), None)
+    cache[key] = response
+
+
+def _cached_get(path: str, timeout: int = 5) -> requests.Response:
+    """GET with per-path session cache. Successful responses only."""
+    key = _cache_key("GET", path)
+    cache = st.session_state["response_cache"]
+    if key in cache:
+        return cache[key]
+    resp = _get(path, timeout=timeout)
+    if resp.status_code < 400:
+        _cache_put(key, resp)
+    return resp
+
+
+def _cached_post(path: str, payload: dict, timeout: int = 30) -> requests.Response:
+    """POST with per-payload session cache. Successful responses only."""
+    key = _cache_key("POST", path, payload)
+    cache = st.session_state["response_cache"]
+    if key in cache:
+        return cache[key]
+    resp = _post(path, payload, timeout=timeout)
+    if resp.status_code < 400:
+        _cache_put(key, resp)
+    return resp
+
+
+def invalidate_response_cache() -> None:
+    """Clear all cached reads. Call after any write mutation."""
+    st.session_state["response_cache"].clear()
+
+
+# ── sweep renderer ─────────────────────────────────────────────────────────
 def render_sweep(sw: dict) -> None:
     m1, m2, m3 = st.columns(3)
     m1.metric("Fitted slope", f"{sw.get('slope', float('nan')):.4f}")
@@ -69,7 +127,9 @@ def render_sweep(sw: dict) -> None:
         eps = np.asarray(sw["epsilons"], dtype=float)
         errs = np.asarray(sw["errors"], dtype=float)
         st.caption("Raw: residual vs ε")
-        st.line_chart(pd.DataFrame({"epsilon": eps, "residual": errs}).set_index("epsilon"))
+        st.line_chart(
+            pd.DataFrame({"epsilon": eps, "residual": errs}).set_index("epsilon")
+        )
         log_eps = np.log(eps)
         log_err = np.log(errs)
         fit = sw["slope"] * log_eps + sw["intercept"]
@@ -94,13 +154,13 @@ def render_sweep(sw: dict) -> None:
         st.error(f"Could not render sweep result: {e}")
 
 
-# ── sidebar ───────────────────────────────────────────────────────────────
+# ── sidebar ────────────────────────────────────────────────────────────────
 st.sidebar.header("Titanos Topology")
 if not API_KEY:
     st.sidebar.warning("Enter an API key to query the backend.")
 else:
     try:
-        stats = _get("/stats").json()
+        stats = _cached_get("/stats").json()
         st.sidebar.metric("Total Learned Facts", stats.get("facts", 0))
         st.sidebar.metric("Active Entities", stats.get("entities", 0))
         st.sidebar.text(f"Core Dim: {stats.get('core_matrix', '-')}")
@@ -113,6 +173,7 @@ else:
 if st.sidebar.button("Seed Greek mythos corpus"):
     try:
         res = _post("/learn_batch", {"facts": MYTHOS_SEED}, timeout=60).json()
+        invalidate_response_cache()
         st.sidebar.success(
             f"Added {res.get('added', 0)} facts. Total: {res.get('records')}."
         )
@@ -122,7 +183,7 @@ if st.sidebar.button("Seed Greek mythos corpus"):
 st.sidebar.divider()
 st.sidebar.header("Substrate")
 try:
-    sub = _get("/substrate_stats").json()
+    sub = _cached_get("/substrate_stats").json()
     st.sidebar.metric("Training Steps", sub.get("training_steps", 0))
     st.sidebar.text(f"hidden_dim: {sub.get('hidden_dim', '-')}")
     st.sidebar.text(f"kernel_dim: {sub.get('kernel_dim', '-')}")
@@ -131,7 +192,8 @@ try:
 except Exception:
     st.sidebar.error("Cannot reach substrate backend.")
 
-# ── tabs ──────────────────────────────────────────────────────────────────
+
+# ── tabs ───────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Fact Ingestion", "Batch Upload", "Substrate Query", "Multi-Hop Chain", "ε-Sweep"]
 )
@@ -151,6 +213,7 @@ with tab1:
         if s and r and o:
             res = _post("/learn", {"subject": s, "relation": r, "obj": o}).json()
             if res.get("status") == "SUCCESS":
+                invalidate_response_cache()
                 st.success(f"Fact committed. Database size: {res['records']} facts.")
                 st.rerun()
         else:
@@ -167,6 +230,7 @@ with tab2:
             if st.button("Commit all rows"):
                 facts = df[["subject", "relation", "obj"]].astype(str).values.tolist()
                 res = _post("/learn_batch", {"facts": facts}, timeout=120).json()
+                invalidate_response_cache()
                 st.success(f"Added {res.get('added', 0)} facts. Total: {res.get('records')}.")
                 st.rerun()
         except Exception as e:
@@ -179,7 +243,7 @@ with tab3:
     q_inv = st.checkbox("Inverse query")
     if st.button("Query Residual Matrix"):
         if q_s and q_r:
-            ans = _post(
+            ans = _cached_post(
                 "/query",
                 {"subject": q_s, "relation": q_r, "inverse": q_inv},
             ).json()
@@ -208,7 +272,9 @@ with tab4:
     if st.button("Execute Chain"):
         if c_start and c_rels:
             relations = [t.strip() for t in c_rels.split(",") if t.strip()]
-            ans = _post("/chain", {"start": c_start, "relations": relations}).json()
+            ans = _cached_post(
+                "/chain", {"start": c_start, "relations": relations}
+            ).json()
             if ans.get("status") == "ACCEPTED":
                 st.success(f"Chain resolved: {ans['value']}")
                 st.json(ans["path"])
@@ -261,7 +327,7 @@ with tab5:
                 "epsilons": eps_list,
             }
             try:
-                r = _post("/sweep_epsilon", payload, timeout=60)
+                r = _cached_post("/sweep_epsilon", payload, timeout=60)
                 if r.status_code != 200:
                     st.error(f"Sweep failed ({r.status_code}): {r.text[:300]}")
                 else:
