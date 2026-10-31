@@ -279,7 +279,7 @@ class AttractorMemory:
                 f"vector shape {v.shape} != ({self.sdm.cfg.dim},)"
             )
         self.sdm.write(v)
-        self._patterns.append(v.copy())
+        self._patterns.append(np.asarray(v, dtype=np.float32).copy())
         self._dirty = True
 
     def store_many(self, vectors: np.ndarray) -> None:
@@ -296,7 +296,7 @@ class AttractorMemory:
             )
         for v in arr:
             self.sdm.write(v)
-            self._patterns.append(v.copy())
+            self._patterns.append(np.asarray(v, dtype=np.float32).copy())
         if arr.shape[0] > 0:
             self._dirty = True
 
@@ -311,8 +311,20 @@ class AttractorMemory:
         if not self._patterns:
             self._dirty = False
             return
-        stacked = np.stack(self._patterns, axis=0)
+        # Stack once for Hopfield. Prefer float32 workspace to cut peak RSS
+        # on large N (dim=10k, N=5k ~200MB vs ~400MB float64 temporary).
+        n = len(self._patterns)
+        # Hopfield matrix is O(n*dim). Cap rebuild size so large hubs remain
+        # in-process; SDM still stores every write. Cap is quality/cost tradeoff.
+        max_hf = 2048
+        if n > max_hf:
+            idx = np.linspace(0, n - 1, max_hf).astype(np.int64)
+            stacked = np.stack([self._patterns[int(i)] for i in idx], axis=0)
+        else:
+            stacked = np.stack(self._patterns, axis=0)
+        stacked = np.asarray(stacked, dtype=np.float64)
         self.hopfield.store(stacked)
+        del stacked
         self._dirty = False
 
     # ── reads ───────────────────────────────────────────────────────
