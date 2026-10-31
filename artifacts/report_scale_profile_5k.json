@@ -1,0 +1,22 @@
+{
+  "product": "scale_profile",
+  "sizes": [
+    5000
+  ],
+  "rows": [
+    {
+      "n_facts": 5000,
+      "n_entities": 2000,
+      "n_relations": 12,
+      "t_learn_use_attractor_false_s": 0.1669,
+      "t_learn_default_s": 13.5972,
+      "query_hit_rate": 1.0,
+      "query_sample_n": 30,
+      "stats_facts": 5000,
+      "attractor_n_patterns": 5000,
+      "hopfield_cap": 2048,
+      "fix": "float32 patterns + Hopfield rebuild capped at 2048; SDM keeps all writes"
+    }
+  ],
+  "note": "OOM cause: dim=10000 * N patterns * float64 * (list+Hopfield) + dual Titanos. Fix: one instance, float32 list, Hopfield cap."
+}
