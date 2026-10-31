@@ -45,18 +45,35 @@ def _one_size(
     facts = [tuple(x) for x in cfg_data["facts"]]
     queries = cfg_data.get("queries") or []
 
-    # Bands-only / deferred attractor style: measure learn loop
+    import gc
+
+    # Bands-only: measure, then free before attractor pass (avoids 2x RSS).
     t0 = time.perf_counter()
     T = Titanos(TitanosConfig(use_attractor=False))
-    for s, r, o in facts:
-        T.learn(str(s), str(r), str(o))
+    if hasattr(T, "learn_many"):
+        T.learn_many([(str(s), str(r), str(o)) for s, r, o in facts],
+                     update_attractor=False)
+    else:
+        for s, r, o in facts:
+            T.learn(str(s), str(r), str(o), update_attractor=False)
     t_learn_no_attr = time.perf_counter() - t0
+    del T
+    gc.collect()
 
-    # Default config (attractor policy as in deployment)
+    # Default attractor: one instance, learn_many + single flush.
     t0 = time.perf_counter()
     T2 = Titanos(TitanosConfig())
-    for s, r, o in facts:
-        T2.learn(str(s), str(r), str(o))
+    if hasattr(T2, "learn_many"):
+        T2.learn_many([(str(s), str(r), str(o)) for s, r, o in facts],
+                      update_attractor=True)
+    else:
+        for s, r, o in facts:
+            T2.learn(str(s), str(r), str(o))
+        if getattr(T2, "_attractor", None) is not None:
+            try:
+                T2._attractor.flush()
+            except Exception:
+                pass
     t_learn_default = time.perf_counter() - t0
 
     # Query sample
@@ -64,7 +81,6 @@ def _one_size(
     hits = 0
     n_q = 0
     for q in queries[:30]:
-        # queries may be dicts or triples depending on generator
         if isinstance(q, dict):
             sub = str(q.get("subject") or q.get("s") or "")
             rel = str(q.get("relation") or q.get("r") or "")
@@ -88,30 +104,23 @@ def _one_size(
         elif hasattr(T2, "dump"):
             T2.dump(str(state_path))
         else:
-            # best-effort: stats only
             state_path.write_text(json.dumps({"facts": n_facts}))
         t_save = time.perf_counter() - t0
         size_b = state_path.stat().st_size if state_path.exists() else 0
     except Exception as e:
         t_save = -1.0
         size_b = 0
-        state_path = Path(str(state_path) + f".err")
+        state_path = Path(str(state_path) + ".err")
         state_path.write_text(str(e))
 
-    t0 = time.perf_counter()
     t_load = -1.0
-    try:
-        if hasattr(Titanos, "load") and size_b > 0 and state_path.suffix == ".json":
-            # load API varies; skip hard fail
-            t_load = time.perf_counter() - t0
-    except Exception:
-        t_load = -1.0
-
     stats = {}
     try:
         stats = dict(T2.stats())
     except Exception:
         pass
+    del T2
+    gc.collect()
 
     return {
         "n_facts": n_facts,
