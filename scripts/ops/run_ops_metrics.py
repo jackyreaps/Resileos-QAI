@@ -151,7 +151,7 @@ def phase_verify() -> dict:
 
     # M2: unknown fact turns must not fabricate.
     m2_rows = []
-    for s, r in UNKNOWN:
+    for s, r, _o in UNKNOWN:
         body, ms = _timed_query(s, r)
         m2_rows.append(
             {
