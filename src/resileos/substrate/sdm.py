@@ -7,12 +7,12 @@ parameter-free layers in sequence:
         │
         ▼
     Kanerva SDM read — k-nearest hard locations, contents summed
-        │ Averages over the query's sparse neighborhood. Reduces
-        │ per-component noise before the snap.
+        │  Averages over the query's sparse neighborhood. Reduces
+        │  per-component noise before the snap.
         ▼
     Hopfield relaxation — softmax attention over stored patterns
-        │ (Ramsauer et al. 2020). Snaps to the nearest stored pattern
-        │ deterministically.
+        │  (Ramsauer et al. 2020). Snaps to the nearest stored pattern
+        │  deterministically.
         ▼
     clean vector
 
@@ -20,32 +20,30 @@ No trainable parameters. The SDM addresses are fixed at construction
 (seeded RNG). The Hopfield patterns are whatever was stored. Update
 rules are closed-form.
 
-Deferred flush:
-    `store()` writes to the SDM and appends to the pattern list, but
-    does NOT rebuild the Hopfield matrix. The matrix is rebuilt on
-    `flush()` or the first `cleanup()`.
+Deferred flush: `store()` writes to the SDM and appends to the pattern
+list, but does NOT rebuild the Hopfield matrix. The matrix is rebuilt on
+`flush()` or the first `cleanup()`. This turns N per-store restacks
+(O(N^2) total) into one restack on the first read. For a batch of N
+inserts followed by a query, the Hopfield matrix is built once instead
+of N times.
 
-    This turns N per-store restacks (O(N^2) total) into one restack on
-    the first read. For a batch of N inserts followed by a query, the
-    Hopfield matrix is built once instead of N times.
-
-    `store_many()` is the batch path: it writes all vectors to the SDM
-    and appends them to the pattern list, one row at a time (no
-    stacked intermediate), then sets the dirty flag. The single stack
-    happens inside `flush()`.
+`store_many()` is the batch path: it writes all vectors to the SDM and
+appends them to the pattern list, one row at a time (no stacked
+intermediate), then sets the dirty flag. The single stack happens inside
+`flush()`.
 
 Off states (explicit):
     learning off. No gradients. Addresses are seeded; contents and
-        patterns are the write history.
+    patterns are the write history.
     capacity claim off. SDM capacity is bounded by n_locations and the
-        k-nearest activation; it does not extend the substrate's flat-
-        bundle capacity (RES-313).
+    k-nearest activation; it does not extend the substrate's flat-
+    bundle capacity (RES-313).
     substitute for codex cleanup off. This does not replace codex
-        cleanup; it sits in front of it. The final token-level argmax
-        is still against the codebook.
+    cleanup; it sits in front of it. The final token-level argmax is
+    still against the codebook.
     approximation off. For clean inputs the pipeline is idempotent
-        (Hopfield relaxation does not move a stored pattern). For noisy
-        inputs it is a projection.
+    (Hopfield relaxation does not move a stored pattern). For noisy
+    inputs it is a projection.
 """
 from __future__ import annotations
 
@@ -53,6 +51,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+
+from resileos.capacity import hopfield_cap
 
 
 # ── config ──────────────────────────────────────────────────────────────
@@ -67,6 +67,7 @@ class SDMConfig:
     k_activate   how many hard locations activate per read/write
     seed         RNG for the fixed address matrix
     """
+
     dim: int
     n_locations: int = 1024
     k_activate: int = 32
@@ -91,10 +92,11 @@ class SDMConfig:
 class HopfieldConfig:
     """Modern Hopfield configuration (Ramsauer 2020).
 
-    beta       inverse temperature; higher = sharper snap
-    max_iters  upper bound on relaxation iterations
-    tol        convergence threshold on ||x_new - x||
+    beta      inverse temperature; higher = sharper snap
+    max_iters upper bound on relaxation iterations
+    tol       convergence threshold on ||x_new - x||
     """
+
     beta: float = 8.0
     max_iters: int = 8
     tol: float = 1e-4
@@ -176,10 +178,7 @@ class KanervaSDM:
 class ModernHopfield:
     """Continuous Hopfield via softmax attention (Ramsauer 2020).
 
-    Update rule:
-
-        x <- X^T · softmax(beta · X · x)
-
+    Update rule: x <- X^T · softmax(beta · X · x)
     where X is the (n_patterns, dim) matrix of stored patterns.
 
     NOTE: the earlier implementation divided the similarities by `dim`
@@ -239,13 +238,13 @@ class ModernHopfield:
 class AttractorMemory:
     """SDM + Hopfield pipeline for VSA crosstalk reduction.
 
-    Stores fact vectors (or any pattern set). On cleanup, the noisy
-    query is (a) SDM-read for neighborhood averaging, then (b)
-    Hopfield-relaxed to snap to the nearest stored pattern.
+    Stores fact vectors (or any pattern set). On cleanup, the noisy query
+    is (a) SDM-read for neighborhood averaging, then (b) Hopfield-relaxed
+    to snap to the nearest stored pattern.
 
-    Deferred flush: `store()` writes to the SDM and appends to the
-    pattern list, but does not rebuild the Hopfield matrix. The
-    rebuild happens on `flush()` or the first `cleanup()`.
+    Deferred flush: `store()` writes to the SDM and appends to the pattern
+    list, but does not rebuild the Hopfield matrix. The rebuild happens
+    on `flush()` or the first `cleanup()`.
 
     Parameters
     ----------
@@ -265,13 +264,14 @@ class AttractorMemory:
         self._patterns: list[np.ndarray] = []
         self._dirty = False
 
-    # ── writes ──────────────────────────────────────────────────────
+    # ── writes ──────────────────────────────────────────────────────────
+
     def store(self, vector: np.ndarray) -> None:
         """SDM write + append. Does not rebuild Hopfield.
 
-        The Hopfield matrix is rebuilt on the next `flush()` or the
-        first `cleanup()`. This is what makes bulk insertion O(N)
-        instead of O(N^2).
+        The Hopfield matrix is rebuilt on the next `flush()` or the first
+        `cleanup()`. This is what makes bulk insertion O(N) instead of
+        O(N^2).
         """
         v = np.asarray(vector, dtype=np.float64)
         if v.shape != (self.sdm.cfg.dim,):
@@ -300,7 +300,8 @@ class AttractorMemory:
         if arr.shape[0] > 0:
             self._dirty = True
 
-    # ── flush ───────────────────────────────────────────────────────
+    # ── flush ───────────────────────────────────────────────────────────
+
     def flush(self) -> None:
         """Rebuild the Hopfield matrix from accumulated patterns.
 
@@ -311,15 +312,22 @@ class AttractorMemory:
         if not self._patterns:
             self._dirty = False
             return
-        # Stack once for Hopfield. Prefer float32 workspace to cut peak RSS
-        # on large N (dim=10k, N=5k ~200MB vs ~400MB float64 temporary).
+
+        # Stack once for Hopfield. Prefer float32 workspace to cut peak
+        # RSS on large N (dim=10k, N=5k ~200MB vs ~400MB float64 temp).
         n = len(self._patterns)
-        # Hopfield matrix is O(n*dim). Cap rebuild size so large hubs remain
-        # in-process; SDM still stores every write. Cap is quality/cost tradeoff.
-        max_hf = 2048
+
+        # Hopfield matrix is O(n*dim). Cap rebuild size so large hubs
+        # remain in-process; SDM still stores every write. The cap is the
+        # process-wide capacity contract (RES-330), not a local constant.
+        # Overriding it here would decouple the runtime from the tested
+        # policy in resileos/capacity.py.
+        max_hf = hopfield_cap()
         if n > max_hf:
             idx = np.linspace(0, n - 1, max_hf).astype(np.int64)
-            stacked = np.stack([self._patterns[int(i)] for i in idx], axis=0)
+            stacked = np.stack(
+                [self._patterns[int(i)] for i in idx], axis=0
+            )
         else:
             stacked = np.stack(self._patterns, axis=0)
         stacked = np.asarray(stacked, dtype=np.float64)
@@ -327,7 +335,8 @@ class AttractorMemory:
         del stacked
         self._dirty = False
 
-    # ── reads ───────────────────────────────────────────────────────
+    # ── reads ───────────────────────────────────────────────────────────
+
     def cleanup(self, query: np.ndarray) -> np.ndarray:
         """Two-stage denoise: SDM read, then Hopfield relax.
 
@@ -339,7 +348,8 @@ class AttractorMemory:
         rough = self.sdm.read(q)
         return self.hopfield.relax(rough)
 
-    # ── introspection ───────────────────────────────────────────────
+    # ── introspection ───────────────────────────────────────────────────
+
     @property
     def n_patterns(self) -> int:
         return len(self._patterns)
