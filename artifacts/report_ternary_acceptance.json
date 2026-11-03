@@ -1,0 +1,26 @@
+{
+  "probes": {
+    "mse": {
+      "dense_bipolar": 9.382549285888672,
+      "dense_ternary": 8.27921199798584,
+      "sparse_bipolar": 9.798307418823242,
+      "sparse_ternary": 7.828021049499512,
+      "dense_ternary_leq_bipolar": true,
+      "sparse_note": "compare relative"
+    },
+    "packet": {
+      "ok": true,
+      "bipolar_step": true,
+      "ternary_mapped_to_bipolar_step": true,
+      "Ub_values_bipolar_only": true
+    },
+    "hopfield_cap": {
+      "cap": 1024,
+      "n_patterns": 1024,
+      "wired": true
+    },
+    "ops_m1_m2": {
+      "note": "covered by test_ops_metrics_inprocess (pytest green)"
+    }
+  }
+}
