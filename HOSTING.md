@@ -23,15 +23,16 @@ Single process. The Titanos store is a module-level singleton. Keep `--workers 1
 
 ## 2. Quick start (Docker)
 
-Clone and prepare the state file:
-
 ```bash
 git clone https://github.com/jackyreaps/Resileos-QAI.git
 cd Resileos-QAI
 touch titanos_live_state.json
+chmod 666 titanos_live_state.json
 mkdir -p configs
 cp configs/api_keys.example.json configs/api_keys.json
 ```
+
+**Why `chmod 666`:** the container runs as uid 10001. A file created by `touch` as root is mode 644, so the container cannot write to it and `POST /api/v1/learn_batch` fails with `PermissionError`. On a shared host, use `chown 10001:10001` + `chmod 644` instead. See `SECURITY.md`.
 
 Generate a key and put its hash into `configs/api_keys.json`:
 
@@ -42,7 +43,7 @@ python scripts/hash_api_key.py
 Example result:
 
 ```text
-key:  Kx8...your-plaintext-key...
+key: Kx8...your-plaintext-key...
 hash: 3f9a...64-hex-chars...
 ```
 
@@ -69,21 +70,26 @@ ssh -L 8501:127.0.0.1:8501 user@host
 
 ## 3. Probes
 
-There is **no** `/healthz` route. A 404 on `/healthz` does not mean the
-process is down.
+If `asgi.py` is the entry point, `/healthz` is public. If you are running `app.py` directly, `/healthz` does not exist and a 404 does not mean the process is down.
 
 ```bash
+# With asgi:app (production)
+curl -sf http://127.0.0.1:8000/healthz
+
+# Always available
 curl -sf http://127.0.0.1:8000/api/v1/ready
 curl -sf http://127.0.0.1:8000/api/v1/substrate_stats
-# optional, if leCore is configured:
+
+# If leCore is configured
 curl -sf http://127.0.0.1:8000/api/v1/lecore/health
 ```
 
+- `GET /healthz` — liveness (public, no auth)
 - `GET /api/v1/ready` — readiness; **503** until the Titanos store is open
 - `GET /api/v1/substrate_stats` — head state / bridge lock
 - `GET /api/v1/lecore/health` — leCore bridge liveness (when configured)
 
-Point container healthchecks at `/api/v1/ready`, not `/healthz`.
+Point container healthchecks at `/healthz` **and** `/api/v1/ready`. The Dockerfile does both.
 
 ## 4. Auth, rate limits, CORS
 
@@ -105,32 +111,41 @@ export RESILEOS_API_KEYS='{"my-key":{"name":"bootstrap","tier":"enterprise","quo
 ```bash
 cloudflared tunnel login
 cloudflared tunnel create resileos-prod
-cloudflared. tunnel route dns resileos-prod api Pers.example.com
-cloudflared tunnel route dnsistence resileos-prod console.example.com
-cloudflared tunnel token
-
- resileos-prod
+cloudflared tunnel route dns resileos-prod api.example.com
+cloudflared tunnel route dns resileos-prod console.example.com
+cloudflared tunnel token resileos-prod
 ```
 
-Set `T|UNNEL_TOKEN` and start the container. The container opens an outbound connection only. `docker ps` must show no `0.0.0.0:*` mappings.
+Set `TUNNEL_TOKEN` and start the container. The container opens an outbound connection only. `docker ps` must show **no** `0.0.0.0:*` mappings.
 
-##  Path | Contents |
+## 6. Persistence
+
+| Path | Contents |
 |---|---|
-| `titanos_live_state.json` | Titanos band store |
-| `/app/data/substrate_state.pt` | Substrate heads, optimizer, `is_trained` |
-| `/app/data/usage.json` | Per-key monthly usage |
+| `titanos_live_state.json` | Titanos band store (bind mount) |
+| `/app/data/substrate_state.pt` | Substrate heads, optimizer, `is_trained` (named volume) |
+| `/app/data/usage.json` | Per-key monthly usage (named volume) |
 
-Both `/app/data` and the state file are mounted as volumes in `docker-compose.yml`. Back them up.
+Back up the bind mount and the named volume. The bind mount must be writable by uid 10001.
 
-## 7. Smoke queries
+## 7. Ops metrics probe
+
+Run it **inside the container** when ports are unpublished:
 
 ```bash
-KEY="your-plaintext-key"
+docker compose exec -T -e RESILEOS_API_KEY="$RESILEOS_TEST_KEY" \
+  resileos python3 scripts/ops/run_ops_metrics.py --phase learn
 
-curl -s -X POST http://127.0.0.1:8000/api/v1/sparql \
-  -H "X-API-Key: $KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"query":"SELECT ?o WHERE alice --knows--> ?o"}'
+docker compose restart resileos
+
+docker compose exec -T -e RESILEOS_API_KEY="$RESILEOS_TEST_KEY" \
+  resileos python3 scripts/ops/run_ops_metrics.py --phase verify
+```
+
+The report is written inside the container at `artifacts/report_ops_metrics.json`. Copy it out:
+
+```bash
+docker compose cp resileos:/app/artifacts/report_ops_metrics.json ./report_ops_metrics.json
 ```
 
 ## 8. What this host is not
