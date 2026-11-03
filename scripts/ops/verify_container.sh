@@ -9,7 +9,12 @@ bad() { printf 'FAIL  %s\n' "$1"; FAIL=$((FAIL+1)); }
 api() { docker compose exec -T resileos curl -s "$@"; }
 
 # ── pre-flight ────────────────────────────────────────────────────────
+# The container runs as uid 10001 (resileos). touch creates the state
+# file as root:root mode 644, so the container cannot write to it and
+# /api/v1/learn_batch fails with PermissionError. World-writable is
+# acceptable on a single-user host; see SECURITY.md for the tradeoff.
 touch titanos_live_state.json
+chmod 666 titanos_live_state.json
 [ -f titanos_live_state.json ] \
   && ok "pre-flight: state file is a regular file" \
   || bad "pre-flight: state file is not regular (Docker likely made a dir)"
@@ -50,6 +55,17 @@ delta=$(( after - before ))
   && ok "4/5 train: steps $before -> $after (delta 10)" \
   || bad "4/5 train: delta $delta, expected 10 ($before -> $after)"
 
+# ── 4b/5 learn_batch: bind-mount write check ──────────────────────────
+# This is the check that would have caught the state-file permission
+# bug. It exercises the bind-mount path, not the named volume.
+lb=$(api -o /dev/null -w '%{http_code}' -X POST \
+       -H "X-API-Key: $RESILEOS_TEST_KEY" -H 'Content-Type: application/json' \
+       -d '{"facts":[["probe","permission_check","ok"]]}' \
+       http://127.0.0.1:8000/api/v1/learn_batch)
+[ "$lb" = "200" ] \
+  && ok "4b/5 learn_batch writes to bind-mounted state file" \
+  || bad "4b/5 learn_batch -> $lb (state file not writable by container)"
+
 # ── 5/5 restart persistence ───────────────────────────────────────────
 docker compose restart resileos >/dev/null
 for _ in $(seq 1 60); do
@@ -66,10 +82,6 @@ else
 fi
 
 # ── port exposure ─────────────────────────────────────────────────────
-# Compose reports container-EXPOSED ports (PublishedPort: 0) alongside
-# host-published ones in .Publishers. Only PublishedPort > 0 is a host
-# binding. --format json shape varies across Compose versions (array vs
-# JSON-lines); jq -s normalizes both.
 pub=$(docker compose ps --format json 2>/dev/null | jq -s '
   (if length == 1 and (.[0] | type) == "array" then .[0] else . end)
   | [ .[] | (.Publishers // []) | map(select(.PublishedPort > 0)) | length ]
