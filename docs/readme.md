@@ -64,28 +64,47 @@ Titanos application layer:
 32. [Zeus Child](320-titanos/zeus-child.md) — RES-324
 33. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
 34. [Answer Route and Pluggable Backends](320-titanos/answer.md) — RES-327
+35. [Gate Encoder](320-titanos/gate-encoder.md)
+36. [Tools and Frames](320-titanos/tools-and-frames.md)
+37. [Chat Router](320-titanos/chat-router.md)
+38. [Growth Spine](320-titanos/growth-spine.md)
+39. [Hub Namespace](320-titanos/hub-namespace.md)
+40. [Hub Chat QVR](320-titanos/hub-chat-qvr.md)
+41. [Frame Atlas Bridge](320-titanos/frame-atlas-bridge.md)
+42. [Persona Envelopes](320-titanos/persona-envelopes.md)
+43. [Olympus Agency](320-titanos/olympus-agency.md)
+44. [Zeus Kin](320-titanos/zeus-kin.md)
+45. [Incremental Analytics](320-titanos/incremental-analytics.md)
+46. [Ops Metrics](320-titanos/ops-metrics.md)
 
 Operations and notes:
-35. [Run Config](400-operations/run-config.md) — RES-400
-36. [Training](400-operations/training.md) — RES-401
-37. [Validation](400-operations/validation.md) — RES-402
-38. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
-39. [Behavioral Notes](500-notes/behavioral.md) — RES-500
-40. [Roadmap](500-notes/roadmap.md) — RES-501
+47. [Run Config](400-operations/run-config.md) — RES-400
+48. [Training](400-operations/training.md) — RES-401
+49. [Validation](400-operations/validation.md) — RES-402
+50. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-403
+51. [Capacity Contract](400-operations/capacity-contract.md) — RES-330
+52. [Ternary Front-End](400-operations/ternary-frontend.md) — RES-401-ternary
+53. [Efficiency Ablation](400-operations/efficiency-ablation.md)
+54. [HDRIFT Gate Status](400-operations/hdrift-gate-status.md)
+55. [Scale 2k Checkpoint](400-operations/scale-2k-checkpoint.md)
+56. [Scale Decision 2k–5k](400-operations/scale-decision-2k5k.md)
+57. [Hosted Mouth](400-operations/hosted-mouth.md)
+58. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+59. [Roadmap](500-notes/roadmap.md) — RES-501
 
 QD-TER bridge:
-41. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-42. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-43. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-44. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
-45. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
-46. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
-47. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
-48. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
-49. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
+60. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+61. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+62. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+63. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+64. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+65. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+66. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
+67. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
+68. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
 
 Reference:
-50. [Glossary](900-reference/glossary.md) — RES-900
+69. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
@@ -130,6 +149,8 @@ Reference:
 
 ## 320-series Titanos modules
 
+Numbered docs:
+
 | Doc | Module | Status | Notes |
 |---|---|---|---|
 | RES-320 | `store.py` | stable | Memory-mapped int32 accumulators + WAL |
@@ -139,6 +160,44 @@ Reference:
 | RES-324 | `zeus-child.md` | draft | AgencyChild residual specialist; declines when unfit |
 | RES-325 | `eat-strategy.md` | draft | Titanos vs transformers: A/B achievable, C not |
 | RES-327 | `answer.md` | stable | `/answer` route; pluggable backends; RAG scaling measured |
+
+Product-surface docs (no RES number assigned):
+
+| Module | Notes |
+|---|---|
+| `gate-encoder.md` | Free-text → `(subject, relation, inverse, sector)`; capacity bound |
+| `tools-and-frames.md` | Tool schemas and frame derivation |
+| `chat-router.md` | Natural-language chat ingress routing |
+| `growth-spine.md` | Growth / capability progression |
+| `hub-namespace.md` | Hub namespace layout |
+| `hub-chat-qvr.md` | Chat QVR under hub namespace |
+| `frame-atlas-bridge.md` | Bridge from frame atlas to gate encoder |
+| `persona-envelopes.md` | Persona envelope definitions |
+| `olympus-agency.md` | Olympus-tier agency children |
+| `zeus-kin.md` | Zeus-kin child hierarchy |
+| `incremental-analytics.md` | F-IVM-style factorized views |
+| `ops-metrics.md` | Operational metric definitions |
+
+## 400-series operations modules
+
+| Doc | Module | Status | Notes |
+|---|---|---|---|
+| RES-400 | `run-config.md` | stable | Run configuration schema |
+| RES-401 | `training.md` | stable | Substrate head training loop |
+| RES-402 | `validation.md` | stable | Validation contract |
+| RES-403 | `phi-compress-redesign.md` | draft | Ladder-walking contraction; rebuild bug documented |
+| RES-330 | `capacity-contract.md` | proposal | Rules C0–C8; metrics M1–M8 |
+| RES-401-ternary | `ternary-frontend.md` | candidate | Ternary front-end; acceptance probes pending |
+
+Unnumbered operations docs:
+
+| Module | Notes |
+|---|---|
+| `efficiency-ablation.md` | `k_flops_est = 0.90`; single-engine diagnostic |
+| `hdrift-gate-status.md` | HDRIFT gate pass/fail record |
+| `scale-2k-checkpoint.md` | 2k-fact seed measurement |
+| `scale-decision-2k5k.md` | 2k → 5k scaling decision |
+| `hosted-mouth.md` | Hosted-model backend path |
 
 ## 600-series QD-TER bridge
 
@@ -158,6 +217,10 @@ The status page (RES-604) is the canonical open/closed inventory. Individual
 docs state their own scope; the status page aggregates them.
 
 ## Dependency graph
+
+Numbered nodes only. Unnumbered product-surface docs (`gate-encoder`, `chat-router`,
+`persona-envelopes`, `olympus-agency`, `zeus-kin`, and the rest of the 320-series
+product docs) hang off the RES-320…RES-327 cluster and are not shown.
 
 ```text
 RES-100 ─▶ RES-101 ─▶ RES-102
@@ -198,6 +261,9 @@ RES-320 ─▶ RES-321 ─▶ RES-322 ─▶ RES-323
     │
     ▼
 RES-400 ─▶ RES-401 ─▶ RES-402 ─▶ RES-403
+         │
+         ├──▶ RES-330
+         └──▶ RES-401-ternary
     │
     ▼
 RES-500 ─▶ RES-501
