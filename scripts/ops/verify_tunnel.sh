@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
+
 : "${TUNNEL_TOKEN:?export TUNNEL_TOKEN first}"
 : "${RESILEOS_TEST_KEY:?export RESILEOS_TEST_KEY first}"
 : "${RESILEOS_HOST:?export RESILEOS_HOST=api.yourdomain.dev}"
@@ -17,7 +18,13 @@ docker compose logs resileos 2>&1 | grep -i "Registered tunnel connection" \
   || { echo "FAIL  tunnel did not register"; docker compose logs resileos | tail -50; exit 1; }
 
 # 3. Still zero published ports
-pub=$(docker compose ps --format json | jq -r '[.[] | (.Publishers // []) | length] | add // 0')
+# Same PublishedPort > 0 filter as verify_container.sh — container-exposed
+# ports (PublishedPort: 0) are not host bindings.
+pub=$(docker compose ps --format json 2>/dev/null | jq -s '
+  (if length == 1 and (.[0] | type) == "array" then .[0] else . end)
+  | [ .[] | (.Publishers // []) | map(select(.PublishedPort > 0)) | length ]
+  | add // 0
+')
 [ "$pub" = "0" ] && echo "PASS  0 publishers after recreate" || { echo "FAIL  publishers=$pub"; exit 1; }
 
 # 4. External reachability (run these from ANOTHER machine too)
