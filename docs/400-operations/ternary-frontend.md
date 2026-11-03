@@ -1,7 +1,7 @@
 ---
 doc: RES-401-ternary
 title: Ternary Front-End Factors (Opt-in under RES-401)
-status: proposed
+status: candidate  # probes run CPU 2026-11-03; see artifacts/report_ternary_acceptance.json
 depends_on: [RES-200, RES-201, RES-401, RES-330]
 related_to: [capacity-contract, growth-spine]
 ---
@@ -65,3 +65,19 @@ Backward: STE — treat ∂q/∂x ≈ 1 (identity STE, same family as current `s
 4. Only then consider packet schema extension
 
 Do not block host G1 / strict M4 on this experiment.
+
+
+## 7. Acceptance results (CPU, 2026-11-03)
+
+Recorded in `artifacts/report_ternary_acceptance.json`.
+
+| Probe | Result |
+|-------|--------|
+| MSE dense (bipolar / ternary) | 9.38 / **8.28** (ternary lower) |
+| MSE sparse (bipolar / ternary) | 9.80 / **7.83** (ternary lower) |
+| Core `step()` bipolar factors | ok |
+| Core `step()` ternary→bipolar map | ok (zeros → +1) |
+| Hopfield cap wire | 1024 |
+| Ops M1/M2 | covered by `test_ops_metrics_inprocess` (pytest green) |
+
+Default production mode remains **bipolar**. Ternary stays opt-in (`mode="ternary"`).
