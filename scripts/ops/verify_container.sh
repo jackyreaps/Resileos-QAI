@@ -39,7 +39,6 @@ c=$(api -o /dev/null -w '%{http_code}' \
 [ "$c" = "200" ] && ok "3/5 /stats with key -> 200" || bad "3/5 /stats with key -> $c"
 
 # ── 4/5 train: training_steps advances by exactly 10 ──────────────────
-# Delta, not absolute — works whether or not a prior volume exists.
 before=$(api -H "X-API-Key: $RESILEOS_TEST_KEY" \
            http://127.0.0.1:8000/api/v1/substrate_stats | jq -r .training_steps)
 api -X POST -H "X-API-Key: $RESILEOS_TEST_KEY" -H 'Content-Type: application/json' \
@@ -67,7 +66,15 @@ else
 fi
 
 # ── port exposure ─────────────────────────────────────────────────────
-pub=$(docker compose ps --format json | jq -r '[.[] | (.Publishers // []) | length] | add // 0')
+# Compose reports container-EXPOSED ports (PublishedPort: 0) alongside
+# host-published ones in .Publishers. Only PublishedPort > 0 is a host
+# binding. --format json shape varies across Compose versions (array vs
+# JSON-lines); jq -s normalizes both.
+pub=$(docker compose ps --format json 2>/dev/null | jq -s '
+  (if length == 1 and (.[0] | type) == "array" then .[0] else . end)
+  | [ .[] | (.Publishers // []) | map(select(.PublishedPort > 0)) | length ]
+  | add // 0
+')
 [ "$pub" = "0" ] && ok "ports: 0 publishers" || bad "ports: $pub publisher(s)"
 
 mapped=$(docker ps --format '{{.Names}}\t{{.Ports}}' | grep -cE ':[0-9]+->')
