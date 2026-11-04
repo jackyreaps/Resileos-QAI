@@ -93,18 +93,18 @@ Status notes:
 
 | Priority | Item | Depends on |
 |----------|------|------------|
-| 1 | Verify orientation transfer fix for φ-compress | core.py `_maybe_contract` |
+| 1 | ~~Verify orientation transfer fix for φ-compress~~ **DONE** — kept θ/ω transfer verified (`test_phi_orientation_transfer.py`) | pipeline.py `_maybe_contract` |
 | 2 | Run CHSH scan for RES-309 | entanglement.py, run_chsh_scan.py |
 | 3 | Falsification test for RES-313 capacity law | RES-310, RES-311 |
 | 4 | Measure RES-314 position-error curve | RES-310, RES-311 |
 | 5 | Minimal experiment for RES-315 modulation | RES-310 ... RES-314 |
 | 6 | Train LowRankMetricHead on real trajectories | geometry.py |
-| 7 | ~~Coupled training probe (κ=0 vs κ=2, pretrained decoder)~~ **DONE** — RES-326 §3b Path B (+0.0996 NLL, t=5.91) | RES-326 |
+| 7 | ~~Coupled training probe~~ **DONE** — RES-326 §3b Path B | RES-326 |
 
 The first three items in the prior roadmap (implement RES-310, RES-311,
 RES-312) are complete. The modules exist and their test suites pass.
-RES-318 and RES-319 are complete through the signal-presence stage.
-The coupled training probe is **DONE** (RES-326 Path B, pretrained decoder).
+RES-318 and RES-319 are complete through the signal-presence stage; the
+training probe is the next measurement.
 
 ## 9. Non-goals
 
@@ -115,7 +115,7 @@ The coupled training probe is **DONE** (RES-326 Path B, pretrained decoder).
 - No claim that the substrate is a language model. It is a side-channel.
 - No claim that RES-308, RES-309, RES-316, RES-318, or RES-319 is
   production-ready. They are research directions. RES-318/319 are
-  implemented and measured. Coupled training probe: DONE (RES-326).
+  implemented and measured, but the training probe has not run.
 
 ## Read next
 
