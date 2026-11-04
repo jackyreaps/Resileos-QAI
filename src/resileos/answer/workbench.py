@@ -1,16 +1,7 @@
 """
-Advanced-project workbench mouth (RES-327 extension).
-
-Titanos is the exact memory. This module is the *working loop* for
-formalization and advanced tasks:
-
-  ingest lines  →  learn triples
-  ask           →  exact rows
-  render        →  structured (always) or local_hf / hosted (optional)
-
-No claim that the residual core is a generative LLM. This *is* the
-build path: store + mouth + optional frozen decoder as RAG bridge.
+Workbench mouth: ingest fact lines, exact ask, pluggable render backend.
 """
+
 from __future__ import annotations
 
 import json
