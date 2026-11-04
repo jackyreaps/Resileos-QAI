@@ -1,0 +1,27 @@
+{
+  "mode": "in_process",
+  "host_strict_M4": "operator-reported green (docker restart)",
+  "M1_tool_honesty": {
+    "rate": 1.0,
+    "target": 1.0,
+    "pass": true
+  },
+  "M2_invention_rate": {
+    "rate": 0.0,
+    "target": 0.0,
+    "pass": true
+  },
+  "M3_store_hit_rate": {
+    "rate": 1.0,
+    "target": 1.0,
+    "pass": true
+  },
+  "M4_hub_durability_inprocess": {
+    "rate": 1.0,
+    "pass": true
+  },
+  "M4_hub_reload": {
+    "rate": 1.0,
+    "pass": true
+  }
+}
