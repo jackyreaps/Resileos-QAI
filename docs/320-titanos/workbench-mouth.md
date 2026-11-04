@@ -1,41 +1,32 @@
 ---
 doc: RES-328-workbench
-title: Advanced Project Workbench Mouth
+title: Workbench Mouth
 status: implemented
-depends_on: [RES-327, RES-325, RES-320]
+depends_on: [RES-327, RES-320]
 ---
 
-# Advanced Project Workbench Mouth
+# Workbench Mouth
 
-## Purpose
+Ingest fact lines into Titanos, ask exact rows, render with a pluggable backend.
 
-Working loop for advanced projects (formalization tags, residual constants,
-engineering status) **without** dumping suite theory into the repo:
+| Backend | Requirement |
+|---------|-------------|
+| `structured` | Default; no extra deps |
+| `local_hf` | `transformers` + model |
+| `hosted` | API key |
 
-1. **Ingest** working facts as triples  
-2. **Ask** exact rows from Titanos  
-3. **Render** via structured (default) or `local_hf` / `hosted` RAG mouth  
+## CLI
+
+```bash
+python scripts/run_workbench.py ingest facts.txt
+python scripts/run_workbench.py ask subject relation
+```
 
 ## Code
 
-| Module | Role |
-|--------|------|
-| `src/resileos/answer/workbench.py` | parse, ingest, ask, render |
+| Path | Role |
+|------|------|
+| `src/resileos/answer/workbench.py` | Parse, ingest, ask, render |
 | `scripts/run_workbench.py` | CLI |
 
-## Backends
-
-| Name | Needs |
-|------|--------|
-| `structured` | nothing extra (default) |
-| `local_hf` | `transformers` + model weights |
-| `hosted` | API key |
-
-Store remains source of truth. Empty rows → explicit “no record,” not invention.
-
-## Example
-
-```bash
-python scripts/run_workbench.py ingest my_working_facts.txt
-python scripts/run_workbench.py ask eps equals
-```
+Empty retrieval returns an explicit no-record answer; it does not invent rows.
