@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resileos — exact memory for teams</title>
+<meta name="description" content="Hosted exact memory and guild workspaces: facts you can learn, query, and build on — without retraining a model to change the truth.">
+<style>
+  :root {
+    --fg: #111;
+    --muted: #555;
+    --bg: #fafaf8;
+    --card: #fff;
+    --accent: #1a4d8f;
+    --border: #e5e5e0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+  header { padding: 64px 0 48px; border-bottom: 1px solid var(--border); }
+  h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.5rem; margin: 56px 0 20px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  p { margin: 0 0 14px; color: var(--muted); }
+  p.lede { font-size: 1.15rem; color: var(--fg); }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 8px; }
+  .btn {
+    display: inline-block; padding: 12px 22px; border-radius: 6px;
+    text-decoration: none; font-weight: 500; border: 1px solid transparent;
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { border-color: var(--border); color: var(--fg); background: var(--card); }
+  .btn:hover { opacity: 0.9; }
+  table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.95rem; }
+  th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; color: var(--fg); background: #f4f4f0; }
+  code { font-size: 0.9em; background: #f0f0ec; padding: 1px 5px; border-radius: 3px; }
+  .soon {
+    display: inline-block; font-size: 0.72rem; padding: 2px 6px;
+    border-radius: 4px; background: #eee; color: #666; margin-left: 6px;
+    vertical-align: middle; white-space: nowrap;
+  }
+  .note {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 18px; margin: 20px 0;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  footer {
+    margin-top: 80px; padding: 32px 0 48px; border-top: 1px solid var(--border);
+    font-size: 0.9rem; color: var(--muted);
+  }
+  footer a { color: var(--muted); margin-right: 14px; text-decoration: none; }
+  footer a:hover { color: var(--fg); }
+  .fineprint { margin-top: 20px; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Exact memory for teams that can't afford made-up answers.</h1>
+  <p class="lede">
+    Learn structured facts. Query them back. Run guild workspaces with Merit,
+    Credits, and a real work board. Optional language models render your store
+    — they don't replace it.
+  </p>
+  <div class="cta-row">
+    <a class="btn primary" href="mailto:hello@resileos.dev?subject=Resileos%20early%20access">Request early access</a>
+    <a class="btn ghost" href="https://github.com/jackyreaps/Resileos-QAI">View docs</a>
+  </div>
+  <p style="font-size:0.9rem;margin-top:16px;">
+    Hosted API, live today for learn, query, chain, and SPARQL. Single-tenant
+    self-host on Org.
+  </p>
+</header>
+
+<section>
+  <h2>The problem</h2>
+  <p>
+    Frontier models forget, invent, and charge you to re-learn the same domain
+    every session. Fine-tunes drift. Wikis rot. You need a system of record for
+    knowledge work — one that answers honestly when it doesn't know.
+  </p>
+</section>
+
+<section>
+  <h2>What you get</h2>
+  <table>
+    <tr><th>Capability</th><th>What it does</th></tr>
+    <tr>
+      <td>Titanos store</td>
+      <td>Learn / query / batch facts with honest empty answers. An unknown fact
+      returns <code>ABSTAINED</code>, not a guess.</td>
+    </tr>
+    <tr>
+      <td>Namespaced hubs</td>
+      <td><code>user:</code>, <code>world:</code>, <code>org:</code> — facts scoped to a
+      person, a project, or a team.</td>
+    </tr>
+    <tr>
+      <td>Multi-hop chains</td>
+      <td>Traverse relations in sequence (<code>/api/v1/chain</code>) and query with a
+      SPARQL-like grammar (<code>/api/v1/sparql</code>).</td>
+    </tr>
+    <tr>
+      <td>Optional mouth</td>
+      <td>Structured answers by default. Attach a hosted model over retrieved rows
+      when prose is wanted. The store stays the source of truth.</td>
+    </tr>
+    <tr>
+      <td>Guild workspace <span class="soon">coming soon</span></td>
+      <td>Members, work board, Merit &amp; Credits. Policy lives in the Guild System
+      repo; runtime is Resileos once the guild endpoints are live.</td>
+    </tr>
+    <tr>
+      <td>World assets <span class="soon">coming soon</span></td>
+      <td>Register image, video, and game-codex paths; query them as structured
+      facts. Generation stays in your tools — Resileos remembers what you built.</td>
+    </tr>
+  </table>
+  <div class="note">
+    <p>
+      <strong>What "coming soon" means here:</strong> the code is in the repository,
+      but the hosted API does not expose those routes yet. We will remove the badge
+      and price those rows only after they are mounted and smoke-tested in production.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>How it differs</h2>
+  <h3>Memory ≠ weights.</h3>
+  <p>Update the store to correct a fact. No retraining, no drift, no re-learn cost.</p>
+  <h3>Policy ≠ runtime.</h3>
+  <p>Guild rules live in the Guild System. Resileos runs state — it doesn't adjudicate.</p>
+  <h3>Credits ≠ cash.</h3>
+  <p>Internal tool units never convert to Merit or fiat inside the product.</p>
+</section>
+
+<section>
+  <h2>Proof, not adjectives</h2>
+  <p>
+    The capacity and honesty gates are published as artifacts in the repository,
+    not as marketing claims: store-hit rate and invent-rate on a fixed probe corpus,
+    plus restart-durability results. The eval harness is in
+    <code>scripts/ops/run_ops_metrics.py</code>.
+  </p>
+</section>
+
+<section>
+  <h2>Pricing</h2>
+  <table>
+    <tr><th></th><th>Free</th><th>Builder</th><th>Team</th><th>Org</th></tr>
+    <tr><td>Price</td><td>$0</td><td>$29/mo</td><td>$99/mo</td><td>Custom</td></tr>
+    <tr><td>API keys</td><td>1</td><td>3</td><td>10</td><td>Custom</td></tr>
+    <tr><td>Requests / month</td><td>5,000</td><td>100,000</td><td>500,000</td><td>Committed use</td></tr>
+    <tr><td>Hubs</td><td>Personal + <code>world:</code></td><td>Shared worlds</td><td>Multi-guild</td><td>Unlimited</td></tr>
+    <tr><td>Durable state</td><td>Best-effort</td><td>Durable volume</td><td>Durable + daily snapshot</td><td>Multi-region backup</td></tr>
+    <tr><td>Optional mouth</td><td>Structured only</td><td>Structured + small RAG</td><td>Higher RAG budget</td><td>BYO key or dedicated</td></tr>
+    <tr><td>Support</td><td>Docs</td><td>Email</td><td>Priority email</td><td>Slack / contract</td></tr>
+    <tr>
+      <td>Guild workspace <span class="soon">soon</span></td>
+      <td>1 guild, 3 members</td><td>1 guild, 15 members</td>
+      <td>3 guilds, 50 members</td><td>Unlimited</td>
+    </tr>
+  </table>
+  <p style="font-size:0.9rem;">
+    Founding Builder: first 50 customers at $19/mo, locked for 12 months.
+    Annual: pay 10, get 12.
+  </p>
+</section>
+
+<section>
+  <h2>FAQ</h2>
+  <h3>Is this an LLM?</h3>
+  <p>It's a memory and workspace system. You can attach a model as a mouth over retrieved facts. The store is the source of truth.</p>
+  <h3>Can I self-host?</h3>
+  <p>Yes — the repo is open (Apache-2.0). Paid plans are for managed hosting, seats, and operations.</p>
+  <h3>What about the Guild System?</h3>
+  <p>Policy and Compact live in a separate repo. Resileos is optional runtime infrastructure.</p>
+  <h3>Do you sell governance tokens?</h3>
+  <p>No. Merit is non-purchasable. Credits are internal and non-convertible in-product.</p>
+  <h3>What happens when I hit my quota?</h3>
+  <p>The API returns <code>429</code> with a clear message and an <code>X-Usage-Quota</code> header. No silent overages.</p>
+  <h3>Do you host my video and images?</h3>
+  <p>No. The world registry stores the path or URL and the facts around it. Generation, storage, and streaming stay in your tooling.</p>
+</section>
+
+<div class="cta-row">
+  <a class="btn primary" href="mailto:hello@resileos.dev?subject=Resileos%20early%20access">Request early access</a>
+  <a class="btn ghost" href="https://github.com/jackyreaps/Resileos-QAI">Read the docs</a>
+</div>
+
+<footer>
+  <a href="https://github.com/jackyreaps/Resileos-QAI">Docs</a>
+  <a href="https://github.com/jackyreaps/Resileos-QAI/blob/main/SECURITY.md">Security</a>
+  <a href="https://github.com/jackyreaps/Resileos-QAI">Status (manual, until a status page exists)</a>
+  <a href="mailto:hello@resileos.dev?subject=Terms">Terms</a>
+  <a href="mailto:hello@resileos.dev?subject=Privacy">Privacy</a>
+  <p class="fineprint">
+    Resileos does not provide legal, tax, or investment advice.
+    Guild Compact compliance is the operator's responsibility.
+    "99.5% target" is an internal goal, not a contractual SLA.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>
