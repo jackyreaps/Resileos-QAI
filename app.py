@@ -26,13 +26,20 @@ Integration (leCore capability router):
     POST /api/v1/lecore/route
     GET  /api/v1/lecore/health
 
-Auth: if RESILEOS_API_KEY is set, every route except
-/api/v1/ready, /api/v1/substrate_stats, and /api/v1/lecore/health
-requires a matching X-API-Key header. If unset, the check bypasses
-(dev default).
+Auth (fail-closed): key sources, merged:
+  1. configs/api_keys.json   {"<sha256-hex>": {...}}   primary, hashed
+  2. RESILEOS_API_KEYS       {"<plaintext>": {...}}    bootstrap map
+  3. RESILEOS_API_KEY        "<plaintext>"             legacy single key
+
+Every route except /api/v1/ready, /api/v1/substrate_stats, and
+/api/v1/lecore/health requires a matching X-API-Key header. If no
+source yields a key, protected routes return 503 instead of serving
+openly. RESILEOS_AUTH_BYPASS=1 is the only way to disable auth, and
+it is for local development only.
 """
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import logging
@@ -117,21 +124,79 @@ _substrate_lock = threading.Lock()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# API key auth (constant-time; bypassed when RESILEOS_API_KEY is unset)
+# API key auth (fail-closed)
+#
+# Sources, merged:
+#   1. configs/api_keys.json   {"<sha256-hex>": {...}}   primary, hashed
+#   2. RESILEOS_API_KEYS       {"<plaintext>": {...}}    bootstrap map
+#   3. RESILEOS_API_KEY        "<plaintext>"             legacy single key
+#
+# If no source yields a key, protected routes return 503 instead of
+# serving openly. RESILEOS_AUTH_BYPASS=1 is the only way to disable
+# auth, and it is for local development only.
 # ═══════════════════════════════════════════════════════════════════════════
 _API_KEY_NAME = "X-API-Key"
 _api_key_header = APIKeyHeader(name=_API_KEY_NAME, auto_error=False)
-_EXPECTED_API_KEY = os.getenv("RESILEOS_API_KEY", "").strip()
+_KEYS_PATH = Path(
+    os.getenv("API_KEYS_PATH", str(ROOT / "configs" / "api_keys.json"))
+)
+_AUTH_BYPASS = os.getenv("RESILEOS_AUTH_BYPASS", "0") == "1"
+
+
+def _hash_key(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _load_hashed_keys() -> dict[str, dict]:
+    """Merge key file, RESILEOS_API_KEYS, and legacy RESILEOS_API_KEY.
+
+    Every returned mapping key is a SHA-256 hex digest. The lookup path
+    hashes the incoming header, so a timing side-channel would need to
+    match the full SHA-256 of the key, which is computationally
+    infeasible.
+    """
+    merged: dict[str, dict] = {}
+
+    if _KEYS_PATH.exists():
+        try:
+            merged.update(json.loads(_KEYS_PATH.read_text(encoding="utf-8")))
+        except Exception as e:
+            log.warning("API key file unreadable (%s): %s", _KEYS_PATH, e)
+
+    raw_env = os.getenv("RESILEOS_API_KEYS", "").strip()
+    if raw_env:
+        try:
+            for key, record in json.loads(raw_env).items():
+                is_hex = len(key) == 64 and all(
+                    c in "0123456789abcdef" for c in key.lower()
+                )
+                merged[key if is_hex else _hash_key(key)] = record
+        except Exception as e:
+            log.warning("RESILEOS_API_KEYS is not valid JSON: %s", e)
+
+    legacy = os.getenv("RESILEOS_API_KEY", "").strip()
+    if legacy:
+        merged.setdefault(
+            _hash_key(legacy),
+            {"name": "legacy", "tier": "enterprise", "quota": 0},
+        )
+
+    return merged
+
+
+def _configured_key_count() -> int:
+    return len(_load_hashed_keys())
 
 
 async def verify_api_key(
     api_key: str | None = Depends(_api_key_header),
 ) -> None:
-    """Constant-time API key check.
+    """Fail-closed API key check against every configured source.
 
-    - If RESILEOS_API_KEY is empty (dev default), the check bypasses.
-    - If set, the header must match exactly (timing-safe comparison).
-    - Missing header + set key -> 403.
+    - Missing key  -> 401
+    - Unknown key  -> 403
+    - No keys set  -> 503 (refuse to serve openly)
+    - RESILEOS_AUTH_BYPASS=1 -> bypass (local development only)
 
     Applied via ``dependencies=[Depends(verify_api_key)]`` on every
     non-health route. Health endpoints (/api/v1/ready,
@@ -139,16 +204,26 @@ async def verify_api_key(
     the Docker HEALTHCHECK and any liveness probe work without
     credentials.
     """
-    if not _EXPECTED_API_KEY:
+    if _AUTH_BYPASS:
         return
-    if api_key is not None and hmac.compare_digest(
-        api_key, _EXPECTED_API_KEY
-    ):
-        return
-    raise HTTPException(
-        status_code=HTTP_403_FORBIDDEN,
-        detail="Unauthorized: invalid or missing X-API-Key",
-    )
+
+    keys = _load_hashed_keys()
+    if not keys:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No API keys configured. Set API_KEYS_PATH, RESILEOS_API_KEYS, "
+                "or RESILEOS_API_KEY. Local dev only: RESILEOS_AUTH_BYPASS=1."
+            ),
+        )
+
+    if api_key is None:
+        raise HTTPException(status_code=401, detail="missing X-API-Key header")
+
+    if keys.get(_hash_key(api_key.strip())) is None:
+        raise HTTPException(status_code=403, detail="invalid API key")
+
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -429,7 +504,7 @@ def titanos_ready():
         "facts": int(s.get("facts", 0)),
         "seeded_from": str(SEED_FILE) if _seed_count else None,
         "answer_backend": _answer_backend().name,
-        "auth_required": bool(_EXPECTED_API_KEY),
+        "auth_required": (not _AUTH_BYPASS) and _configured_key_count() > 0,
     }
 
 
