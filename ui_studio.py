@@ -22,6 +22,19 @@ from urllib.parse import quote
 import requests
 import streamlit as st
 
+try:
+    from resileos.answer.user_profile import (
+        PERSONA_PACKS,
+        extract_interest_signal,
+        load_profile,
+        save_profile_facts,
+        shape_reply,
+    )
+    _HAS_PROFILE = True
+except ImportError:
+    _HAS_PROFILE = False
+    PERSONA_PACKS = {"honest": {"label": "Honest", "tone": "neutral"}}
+
 st.set_page_config(page_title="Resileos Studio", page_icon="◈", layout="wide")
 st.markdown(
     "<style>.block-container{padding-top:1rem;max-width:1120px}"
@@ -243,6 +256,32 @@ with st.sidebar:
     if b.strip():
         BACKEND = b.strip().rstrip("/")
     key = st.text_input("API key", value=DEFAULT_KEY, type="password")
+    user_id = st.text_input("User id", value=st.session_state.get("user_id", "anon"), help="Stable id for user: hub memory")
+    st.session_state["user_id"] = user_id.strip() or "anon"
+    display_name = st.text_input("Display name", value=st.session_state.get("display_name", ""))
+    st.session_state["display_name"] = display_name
+    persona = st.selectbox(
+        "Persona",
+        list(PERSONA_PACKS.keys()),
+        format_func=lambda k: PERSONA_PACKS[k].get("label", k),
+        index=list(PERSONA_PACKS.keys()).index(st.session_state.get("persona", "honest"))
+        if st.session_state.get("persona", "honest") in PERSONA_PACKS
+        else 0,
+    )
+    st.session_state["persona"] = persona
+    if st.button("Load / save profile", use_container_width=True) and _HAS_PROFILE:
+        def _post(path, payload):
+            return api_post(path, key, payload)
+        prof = load_profile(user_id, _post)
+        if display_name:
+            prof.display_name = display_name
+        prof.persona = persona
+        n = save_profile_facts(prof, _post)
+        st.session_state["profile"] = prof
+        st.success(f"Profile stored ({n} fields) under user:{prof.user_id}")
+    elif not _HAS_PROFILE:
+        st.caption("Install resileos.answer.user_profile for durable persona")
+
     c1, c2 = st.columns(2)
     cr, br = api_get("/ready", key)
     with c1:
@@ -307,6 +346,21 @@ with tab_chat:
                     reply = format_result(result)
                 else:
                     reply = format_result(search_answer(key, question=prompt))
+        if _HAS_PROFILE:
+            def _post(path, payload):
+                return api_post(path, key, payload)
+            prof = st.session_state.get("profile")
+            if prof is None:
+                prof = load_profile(st.session_state.get("user_id", "anon"), _post)
+            prof.display_name = st.session_state.get("display_name") or prof.display_name
+            prof.persona = st.session_state.get("persona", prof.persona)
+            prof.turn_count = int(getattr(prof, "turn_count", 0)) + 1
+            sig = extract_interest_signal(prompt)
+            if sig and sig not in prof.interests:
+                prof.interests.append(sig)
+            reply = shape_reply(reply, prof)
+            save_profile_facts(prof, _post)
+            st.session_state["profile"] = prof
         st.session_state.messages.append({"role": "assistant", "content": reply, "image_url": image_url})
         with st.chat_message("assistant"):
             st.markdown(reply)
@@ -421,6 +475,9 @@ with tab_help:
 | Images | Pollinations HTTP generate + auto `/learn_batch` register |
 | Video | Register/preview URLs (bring your own encoder) |
 | Product | Same API keys as paid hosting |
+
+### Persona / user memory (PAL-style)
+Set **User id** + **Persona** in the sidebar. Profile triples live under `user:<id>` (display_name, persona, interest, turn_count). Tone adapts; **facts still only come from the store**.
 
 ### Optional paid images
 ```bash
