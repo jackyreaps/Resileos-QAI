@@ -26,6 +26,10 @@ Integration (leCore capability router):
     POST /api/v1/lecore/route
     GET  /api/v1/lecore/health
 
+Kin cycle (registered by wire_kin):
+    /api/v1/kin/*                    (Iris, Metis, Hermes, KinBundle)
+    /api/v1/eat/*                    (Eat filter, learn functions)
+
 Auth (fail-closed): key sources, merged:
   1. configs/api_keys.json   {"<sha256-hex>": {...}}   primary, hashed
   2. RESILEOS_API_KEYS       {"<plaintext>": {...}}    bootstrap map
@@ -96,6 +100,7 @@ from resileos.titanos.zeus import (  # noqa: E402
     make_zeus_handler,
     run_zeus_query,
 )
+from resileos.kin.wiring import wire_kin  # noqa: E402
 from titanos import Answer, Titanos, TitanosConfig  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -336,6 +341,20 @@ except Exception as e:
     log.warning(
         "Zeus registration failed; /query will use parent only: %s", e
     )
+
+
+# ── Kin cycle wiring ────────────────────────────────────────────────────
+# Registers the /api/v1/kin/* and /api/v1/eat/* routes on the app.
+# Requires titanos_singleton (defined above) and verify_api_key
+# (defined above) to be in scope. The auth_dep is forwarded to the kin
+# routes so they enforce the same policy as the core routes; this is
+# what keeps the two auth layers (middleware + Depends) aligned across
+# every registered route.
+try:
+    wire_kin(app, titanos_singleton, auth_dep=verify_api_key)
+    log.info("Kin cycle routes wired: /api/v1/kin/*, /api/v1/eat/*")
+except Exception as e:
+    log.warning("Kin wiring failed; kin routes unavailable: %s", e)
 
 
 # ── Answer backend (RES-327) ───────────────────────────────────────────
