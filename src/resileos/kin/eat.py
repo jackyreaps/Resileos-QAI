@@ -30,9 +30,16 @@ class EatDecision:
     obj: str = ""
     reason: str = ""
     source: str = ""
+    trail: list | None = None
+    frame: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        if not d.get("trail"):
+            d.pop("trail", None)
+        if not d.get("frame"):
+            d.pop("frame", None)
+        return d
 
 
 def _parse_triple(text: str) -> Optional[tuple[str, str, str]]:
@@ -77,14 +84,36 @@ def eat_filter(
     max_obj_len: int = 500,
     allow_sys: bool = False,
     min_parts: int = 3,
+    use_swarm: bool = True,
+    ctx: dict | None = None,
 ) -> EatDecision:
     """
     Filter a candidate claim before it can enter Titanos.
 
-    accept  → well-formed triple, safe subject
-    reject  → malformed or forbidden
-    abstain → cannot decide (e.g. prose without structure)
+    When use_swarm=True (default), runs the deterministic verifier pipeline
+    (schema → … → hub_consistency) and attaches reason trail on the decision.
     """
+    if use_swarm:
+        try:
+            from resileos.kin.verifiers import run_verifiers
+            c = dict(ctx or {})
+            c.setdefault("max_obj_len", max_obj_len)
+            c.setdefault("allow_sys", allow_sys)
+            rep = run_verifiers(claim, ctx=c)
+            d = EatDecision(
+                action=rep.action,
+                subject=rep.claim.subject if rep.claim else "",
+                relation=rep.claim.relation if rep.claim else "",
+                obj=rep.claim.obj if rep.claim else "",
+                reason=rep.reason,
+                source=rep.claim.source if rep.claim else "",
+            )
+            # trail + frame for API consumers
+            d.trail = getattr(rep, "trail", [])  # type: ignore[attr-defined]
+            d.frame = getattr(rep, "frame", "")  # type: ignore[attr-defined]
+            return d
+        except Exception:
+            pass  # fall through to legacy single-stage
     source = "dict" if isinstance(claim, dict) else "text"
     if isinstance(claim, dict):
         s = str(claim.get("subject") or "").strip()
