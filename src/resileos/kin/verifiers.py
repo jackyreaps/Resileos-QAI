@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
+from resileos.kin.frames import classify_decision
+
 # Optional frame / dimensionality tag (RES frame atlas — operational only)
 FRAME_TAGS = frozenset(
     {
@@ -197,6 +199,7 @@ class VerifierReport:
     reason: str = ""
     trail: list[dict[str, str]] = field(default_factory=list)
     frame: str = "filtered"
+    dim: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -207,6 +210,7 @@ class VerifierReport:
             "reason": self.reason,
             "trail": list(self.trail),
             "frame": self.frame,
+            "dim": self.dim,
             "source": self.claim.source if self.claim else "",
         }
 
@@ -258,24 +262,32 @@ def run_verifiers(
             reason="unstructured_prose",
             trail=[{"checker": "parse", "reason": "unstructured_prose"}],
             frame="abstained",
+            dim="",
         )
     trail: list[dict[str, str]] = []
     for fn in pipeline or DEFAULT_PIPELINE:
         res = fn(claim, ctx)
         trail.append({"checker": res.checker, "reason": res.reason or "ok"})
         if not res.ok:
+            c = classify_decision("reject", subject=claim.subject)
             return VerifierReport(
                 action="reject",
                 claim=claim,
                 reason=res.reason,
                 trail=trail,
-                frame="filtered",
+                frame=c["frame"],
+                dim=c["dim"],
             )
-    frame = "provisional" if not claim.source and ctx.get("require_source") is False else "exact"
+    c = classify_decision(
+        "accept",
+        subject=claim.subject,
+        has_source=bool(claim.source),
+    )
     return VerifierReport(
         action="accept",
         claim=claim,
         reason="ok",
         trail=trail,
-        frame=frame,
+        frame=c["frame"],
+        dim=c.get("dim", ""),
     )
