@@ -12,6 +12,7 @@ from typing import Any, Callable, Optional
 
 from resileos.kin.bundle import KinBundle, build_kin_bundle
 from resileos.kin.eat import eat_and_learn, eat_filter
+from resileos.kin.council import council_query
 
 
 def register_kin_routes(
@@ -88,3 +89,23 @@ def register_kin_routes(
     def api_eat_preview(body: EatRequest) -> dict:
         """Filter only — no learn."""
         return eat_filter(body.claim, allow_sys=body.allow_sys).to_dict()
+
+    class CouncilRequest(BaseModel):
+        subject: str
+        relation: str
+        profile: str = "personal"
+
+    @app.post("/api/v1/council/query", dependencies=deps)
+    def api_council(body: CouncilRequest) -> dict:
+        titan = get_titanos()
+
+        def ask(s: str, r: str):
+            ask_list = getattr(titan, "ask_list", None)
+            if callable(ask_list):
+                rows = ask_list(s, r)
+                if not rows:
+                    return None
+                return rows if len(rows) > 1 else rows[0]
+            return titan.ask(s, r)
+
+        return council_query(body.subject, body.relation, ask, profile=body.profile).to_dict()
