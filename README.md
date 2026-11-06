@@ -4,17 +4,19 @@ Resileos-QAI: a layered architecture for residual compression and generative hyp
 
 ## What this is
 
-Resileos-QAI is a low-compute knowledge engine that does three things a language model does not separate:
+Resileos-QAI is a low-compute knowledge engine that separates three things a language model does not:
 
-1. **Stores facts** as `(subject, relation, object)` triples in compressed hypervectors.
+1. **Stores facts** as `(subject, relation, object)` triples in compressed hypervectors, gated by a verifier pipeline on ingest.
 2. **Derives what follows** by composing those facts — bind/unbind and chain — with every hop traceable to its source.
-3. **Generates candidates** by vector composition: novel combinations that were never stored, marked as candidates, never asserted as facts.
+3. **Abstains on unknowns** — a relation not derivable from stored facts returns `ABSTAINED` or `NO_ROWS`, never a guess.
 
-The difference from an LLM is not that it is more accurate. It is that every output carries **epistemic status**. A fact is asserted. A derivation is asserted with provenance. A candidate is *offered*, not asserted. A hallucination is a candidate asserted as a fact — and this architecture cannot produce one, because the verifier gate sits between candidate and assertion.
+The difference from an LLM is not that it is more accurate. It is that every output carries **epistemic status**. A fact is asserted. A derivation is asserted with provenance. An unknown relation is refused — the system says it does not know, rather than fabricating an answer. The verifier gate sits between ingest and storage, so what is stored is gated; what is asked and not found is refused.
+
+A candidate tier — novel compositions offered as provisional, never asserted as facts — is on the roadmap, not current behavior. The API returns `ACCEPTED`, `ABSTAINED`, `NO_ROWS`, and `NONE_CHANNEL` today. No `CANDIDATE` status exists on the query path yet.
 
 **Why it's cheap to run:** the classical core uses Vector Symbolic Architecture operations (element-wise binding, bundling, unbinding, cleanup) instead of transformer attention. A $5/month instance handles what would otherwise require GPU infrastructure.
 
-**What it is not:** a general-purpose language model, a quantum computer, or a trillion-token retrieval system. It does not write prose, translate, or summarise. It stores, derives, and proposes — and it tells you which one it just did. See [RES-313](docs/310-hierarchy/capacity-law.md) for explicit non-goals.
+**What it is not:** a general-purpose language model, a quantum computer, or a trillion-token retrieval system. It does not write prose, translate, or summarise. It stores, derives, and refuses — and it tells you which one it just did. See [RES-313](docs/310-hierarchy/capacity-law.md) for explicit non-goals.
 
 ```
 Classical Residual Core -> Control Packet -> HDRIFT Generative Substrate -> (optional) Quantum / Coherence Backend
@@ -30,6 +32,7 @@ QAI names the ambition. The quantum layer is speculative and gated downstream of
 | Substrate (RES-300–307) | **Stable contracts** |
 | Titanos Application Layer | **Prototype** |
 | Kin layer (Iris, Metis, Hermes, Eat, bundle) | **Tested** |
+| Candidate synthesis tier | **Roadmap — not implemented** |
 | QD-TER Bridge (RES-600–603) | **Conditional / conjectural** |
 | Quantum Backend | **Speculative** |
 
@@ -51,9 +54,9 @@ Do not sell seats or asset storage until the corresponding routes are mounted an
 
 Three published benchmarks, each with the script that regenerates its numbers.
 
-- **Invention without hallucination** — [docs/benchmarks/invention-without-hallucination.md](docs/benchmarks/invention-without-hallucination.md) — grounded novel candidates at zero assertion, Resileos vs an LLM baseline. Regenerate: `python scripts/ops/bench_invention.py`
-- **Compositional generalization** — [docs/benchmarks/compositional-generalization.md](docs/benchmarks/compositional-generalization.md) — derivation rate on novel queries. Regenerate: `python scripts/ops/bench_compositional.py`
-- **Honest abstention** — [docs/benchmarks/memory-vs-llm.md](docs/benchmarks/memory-vs-llm.md) — invent rate on unknown facts. Regenerate: `python scripts/ops/bench_vs_llm.py`
+- **Honest abstention** — [docs/benchmarks/memory-vs-llm.md](docs/benchmarks/memory-vs-llm.md) — invent rate on unknown facts, Resileos vs an LLM baseline. Regenerate: `python scripts/ops/bench_vs_llm.py`
+- **Compositional generalization** — [docs/benchmarks/compositional-generalization.md](docs/benchmarks/compositional-generalization.md) — derivation rate on novel queries, Resileos vs an LLM baseline. Regenerate: `python scripts/ops/bench_compositional.py`
+- **Assertion rate on novel output** — [docs/benchmarks/invention-without-hallucination.md](docs/benchmarks/invention-without-hallucination.md) — how often does each system present something it invented as though it were a fact. Resileos abstains; the LLM baseline asserts. Regenerate: `python scripts/ops/bench_invention.py`
 
 All scripts write to `artifacts/` (gitignored). Published tables are populated from a real run on a host with the API up, not from simulation.
 
