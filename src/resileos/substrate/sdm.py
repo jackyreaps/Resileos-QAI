@@ -52,6 +52,8 @@ from typing import Optional
 
 import numpy as np
 
+from ..state_dtype import state_dtype
+
 from resileos.capacity import hopfield_cap
 
 
@@ -133,7 +135,7 @@ class KanervaSDM:
         )
         self.contents = np.zeros(
             (cfg.n_locations, cfg.dim),
-            dtype=np.float64,
+            dtype=state_dtype(),
         )
         self._n_writes = 0
 
@@ -147,7 +149,7 @@ class KanervaSDM:
 
     def write(self, vector: np.ndarray) -> None:
         """Distribute a pattern to the k nearest hard locations."""
-        v = np.asarray(vector, dtype=np.float64)
+        v = np.asarray(vector, dtype=state_dtype())
         if v.shape != (self.cfg.dim,):
             raise ValueError(
                 f"vector shape {v.shape} != ({self.cfg.dim},)"
@@ -158,7 +160,7 @@ class KanervaSDM:
 
     def read(self, query: np.ndarray) -> np.ndarray:
         """Sum the k nearest contents and re-binarise to ±1."""
-        q = np.asarray(query, dtype=np.float64)
+        q = np.asarray(query, dtype=state_dtype())
         if q.shape != (self.cfg.dim,):
             raise ValueError(
                 f"query shape {q.shape} != ({self.cfg.dim},)"
@@ -198,7 +200,7 @@ class ModernHopfield:
 
     def store(self, patterns: np.ndarray) -> None:
         """Replace the stored pattern matrix. Shape (n_patterns, dim)."""
-        arr = np.asarray(patterns, dtype=np.float64)
+        arr = np.asarray(patterns, dtype=state_dtype())
         if arr.ndim != 2:
             raise ValueError(
                 f"patterns must be 2-D (n, dim), got shape {arr.shape}"
@@ -212,9 +214,9 @@ class ModernHopfield:
     def relax(self, query: np.ndarray) -> np.ndarray:
         """Iterate the Hopfield update from `query` until convergence."""
         if self._patterns is None or self._patterns.shape[0] == 0:
-            return np.asarray(query, dtype=np.float64).copy()
+            return np.asarray(query, dtype=state_dtype()).copy()
         dim = self._patterns.shape[1]
-        x = np.asarray(query, dtype=np.float64).copy()
+        x = np.asarray(query, dtype=state_dtype()).copy()
         if x.shape != (dim,):
             raise ValueError(
                 f"query shape {x.shape} != ({dim},)"
@@ -273,7 +275,7 @@ class AttractorMemory:
         `cleanup()`. This is what makes bulk insertion O(N) instead of
         O(N^2).
         """
-        v = np.asarray(vector, dtype=np.float64)
+        v = np.asarray(vector, dtype=state_dtype())
         if v.shape != (self.sdm.cfg.dim,):
             raise ValueError(
                 f"vector shape {v.shape} != ({self.sdm.cfg.dim},)"
@@ -288,7 +290,7 @@ class AttractorMemory:
         Writes row by row so no stacked intermediate is allocated here;
         the single stack happens inside `flush()`.
         """
-        arr = np.asarray(vectors, dtype=np.float64)
+        arr = np.asarray(vectors, dtype=state_dtype())
         if arr.ndim != 2 or arr.shape[1] != self.sdm.cfg.dim:
             raise ValueError(
                 f"vectors must be (n, {self.sdm.cfg.dim}), "
@@ -330,7 +332,7 @@ class AttractorMemory:
             )
         else:
             stacked = np.stack(self._patterns, axis=0)
-        stacked = np.asarray(stacked, dtype=np.float64)
+        stacked = np.asarray(stacked, dtype=state_dtype())
         self.hopfield.store(stacked)
         del stacked
         self._dirty = False
@@ -344,7 +346,7 @@ class AttractorMemory:
         sync with the pattern list.
         """
         self.flush()
-        q = np.asarray(query, dtype=np.float64)
+        q = np.asarray(query, dtype=state_dtype())
         rough = self.sdm.read(q)
         return self.hopfield.relax(rough)
 
