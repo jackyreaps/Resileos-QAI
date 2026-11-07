@@ -6,6 +6,8 @@ Does not invent values. Conflicts are surfaced (dim.conflict).
 """
 from __future__ import annotations
 
+from resileos.ui.scale_address import scale_address
+
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Optional
 
@@ -183,3 +185,10 @@ def council_query(
     result.frame = FRAME_EXACT
     result.dim = CAT_MULTI
     return result
+
+def council_with_address(result, subject: str = "") -> dict:
+    """Attach a scale address to a council result."""
+    addr = scale_address(subject=subject or "council")
+    base = result.to_dict() if hasattr(result, "to_dict") else {"result": str(result)}
+    base["scale"] = {"address": addr["embed"], "gate": addr["gate"]}
+    return base
