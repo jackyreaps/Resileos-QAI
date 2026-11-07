@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, "src")
+from resileos.ui.attach_scale import attach_scale
 #!/usr/bin/env python3
 """Invention-without-hallucination benchmark.
 
@@ -288,7 +291,7 @@ def main() -> int:
     report["llm"] = run_llm()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    args.out.write_text(json.dumps(attach_scale(report), indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
     print(f"\nwrote {args.out}")
     return 0
