@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, "src")
+from resileos.ui.attach_scale import attach_scale
 #!/usr/bin/env python3
 """
 Exact-memory benchmark harness (Resileos vs optional LLM baseline).
@@ -119,7 +122,7 @@ def main() -> int:
         "thesis": "Invent rate on unknown facts should be 0 for Resileos; LLM baseline often > 0.",
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=2))
+    args.out.write_text(json.dumps(attach_scale(report), indent=2))
     print(json.dumps(report, indent=2))
     return 0
 
