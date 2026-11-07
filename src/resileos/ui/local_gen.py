@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 
 from resileos.ui.residual_embed import address_triple, embed_frame
+from resileos.ui.scale_address import scale_address
 
 try:
     from resileos.substrate.oscillator import KuramotoField
@@ -70,19 +71,20 @@ def generate_local(
     belt: int = 0,
     frame: int = 0,
     subject: str = "frame",
+    persona: str = "",
 ) -> dict[str, Any]:
-    """Local generation using the oscillator field and residual address."""
+    """Local generation using the scale address (residual + Kuramoto + gate)."""
     if arr is None:
         arr = np.zeros((8, 8, 3), dtype=np.uint8)
-    embed = embed_frame(arr, belt=belt, frame=frame)
-    field = field_from_embed(embed)
-    pattern = local_pattern_from_theta(field["theta"])
+    scaled = scale_address(arr, belt=belt, frame=frame, persona=persona, subject=subject)
+    pattern = local_pattern_from_theta(scaled["field"]["theta"])
     return {
-        "embed": embed,
-        "field": field,
-        "triple": address_triple(embed, subject=subject),
+        "embed": scaled["embed"],
+        "field": scaled["field"],
+        "triple": scaled["triple"],
+        "gate": scaled["gate"],
         "pattern_shape": list(pattern.shape),
         "pattern": pattern,
-        "backend": field["backend"],
-        "note": "Local. Kuramoto when present; residual address always.",
+        "backend": scaled["field"]["backend"],
+        "note": "Local. Scale address shared with facts and world state.",
     }
