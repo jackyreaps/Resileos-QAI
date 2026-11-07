@@ -308,7 +308,7 @@ def _run_surface(mode: str) -> None:
             sc, sb = api_post("/learn_batch", key, {"facts": demo})
             st.success(str(sb)) if sc == 200 else st.error(f"{sc}: {sb}")
 
-    tab_chat, tab_search, tab_media, tab_diag, tab_help = st.tabs(["Chat", "Search", "Media", "Diagnostics", "Help"])
+    tab_chat, tab_search, tab_media, tab_make, tab_diag, tab_help = st.tabs(["Chat", "Search", "Media", "Make", "Diagnostics", "Help"])
 
     with tab_chat:
         for msg in st.session_state.messages:
@@ -468,6 +468,22 @@ def _run_surface(mode: str) -> None:
                     st.json(sb)
 
 
+    
+    with tab_make:
+        st.subheader("Make a world")
+        prompt = st.text_input("What should it look like", key="make_prompt")
+        world = st.text_input("World", value="world:mine", key="make_world")
+        if st.button("Make still", key="make_btn") and prompt:
+            from resileos.ui.make_world import make_still
+            out = make_still(prompt, world_id=world)
+            st.json({"address": out["address"], "rows": out["rows"], "backend": out["backend"]})
+            st.session_state["last_address"] = out["address"]
+        if st.button("Continue", key="cont_btn") and st.session_state.get("last_address"):
+            from resileos.ui.make_world import continue_from
+            nxt = continue_from(st.session_state["last_address"], prompt or "continue", world_id=world)
+            st.json({"address": nxt["address"], "rows": nxt["rows"]})
+            st.session_state["last_address"] = nxt["address"]
+
     with tab_diag:
         st.subheader("Photo diagnostics")
         st.caption("Inspection figures for work photos. Not medical or forensic claims.")
@@ -505,23 +521,23 @@ def _run_surface(mode: str) -> None:
     with tab_help:
         st.markdown(
             """
-    ### Why this is useful
-    | Capability | Implementation |
-    |------------|----------------|
-    | Fact memory | `/learn`, `/learn_batch`, `/query`, `/answer` |
-    | Search | Answer + Triple + SPARQL + Chain (live API) |
-    | Images | Pollinations HTTP generate + auto `/learn_batch` register |
-    | Video | Register/preview URLs (bring your own encoder) |
-    | Product | Same API keys as paid hosting |
+        ### Why this is useful
+        | Capability | Implementation |
+        |------------|----------------|
+        | Fact memory | `/learn`, `/learn_batch`, `/query`, `/answer` |
+        | Search | Answer + Triple + SPARQL + Chain (live API) |
+        | Images | Pollinations HTTP generate + auto `/learn_batch` register |
+        | Video | Register/preview URLs (bring your own encoder) |
+        | Product | Same API keys as paid hosting |
 
-    ### Persona / user memory (PAL-style)
-    Set **User id** + **Persona** in the sidebar. Profile triples live under `user:<id>` (display_name, persona, interest, turn_count). Tone adapts; **facts still only come from the store**.
+        ### Persona / user memory (PAL-style)
+        Set **User id** + **Persona** in the sidebar. Profile triples live under `user:<id>` (display_name, persona, interest, turn_count). Tone adapts; **facts still only come from the store**.
 
-    ### Optional paid images
-    ```bash
-    export RESILEOS_IMAGE_PROVIDER=openai
-    export RESILEOS_IMAGE_API_URL=https://api.openai.com/v1/images/generations
-    export RESILEOS_IMAGE_API_KEY=sk-...
-    ```
-    """
-        )
+        ### Optional paid images
+        ```bash
+        export RESILEOS_IMAGE_PROVIDER=openai
+        export RESILEOS_IMAGE_API_URL=https://api.openai.com/v1/images/generations
+        export RESILEOS_IMAGE_API_KEY=sk-...
+        ```
+        """
+            )
