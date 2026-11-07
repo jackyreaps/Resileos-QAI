@@ -30,6 +30,8 @@ Optional oscillator:
 """
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 from typing import Optional
 
 import numpy as np
@@ -191,3 +193,6 @@ class NonConservativeOperator:
 
 
 __all__ = ["NonConservativeOperator"]
+
+def operator_scale(theta: float = 0.0) -> dict:
+    return attach_scale({"theta": theta}, "nonconservative")
