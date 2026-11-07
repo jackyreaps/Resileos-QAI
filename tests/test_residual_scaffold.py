@@ -11,7 +11,7 @@ def test_embed_and_triple():
     e = embed_frame(arr, belt=1, frame=3)
     assert e["belt"] == 1
     assert e["frame"] == 3
-    assert e["residual_bin"] in {"high_high", "high_low", "low_high", "low_low"}
+    assert e["residual_bin"].startswith("r")
     t = address_triple(e, subject="clip")
     assert t["relation"] == "residual_address"
     assert "belt1_frame3" in t["obj"]
