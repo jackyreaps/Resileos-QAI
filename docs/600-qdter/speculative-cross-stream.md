@@ -33,7 +33,7 @@ state. They are optional; the layer runs without them.
 | Parameter | Value | Source |
 |---|---|---|
 | DFlash block size | 16 tokens | DFlash (Chen, Liang, Liu; ICML 2026) |
-| EAGLE-3 fusion layers | low / mid / high (3 layers) | EAGLE-3 (Li et al., 2024) |
+| EAGLE-3 fusion layers | low / mid / high (3 layers) | EAGLE-3 (Li et al., 2025) |
 | DFlash fusion layers (Muse Glimmer 30B) | (1, 13, 25, 37, 49) | DFlash config |
 
 The block size is fixed at 16. The drafter is trained to predict the whole
