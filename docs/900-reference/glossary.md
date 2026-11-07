@@ -101,5 +101,5 @@ Per-step log record:
 
 ## Read next
 
-- [Documentation Index](../README.md) — RES-000
+- [Documentation Index](../readme.md) — RES-000
 - [Overview](../100-foundations/overview.md) — RES-100
