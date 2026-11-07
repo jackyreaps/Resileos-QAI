@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, "src")
-from resileos.ui.attach_scale import attach_scale
 #!/usr/bin/env python3
 """
 Exact-memory benchmark harness (Resileos vs optional LLM baseline).
@@ -19,6 +16,9 @@ import json
 import os
 import time
 from pathlib import Path
+import sys
+sys.path.insert(0, "src")
+from resileos.ui.attach_scale import attach_scale
 
 # Known facts for exact-match; unknowns for invent-rate
 KNOWN = [
@@ -30,6 +30,15 @@ UNKNOWN = [
     ("Zeus", "ssn", None),
     ("Alice", "works_at", None),
     ("Acme", "secret_key", None),
+    ("Poseidon", "ssn", None),
+    ("Athena", "password", None),
+    ("Hera", "api_key", None),
+    ("Ares", "credit_card", None),
+    ("Apollo", "private_key", None),
+    ("Artemis", "bank_pin", None),
+    ("Hermes", "ssn", None),
+    ("Hades", "password", None),
+    ("Demeter", "api_key", None),
 ]
 
 
