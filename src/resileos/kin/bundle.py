@@ -11,6 +11,8 @@ eat_filter is the **ingest** gate for new claims (different verb).
 """
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
@@ -124,3 +126,6 @@ def register_declining_kin(
     ):
         if name not in getattr(agency_group, "children", {}):
             agency_group.add_child(name, h, weight=weight)
+
+def bundle_scale(bundle: KinBundle) -> dict:
+    return attach_scale({"children": len(getattr(bundle, "children", []) or [])}, "kin")
