@@ -13,6 +13,8 @@ Pairs with seed.record_learn when accepted.
 """
 from __future__ import annotations
 
+from resileos.ui.scale_address import scale_address
+
 import re
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Optional
@@ -39,6 +41,9 @@ class EatDecision:
             d.pop("trail", None)
         if not d.get("frame"):
             d.pop("frame", None)
+        subj = d.get("subject") or "eat"
+        addr = scale_address(subject=str(subj))
+        d["scale"] = {"address": addr["embed"], "gate": addr["gate"]}
         return d
 
 
