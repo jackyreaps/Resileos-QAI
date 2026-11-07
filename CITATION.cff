@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use Resileos-QAI, please cite it as below."
+title: "Resileos-QAI"
+type: software
+authors:
+  - family-names: "Dean"
+    given-names: "James"
+repository-code: "https://github.com/jackyreaps/Resileos-QAI"
+url: "https://github.com/jackyreaps/Resileos-QAI"
+license: "MIT"
+abstract: "Exact-memory knowledge engine with VSA substrate, verifier gate, and optional language-model mouth."
