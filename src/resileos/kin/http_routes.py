@@ -125,3 +125,23 @@ def register_kin_routes(
 
         return perceive(body.caption, subject=body.subject, eat_fn=eat, commit=body.commit)
 
+    class TaskStep(BaseModel):
+        subject: str
+        relation: str
+
+    class TaskRequest(BaseModel):
+        goal: str
+        steps: list[TaskStep]
+
+    @app.post("/api/v1/task", dependencies=deps)
+    def api_task(body: TaskRequest) -> dict:
+        from resileos.ui.task_api import task_from_steps
+        titan = get_titanos()
+
+        def ask(s, r):
+            fn = getattr(titan, "ask", None)
+            return fn(s, r) if callable(fn) else None
+
+        steps = [st.model_dump() if hasattr(st, "model_dump") else st.dict() for st in body.steps]
+        return task_from_steps(body.goal, steps, ask)
+
