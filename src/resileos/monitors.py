@@ -14,6 +14,8 @@ No framework-specific names. Every field here exists in the packet
 """
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 from dataclasses import dataclass
 from typing import Optional
 
