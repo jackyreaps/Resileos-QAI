@@ -135,7 +135,7 @@ def register_kin_routes(
 
     @app.post("/api/v1/task", dependencies=deps)
     def api_task(body: TaskRequest) -> dict:
-        from resileos.ui.task_api import task_from_steps
+        from resileos.ui.scale_wire import task_with_scale
         titan = get_titanos()
 
         def ask(s, r):
@@ -143,5 +143,19 @@ def register_kin_routes(
             return fn(s, r) if callable(fn) else None
 
         steps = [st.model_dump() if hasattr(st, "model_dump") else st.dict() for st in body.steps]
-        return task_from_steps(body.goal, steps, ask)
+        return task_with_scale(body.goal, steps, ask)
+
+    class PerceiveImageRequest(BaseModel):
+        # base64 RGB bytes or a feature dict from the client
+        features: Optional[dict] = None
+        subject: str = "image"
+
+    @app.post("/api/v1/perceive/image", dependencies=deps)
+    def api_perceive_image(body: PerceiveImageRequest) -> dict:
+        from resileos.ui.framework_gate import gate_candidate
+        from resileos.ui.image_encoder import features_to_triples
+        features = body.features or {}
+        triples = features_to_triples(features, subject=body.subject) if features else []
+        gated = [gate_candidate(t, stored=[], eat_accepted=False) for t in triples]
+        return {"features": features, "candidates": gated, "note": "Not facts until eat accepts and learn is called."}
 
