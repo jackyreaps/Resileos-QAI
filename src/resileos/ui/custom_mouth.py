@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 from typing import Any, Callable, Optional
 
+from resileos.ui.scale_address import scale_address
+
 
 def epistemic_label(rows: list[dict[str, Any]]) -> str:
     if not rows:
@@ -65,11 +67,13 @@ def answer(
     else:
         text = render_structured(rows, question)
         backend = "structured"
+    addr = scale_address(subject="mouth")
     return {
         "text": text,
         "backend": backend,
         "epistemic": label,
         "row_count": len(rows),
+        "scale": {"address": addr["embed"], "gate": addr["gate"]},
     }
 
 
