@@ -4,6 +4,8 @@ Owning doc: RES-302.
 """
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 from dataclasses import dataclass
 
 CONTINUE, REPULSE, CLEANUP, ABSTAIN = "CONTINUE", "REPULSE", "CLEANUP", "ABSTAIN"
@@ -70,3 +72,6 @@ def calibrate_parity(F_res_warm: list[float]) -> tuple[float, float]:
     import numpy as np
     arr = np.asarray(F_res_warm, dtype=np.float64)
     return float(np.quantile(arr, 0.95)), float(-np.quantile(arr, 0.05))
+
+def abstain_with_scale(reason: str, subject: str = "") -> dict:
+    return attach_scale({"abstained": True, "reason": reason}, subject or "abstain")
