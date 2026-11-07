@@ -23,6 +23,12 @@ from resileos.answer.hub_train import (  # noqa: E402
 )
 
 
+
+def _print_addresses(wb) -> None:
+    addrs = getattr(wb, "last_hub_addresses", None)
+    if addrs:
+        print(json.dumps({"addresses": addrs}, indent=2))
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["seed", "train", "ask"])
@@ -40,6 +46,7 @@ def main() -> int:
 
     if args.cmd == "seed":
         n = seed_default_hubs(wb)
+        _print_addresses(wb)
         if hasattr(wb.titan, "save"):
             state.parent.mkdir(parents=True, exist_ok=True)
             wb.titan.save(str(state))
@@ -51,6 +58,7 @@ def main() -> int:
             print("usage: train <facts.txt>", file=sys.stderr)
             return 2
         n = train_from_file(wb, Path(args.args[0]))
+        _print_addresses(wb)
         if hasattr(wb.titan, "save"):
             state.parent.mkdir(parents=True, exist_ok=True)
             wb.titan.save(str(state))
