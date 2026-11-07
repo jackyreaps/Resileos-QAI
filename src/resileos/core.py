@@ -35,6 +35,8 @@ from typing import Optional
 
 import numpy as np
 
+from .state_dtype import state_dtype
+
 from .packet import Packet, encode_exponent, packet_hash
 from .abstention import ParityState
 from .substrate.nonconservative import NonConservativeOperator
@@ -174,7 +176,7 @@ class ResidualCore:
     def step(self, W, mu=0, F_res=0.0, theta_hi=0.0, theta_lo=0.0,
              DeltaS=0.0, sigma1_gate=False, sigma1_action="NONE",
              version="1.0.0", factors=None) -> Packet:
-        W = np.asarray(W, dtype=np.float64)
+        W = np.asarray(W, dtype=state_dtype())
         if W.shape != (self.cfg.m, self.cfg.n):
             raise ValueError(
                 f"W must be ({self.cfg.m}, {self.cfg.n}), got {W.shape}")
