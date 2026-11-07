@@ -1,6 +1,8 @@
 """Metis — organizer kin. Policy flags only; cannot learn world triples."""
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
