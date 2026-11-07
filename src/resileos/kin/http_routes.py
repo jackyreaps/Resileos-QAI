@@ -109,3 +109,19 @@ def register_kin_routes(
             return titan.ask(s, r)
 
         return council_query(body.subject, body.relation, ask, profile=body.profile).to_dict()
+
+    class PerceiveRequest(BaseModel):
+        caption: str
+        subject: str = "image"
+        commit: bool = False
+
+    @app.post("/api/v1/perceive", dependencies=deps)
+    def api_perceive(body: PerceiveRequest) -> dict:
+        from resileos.ui.perceive import perceive
+        from resileos.kin.eat import eat_filter
+
+        def eat(claim):
+            return eat_filter(claim)
+
+        return perceive(body.caption, subject=body.subject, eat_fn=eat, commit=body.commit)
+
