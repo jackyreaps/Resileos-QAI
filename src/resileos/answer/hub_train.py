@@ -7,12 +7,14 @@ Namespaces (RES-328-hub-ns):
   org:<id>    — tenant
 
 Train = learn() under those subjects.
+Each trained subject gets a scale address via hub_address.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable, Optional
 
+from resileos.answer.hub_address import address_for_hub_subject
 from resileos.answer.workbench import Workbench, open_workbench, parse_fact_line
 
 # Minimal workspace seed (no suite physics constants)
@@ -50,6 +52,14 @@ def train_hub(
     else:
         for s, r, o in batch:
             wb.titan.learn(s, r, o, update_attractor=False)
+    # attach scale addresses for the subjects just trained
+    seen = []
+    addresses = []
+    for s, _, _ in batch:
+        if s not in seen:
+            seen.append(s)
+            addresses.append(address_for_hub_subject(s))
+    wb.last_hub_addresses = addresses
     return len(batch)
 
 
