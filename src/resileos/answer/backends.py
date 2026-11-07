@@ -31,6 +31,8 @@ re-select; restart the service to switch backends.
 """
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 import logging
 import os
 from dataclasses import dataclass
@@ -443,3 +445,6 @@ def list_backends() -> list[dict]:
         b = build_backend(name)
         out.append({"name": name, "available": bool(b.available())})
     return out
+
+def context_scale(ctx: AnswerContext) -> dict:
+    return attach_scale({"subject": ctx.subject, "relation": ctx.relation}, ctx.subject)
