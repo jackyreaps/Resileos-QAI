@@ -16,6 +16,8 @@ from typing import Any
 
 import numpy as np
 
+from resileos.ui.suite_residual import suite_residual
+
 
 def residual_bin(mean_luma: float, edge_density: float) -> str:
     """Coarse residual bin from two scalars. Placeholder for the suite residual."""
@@ -45,7 +47,7 @@ def embed_frame(arr: np.ndarray, *, belt: int = 0, frame: int = 0) -> dict[str, 
     gy, gx = np.gradient(gray)
     edge = float((np.hypot(gx, gy) > 0.08).mean())
     luma = float(gray.mean())
-    rbin = residual_bin(luma, edge)
+    rbin = suite_residual(luma, edge, belt)
     return {
         "belt": int(belt),
         "frame": int(frame),
