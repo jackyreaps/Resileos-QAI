@@ -235,5 +235,5 @@ Run `pytest tests/test_native_encode.py tests/test_answer_backends.py -q`.
 
 - [Answer backends](../320-titanos/answer.md) — RES-327
 - [Zeus Child](../320-titanos/zeus-child.md) — RES-324
-- [SDM + Hopfield Attractor Memory](sdm-hopfield.md) — RES-317
+- [SDM + Hopfield Attractor Memory](../300-substrate/sdm-hopfield.md) — RES-317
 - [Documentation Index](../readme.md)
