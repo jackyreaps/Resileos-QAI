@@ -1,6 +1,8 @@
 """Hermes — context navigator. Layers context under a depth budget."""
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
