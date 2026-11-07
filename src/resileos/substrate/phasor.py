@@ -16,6 +16,8 @@ import hashlib
 
 import numpy as np
 
+from ..state_dtype import state_dtype
+
 
 def phase_from_names(name_a: str, name_b: str) -> float:
     """
@@ -82,7 +84,7 @@ class PhasorGraph:
         so the coupling oscillates with the non-conservative operator's
         phase dynamics.
         """
-        theta = np.asarray(theta, dtype=np.float64)
+        theta = np.asarray(theta, dtype=state_dtype())
         if theta.size == 0:
             return
         for (i, j), w in list(self._edges.items()):
@@ -170,10 +172,10 @@ class BandCarriers:
         self.dim = dim
         self.n_bands = n_bands
         phi = (1.0 + np.sqrt(5.0)) / 2.0
-        m = np.arange(dim, dtype=np.float64)
+        m = np.arange(dim, dtype=state_dtype())
         self._freqs = np.array(
             [2.0 * np.pi * (k * phi % 1.0) for k in range(n_bands)],
-            dtype=np.float64,
+            dtype=state_dtype(),
         )
         if n_bands > 0:
             self._carriers = np.array(
