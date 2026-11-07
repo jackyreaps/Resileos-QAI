@@ -17,6 +17,7 @@ import numpy as np
 
 from resileos.ui.framework_gate import gate_candidate
 from resileos.ui.residual_embed import address_triple, embed_frame
+from resileos.ui.core_bridge import core_step_from_address, search_from_field
 
 try:
     from resileos.substrate.oscillator import KuramotoField
@@ -66,10 +67,15 @@ def scale_address(
         backend = "kuramoto"
     triple = address_triple(embed, subject=subject)
     gated = gate_candidate(triple, stored=stored or [], eat_accepted=eat_accepted)
+    field_info = {"backend": backend, "theta": [round(t, 4) for t in theta]}
+    core = core_step_from_address(embed)
+    search = search_from_field(field_info["theta"])
     return {
         "embed": embed,
         "persona": persona,
-        "field": {"backend": backend, "theta": [round(t, 4) for t in theta]},
+        "field": field_info,
+        "core": core,
+        "search": search,
         "triple": triple,
         "gate": gated,
         "scale": "belt/frame/residual",
