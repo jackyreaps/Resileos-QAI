@@ -152,3 +152,9 @@ def extract_interest_signal(user_text: str) -> str | None:
         if needle in t:
             return tag
     return None
+
+def persona_phase(persona: str) -> float:
+    """Stable phase offset for the scale address. Empty persona is 0."""
+    if not persona:
+        return 0.0
+    return (sum(ord(c) for c in persona) % 360) * 3.141592653589793 / 180.0
