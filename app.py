@@ -55,6 +55,8 @@ from pathlib import Path
 import numpy as np
 import torch
 from fastapi import Depends, FastAPI, HTTPException
+from resileos.ui.shared_state import init_shared
+from resileos.ui.query_scale import with_scale
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 from starlette.status import HTTP_403_FORBIDDEN
@@ -107,6 +109,8 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("resileos.api")
 
 app = FastAPI(title="Resileos-QAI")
+# one residual core and one Kuramoto field for the process
+init_shared()
 
 STATE_FILE = ROOT / "titanos_live_state.json"
 SEED_FILE = ROOT / "configs" / "titanos-facts.json"
@@ -900,7 +904,7 @@ def titanos_query(payload: QueryRequest):
                 text = backend.render(ctx)
             out["answer_text"] = text
             out["backend"] = backend.name
-        return out
+        return with_scale(out, payload.subject, payload.relation)
     except Exception as e:
         raise HTTPException(500, str(e))
 
