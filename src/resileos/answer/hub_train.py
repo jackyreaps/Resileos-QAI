@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from resileos.answer.hub_address import address_for_hub_subject
+from resileos.ui.shared_state import step_shared
 from resileos.answer.workbench import Workbench, open_workbench, parse_fact_line
 
 # Minimal workspace seed (no suite physics constants)
@@ -60,6 +61,7 @@ def train_hub(
             seen.append(s)
             addresses.append(address_for_hub_subject(s))
     wb.last_hub_addresses = addresses
+    wb.last_core_step = step_shared()
     return len(batch)
 
 
