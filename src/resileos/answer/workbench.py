@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional
 
+from resileos.answer.hub_address import address_for_hub_subject
 from resileos.answer.backends import (
     AnswerContext,
     list_backends,
@@ -95,6 +96,9 @@ class Workbench:
                 self.titan.learn(s, r, o, update_attractor=False)
                 n += 1
         return n
+
+    def last_addresses(self) -> list:
+        return getattr(self, "_addresses", [])
 
     def ingest_file(self, path: Path) -> int:
         return self.ingest_lines(path.read_text(encoding="utf-8").splitlines())
