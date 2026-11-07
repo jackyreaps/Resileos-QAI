@@ -28,6 +28,8 @@ The loop is deterministic given (search_space, strategy, seed).
 """
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 import itertools
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterable, Iterator, Optional
@@ -233,3 +235,6 @@ class EvolutionLoop:
 
 
 __all__ = ["SubstrateConfig", "EvolutionRecord", "EvolutionLoop"]
+
+def record_scale(record: EvolutionRecord) -> dict:
+    return attach_scale({"reward": getattr(record, "reward", None)}, "evolution")
