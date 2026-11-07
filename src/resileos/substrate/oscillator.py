@@ -37,6 +37,8 @@ from typing import Optional
 
 import numpy as np
 
+from ..state_dtype import state_dtype
+
 
 PHI = (1.0 + np.sqrt(5.0)) / 2.0
 
@@ -52,7 +54,7 @@ def golden_ladder(r: int, omega_base: float = 2.0 * np.pi) -> np.ndarray:
     i, j with |omega_i / omega_j - p/q| < eps. The events are rare and
     slow, not impossible.
     """
-    powers = PHI ** np.arange(r, dtype=np.float64)
+    powers = PHI ** np.arange(r, dtype=state_dtype())
     return np.mod(powers, omega_base)
 
 
@@ -64,7 +66,7 @@ def golden_weyl(r: int, omega_base: float = 2.0 * np.pi) -> np.ndarray:
     the powers. Also incommensurate in the sense that no pair forms a
     rational ratio exactly.
     """
-    i = np.arange(r, dtype=np.float64)
+    i = np.arange(r, dtype=state_dtype())
     frac = np.mod(PHI * i, 1.0)
     return frac * omega_base
 
@@ -91,7 +93,7 @@ def coupling_from_graph(graph) -> np.ndarray:
 
 
 def empty_coupling(r: int) -> np.ndarray:
-    return np.zeros((r, r), dtype=np.float64)
+    return np.zeros((r, r), dtype=state_dtype())
 
 
 # ── Kuramoto field ──────────────────────────────────────────────────────
@@ -157,7 +159,7 @@ class KuramotoField:
             rng = np.random.default_rng(seed)
             self.theta = rng.uniform(-np.pi, np.pi, size=self.r)
         else:
-            self.theta = np.zeros(self.r, dtype=np.float64)
+            self.theta = np.zeros(self.r, dtype=state_dtype())
 
         self._last_epsilon = 0.0
 
@@ -186,13 +188,13 @@ class KuramotoField:
         """
         if theta is None:
             theta = self.theta
-        theta = np.asarray(theta, dtype=np.float64)
+        theta = np.asarray(theta, dtype=state_dtype())
         if theta.shape != (self.r,):
             raise ValueError(
                 f"theta shape {theta.shape} != ({self.r},)")
         if W is None:
             W = empty_coupling(self.r)
-        W = np.asarray(W, dtype=np.float64)
+        W = np.asarray(W, dtype=state_dtype())
         if W.shape != (self.r, self.r):
             raise ValueError(
                 f"W shape {W.shape} != ({self.r}, {self.r})")
@@ -210,7 +212,7 @@ class KuramotoField:
         dt = self.dt if dt is None else float(dt)
         if W is None:
             W = empty_coupling(self.r)
-        W = np.asarray(W, dtype=np.float64)
+        W = np.asarray(W, dtype=state_dtype())
         if W.shape != (self.r, self.r):
             raise ValueError(
                 f"W shape {W.shape} != ({self.r}, {self.r})")
@@ -260,8 +262,8 @@ class KuramotoField:
     def load_state_dict(self, d: dict) -> None:
         if d["r"] != self.r:
             raise ValueError(f"r mismatch: {d['r']} vs {self.r}")
-        self.omega = np.asarray(d["omega"], dtype=np.float64)
-        self.theta = np.asarray(d["theta"], dtype=np.float64)
+        self.omega = np.asarray(d["omega"], dtype=state_dtype())
+        self.theta = np.asarray(d["theta"], dtype=state_dtype())
         self.kappa = float(d.get("kappa", self.kappa))
         self.alpha = float(d.get("alpha", self.alpha))
         self.dt = float(d.get("dt", self.dt))
