@@ -487,6 +487,9 @@ def _run_surface(mode: str) -> None:
                     st.write(d["channel_means"])
 
                 st.bar_chart(histogram_rows(d))
+                from resileos.ui.studio_scale import diagnose_with_scale
+                st.write("Scale")
+                st.json(diagnose_with_scale(img))
                 st.divider()
                 st.subheader("Candidate triples (not facts)")
                 cap = st.text_input("Caption for this photo", key="diag_cap")
