@@ -9,6 +9,7 @@ def test_local_uses_field():
     arr[..., 0] = 200
     out = generate_local(arr, belt=1, frame=2)
     assert out["triple"]["relation"] == "residual_address"
-    assert out["field"]["n"] == 3
+    assert len(out["field"]["theta"]) == 3
     assert out["backend"] in {"kuramoto", "fallback"}
+    assert "gate" in out
     assert out["pattern_shape"] == [32, 32, 3]
