@@ -199,7 +199,7 @@ The driver is `scripts/run_chsh_scan.py`:
     drive field to LOCKED / MIXED / EXPLORING
     report CHSH in each regime
 
-The results document is `docs/300-substrate/entanglement-results.md`.
+Results are not published as a separate file yet. When added, the path will be `docs/300-substrate/entanglement-results.md`.
 It does not exist. It is where the boundary between quantum-shaped
 mathematics and quantum capability would be located, empirically, for
 the specific case of the oscillator field.
