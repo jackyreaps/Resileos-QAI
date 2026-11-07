@@ -1,27 +1,24 @@
 # Contributing
 
-## Frozen vs. open surfaces
+## Layout
 
-- `src/resileos/core/` — frozen. Do not modify without a RES-document proposal.
-- `src/resileos/substrate/` — stable contracts. Changes require review against RES-300–307.
-- `app.py`, `asgi.py`, `ui.py`, `middleware/`, `scripts/`, `Dockerfile` — open for contribution.
+The package lives under `src/resileos/`. Entry points:
 
-## Process
+- `src/resileos/core.py` — core types and helpers (not `core/`)
+- `src/resileos/hierarchy/` — hierarchy package (the sibling `hierarchy.py` is unused)
+- `app.py` — FastAPI surface
 
-1. Open an issue describing the change and the affected RES document.
-2. Submit a PR with tests. `pytest` must pass.
-3. Do not add authentication bypasses or public port bindings.
-
-## Local checks
+## Tests
 
 ```bash
-pip install -e ".[all]"
-pytest
-python scripts/run_fep_sweep.py --simulate
+pip install -e ".[dev]"
+pytest -q
 ```
 
-## Code style
+Auth tests that hit protected routes need either `RESILEOS_API_KEYS` or
+`RESILEOS_AUTH_BYPASS=1`. Without keys the middleware returns 503.
 
-- Python 3.11+, type hints on public functions.
-- Keep the substrate store as a module-level singleton unless you also update RES-320 §6.
-- No new runtime dependencies without discussion in an issue first.
+## Docs
+
+The docs index is `docs/readme.md` (lowercase). GitHub is case-sensitive;
+do not link to `docs/README.md`.
