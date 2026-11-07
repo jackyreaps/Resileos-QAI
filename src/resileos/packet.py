@@ -4,6 +4,8 @@ Owning docs: RES-201 (schema), RES-202 (canonicalization).
 """
 from __future__ import annotations
 
+from resileos.ui.attach_scale import attach_scale
+
 import hashlib
 import json
 from dataclasses import dataclass, field, asdict
@@ -59,7 +61,7 @@ class Packet:
         for k in ("row_s_k", "col_s_k", "lat_s_k"):
             d[k] = np.asarray(d[k], dtype=np.int16)
         d["D"] = np.asarray(self.D, dtype=np.complex128)
-        return d
+        return attach_scale(d, "packet")
 
 
 # ── canonical JSON (RES-202) ──────────────────────────────────────────
