@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from resileos.ui.scale_address import scale_address
+
 
 def explain(query: str, hub_rows: list[Any]) -> dict[str, Any]:
     if hub_rows:
@@ -21,4 +23,5 @@ def explain(query: str, hub_rows: list[Any]) -> dict[str, Any]:
 
 def remember(subject: str, relation: str, obj: str) -> dict[str, str]:
     sub = subject if subject.startswith(("user:", "world:", "org:")) else f"user:{subject}"
-    return {"subject": sub, "relation": relation, "obj": obj}
+    addr = scale_address(subject=sub)
+    return {"subject": sub, "relation": relation, "obj": obj, "scale": addr["embed"]}
