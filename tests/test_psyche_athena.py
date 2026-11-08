@@ -13,7 +13,12 @@ def test_psyche_frame_stack():
     assert any(r["relation"] == "frame" and r["obj"] == "atlas" for r in rows)
 
 
-def test_drives_from_materials():
+def test_art_and_image_same_path():
+    from resileos.kin.perceive_into import perceive_into
+    p = Psyche("world:art")
+    perceive_into(p, {"address": {"belt": 1, "residual_bin": "low_high"}, "mean_luma": 0.6})
+    assert p.state["drives"]["endocrine"] == 0.6
+    assert p.state["belt"] == 1
     p = Psyche("user:ada")
     p.set_drives({"endocrine": 0.8, "pineal": 0.2})
     rows = p.hub_rows()
