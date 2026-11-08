@@ -1,41 +1,41 @@
-# Guild board completion and merit
+# Guild merit and credit
 
-A solved board item in Resileos is a merit candidate for the guild-system.
+## Merit
 
-## Flow
+A permanent, non-transferable, non-purchasable record of verified contribution.
+It is the metric for recognition and governance. It is not spent.
 
-1. A board item is created with `guild_board(guild_id, title)`.
-2. Work is done on the worker (files, tests, Lean, shell).
-3. `complete_and_credit(guild_id, member, title, evidence=...)` returns:
-   - a board triple on `guild:<id>`
-   - a merit candidate with `relation: "merit"` and an attestation block
-
-## Attestation shape
-
-The candidate matches the guild-system attestation closely enough to learn into a guild hub:
-
-| Field | Source |
+| Field | Value |
 |-------|--------|
-| issuer_guild | guild_id |
-| issuer_moniker | member |
-| artifact_ref | title |
-| verification_evidence | evidence string |
-| score | integer |
-| status | candidate |
+| Lives on | `guild:<id>` relation `merit` |
+| Transferable | No |
+| Purchasable | No |
+| Signed | By the guild process |
 
-Signature and public key stay with the guild process. Resileos does not sign.
+## Credit
 
-## Learn into the hub
+A variable internal accounting unit. It is used to access shared compute, tools, material resources, and education. It is not convertible to fiat. Protocol endpoints `/convert`, `/redeem`, and `/transfer` are prohibited (RS-INF-002 §7.2, Compact Article II).
 
-```text
-subject: guild:<id>
-relation: merit
-obj: <member>:<artifact>
-```
+| Field | Value |
+|-------|--------|
+| Lives on | `user:<member>` relation `credit_earn` / `credit_spend` |
+| Used for | Compute, tools, materials, education |
+| Convertible to fiat | No |
+| Protocol transfer | Prohibited |
+| Mutual credit | Exists as a facility among members, guild as clearinghouse |
 
-That triple is the credit on the board.
+## Free tier and earned use
 
-## Cross-reference
+A free tier exists. Credits add more. Work on a board or on the engine earns credits. Use burns them. The free tier is not removed.
 
-- Resileos: `src/resileos/ui/worker_tools.py` (`complete_and_credit`, `record_merit`)
-- guild-system: `schemas/attestation.v1.json`, `matrices/GS-MTX-003`, `matrices/GS-MTX-004`
+## Both issued on board completion
+
+`complete_and_credit` emits a merit candidate and a credit earn. They are not the same record.
+
+## References
+
+- Compact: GS-FND-002 Article II, definitions of Merit and Credits
+- Credit exposure: GS-MTX-005
+- Mutual credit: GS-OPS-009
+- Attestation schema: schemas/attestation.v1.json
+- Resileos: `src/resileos/ui/credits.py`, `src/resileos/ui/worker_tools.py`
