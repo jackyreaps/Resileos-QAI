@@ -316,8 +316,9 @@ _SAFE = {
     "search_repo": search_repo, "run_tests": run_tests, "lean_check": lean_check,
     "web_search": web_search, "fetch_url": fetch_url, "apply_diff": apply_diff,
     "git_status": git_status, "git_diff": git_diff, "git_commit": git_commit,
-    "guild_board": guild_board, "guild_assign": guild_assign, "run_next": run_next,
-    "advance": advance,
+    "guild_board": guild_board, "guild_assign": guild_assign,
+    "record_merit": record_merit, "complete_and_credit": complete_and_credit,
+    "run_next": run_next, "advance": advance,
     "run_shell": run_shell, "diagnostics": diagnostics, "edit_files": edit_files,
 }
 
