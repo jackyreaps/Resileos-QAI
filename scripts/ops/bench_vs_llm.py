@@ -77,18 +77,19 @@ def main() -> int:
     def query(s, r):
         return store.get((s, r))
 
-    # Prefer live Titanos if importable
+    # Prefer live Titanos if importable. Titanos() requires a config.
     try:
-        from titanos import Titanos  # type: ignore
+        from titanos import Titanos, TitanosConfig  # type: ignore
 
-        t = Titanos()
+        t = Titanos(TitanosConfig())
         def learn(s, r, o):
             t.learn(s, r, o)
 
         def query(s, r):
-            return t.ask(s, r)
-    except Exception:
-        pass
+            ans = t.ask(s, r)
+            return getattr(ans, "value", ans)
+    except Exception as exc:
+        print(f"bench: Titanos unavailable ({exc}); using dict stub")
 
     resileos = run_store_bench(learn, query)
     llm = {
