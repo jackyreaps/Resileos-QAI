@@ -28,6 +28,7 @@ Integration (leCore capability router):
 
 Kin cycle (registered by wire_kin):
     /api/v1/kin/*                    (Iris, Metis, Hermes, KinBundle)
+    /api/v1/apollo                   (Apollo improve cycle)
     /api/v1/eat/*                    (Eat filter, learn functions)
 
 Auth (fail-closed): key sources, merged:
