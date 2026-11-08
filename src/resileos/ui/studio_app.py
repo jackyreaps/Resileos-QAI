@@ -484,6 +484,14 @@ def _run_surface(mode: str) -> None:
         st.subheader("Make a world")
         prompt = st.text_input("What should it look like", key="make_prompt")
         world = st.text_input("World", value="world:mine", key="make_world")
+        if st.button("Make art", key="make_art_btn") and prompt:
+            from resileos.ui.make_world import make_art
+            art = make_art(prompt, world_id=world)
+            st.json({"art": art.get("art"), "kept": art.get("kept"), "facts": art.get("facts")})
+        if st.button("Make recesses", key="make_rec_btn") and prompt:
+            from resileos.ui.make_world import make_recess_sequence
+            seq = make_recess_sequence(prompt, world_id=world)
+            st.json({"recesses": len(seq["recesses"]), "rows": seq["rows"]})
         if st.button("Make still", key="make_btn") and prompt:
             from resileos.ui.make_world import make_still
             out = make_still(prompt, world_id=world)
