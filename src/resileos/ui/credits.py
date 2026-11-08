@@ -55,8 +55,11 @@ class CreditLedger:
         return {"ok": True, **row}
 
     def transfer(self, src: str, dst: str, amount: int) -> dict[str, Any]:
-        """Prohibited. Credits do not move between members."""
-        return {"ok": False, "error": "credits are not transferable", "closed_loop": True}
+        """Protocol transfer is prohibited (RS-INF-002 §7.2).
+
+        Mutual credit is a separate facility, not a free move of balance.
+        """
+        return {"ok": False, "error": "protocol transfer prohibited", "closed_loop": True}
 
     def log(self, member: str | None = None) -> list[dict[str, Any]]:
         if member is None:
