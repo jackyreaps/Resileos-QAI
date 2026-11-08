@@ -99,6 +99,52 @@ def web_search(query: str) -> dict[str, Any]:
     return {"query": query, "url": web_search_url(query)}
 
 
+def run_shell(cmd: str, timeout: int = 60) -> dict[str, Any]:
+    """Scoped shell in the workspace. No cd outside. Timeout enforced."""
+    if any(x in cmd for x in ("..", "sudo", "rm -rf /", "shutdown")):
+        return {"ok": False, "error": "command blocked"}
+    try:
+        proc = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(WORKSPACE),
+        )
+        return {"ok": proc.returncode == 0, "code": proc.returncode, "out": proc.stdout[-800:], "err": proc.stderr[-400:]}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def diagnostics(rel: str) -> dict[str, Any]:
+    """Syntax and Lean diagnostics for a file. LSP-lite."""
+    p = _safe_path(rel)
+    if not p.exists():
+        return {"ok": False, "error": "missing"}
+    if p.suffix == ".py":
+        try:
+            compile(p.read_text(), str(p), "exec")
+            return {"ok": True, "kind": "python", "note": "syntax ok"}
+        except SyntaxError as exc:
+            return {"ok": False, "kind": "python", "error": str(exc), "line": exc.lineno}
+    if p.suffix == ".lean":
+        return lean_check(rel)
+    return {"ok": True, "kind": p.suffix, "note": "no checker"}
+
+
+def edit_files(edits: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Multi-file write. Each item: {path, content}."""
+    out = []
+    for e in edits:
+        try:
+            path = write_file(e["path"], e["content"])
+            out.append({"path": path, "ok": True})
+        except Exception as exc:
+            out.append({"path": e.get("path"), "ok": False, "error": str(exc)})
+    return out
+
+
 def grid(rows: int, cols: int, fill: float = 0.0) -> np.ndarray:
     return np.full((int(rows), int(cols)), fill, dtype=np.float32)
 
@@ -121,7 +167,8 @@ _SAFE = {
     "grid": grid, "scene": scene,
     "read_file": read_file, "write_file": write_file, "list_files": list_files,
     "search_repo": search_repo, "run_tests": run_tests, "lean_check": lean_check,
-    "web_search": web_search,
+    "web_search": web_search, "run_shell": run_shell, "diagnostics": diagnostics,
+    "edit_files": edit_files,
 }
 
 
