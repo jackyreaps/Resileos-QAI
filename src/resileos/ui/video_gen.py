@@ -8,6 +8,8 @@ hook the Studio can call when a provider is set.
 """
 from __future__ import annotations
 
+from resileos.ui.scale_address import scale_address
+
 import os
 from typing import Any, Optional
 
@@ -36,3 +38,7 @@ def request_video(prompt: str, *, provider_fn: Optional[Any] = None) -> dict[str
         return {"status": "provider_set_but_no_fn", "prompt": prompt, "url": None}
     result = provider_fn(prompt)
     return {"status": "submitted", "prompt": prompt, "result": result}
+
+def video_address(prompt: str, world_id: str = "world:video") -> dict:
+    addr = scale_address(subject=world_id)
+    return {"prompt": prompt, "world_id": world_id, "address": addr["embed"]}
