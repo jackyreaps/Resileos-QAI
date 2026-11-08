@@ -371,6 +371,17 @@ def _run_surface(mode: str) -> None:
                     st.image(image_url, use_container_width=True)
 
     with tab_search:
+        st.subheader("Find")
+        qfind = st.text_input("Find something", key="find_q")
+        if st.button("Look up", key="find_btn") and qfind:
+            from resileos.ui.search_flow import search
+            from resileos.ui.explain_remember import explain
+            out = search(qfind)
+            st.write(explain(qfind, out["hub"])["text"])
+            st.markdown(f"[Web results]({out['web_url']})")
+            if out["offer_save"]:
+                st.caption("Not in your hub. Save it after you read it.")
+        st.divider()
         st.subheader("Search the store")
         mode = st.radio("Mode", ["Answer", "Triple", "SPARQL", "Chain"], horizontal=True)
         left, right = st.columns([3, 2])
