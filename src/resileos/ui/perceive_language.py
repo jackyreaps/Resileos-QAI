@@ -6,6 +6,8 @@ It is the surface that lets text enter the hub like image and audio.
 """
 from __future__ import annotations
 
+from typing import Any, Optional
+
 from typing import Any
 
 import numpy as np
@@ -37,3 +39,9 @@ def perceive_language(text: str, *, subject: str = "text") -> dict[str, Any]:
         "gate": addr["gate"],
         "note": "perception only; not a translation",
     }
+
+def into_kin(perceived: dict, psyche=None):
+    """Send this perception into Psyche and Athena."""
+    from resileos.kin.psyche import Psyche
+    from resileos.kin.wire_perception import wire_perception
+    return wire_perception(psyche or Psyche(), perceived)
