@@ -16,7 +16,18 @@ def test_scene_and_math():
     assert run_worker("math.sqrt(4)")["result"] == 2
 
 
-def test_shell_blocked():
+def test_merit_on_complete():
+    from resileos.ui.worker_tools import complete_and_credit
+    out = complete_and_credit("builders", "ada", "fix gate", evidence="tests passed")
+    assert out["merit"]["relation"] == "merit"
+    assert out["merit"]["attestation"]["status"] == "candidate"
+    from resileos.ui.worker_tools import guild_board, run_next, board
+    from resileos.ui.offline_tasks import queue_worker
+    item = guild_board("builders", "fix gate")
+    assert item["subject"] == "guild:builders"
+    board.add(queue_worker("1+1"))
+    out = run_next()
+    assert out["result"]["ok"] is True
     from resileos.ui.worker_tools import run_shell
     out = run_shell("rm -rf /")
     assert out["ok"] is False
