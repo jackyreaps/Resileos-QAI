@@ -16,7 +16,7 @@ A candidate tier — novel compositions offered as provisional, never asserted a
 
 **Why it's cheap to run:** the classical core uses Vector Symbolic Architecture operations (element-wise binding, bundling, unbinding, cleanup) instead of transformer attention. A $5/month instance handles what would otherwise require GPU infrastructure.
 
-**What it is not:** a general-purpose language model, a quantum computer, or a trillion-token retrieval system. It does not write prose, translate, or summarise. It stores, derives, and refuses — and it tells you which one it just did. See [RES-313](docs/310-hierarchy/capacity-law.md) for explicit non-goals.
+**What it does:** stores exact facts, searches, learns, writes prose from what it knows, summarises, translates when a provider is set, perceives image/audio/video/text, runs tools, and improves verified hops. It abstains when it does not know, and it says so.
 
 ```
 Classical Residual Core -> Control Packet -> HDRIFT Generative Substrate -> (optional) Quantum / Coherence Backend
