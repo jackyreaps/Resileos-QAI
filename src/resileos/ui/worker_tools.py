@@ -217,6 +217,16 @@ def run_next() -> dict[str, Any]:
         result = {"ok": False, "error": f"unknown kind {kind}"}
     board.complete(task["id"], result)
     return {"task": task["id"], "result": result}
+
+
+def advance(steps: int = 3) -> list[dict[str, Any]]:
+    """Run the next open tasks in order. This is the advance loop."""
+    out = []
+    for _ in range(max(1, steps)):
+        if not board.open():
+            break
+        out.append(run_next())
+    return out
     """Take the next queued task and run it."""
     open_tasks = board.open()
     if not open_tasks:
@@ -305,6 +315,7 @@ _SAFE = {
     "web_search": web_search, "fetch_url": fetch_url, "apply_diff": apply_diff,
     "git_status": git_status, "git_diff": git_diff, "git_commit": git_commit,
     "guild_board": guild_board, "guild_assign": guild_assign, "run_next": run_next,
+    "advance": advance,
     "run_shell": run_shell, "diagnostics": diagnostics, "edit_files": edit_files,
 }
 
