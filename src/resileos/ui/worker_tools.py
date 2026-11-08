@@ -99,6 +99,141 @@ def web_search(query: str) -> dict[str, Any]:
     return {"query": query, "url": web_search_url(query)}
 
 
+def fetch_url(url: str, timeout: int = 20) -> dict[str, Any]:
+    """Fetch a page and return text. Search is no longer only a link."""
+    from urllib.request import urlopen
+    try:
+        with urlopen(url, timeout=timeout) as resp:
+            raw = resp.read(200_000)
+        text = raw.decode("utf-8", errors="ignore")
+        return {"ok": True, "url": url, "text": text[:4000]}
+    except Exception as exc:
+        return {"ok": False, "url": url, "error": str(exc)}
+
+
+def apply_diff(rel: str, old: str, new: str) -> dict[str, Any]:
+    """Replace one occurrence of old with new in a workspace file."""
+    p = _safe_path(rel)
+    if not p.exists():
+        return {"ok": False, "error": "missing"}
+    text = p.read_text()
+    if old not in text:
+        return {"ok": False, "error": "old text not found"}
+    p.write_text(text.replace(old, new, 1))
+    return {"ok": True, "path": str(p)}
+
+
+def git_status() -> dict[str, Any]:
+    return run_shell("git status --short")
+
+
+def git_diff() -> dict[str, Any]:
+    return run_shell("git diff")
+
+
+def git_commit(message: str) -> dict[str, Any]:
+    if not message.strip():
+        return {"ok": False, "error": "empty message"}
+    add = run_shell("git add -A")
+    if not add.get("ok"):
+        return add
+    return run_shell(f'git commit -m "{message}"')
+
+
+def guild_board(guild_id: str, title: str, body: str = "") -> dict[str, Any]:
+    """A board item under a guild hub namespace."""
+    return {
+        "subject": f"guild:{guild_id}",
+        "relation": "board",
+        "obj": title,
+        "body": body,
+        "status": "open",
+    }
+
+
+def guild_assign(guild_id: str, title: str, member: str) -> dict[str, Any]:
+    """Assign a board item to a member."""
+    return {
+        "subject": f"guild:{guild_id}",
+        "relation": "assigned",
+        "obj": f"{title} -> {member}",
+    }
+
+
+def record_merit(
+    guild_id: str,
+    member: str,
+    artifact: str,
+    *,
+    evidence: str = "",
+    score: int = 1,
+) -> dict[str, Any]:
+    """A completed board task as a merit candidate.
+
+    Matches the guild-system attestation shape closely enough to learn
+    into a guild hub. Signature and key stay with the guild process.
+    """
+    return {
+        "subject": f"guild:{guild_id}",
+        "relation": "merit",
+        "obj": f"{member}:{artifact}",
+        "attestation": {
+            "issuer_guild": guild_id,
+            "issuer_moniker": member,
+            "artifact_ref": artifact,
+            "verification_evidence": evidence,
+            "score": int(score),
+            "status": "candidate",
+        },
+    }
+
+
+def complete_and_credit(
+    guild_id: str,
+    member: str,
+    title: str,
+    *,
+    evidence: str = "",
+) -> dict[str, Any]:
+    """Finish a board item and emit a merit candidate."""
+    board_item = guild_board(guild_id, title)
+    merit = record_merit(guild_id, member, title, evidence=evidence)
+    return {"board": board_item, "merit": merit}
+
+
+def run_next() -> dict[str, Any]:
+    """Take the next queued task and run it."""
+    open_tasks = board.open()
+    if not open_tasks:
+        return {"ok": False, "note": "no open tasks"}
+    task = open_tasks[0]
+    kind = task.get("kind")
+    payload = task.get("payload", {})
+    if kind == "worker":
+        result = run_worker(payload.get("code", ""))
+    elif kind == "learn":
+        result = {"ok": True, "facts": payload.get("facts", []), "note": "queued for hub learn"}
+    else:
+        result = {"ok": False, "error": f"unknown kind {kind}"}
+    board.complete(task["id"], result)
+    return {"task": task["id"], "result": result}
+    """Take the next queued task and run it."""
+    open_tasks = board.open()
+    if not open_tasks:
+        return {"ok": False, "note": "no open tasks"}
+    task = open_tasks[0]
+    kind = task.get("kind")
+    payload = task.get("payload", {})
+    if kind == "worker":
+        result = run_worker(payload.get("code", ""))
+    elif kind == "learn":
+        result = {"ok": True, "facts": payload.get("facts", []), "note": "queued for hub learn"}
+    else:
+        result = {"ok": False, "error": f"unknown kind {kind}"}
+    board.complete(task["id"], result)
+    return {"task": task["id"], "result": result}
+
+
 def run_shell(cmd: str, timeout: int = 60) -> dict[str, Any]:
     """Scoped shell in the workspace. No cd outside. Timeout enforced."""
     if any(x in cmd for x in ("..", "sudo", "rm -rf /", "shutdown")):
@@ -167,8 +302,10 @@ _SAFE = {
     "grid": grid, "scene": scene,
     "read_file": read_file, "write_file": write_file, "list_files": list_files,
     "search_repo": search_repo, "run_tests": run_tests, "lean_check": lean_check,
-    "web_search": web_search, "run_shell": run_shell, "diagnostics": diagnostics,
-    "edit_files": edit_files,
+    "web_search": web_search, "fetch_url": fetch_url, "apply_diff": apply_diff,
+    "git_status": git_status, "git_diff": git_diff, "git_commit": git_commit,
+    "guild_board": guild_board, "guild_assign": guild_assign, "run_next": run_next,
+    "run_shell": run_shell, "diagnostics": diagnostics, "edit_files": edit_files,
 }
 
 
