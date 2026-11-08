@@ -16,7 +16,10 @@ def test_scene_and_math():
     assert run_worker("math.sqrt(4)")["result"] == 2
 
 
-def test_web_search_url():
+def test_shell_blocked():
+    from resileos.ui.worker_tools import run_shell
+    out = run_shell("rm -rf /")
+    assert out["ok"] is False
     from resileos.ui.worker_tools import web_search
     out = web_search("lean theorem prover")
     assert "duckduckgo" in out["url"]
