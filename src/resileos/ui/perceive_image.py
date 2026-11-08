@@ -5,6 +5,8 @@ so a perceived image can enter the hub and the Apollo path.
 """
 from __future__ import annotations
 
+from typing import Any, Optional
+
 from typing import Any
 
 import numpy as np
@@ -28,3 +30,9 @@ def perceive_image(arr: np.ndarray, *, subject: str = "image") -> dict[str, Any]
         "mean_luma": diag.get("mean_luma"),
         "edge_density": diag.get("edge_density"),
     }
+
+def into_kin(perceived: dict, psyche=None):
+    """Send this perception into Psyche and Athena."""
+    from resileos.kin.psyche import Psyche
+    from resileos.kin.wire_perception import wire_perception
+    return wire_perception(psyche or Psyche(), perceived)
