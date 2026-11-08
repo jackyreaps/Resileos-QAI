@@ -5,6 +5,8 @@ so a perceived sound can enter the hub and the Apollo path.
 """
 from __future__ import annotations
 
+from typing import Any, Optional
+
 from typing import Any
 
 import numpy as np
@@ -44,3 +46,9 @@ def perceive_audio(
         "address": addr["embed"],
         "gate": addr["gate"],
     }
+
+def into_kin(perceived: dict, psyche=None):
+    """Send this perception into Psyche and Athena."""
+    from resileos.kin.psyche import Psyche
+    from resileos.kin.wire_perception import wire_perception
+    return wire_perception(psyche or Psyche(), perceived)
