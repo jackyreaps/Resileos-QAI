@@ -1,6 +1,8 @@
 """Hermes — context navigator. Layers context under a depth budget."""
 from __future__ import annotations
 
+from resileos.ui.recursive_improve import recursive_step
+
 from resileos.ui.attach_scale import attach_scale
 
 from dataclasses import asdict, dataclass, field
@@ -52,3 +54,7 @@ def make_hermes_navigator(*, max_depth: int = 2, max_items: int = 8):
         return None
 
     return navigate, handler
+
+def hermes_recursive(facts: list, subject: str = "world:kin") -> dict:
+    """Run one recursive improve step from this kin."""
+    return recursive_step(facts, subject=subject)
