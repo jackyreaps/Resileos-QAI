@@ -5,6 +5,8 @@ and attaches the scale address so a clip can enter the hub.
 """
 from __future__ import annotations
 
+from typing import Any, Optional
+
 from typing import Any
 
 import numpy as np
@@ -51,3 +53,9 @@ def perceive_video(
         "gate": addr["gate"],
         "sample_diagnostics": diags[:2],
     }
+
+def into_kin(perceived: dict, psyche=None):
+    """Send this perception into Psyche and Athena."""
+    from resileos.kin.psyche import Psyche
+    from resileos.kin.wire_perception import wire_perception
+    return wire_perception(psyche or Psyche(), perceived)
