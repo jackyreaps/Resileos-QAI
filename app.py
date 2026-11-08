@@ -762,6 +762,14 @@ def titanos_query(payload: QueryRequest):
         fallthrough, full recurrent path.
     """
     try:
+        from resileos.ui.query_gate import gate_query
+        member = getattr(payload, "member", None) or "anon"
+        used = int(getattr(payload, "used_free", 0) or 0)
+        decision = gate_query(member, used_free=used)
+        if not decision.get("ok"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=402, detail="credit required")
+
         # Sector from gate encoder (routing label only).
         sector = ""
         g = None
