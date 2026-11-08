@@ -5,6 +5,8 @@ eat gate. A later encoder can replace the body; the interface stays.
 """
 from __future__ import annotations
 
+from typing import Any, Optional
+
 from typing import Any
 
 from resileos.kin.apollo import apollo_cycle
@@ -25,3 +27,9 @@ def encode_art(title: str, description: str, *, world_id: str = "world:art") -> 
     facts = [{"subject": world_id, "relation": "art", "obj": f"{title}: {description[:80]}"}]
     out = apollo_cycle(facts, subject=world_id, art=True)
     return {"kind": "art", "title": title, "address": addr["embed"], "apollo": out}
+
+def into_kin(perceived: dict, psyche=None):
+    """Send this perception into Psyche and Athena."""
+    from resileos.kin.psyche import Psyche
+    from resileos.kin.wire_perception import wire_perception
+    return wire_perception(psyche or Psyche(), perceived)
