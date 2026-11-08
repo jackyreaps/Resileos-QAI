@@ -13,6 +13,9 @@ Pairs with seed.record_learn when accepted.
 """
 from __future__ import annotations
 
+from resileos.ui.recursive_improve import recursive_step
+from resileos.ui.video_codex import recess_from_codex
+
 from resileos.ui.scale_address import scale_address
 
 import re
@@ -211,3 +214,12 @@ def eat_and_learn(
         except Exception:
             pass
     return decision
+
+def eat_recursive(facts: list, subject: str = "world:kin") -> dict:
+    """Run one recursive improve step from this kin."""
+    return recursive_step(facts, subject=subject)
+
+def eat_video_codex(codex: str, world_id: str = "world:video") -> dict:
+    """Compress a codex into recesses and gate the first one."""
+    seq = recess_from_codex(codex, world_id=world_id, n_frames=1)
+    return {"recesses": seq["recesses"], "rows": seq["rows"]}
