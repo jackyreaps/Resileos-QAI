@@ -17,6 +17,8 @@ from typing import Iterable, Optional
 from resileos.answer.hub_address import address_for_hub_subject
 from resileos.ui.shared_state import step_shared
 from resileos.ui.recursive_improve import recursive_step
+from resileos.ui.success_improve import improve_cycle
+from resileos.kin.apollo import apollo_cycle
 from resileos.answer.workbench import Workbench, open_workbench, parse_fact_line
 
 # Minimal workspace seed (no suite physics constants)
@@ -66,6 +68,8 @@ def train_hub(
     # recursive refine on the batch just trained
     facts = [{"subject": s, "relation": r, "obj": o} for s, r, o in batch]
     wb.last_recursive = recursive_step(facts, subject=batch[0][0] if batch else "world:improve")
+    wb.last_improve = improve_cycle(facts, subject=batch[0][0] if batch else "world:improve")
+    wb.last_apollo = apollo_cycle(facts, subject=batch[0][0] if batch else "world:apollo")
     return len(batch)
 
 
