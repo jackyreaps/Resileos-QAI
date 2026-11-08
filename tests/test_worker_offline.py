@@ -16,7 +16,14 @@ def test_scene_and_math():
     assert run_worker("math.sqrt(4)")["result"] == 2
 
 
-def test_merit_on_complete():
+def test_advance_runs_queue():
+    from resileos.ui.worker_tools import advance, board
+    from resileos.ui.offline_tasks import queue_worker
+    board.add(queue_worker("1+1"))
+    board.add(queue_worker("2+2"))
+    out = advance(steps=2)
+    assert len(out) == 2
+    assert all(x["result"]["ok"] for x in out)
     from resileos.ui.worker_tools import complete_and_credit
     out = complete_and_credit("builders", "ada", "fix gate", evidence="tests passed")
     assert out["merit"]["relation"] == "merit"
