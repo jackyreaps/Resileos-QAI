@@ -70,3 +70,13 @@ def continue_from(address: dict[str, Any], prompt: str, *, world_id: str = "worl
     belt = int(address.get("belt", 0))
     frame = int(address.get("frame", 0)) + 1
     return make_still(prompt, world_id=world_id, belt=belt, frame=frame)
+
+def make_recess_sequence(prompt: str, *, world_id: str = "world:default", n_frames: int = 4) -> dict:
+    from resileos.ui.video_codex import recess_from_codex
+    return recess_from_codex(prompt, world_id=world_id, n_frames=n_frames)
+
+def make_art(prompt: str, *, world_id: str = "world:art") -> dict:
+    """Music or poetry path. Does not require the pure-truth gate."""
+    from resileos.kin.apollo import apollo_cycle
+    facts = [{"subject": world_id, "relation": "verse", "obj": prompt[:120]}]
+    return apollo_cycle(facts, subject=world_id, art=True)
