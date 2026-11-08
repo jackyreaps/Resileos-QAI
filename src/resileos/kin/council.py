@@ -6,6 +6,8 @@ Does not invent values. Conflicts are surfaced (dim.conflict).
 """
 from __future__ import annotations
 
+from resileos.ui.recursive_improve import recursive_step
+
 from resileos.ui.scale_address import scale_address
 
 from dataclasses import asdict, dataclass, field
@@ -192,3 +194,7 @@ def council_with_address(result, subject: str = "") -> dict:
     base = result.to_dict() if hasattr(result, "to_dict") else {"result": str(result)}
     base["scale"] = {"address": addr["embed"], "gate": addr["gate"]}
     return base
+
+def council_recursive(facts: list, subject: str = "world:kin") -> dict:
+    """Run one recursive improve step from this kin."""
+    return recursive_step(facts, subject=subject)
