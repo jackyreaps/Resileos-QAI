@@ -572,6 +572,24 @@ def _run_surface(mode: str) -> None:
                 from resileos.ui.perceive_image import perceive_image
                 st.json(perceive_image(np.array(Image.open(up).convert("RGB")), subject="upload"))
 
+
+        st.divider()
+        st.markdown("**Worker and offline**")
+        code = st.text_input("Numpy or Python expression", key="worker_code", placeholder="np.arange(4).sum()")
+        if st.button("Run and record", key="worker_rec") and code:
+            from resileos.ui.worker_tools import worker_with_task
+            st.json(worker_with_task(code))
+        if st.button("Run worker", key="worker_btn") and code:
+            from resileos.ui.worker_tools import run_worker
+            st.json(run_worker(code))
+        facts = st.text_input("Offline learn (subject relation object)", key="off_fact", placeholder="world:demo status ok")
+        if st.button("Queue learn", key="off_btn") and facts:
+            from resileos.ui.offline_tasks import queue_learn
+            parts = facts.split()
+            row = {"subject": parts[0], "relation": parts[1] if len(parts)>1 else "status", "obj": " ".join(parts[2:]) if len(parts)>2 else ""}
+            st.json(queue_learn([row], note="queued from Studio"))
+        st.caption("Council is the multi-agent surface. It runs under the kin cycle, not as a button.")
+
     with tab_diag:
         st.subheader("Photo diagnostics")
         st.caption("Inspection figures for work photos. Not medical or forensic claims.")
