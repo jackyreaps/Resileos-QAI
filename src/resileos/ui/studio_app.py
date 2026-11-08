@@ -308,7 +308,7 @@ def _run_surface(mode: str) -> None:
             sc, sb = api_post("/learn_batch", key, {"facts": demo})
             st.success(str(sb)) if sc == 200 else st.error(f"{sc}: {sb}")
 
-    tab_chat, tab_search, tab_media, tab_make, tab_lang, tab_diag, tab_help = st.tabs(["Chat", "Search", "Media", "Make", "Language", "Diagnostics", "Help"])
+    tab_chat, tab_search, tab_media, tab_make, tab_lang, tab_tools, tab_diag, tab_help = st.tabs(["Chat", "Search", "Media", "Make", "Language", "Tools", "Diagnostics", "Help"])
 
     with tab_chat:
         for msg in st.session_state.messages:
@@ -544,6 +544,33 @@ def _run_surface(mode: str) -> None:
                 from resileos.ui.perceive_video import perceive_video
                 frames = [np.array(Image.open(f).convert("RGB")) for f in up_v]
                 st.json(perceive_video(np.stack(frames)))
+
+
+    with tab_tools:
+        st.subheader("Tools")
+        st.caption("One place for the modules. Results show as JSON.")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**Art and music**")
+            fact = st.text_input("Title or line", key="tool_fact", placeholder="dawn over the field")
+            if st.button("Encode art", key="tool_art") and fact:
+                from resileos.ui.art_encoders import encode_art
+                st.json(encode_art(fact[:40], fact))
+            if st.button("Encode music", key="tool_music") and fact:
+                from resileos.ui.art_encoders import encode_music
+                st.json(encode_music(fact[:40], fact))
+        with col_b:
+            st.markdown("**Perceive**")
+            txt = st.text_area("Text to perceive", key="tool_perc_text", height=80)
+            if st.button("Perceive language", key="tool_perc_lang") and txt:
+                from resileos.ui.perceive_language import perceive_language
+                st.json(perceive_language(txt))
+            up = st.file_uploader("Image", type=["png", "jpg"], key="tool_img")
+            if st.button("Perceive image", key="tool_perc_img") and up is not None:
+                import numpy as np
+                from PIL import Image
+                from resileos.ui.perceive_image import perceive_image
+                st.json(perceive_image(np.array(Image.open(up).convert("RGB")), subject="upload"))
 
     with tab_diag:
         st.subheader("Photo diagnostics")
