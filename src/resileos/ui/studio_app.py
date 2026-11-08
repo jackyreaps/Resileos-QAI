@@ -505,6 +505,31 @@ def _run_surface(mode: str) -> None:
 
 
     with tab_lang:
+        st.subheader("Cycle")
+        st.caption("Search, fact-check, learn, and speak for a user, world, or guild.")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            kind = st.selectbox("Namespace", ["user", "world", "guild"], key="cyc_kind")
+        with c2:
+            name = st.text_input("Name", value="ada", key="cyc_name")
+        with c3:
+            relation = st.text_input("Relation", value="domain", key="cyc_rel")
+        obj = st.text_input("Learn object (optional)", key="cyc_obj")
+        claimed = st.text_input("Fact-check claim (optional)", key="cyc_claim")
+        if st.button("Run cycle", key="cyc_btn"):
+            from resileos.ui.language_codex import cycle
+            store = st.session_state.setdefault("cyc_store", {})
+            def q(s, r):
+                return store.get((s, r))
+            def learn(s, r, o):
+                store[(s, r)] = o
+            out = cycle(
+                q, learn,
+                kind=kind, name=name, relation=relation,
+                obj=obj or None, claimed=claimed or None,
+            )
+            st.json(out)
+
         st.subheader("Language")
         st.caption("Native is stored. Translate is a surface. Multilingual is the default path.")
         txt = st.text_area("Text", key="lang_text", height=100)
