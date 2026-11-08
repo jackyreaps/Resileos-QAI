@@ -7,6 +7,8 @@ If not, look up and offer to save.
 from __future__ import annotations
 
 from typing import Any, Callable, Optional
+
+from resileos.ui.scale_address import scale_address
 from urllib.parse import quote_plus
 
 
@@ -34,10 +36,12 @@ def search(
     hub_rows: list[Any] = []
     if ask is not None and subject:
         hub_rows = search_hub(ask, subject, relation)
+    addr = scale_address(subject=subject or query[:40])
     return {
         "query": query,
         "hub": hub_rows,
         "hub_hit": bool(hub_rows),
         "web_url": web_search_url(query),
         "offer_save": not hub_rows,
+        "scale": {"address": addr["embed"], "gate": addr["gate"]},
     }
