@@ -198,7 +198,9 @@ def complete_and_credit(
     """Finish a board item and emit a merit candidate."""
     board_item = guild_board(guild_id, title)
     merit = record_merit(guild_id, member, title, evidence=evidence)
-    return {"board": board_item, "merit": merit}
+    from resileos.ui.credits import earn_for_work
+    credit = earn_for_work(member, title, amount=1)
+    return {"board": board_item, "merit": merit, "credit": credit}
 
 
 def run_next() -> dict[str, Any]:
