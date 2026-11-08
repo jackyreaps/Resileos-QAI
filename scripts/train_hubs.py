@@ -28,6 +28,9 @@ def _print_addresses(wb) -> None:
     addrs = getattr(wb, "last_hub_addresses", None)
     if addrs:
         print(json.dumps({"addresses": addrs}, indent=2))
+    apollo = getattr(wb, "last_apollo", None)
+    if apollo:
+        print(json.dumps({"apollo": {"kept": apollo.get("kept"), "lifts": apollo.get("lifts")}}, indent=2))
 
 def main() -> int:
     ap = argparse.ArgumentParser()
