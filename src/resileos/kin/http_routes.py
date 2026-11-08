@@ -159,3 +159,87 @@ def register_kin_routes(
         gated = [gate_candidate(t, stored=[], eat_accepted=False) for t in triples]
         return {"features": features, "candidates": gated, "note": "Not facts until eat accepts and learn is called."}
 
+    class WorkbenchRequest(BaseModel):
+        text: str
+        subject: str = "work"
+        persona: str = ""
+
+    @app.post("/api/v1/workbench", dependencies=deps)
+    def api_workbench(body: WorkbenchRequest) -> dict:
+        from resileos.ui.workbench import formalize
+        from resileos.kin.eat import eat_filter
+        titan = get_titanos()
+
+        def eat(claim):
+            return eat_filter(claim)
+
+        def learn(s, r, o):
+            fn = getattr(titan, "learn", None)
+            if callable(fn):
+                fn(s, r, o)
+
+        return formalize(body.text, subject=body.subject, persona=body.persona, eat_fn=eat, learn_fn=learn)
+
+    class QdterIngestRequest(BaseModel):
+        track: str
+        payload_id: str
+        belt: int = 0
+        frame: int = 0
+        persona: str = ""
+
+    @app.post("/api/v1/qdter/ingest", dependencies=deps)
+    def api_qdter(body: QdterIngestRequest) -> dict:
+        from resileos.ui.qdter_interface import ingest
+        from resileos.kin.eat import eat_filter
+        claim = f"{body.track} payload {body.payload_id}"
+        decision = eat_filter(claim)
+        return ingest(
+            body.track,
+            body.payload_id,
+            belt=body.belt,
+            frame=body.frame,
+            persona=body.persona,
+            eat_accepted=bool(getattr(decision, "accepted", False)),
+        )
+
+    _HUBS: dict = {}
+
+    class HubLearnRequest(BaseModel):
+        hub_id: str
+        subject: str
+        relation: str
+        obj: str
+        kind: str = "user"
+
+    @app.post("/api/v1/hub/learn", dependencies=deps)
+    def api_hub_learn(body: HubLearnRequest) -> dict:
+        from resileos.ui.hub import Hub
+        from resileos.kin.eat import eat_filter
+        h = _HUBS.get(body.hub_id)
+        if h is None:
+            h = Hub(body.hub_id, kind=body.kind)
+            _HUBS[body.hub_id] = h
+
+        def eat(claim):
+            return eat_filter(claim)
+
+        event = h.learn(body.subject, body.relation, body.obj, eat_fn=eat)
+        return {"event": event, "observe": h.observe()}
+
+    @app.get("/api/v1/hub/{hub_id}", dependencies=deps)
+    def api_hub_get(hub_id: str) -> dict:
+        h = _HUBS.get(hub_id)
+        if h is None:
+            return {"hub_id": hub_id, "n_facts": 0, "n_events": 0}
+        return h.observe()
+
+    class ApolloRequest(BaseModel):
+        subject: str = "world:apollo"
+        facts: list = []
+        art: bool = False
+
+    @app.post("/api/v1/apollo", dependencies=deps)
+    def api_apollo(body: ApolloRequest) -> dict:
+        from resileos.kin.apollo import apollo_cycle
+        from resileos.kin.eat import eat_filter
+        return apollo_cycle(body.facts, subject=body.subject, eat_fn=eat_filter, art=body.art)
