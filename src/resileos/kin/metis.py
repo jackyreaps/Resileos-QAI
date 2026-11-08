@@ -1,6 +1,8 @@
 """Metis — organizer kin. Policy flags only; cannot learn world triples."""
 from __future__ import annotations
 
+from resileos.ui.recursive_improve import recursive_step
+
 from resileos.ui.attach_scale import attach_scale
 
 from dataclasses import asdict, dataclass, field
@@ -63,3 +65,7 @@ def make_metis_organizer(*, miss_threshold: float = 0.3):
         return None
 
     return organize, handler
+
+def metis_recursive(facts: list, subject: str = "world:kin") -> dict:
+    """Run one recursive improve step from this kin."""
+    return recursive_step(facts, subject=subject)
