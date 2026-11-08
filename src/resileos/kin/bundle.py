@@ -12,6 +12,8 @@ eat_filter is the **ingest** gate for new claims (different verb).
 from __future__ import annotations
 
 from resileos.ui.recursive_improve import recursive_step
+from resileos.ui.success_improve import improve_cycle
+from resileos.kin.apollo import apollo_cycle
 
 from resileos.ui.attach_scale import attach_scale
 
@@ -132,6 +134,9 @@ def register_declining_kin(
 def bundle_scale(bundle: KinBundle) -> dict:
     return attach_scale({"children": len(getattr(bundle, "children", []) or [])}, "kin")
 
-def bundle_recursive(facts: list, subject: str = "world:kin") -> dict:
-    """Run one recursive improve step from this kin."""
-    return recursive_step(facts, subject=subject)
+def bundle_recursive(facts: list, subject: str = "world:kin", eat_fn=None) -> dict:
+    """Run one success-prioritized improve cycle from this kin."""
+    return improve_cycle(facts, subject=subject, eat_fn=eat_fn)
+
+def bundle_apollo(facts: list, subject: str = "world:apollo", eat_fn=None, art: bool = False) -> dict:
+    return apollo_cycle(facts, subject=subject, eat_fn=eat_fn, art=art)
