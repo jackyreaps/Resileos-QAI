@@ -308,7 +308,7 @@ def _run_surface(mode: str) -> None:
             sc, sb = api_post("/learn_batch", key, {"facts": demo})
             st.success(str(sb)) if sc == 200 else st.error(f"{sc}: {sb}")
 
-    tab_chat, tab_search, tab_media, tab_make, tab_diag, tab_help = st.tabs(["Chat", "Search", "Media", "Make", "Diagnostics", "Help"])
+    tab_chat, tab_search, tab_media, tab_make, tab_lang, tab_diag, tab_help = st.tabs(["Chat", "Search", "Media", "Make", "Language", "Diagnostics", "Help"])
 
     with tab_chat:
         for msg in st.session_state.messages:
@@ -502,6 +502,48 @@ def _run_surface(mode: str) -> None:
             nxt = continue_from(st.session_state["last_address"], prompt or "continue", world_id=world)
             st.json({"address": nxt["address"], "rows": nxt["rows"]})
             st.session_state["last_address"] = nxt["address"]
+
+
+    with tab_lang:
+        st.subheader("Language")
+        st.caption("Native is stored. Translate is a surface. Multilingual is the default path.")
+        txt = st.text_area("Text", key="lang_text", height=100)
+        target = st.text_input("Target language code", value="en", key="lang_target")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if st.button("Detect", key="lang_detect") and txt:
+                from resileos.ui.language_tool import detect_language
+                st.json(detect_language(txt))
+        with c2:
+            if st.button("Keep native", key="lang_native") and txt:
+                from resileos.ui.language_tool import native_or_translate
+                st.json(native_or_translate(txt, prefer_native=True))
+        with c3:
+            if st.button("Translate", key="lang_tr") and txt:
+                from resileos.ui.language_tool import translate
+                st.json(translate(txt, target=target or "en"))
+        st.divider()
+        st.subheader("Perceive")
+        p1, p2, p3 = st.columns(3)
+        with p1:
+            if st.button("Perceive text", key="perc_text") and txt:
+                from resileos.ui.perceive_language import perceive_language
+                st.json(perceive_language(txt))
+        with p2:
+            up_a = st.file_uploader("Audio", type=["wav"], key="perc_audio")
+            if st.button("Perceive audio", key="perc_a") and up_a is not None:
+                import numpy as np
+                from resileos.ui.perceive_audio import perceive_audio
+                raw = np.frombuffer(up_a.read(), dtype=np.int16).astype(np.float32)
+                st.json(perceive_audio(raw / 32768.0))
+        with p3:
+            up_v = st.file_uploader("Video frames", type=["png", "jpg"], key="perc_vid", accept_multiple_files=True)
+            if st.button("Perceive frames", key="perc_v") and up_v:
+                import numpy as np
+                from PIL import Image
+                from resileos.ui.perceive_video import perceive_video
+                frames = [np.array(Image.open(f).convert("RGB")) for f in up_v]
+                st.json(perceive_video(np.stack(frames)))
 
     with tab_diag:
         st.subheader("Photo diagnostics")
