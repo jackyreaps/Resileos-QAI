@@ -11,6 +11,8 @@ eat_filter is the **ingest** gate for new claims (different verb).
 """
 from __future__ import annotations
 
+from resileos.ui.recursive_improve import recursive_step
+
 from resileos.ui.attach_scale import attach_scale
 
 from dataclasses import dataclass, field
@@ -129,3 +131,7 @@ def register_declining_kin(
 
 def bundle_scale(bundle: KinBundle) -> dict:
     return attach_scale({"children": len(getattr(bundle, "children", []) or [])}, "kin")
+
+def bundle_recursive(facts: list, subject: str = "world:kin") -> dict:
+    """Run one recursive improve step from this kin."""
+    return recursive_step(facts, subject=subject)
