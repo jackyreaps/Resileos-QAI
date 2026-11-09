@@ -27,10 +27,10 @@ def perception_cycle(
     profile: str = "personal",
 ) -> dict:
     """Perceive -> propose -> review -> apply. Zeus applies only if passed."""
-    # 1. Observation writes into Psyche (no store write, state only)
+    # 1. Observation: write perceived into Psyche. No store write.
     perceive_into(psyche, perceived)
 
-    # 2. Writer: Athena judges the current perception set, capturing claims
+    # 2. Writer: Athena judges the perception set, claims captured by shim.
     percs = [perceived] + (others or [])
     sc = SeparatedCycle(id_prefix="perceive")
     proposal = sc.propose(
@@ -43,7 +43,15 @@ def perception_cycle(
         action_type="athena_judge",
     )
 
-    # 3. Reviewers: verifier swarm + council + athena frame gate
+    # Normalise writer result: apollo_success expects {"status": ...},
+    # but Athena returns {"ok": bool}. Without this, the strict
+    # verification gate fails even when the writer succeeded.
+    if isinstance(proposal.result, dict) and "status" not in proposal.result:
+        proposal.result["status"] = (
+            "ok" if proposal.result.get("ok") else "abstained"
+        )
+
+    # 3. Reviewers: verifier swarm, optional council, athena frame gate.
     reviewers = [
         ("verifiers", lambda p: sc.review_verifiers(p)),
     ]
@@ -53,9 +61,11 @@ def perception_cycle(
                 p, ask_fn=ask_fn, profile=profile
             ))
         )
-    reviewers.append(("athena", lambda p: sc.review_athena(p, subject=psyche.subject)))
+    reviewers.append(
+        ("athena", lambda p: sc.review_athena(p, subject=psyche.subject))
+    )
 
-    # 4. Head: apply only if all reviewers approve
+    # 4. Head: apply only if all reviewers approve.
     result = zeus_head(proposal, reviewers, learn_fn, cycle=sc)
     result["psyche_state"] = dict(psyche.state)
     result["hub_rows"] = psyche.hub_rows()
