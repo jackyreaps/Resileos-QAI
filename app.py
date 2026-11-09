@@ -10,9 +10,9 @@ Titanos console (application layer):
     POST /api/v1/learn
     POST /api/v1/learn_batch
     POST /api/v1/query               (routed through Zeus with fallthrough)
-    POST /api/v1/sparql              (query language, RES-322)
+    POST /api/v1/sparql              (query language, RES-322; AS OF temporal)
     POST /api/v1/chain
-    POST /api/v1/answer              (retrieve + render, RES-327)
+    POST /api/v1/answer              (retrieve + render, RES-327; AS OF temporal)
     GET  /api/v1/answer/backends     (backend availability report)
     POST /api/v1/save
 
@@ -36,6 +36,12 @@ Harness (exposed via /api/v1/tools):
     verify_on_stop, budget_and_stuck_guard, guide_load, evidence_attach,
     evidence_attach_raw, residual_consistency, apollo_success
 
+Temporal (RES-332):
+    learn / learn_batch accept valid_from / valid_to (ISO 8601 or None).
+    query / answer / sparql accept as_of (ISO 8601 or None = today).
+    Empty-string as_of on ask_list returns the full append-only log
+    (used internally by probes and diagnostics).
+
 Auth (fail-closed): key sources, merged:
   1. configs/api_keys.json   {"<sha256-hex>": {...}}   primary, hashed
   2. RESILEOS_API_KEYS       {"<plaintext>": {...}}    bootstrap map
@@ -57,6 +63,7 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import torch
@@ -137,9 +144,6 @@ init_shared()
 STATE_FILE = ROOT / "titanos_live_state.json"
 SEED_FILE = ROOT / "configs" / "titanos-facts.json"
 
-# Substrate state persistence path. In Docker, set
-# RESILEOS_SUBSTRATE_STATE=/app/data/substrate_state.pt so the volume
-# mount catches it. Local dev falls back to ./data/substrate_state.pt.
 SUBSTRATE_STATE_PATH = Path(
     os.getenv(
         "RESILEOS_SUBSTRATE_STATE",
@@ -147,24 +151,11 @@ SUBSTRATE_STATE_PATH = Path(
     )
 )
 
-# Serializes writes to the substrate checkpoint. Training itself is not
-# fully locked — concurrent training calls can interleave optimizer steps.
-# The single-worker single-replica deployment invariant (see HOSTING.md)
-# is what keeps training coherent in production.
 _substrate_lock = threading.Lock()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # API key auth (fail-closed)
-#
-# Sources, merged:
-#   1. configs/api_keys.json   {"<sha256-hex>": {...}}   primary, hashed
-#   2. RESILEOS_API_KEYS       {"<plaintext>": {...}}    bootstrap map
-#   3. RESILEOS_API_KEY        "<plaintext>"             legacy single key
-#
-# If no source yields a key, protected routes return 503 instead of
-# serving openly. RESILEOS_AUTH_BYPASS=1 is the only way to disable
-# auth, and it is for local development only.
 # ═══════════════════════════════════════════════════════════════════════════
 _API_KEY_NAME = "X-API-Key"
 _api_key_header = APIKeyHeader(name=_API_KEY_NAME, auto_error=False)
@@ -179,13 +170,6 @@ def _hash_key(value: str) -> str:
 
 
 def _load_hashed_keys() -> dict[str, dict]:
-    """Merge key file, RESILEOS_API_KEYS, and legacy RESILEOS_API_KEY.
-
-    Every returned mapping key is a SHA-256 hex digest. The lookup path
-    hashes the incoming header, so a timing side-channel would need to
-    match the full SHA-256 of the key, which is computationally
-    infeasible.
-    """
     merged: dict[str, dict] = {}
 
     if _KEYS_PATH.exists():
@@ -222,19 +206,6 @@ def _configured_key_count() -> int:
 async def verify_api_key(
     api_key: str | None = Depends(_api_key_header),
 ) -> None:
-    """Fail-closed API key check against every configured source.
-
-    - Missing key  -> 401
-    - Unknown key  -> 403
-    - No keys set  -> 503 (refuse to serve openly)
-    - RESILEOS_AUTH_BYPASS=1 -> bypass (local development only)
-
-    Applied via ``dependencies=[Depends(verify_api_key)]`` on every
-    non-health route. Health endpoints (/api/v1/ready,
-    /api/v1/substrate_stats, /api/v1/lecore/health) stay open so that
-    the Docker HEALTHCHECK and any liveness probe work without
-    credentials.
-    """
     if _AUTH_BYPASS:
         return
 
@@ -283,11 +254,8 @@ if STATE_FILE.exists():
 
 def _maybe_seed_from_bundled_facts() -> int:
     """Seed the console from configs/titanos-facts.json when the store is
-    empty. Returns the number of facts loaded (0 = no seed performed).
-
-    Uses `learn_many()` so the attractor's Hopfield matrix is rebuilt
-    once at the end of the batch, not per fact. Falls back to per-fact
-    `learn()` if the batch path raises.
+    empty. Facts may be 3-tuples (s, r, o) or 5-tuples
+    (s, r, o, valid_from, valid_to). Returns the number of facts loaded.
     """
     try:
         stats = titanos_singleton.stats()
@@ -308,14 +276,20 @@ def _maybe_seed_from_bundled_facts() -> int:
         log.warning("Seed file unreadable: %s", e)
         return 0
 
-    batch: list[tuple[str, str, str]] = []
+    batch: list[tuple] = []
     for row in raw.get("facts", []):
-        if not isinstance(row, (list, tuple)) or len(row) != 3:
+        if not isinstance(row, (list, tuple)):
             continue
-        s, r, o = (str(x).strip() for x in row)
-        if not (s and r and o):
-            continue
-        batch.append((s, r, o))
+        if len(row) == 3:
+            s, r, o = (str(x).strip() for x in row)
+            if s and r and o:
+                batch.append((s, r, o))
+        elif len(row) >= 5:
+            s, r, o = (str(x).strip() for x in row[:3])
+            vf = row[3] if row[3] is not None else None
+            vt = row[4] if row[4] is not None else None
+            if s and r and o:
+                batch.append((s, r, o, vf, vt))
 
     if not batch:
         return 0
@@ -328,14 +302,18 @@ def _maybe_seed_from_bundled_facts() -> int:
             "learn_many failed, falling back to per-fact learn: %s", e
         )
         loaded = 0
-        for s, r, o in batch:
+        for item in batch:
             try:
-                titanos_singleton.learn(s, r, o)
+                if len(item) == 3:
+                    titanos_singleton.learn(item[0], item[1], item[2])
+                else:
+                    titanos_singleton.learn(
+                        item[0], item[1], item[2],
+                        valid_from=item[3], valid_to=item[4],
+                    )
                 loaded += 1
             except Exception as e2:
-                log.warning(
-                    "Failed to learn %r %r %r: %s", s, r, o, e2
-                )
+                log.warning("Failed to learn %r: %s", item, e2)
 
     if loaded:
         try:
@@ -354,11 +332,6 @@ def _maybe_seed_from_bundled_facts() -> int:
 _seed_count = _maybe_seed_from_bundled_facts()
 
 
-# ── Zeus wiring ─────────────────────────────────────────────────────────
-# Zeus is registered as an AgencyChild on the Titanos singleton's own
-# AgencyGroup, so stats()["agency"] reflects the registration. The
-# query route reads from the same group; if Zeus declines (returns
-# None), the parent answers directly (RES-324 doctrine).
 try:
     _zeus_handler = make_zeus_handler()
     titanos_singleton.agency.add_child("zeus", _zeus_handler, weight=1.0)
@@ -369,13 +342,6 @@ except Exception as e:
     )
 
 
-# ── Kin cycle wiring ────────────────────────────────────────────────────
-# Registers the /api/v1/kin/* and /api/v1/eat/* routes on the app.
-# Requires titanos_singleton (defined above) and verify_api_key
-# (defined above) to be in scope. The auth_dep is forwarded to the kin
-# routes so they enforce the same policy as the core routes; this is
-# what keeps the two auth layers (middleware + Depends) aligned across
-# every registered route.
 try:
     wire_kin(app, titanos_singleton, auth_dep=verify_api_key)
     log.info("Kin cycle routes wired: /api/v1/kin/*, /api/v1/eat/*")
@@ -383,10 +349,6 @@ except Exception as e:
     log.warning("Kin wiring failed; kin routes unavailable: %s", e)
 
 
-# ── Answer backend (RES-327) ───────────────────────────────────────────
-# Selected once at first use from RESILEOS_ANSWER_BACKEND (default auto:
-# local_hf -> hosted -> structured). The structured backend is always
-# available; the others depend on transformers / an API key.
 _answer_backend_singleton: AnswerBackend | None = None
 
 
@@ -400,7 +362,6 @@ def _answer_backend() -> AnswerBackend:
     return _answer_backend_singleton
 
 
-# ── Harness tool registry ──────────────────────────────────────────────
 HARNESS_TOOLS = {
     "decision_fanout": decision_fanout,
     "confidence_route": confidence_route,
@@ -417,7 +378,6 @@ HARNESS_TOOLS = {
 
 
 def harness_tool_schemas() -> list[dict]:
-    """Flat schema per harness tool: name + first docstring line."""
     out: list[dict] = []
     for name, fn in HARNESS_TOOLS.items():
         doc = (fn.__doc__ or name).strip().split("\n")[0]
@@ -429,21 +389,28 @@ def harness_tool_schemas() -> list[dict]:
     return out
 
 
-# ── SPARQL adapter ──────────────────────────────────────────────────────
+# ── SPARQL adapter (temporal-aware) ────────────────────────────────────
 class _SPARQLAdapter:
     """Bridges Titanos to the RES-322 `_Core` Protocol.
 
-    The query engine calls `core.ask(anchor, relation, inverse=...)` and
-    expects `list[str]`. Titanos exposes `ask_list` which returns
-    exactly that. `iter_entities` passthrough enables full-scan queries.
+    `ask` accepts `as_of` so the executor can pass the query's AS OF
+    clause through to `Titanos.ask_list`. Without this kwarg the
+    temporal SPARQL grammar would TypeError at execution time.
     """
 
     def __init__(self, titanos) -> None:
         self._t = titanos
 
-    def ask(self, anchor: str, relation: str,
-            inverse: bool = False) -> list[str]:
-        return self._t.ask_list(anchor, relation, inverse=inverse)
+    def ask(
+        self,
+        anchor: str,
+        relation: str,
+        inverse: bool = False,
+        as_of: Optional[str] = None,
+    ) -> list[str]:
+        return self._t.ask_list(
+            anchor, relation, inverse=inverse, as_of=as_of,
+        )
 
     def iter_entities(self) -> list[str]:
         return self._t.iter_entities()
@@ -453,6 +420,9 @@ class LearnRequest(BaseModel):
     subject: str
     relation: str
     obj: str
+    # RES-332: ISO 8601 date strings, or None.
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
 
 
 class QueryRequest(BaseModel):
@@ -460,6 +430,8 @@ class QueryRequest(BaseModel):
     relation: str
     inverse: bool = False
     render: bool = False
+    # RES-332: ISO 8601 date, None = today, "" = full historical log.
+    as_of: Optional[str] = None
 
 
 class SparqlRequest(BaseModel):
@@ -472,27 +444,24 @@ class ChainRequest(BaseModel):
 
 
 class BatchLearnRequest(BaseModel):
-    facts: list[list[str]]
+    # Rows may be 3-element (s, r, o) or 5-element
+    # (s, r, o, valid_from, valid_to). None is allowed for the
+    # validity fields.
+    facts: list[list[Optional[str]]]
 
 
 class AnswerRequest(BaseModel):
-    """Either free-text `question`, or structured `subject`+`relation`.
-
-    If both are provided, the structured fields win and `question` is
-    used only for display. If only `question` is provided, the parser
-    in scripts/titanos.py is used to extract (subject, relation,
-    inverse). If neither resolves, the route returns 400.
-    """
-    question: str | None = None
-    subject: str | None = None
-    relation: str | None = None
+    question: Optional[str] = None
+    subject: Optional[str] = None
+    relation: Optional[str] = None
     inverse: bool = False
+    # RES-332: ISO 8601 date, None = today, "" = full historical log.
+    as_of: Optional[str] = None
 
 
 def _resolve_answer_input(
     payload: AnswerRequest,
-) -> tuple[str | None, str | None, bool, str]:
-    """Return (subject, relation, inverse, question_for_display)."""
+) -> tuple[Optional[str], Optional[str], bool, str]:
     subject = (payload.subject or "").strip()
     relation = (payload.relation or "").strip()
     question = (payload.question or "").strip()
@@ -514,8 +483,6 @@ def _resolve_answer_input(
             if parsed is not None:
                 s, r, inv = parsed
                 return str(s), str(r), bool(inv), question
-        # Framework-native fallback: resolve against live store vocab
-        # (no HF / external LLM).
         try:
             ents = list(titanos_singleton.entities.keys())
             rels = list(titanos_singleton.relations.keys())
@@ -554,7 +521,6 @@ def titanos_stats():
     dependencies=[Depends(verify_api_key)],
 )
 def list_tools():
-    """Tool schemas for external frontier mouths + frame tags + harness."""
     return {
         "tools": list_tool_schemas(),
         "openai": openai_tools(),
@@ -565,11 +531,6 @@ def list_tools():
 
 @app.get("/api/v1/ready")
 def titanos_ready():
-    """Readiness probe. Returns 503 until the Titanos store is open.
-
-    Open (no auth): the Docker HEALTHCHECK and any liveness probe
-    depend on this endpoint being reachable without credentials.
-    """
     try:
         s = titanos_singleton.stats()
     except Exception as e:
@@ -577,6 +538,8 @@ def titanos_ready():
     return {
         "ready": True,
         "facts": int(s.get("facts", 0)),
+        "facts_with_validity": int(s.get("facts_with_validity", 0)),
+        "facts_expired": int(s.get("facts_expired", 0)),
         "seeded_from": str(SEED_FILE) if _seed_count else None,
         "answer_backend": _answer_backend().name,
         "auth_required": (not _AUTH_BYPASS) and _configured_key_count() > 0,
@@ -588,7 +551,6 @@ def titanos_ready():
     dependencies=[Depends(verify_api_key)],
 )
 def titanos_answer_backends():
-    """Availability report for the three answer backends."""
     return {
         "configured": os.getenv("RESILEOS_ANSWER_BACKEND", "auto"),
         "active": _answer_backend().name,
@@ -601,19 +563,9 @@ def titanos_answer_backends():
     dependencies=[Depends(verify_api_key)],
 )
 def titanos_answer(payload: AnswerRequest):
-    """Retrieve exact rows, render one sentence.
-
-    Fast path: no recurrent loop, no sigma gate. Uses ``ask_list`` so
-    multi-valued relations return every row. The F2 recovery gate, if
-    enabled on the singleton, is checked once against the live phase
-    field; if the field has decohered, the route abstains before
-    rendering. See ``docs/320-titanos/answer.md`` (RES-327) for the
-    contract.
-    """
+    """Retrieve exact rows, render one sentence. Temporal-aware (RES-332)."""
     subject, relation, inverse, question = _resolve_answer_input(payload)
     if not subject or not relation:
-        # None channel: gate did not select a symbol (unresolved free-text
-        # or missing structured fields). Do not invent a triple.
         return {
             "question": question or (payload.question or ""),
             "subject": subject or "",
@@ -629,14 +581,12 @@ def titanos_answer(payload: AnswerRequest):
             "symbol_index": -1,
             "sector": "",
             "gate_capacity_bits": 0.0,
-            # Truth-frame only (exact|reconstructed|abstained|unresolved).
-            # Not Human-Medium prose frames; Gnosis is the sole finished
-            # medium frame and is not required for this axis.
+            "as_of": payload.as_of,
             "frame": derive_frame(status="NONE_CHANNEL"),
         }
 
     rows = titanos_singleton.ask_list(
-        subject, relation, inverse=inverse
+        subject, relation, inverse=inverse, as_of=payload.as_of,
     )
     confidence = 1.0 if rows else 0.0
 
@@ -666,10 +616,10 @@ def titanos_answer(payload: AnswerRequest):
                 "symbol_index": -1,
                 "sector": "",
                 "gate_capacity_bits": 0.0,
+                "as_of": payload.as_of,
                 "frame": derive_frame(status="ABSTAINED"),
             }
 
-    # Single gate encode: sector + symbol_index + capacity (consistent).
     g = None
     try:
         g = encode_gate(
@@ -728,6 +678,7 @@ def titanos_answer(payload: AnswerRequest):
         "symbol_index": sym,
         "sector": sector,
         "gate_capacity_bits": cap,
+        "as_of": payload.as_of,
         "frame": derive_frame(
             sector=sector,
             status=status,
@@ -741,19 +692,23 @@ def titanos_answer(payload: AnswerRequest):
     dependencies=[Depends(verify_api_key)],
 )
 def titanos_learn(payload: LearnRequest):
-    s, r, o = (
-        payload.subject.strip(),
-        payload.relation.strip(),
-        payload.obj.strip(),
-    )
+    s = payload.subject.strip()
+    r = payload.relation.strip()
+    o = payload.obj.strip()
     if not (s and r and o):
         raise HTTPException(400, "subject/relation/obj must be non-empty")
     try:
-        titanos_singleton.learn(s, r, o)
+        titanos_singleton.learn(
+            s, r, o,
+            valid_from=payload.valid_from,
+            valid_to=payload.valid_to,
+        )
         titanos_singleton.save(STATE_FILE)
         return {
             "status": "SUCCESS",
             "records": titanos_singleton.stats()["facts"],
+            "valid_from": payload.valid_from,
+            "valid_to": payload.valid_to,
         }
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -766,23 +721,41 @@ def titanos_learn(payload: LearnRequest):
 def titanos_learn_batch(payload: BatchLearnRequest):
     if not payload.facts:
         raise HTTPException(400, "facts list is empty")
-    batch: list[tuple[str, str, str]] = []
+    batch: list[tuple] = []
+    skipped = 0
     for row in payload.facts:
-        if len(row) != 3:
-            continue
-        s, r, o = (x.strip() for x in row)
-        if not (s and r and o):
-            continue
-        batch.append((s, r, o))
+        if len(row) == 3:
+            s, r, o = (str(x).strip() for x in row)
+            if s and r and o:
+                batch.append((s, r, o))
+            else:
+                skipped += 1
+        elif len(row) >= 5:
+            s, r, o = (str(x).strip() for x in row[:3])
+            vf = row[3] if row[3] not in (None, "") else None
+            vt = row[4] if row[4] not in (None, "") else None
+            if s and r and o:
+                batch.append((s, r, o, vf, vt))
+            else:
+                skipped += 1
+        else:
+            skipped += 1
+
     added = 0
     if batch:
         try:
             added = int(titanos_singleton.learn_many(batch))
         except Exception:
             added = 0
-            for s, r, o in batch:
+            for item in batch:
                 try:
-                    titanos_singleton.learn(s, r, o)
+                    if len(item) == 3:
+                        titanos_singleton.learn(item[0], item[1], item[2])
+                    else:
+                        titanos_singleton.learn(
+                            item[0], item[1], item[2],
+                            valid_from=item[3], valid_to=item[4],
+                        )
                     added += 1
                 except Exception:
                     continue
@@ -791,6 +764,7 @@ def titanos_learn_batch(payload: BatchLearnRequest):
     return {
         "status": "SUCCESS",
         "added": added,
+        "skipped": skipped,
         "records": titanos_singleton.stats()["facts"],
     }
 
@@ -800,28 +774,15 @@ def titanos_learn_batch(payload: BatchLearnRequest):
     dependencies=[Depends(verify_api_key)],
 )
 def titanos_query(payload: QueryRequest):
-    """Route through Zeus with parent fallthrough.
-
-    Sector policy (dual-sector, RES-326):
-
-      - gbx_like + exactly one row in the band  -> synthetic Answer,
-        mode="FAST", loops=0, no recurrent pass, no Zeus.
-      - gbx_like + 0 or >1 rows                 -> fall through to Zeus
-        and the recurrent path (multi-valued relations and empty bands
-        need abstention / multi-row logic).
-      - otx_like / unset                        -> Zeus with parent
-        fallthrough, full recurrent path.
-    """
+    """Route through Zeus with parent fallthrough. Temporal-aware (RES-332)."""
     try:
         from resileos.ui.use_gate import allow_use
         member = getattr(payload, "member", None) or "anon"
         used = int(getattr(payload, "used_free", 0) or 0)
         decision = allow_use(member, units=1, used_free=used, what="query")
         if not decision.get("ok"):
-            from fastapi import HTTPException
             raise HTTPException(status_code=402, detail="credit required")
 
-        # Sector from gate encoder (routing label only).
         sector = ""
         g = None
         try:
@@ -836,21 +797,16 @@ def titanos_query(payload: QueryRequest):
             sector = ""
             g = None
 
-        # Publish sector for Zeus cheap-decline on otx fall-through.
         titanos_singleton._route_sector = sector
 
         ans = None
         agency = titanos_singleton.agency
 
-        # gbx_like fast path: exactly one row in the band -> synthesise
-        # the Answer directly. No recurrent loop, no Zeus. mode="FAST"
-        # and loops=0 make the fast path observable in the response and
-        # in /stats. The len(rows) == 1 guard is load-bearing: 0 rows
-        # (nothing stored) and >1 rows (multi-valued relation) both fall
-        # through to the recurrent path.
+        # gbx fast path — temporal filter applied via ask_list(as_of=...)
         if gbx_bypass_recurrent(sector) and not payload.inverse:
             rows = titanos_singleton.ask_list(
-                payload.subject, payload.relation, inverse=False
+                payload.subject, payload.relation,
+                inverse=False, as_of=payload.as_of,
             )
             if len(rows) == 1:
                 ans = Answer(
@@ -868,11 +824,6 @@ def titanos_query(payload: QueryRequest):
                     ),
                 )
 
-        # Zeus is invoked only when the fast path did not resolve. On
-        # fall-through gbx (0 or >1 rows) and on otx_like, Zeus runs with
-        # full fitness tracking. On fast-path gbx, Zeus is skipped by
-        # design — the whole point is not paying recurrent / Zeus
-        # overhead on the cheap path. See gate-encoder.md §2.
         if ans is None and agency.children:
             ans = run_zeus_query(
                 agency,
@@ -884,10 +835,14 @@ def titanos_query(payload: QueryRequest):
         if ans is None:
             ans = (
                 titanos_singleton.ask_inverse(
-                    payload.subject, payload.relation)
+                    payload.subject, payload.relation,
+                    as_of=payload.as_of,
+                )
                 if payload.inverse
                 else titanos_singleton.ask(
-                    payload.subject, payload.relation)
+                    payload.subject, payload.relation,
+                    as_of=payload.as_of,
+                )
             )
         out = {
             "value": ans.value,
@@ -899,6 +854,7 @@ def titanos_query(payload: QueryRequest):
             "gate_state": ans.gate_state,
             "child_name": ans.child_name,
             "recovery_loss": float(getattr(ans, "recovery_loss", 0.0)),
+            "as_of": payload.as_of,
             "trace": [
                 {
                     "loop": h["loop"],
@@ -919,8 +875,6 @@ def titanos_query(payload: QueryRequest):
             status=str(getattr(ans, "status", "") or ""),
             n_rows=1 if ans.value else 0,
         )
-        # Capacity-aware first preference (does not change Zeus-always-on
-        # fitness tracking; used when routing without agency children).
         _ = prefer_child(
             sector=sector,
             gate_state=str(getattr(ans, "gate_state", "") or ""),
@@ -936,7 +890,6 @@ def titanos_query(payload: QueryRequest):
                 relation=payload.relation,
                 inverse=payload.inverse,
             )
-            # Prefer gate sector on the mouth context when present.
             if sector:
                 ctx = AnswerContext(
                     question=ctx.question,
@@ -965,6 +918,8 @@ def titanos_query(payload: QueryRequest):
             out["answer_text"] = text
             out["backend"] = backend.name
         return with_scale(out, payload.subject, payload.relation)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -974,13 +929,13 @@ def titanos_query(payload: QueryRequest):
     dependencies=[Depends(verify_api_key)],
 )
 def titanos_sparql(payload: SparqlRequest):
-    """Execute a query in the RES-322 grammar against the live state.
+    """Execute a RES-322 grammar query. Temporal-aware via `AS OF`.
 
     Examples:
         SELECT ?o WHERE alice --knows--> ?o
+        SELECT ?o WHERE alice --knows--> ?o AS OF "1800-01-01"
         SELECT ?s WHERE ?s <--knows-- bob
         SELECT ?o WHERE alice --knows--> ?o AND ?o --works_at--> acme
-        SELECT ?s, ?o WHERE ?s --knows--> ?o
     """
     q = payload.query.strip()
     if not q:
@@ -1033,7 +988,7 @@ def titanos_save():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Substrate (QD-TER two-head system)
+# Substrate (unchanged)
 # ═══════════════════════════════════════════════════════════════════════════
 HIDDEN_DIM = int(os.getenv("RESILEOS_HIDDEN_DIM", "128"))
 KERNEL_DIM = int(os.getenv("RESILEOS_KERNEL_DIM", "1"))
@@ -1041,8 +996,6 @@ MIN_TRAIN_STEPS = int(os.getenv("RESILEOS_MIN_TRAIN_STEPS", "5"))
 
 
 class SubstrateContainer:
-    """Module-level persistent model singleton for the substrate."""
-
     def __init__(self) -> None:
         torch.manual_seed(42)
         kernel = torch.zeros(HIDDEN_DIM, KERNEL_DIM)
@@ -1091,12 +1044,6 @@ class SubstrateContainer:
         return metrics
 
     def save(self, path: Path) -> None:
-        """Persist head weights, optimizer state, and training flags.
-
-        The checkpoint is written atomically: a sibling .tmp file is
-        written first, then renamed. A crash mid-write leaves the
-        previous checkpoint intact.
-        """
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
         torch.save(
@@ -1115,12 +1062,6 @@ class SubstrateContainer:
         tmp.replace(path)
 
     def load(self, path: Path) -> bool:
-        """Restore state if present. Returns True on success.
-
-        Fails gracefully and logs a warning if the checkpoint is
-        missing, corrupt, or incompatible with the current
-        HIDDEN_DIM/KERNEL_DIM (e.g. after an env-var change).
-        """
         if not path.exists():
             return False
         try:
@@ -1186,7 +1127,6 @@ class SweepRequest(BaseModel):
 
 @app.get("/api/v1/substrate_stats")
 def substrate_stats():
-    """Health endpoint. Open (no auth): Docker HEALTHCHECK depends on it."""
     return {
         "hidden_dim": substrate_singleton.hidden_dim,
         "kernel_dim": substrate_singleton.kernel_dim,
@@ -1368,7 +1308,7 @@ def sweep_epsilon(payload: SweepRequest):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# leCore integration (capability router)
+# leCore integration (unchanged)
 # ═══════════════════════════════════════════════════════════════════════════
 _lecore = LeCoreClient()
 
@@ -1379,7 +1319,6 @@ class LeCoreRouteRequest(BaseModel):
 
 @app.get("/api/v1/lecore/health")
 def lecore_health():
-    """Health endpoint. Open (no auth): liveness probe depends on it."""
     try:
         return {"available": True, **_lecore.health()}
     except (LeCoreUnreachable, LeCoreError) as e:
