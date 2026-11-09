@@ -12,10 +12,8 @@ Verification contract (added 2026-11-09):
     - Unknown action types default to requiring verification (fail closed).
     - Fixes a fail-open bug in verify_on_stop: a failed apollo with no
       scars previously returned verified=True. The require_evidence=True
-      path now returns verified=False with reason "apollo did not report
-      success". Callers not passing require_evidence keep the old
-      (buggy) behaviour for backwards compatibility; migrate by passing
-      require_evidence=True.
+      path now returns verified=False. Callers not passing require_evidence
+      keep the old (buggy) behaviour for backwards compatibility.
 """
 from __future__ import annotations
 
@@ -29,10 +27,7 @@ def decision_fanout(
     options: List[str],
     packet: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """Jev-style Choice. Returns typed answer + calibrated probability.
-
-    High-conf routes to residual/Apollo; else cascade.
-    """
+    """Jev-style Choice. Returns typed answer + calibrated probability."""
     scores = {opt: 0.5 for opt in options}
     if packet and "residual_query" in packet.get("state", {}):
         pass
@@ -66,10 +61,7 @@ def risk_classify(
     action: str,
     context: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """Policy-as-code risk gate (allow/ask/deny).
-
-    Syntax-aware stub; replace with tree-sitter or residual.
-    """
+    """Policy-as-code risk gate (allow/ask/deny)."""
     deny_patterns = ["rm -rf", "delete", "drop table", "force push"]
     ask_patterns = ["write", "commit", "deploy", "send"]
 
@@ -94,14 +86,7 @@ _VERIFICATION_OPTIONAL = {
 
 
 def verification_required(action_type: str) -> Dict[str, Any]:
-    """Classify whether an action type demands verification evidence.
-
-    Mutation and cycle actions require evidence. Read-only actions do
-    not. Unknown actions default to required (fail closed).
-
-    Returns:
-        {"action_type": str, "requires_verification": bool, "reason": str}
-    """
+    """Classify whether an action type demands verification evidence."""
     at = (action_type or "").strip().lower()
     if at in _VERIFICATION_OPTIONAL:
         return {
@@ -130,16 +115,14 @@ def verify_on_stop(
 ) -> Dict[str, Any]:
     """Outer verification loop. Must pass before closing turn.
 
-    Default `require_evidence=False` preserves prior behaviour
-    (including the fail-open on apollo=False + no scars). Pass
-    `require_evidence=True` to enforce the Codio zero-match rule and
-    the fail-closed apollo check.
+    Default require_evidence=False preserves prior behaviour (including
+    the fail-open on apollo=False + no scars). Pass require_evidence=True
+    to enforce the zero-match rule and fail-closed apollo check.
     """
     packet_verified = bool(packet.get("verified", False))
     apollo_ok = bool(apollo_result and apollo_result.get("success", False))
     scars = packet.get("scars", []) or []
 
-    # Scars always fail, whether verified was set or not.
     if scars:
         return {
             "verified": False,
@@ -148,7 +131,6 @@ def verify_on_stop(
         }
 
     if not require_evidence:
-        # Backwards-compatible path. Preserves prior behaviour exactly.
         verified = packet_verified or apollo_ok
         return {
             "verified": verified,
@@ -159,7 +141,7 @@ def verify_on_stop(
             ),
         }
 
-    # Strict path: fail-closed apollo, evidence required, zero-match rejected.
+    # Strict path
     if not (packet_verified or apollo_ok):
         return {
             "verified": False,
@@ -194,7 +176,7 @@ def verify_on_stop(
 
 
 def budget_and_stuck_guard(packet: Dict[str, Any]) -> Dict[str, Any]:
-    """Budgeted loop + simple stuck detection (hash of recent history)."""
+    """Budgeted loop + simple stuck detection."""
     budget = packet.get("budget_remaining", {})
     if budget.get("steps", 1) <= 0 or budget.get("cost", 1) <= 0:
         return {
@@ -234,7 +216,7 @@ def evidence_attach(
     source: str,
     packet: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """AgenC-style evidence attachment for every tool/residual update."""
+    """AgenC-style evidence attachment."""
     evidence = packet.get("evidence", [])
     evidence.append({
         "source": source,
@@ -250,14 +232,7 @@ def evidence_attach_raw(
     source: str,
     packet: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Attach raw evidence. Rejects summary-only payloads.
-
-    A result is raw if it contains at least one structured field beyond
-    a bare `summary` or `note`. A probe output with
-    `{"matched": 0, "passed": 0}` is raw evidence of zero matches —
-    which is not evidence of success, and verify_on_stop rejects it
-    when require_evidence=True.
-    """
+    """Attach raw evidence. Rejects summary-only payloads."""
     if not isinstance(result, dict):
         raise TypeError("result must be a dict")
     if not result:
@@ -272,16 +247,7 @@ def evidence_attach_raw(
 
 
 def residual_consistency(packet: Dict[str, Any]) -> Dict[str, Any]:
-    """Check the control packet for signs of a broken residual trajectory.
-
-    A packet is consistent when:
-      - no unresolved scars are recorded, AND
-      - every evidence entry that claims a residual hash has a
-        non-empty hash (no placeholder/None entries).
-
-    Returns:
-        {"consistent": bool, "reason": str, "scars": list}
-    """
+    """Check the control packet for signs of a broken residual trajectory."""
     scars = list(packet.get("scars", []) or [])
     evidence = packet.get("evidence", []) or []
 
@@ -313,15 +279,7 @@ def residual_consistency(packet: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def apollo_success(result: Dict[str, Any]) -> Dict[str, Any]:
-    """Outer sensor: did the Apollo / residual pass report success?
-
-    `result` is a dict with at least `status`. Anything other than a
-    non-empty status string is treated as failure so verification
-    fails closed rather than open.
-
-    Returns:
-        {"success": bool, "status": str, "reason": str}
-    """
+    """Outer sensor: did the Apollo / residual pass report success?"""
     status = str((result or {}).get("status", "") or "").strip().lower()
     if status in ("ok", "success", "passed", "verified"):
         return {
