@@ -16,8 +16,10 @@ Temporal extension (RES-332, 2026-11-09):
     behaviour is opt-in via ctx['reject_expired']=True.
 
     check_contradiction skips the single_valued check when the claim is
-    temporal (valid_from set), because append-only permits overlaps that
-    resolve at query time (RES-332 §2).
+    temporal (valid_from OR valid_until set), because append-only
+    permits overlaps that resolve at query time (RES-332 §2). Facts
+    with only valid_until (e.g. "was true until 1834") are temporal
+    too — see RES-332 §2, unbounded valid_from.
 
     Date-only and datetime forms are both accepted. Missing / empty
     fields mean "unbounded" (None = since forever / still true).
@@ -130,11 +132,17 @@ def check_size(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
 def check_contradiction(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
     """Reject if store has explicit not_<relation> or inverse conflict when provided.
 
-    Temporal claims (claim.valid_from set) skip the single_valued check.
-    Under RES-332 §2, append-only permits a historical fact to overlap
-    with a current fact; the conflict resolves at query time via AS OF,
-    not by rejecting the write. Callers who want strict rejection even
-    for temporal claims set ctx['single_valued_temporal']=True.
+    Temporal claims (claim.valid_from OR claim.valid_until set) skip the
+    single_valued check. Under RES-332 §2, append-only permits a
+    historical fact to overlap with a current fact; the conflict
+    resolves at query time via AS OF, not by rejecting the write.
+    Callers who want strict rejection even for temporal claims set
+    ctx['single_valued_temporal']=True.
+
+    Both bounds trigger temporal mode: a fact with only valid_until is
+    "was true since forever, stopped at T" — a legitimate historical
+    shape that must not be rejected by the current-state contradiction
+    check.
     """
     ask = ctx.get("ask_fn")  # (s, r) -> value | list | None
     if not callable(ask):
@@ -149,9 +157,9 @@ def check_contradiction(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
         if claim.obj in [str(v) for v in vals] or str(existing_neg) == claim.obj:
             return CheckResult(False, "contradicts_not_relation", "contradiction")
     # Same relation different locked value when ctx says single-valued.
-    # Skip if claim is temporal (valid_from set) unless caller explicitly
-    # requests strict temporal contradiction (RES-332 §2 append-only).
-    is_temporal = bool(claim.valid_from)
+    # Skip if claim is temporal (either bound set) unless caller
+    # explicitly requests strict temporal contradiction.
+    is_temporal = bool(claim.valid_from or claim.valid_until)
     if is_temporal and not ctx.get("single_valued_temporal"):
         return CheckResult(True, "", "contradiction")
     if ctx.get("single_valued"):
