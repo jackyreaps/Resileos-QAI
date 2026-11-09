@@ -1,7 +1,8 @@
-"""
-Kin bundle — align Iris / Metis / Hermes / Eat with AgencyGroup + Zeus.
+"""Kin bundle — align Iris / Metis / Hermes / Eat with AgencyGroup + Zeus.
+
 Harness layer integrated: risk gates, confidence routing, verify-on-stop,
-budget/stuck guards, residual consistency, and Apollo as outer sensor.
+budget/stuck guards, residual consistency, Apollo outer sensor, and the
+verification-requirement classification (zero-match rule).
 """
 from __future__ import annotations
 
@@ -22,13 +23,14 @@ from resileos.kin.metis import MetisPolicy, make_metis_organizer
 # Harness integration
 from resileos.harness.packet import ControlPacket
 from resileos.harness.tools import (
-    budget_and_stuck_guard,
-    residual_consistency,
-    verify_on_stop,
-    risk_classify,
-    guide_load,
-    evidence_attach,
     apollo_success,
+    budget_and_stuck_guard,
+    evidence_attach,
+    guide_load,
+    residual_consistency,
+    risk_classify,
+    verification_required,
+    verify_on_stop,
 )
 from resileos.harness.cascade import CascadeRouter
 
@@ -52,28 +54,31 @@ class KinBundle:
         agency_group: Any = None,
         *,
         apply_policy: bool = True,
-        residual_packet: Any = None,  # optional residual Packet for consistency
+        residual_packet: Any = None,
     ) -> tuple[IrisReport, MetisPolicy, dict]:
-        """Iris → Metis + full harness guards and outer verification."""
-        # Ensure control packet exists
+        """Iris -> Metis + full harness guards and outer verification."""
         if self.control is None:
             self.control = ControlPacket(id="kin-cycle")
 
         # 1. Hierarchical guides (JIT context)
-        guide_load(["docs/harness/CONSTRAINTS.md", "docs/harness/AGENTS.md"], self.control.to_dict())
+        guide_load(
+            ["docs/harness/CONSTRAINTS.md", "docs/harness/AGENTS.md"],
+            self.control.to_dict(),
+        )
 
         # 2. Budget + stuck guard
         guard = budget_and_stuck_guard(self.control.to_dict())
         if not guard["ok"]:
             self.control.append({"event": "guard_fail", "reason": guard["reason"]})
-            # Still produce Iris/Metis but mark unverified
             report = self.observe(metrics=metrics, agency_group=agency_group)
             policy = self.organize(report)
             self.last_report = report
             self.last_policy = policy
-            return report, policy, {"harness": {"guard": guard, "verified": False}}
+            return report, policy, {
+                "harness": {"guard": guard, "verified": False}
+            }
 
-        # 3. Iris observe → Metis organize
+        # 3. Iris observe -> Metis organize
         report = self.observe(metrics=metrics, agency_group=agency_group)
         policy = self.organize(report)
         self.last_report = report
@@ -85,21 +90,34 @@ class KinBundle:
         # 4. Residual consistency sensor (if residual Packet supplied)
         consistency = residual_consistency(self.control.to_dict())
         if residual_packet is not None:
-            # Attach residual hash as evidence
             evidence_attach(
                 {"packet_hash": getattr(residual_packet, "packet_hash", None)},
                 "residual_core",
                 self.control.to_dict(),
             )
 
-        # 5. Outer verification (Apollo + verify-on-stop)
-        apollo = apollo_success({"status": "ok" if consistency.get("consistent") else "scarred"})
-        v = verify_on_stop(self.control.to_dict(), apollo)
+        # 5. Verification requirement + outer verification
+        verification = verification_required("kin_cycle")
+        apollo = apollo_success({
+            "status": "ok" if consistency.get("consistent") else "scarred"
+        })
+        v = verify_on_stop(
+            self.control.to_dict(),
+            apollo,
+            require_evidence=verification["requires_verification"],
+        )
         self.control.verified = v["verified"]
-        self.control.append({"event": "verify", "result": v, "consistency": consistency})
+        self.control.append({
+            "event": "verify",
+            "result": v,
+            "consistency": consistency,
+            "verification_required": verification,
+        })
 
         harness_summary = {
             "verified": v["verified"],
+            "reason": v["reason"],
+            "verification_required": verification["requires_verification"],
             "consistency": consistency,
             "apollo": apollo,
             "budget": self.control.budget_remaining,
