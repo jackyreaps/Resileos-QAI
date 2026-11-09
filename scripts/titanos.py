@@ -47,9 +47,15 @@ Temporal extension (RES-332):
     Facts gain an optional validity interval `(valid_from, valid_to)`.
     Legacy 3-tuple facts read as `(None, None)` = always valid.
     `ask_list(..., as_of=...)` filters on validity at query time.
-    `ask()` respects current validity (as_of=None means "now").
+    `ask(...)` and `ask_inverse(...)` accept `as_of` and forward it to
+    the slot filter, so the recurrent path is temporal as well.
     Append-only: a conflicting fact with overlapping validity is
     stored, not overwritten. Conflict surfacing is the caller's job.
+
+    as_of:
+        None          -> current state (today)
+        ISO 8601 date -> only facts valid at that moment
+        Empty string  -> all facts regardless of validity
 """
 from __future__ import annotations
 
@@ -260,6 +266,8 @@ class Titanos:
         as_of=None means "now" (today's date in ISO 8601).
         None valid_from means "since forever"; None valid_to means
         "still true".
+
+        Interval is half-open: [valid_from, valid_to).
         """
         _s, _r, _o, valid_from, valid_to = cls._fact_fields(fact)
         as_of_str = str(as_of) if as_of is not None else date.today().isoformat()
@@ -298,8 +306,13 @@ class Titanos:
         facts are excluded. Pass an explicit `as_of` for historical
         queries, or set `temporal_filter_current=False` on the config
         to disable the filter.
+
+        as_of="" disables the filter entirely (all facts regardless
+        of validity). Used by ask_list for the append-only log view.
         """
         idx = 0 if inverse else 2
+        if as_of == "":
+            return {f[idx] for f in self.facts if f[1] == relation}
         use_filter = as_of is not None or self.cfg.temporal_filter_current
         if not use_filter:
             return {f[idx] for f in self.facts if f[1] == relation}
@@ -695,7 +708,8 @@ class Titanos:
 
     # ── single query ─────────────────────────────────────────────────
     def _ask(self, subject: str, relation: str, inverse: bool,
-             conf_mode_override: str | None = None) -> Answer:
+             conf_mode_override: str | None = None,
+             as_of: Optional[str] = None) -> Answer:
         if subject not in self.entities:
             return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", 0,
                           reason=f"unknown entity '{subject}'",
@@ -712,7 +726,7 @@ class Titanos:
 
         self._query_count += 1
         probe = self._encode_probe(subject, relation, inverse=inverse)
-        slot = self._slot_candidates(relation, inverse=inverse)
+        slot = self._slot_candidates(relation, inverse=inverse, as_of=as_of)
         current_csi = self._csi.value()
         classical_thresh, abstain_thresh, sigma_eff = \
             self._thresholds_for(relation)
@@ -865,11 +879,13 @@ class Titanos:
                       order_parameter_scale=scale,
                       recovery_loss=rec_loss)
 
-    def ask(self, subject: str, relation: str) -> Answer:
-        return self._ask(subject, relation, inverse=False)
+    def ask(self, subject: str, relation: str,
+            as_of: Optional[str] = None) -> Answer:
+        return self._ask(subject, relation, inverse=False, as_of=as_of)
 
-    def ask_inverse(self, obj: str, relation: str) -> Answer:
-        return self._ask(obj, relation, inverse=True)
+    def ask_inverse(self, obj: str, relation: str,
+                    as_of: Optional[str] = None) -> Answer:
+        return self._ask(obj, relation, inverse=True, as_of=as_of)
 
     def ask_list(self, anchor: str, relation: str,
                  inverse: bool = False,
