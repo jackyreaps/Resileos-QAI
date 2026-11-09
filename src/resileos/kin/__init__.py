@@ -60,14 +60,11 @@ __all__ = [
     "get_kin_bundle",
     "mouth_allowed_from_last_cycle",
     "wire_kin",
-    # Separated cycle
     "SeparatedCycle",
     "Proposal",
     "Verdict",
     "zeus_head",
     "run_separated",
-    # Perception kin
     "perception_cycle",
-    # Harness wrapper for non-writer kin
     "harness_wrap",
 ]
