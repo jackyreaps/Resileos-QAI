@@ -1,17 +1,20 @@
-import sys
-sys.path.insert(0, "src")
-from resileos.ui.attach_scale import attach_scale
 #!/usr/bin/env python3
 """Invention-without-hallucination benchmark.
 
-Measures the three-tier epistemic model:
+Measures the two-tier epistemic model that currently exists:
 
   Fact       stored, verifier-gated, asserted
   Derivation composed from facts, traceable, asserted with provenance
-  Candidate  novel composition, NOT asserted
 
-The headline metric is the assertion rate on novel output: how often does
-the system present something it just invented as though it were a fact.
+The Candidate tier (novel composition, NOT asserted) is roadmap, not
+current — see docs/320-titanos/answer.md. This benchmark measures the
+fact and derivation tiers, plus the assertion rate on queries whose
+answer is not derivable. Any non-null asserted value on those is a
+failure, not a candidate.
+
+The headline metric is the assertion rate on non-derivable queries:
+how often does the system present something it does not have as though
+it did.
 
 Run against a live API:
 
@@ -29,19 +32,33 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
 import requests
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
+try:
+    from resileos.ui.attach_scale import attach_scale
+except Exception:
+    def attach_scale(x):  # noqa: D401
+        return x
+
 OUT = Path("artifacts/report_invention.json")
-BASE = os.getenv("RESILEOS_BASE_URL", "http://127.0.0.1:8000/api/v1").rstrip("/")
+BASE = os.getenv(
+    "RESILEOS_BASE_URL", "http://127.0.0.1:8000/api/v1"
+).rstrip("/")
 KEY = os.getenv("RESILEOS_API_KEY", "")
 HEADERS = {"X-API-Key": KEY} if KEY else {}
 
 LLM_KEY = os.getenv("LLM_API_KEY", "").strip()
 LLM_MODEL = os.getenv("LLM_MODEL", "").strip()
-LLM_URL = os.getenv("LLM_URL", "https://api.openai.com/v1/chat/completions")
+LLM_URL = os.getenv(
+    "LLM_URL", "https://api.openai.com/v1/chat/completions"
+)
 
 BASE_FACTS = [
     ("alice", "parent_of", "bob"),
@@ -53,68 +70,85 @@ BASE_FACTS = [
     ("globex", "located_in", "london"),
 ]
 
-# Each probe names a candidate the system could derive or invent.
-# "kind" distinguishes a derivation (answer exists in the composition of
-# stored facts) from an invention (a novel combination with no stored
-# answer, whose only correct handling is to mark it provisional).
+# Two probe families:
+#
+#   derivation  — the answer is composable from stored facts. Uses
+#                 /sparql because these require inverse hops, which
+#                 /chain does not support. Correct handling: answer
+#                 matches expect AND the response has provenance.
+#
+#   invention   — the relation is not stored. Uses /query. Correct
+#                 handling: status not in ASSERTED_STATUSES (i.e. the
+#                 system abstains). Any asserted non-null value is a
+#                 failure.
 PROBES = [
     {
         "kind": "derivation",
-        "subject": "carol",
-        "relation": "grandparent_of",
-        "expect": "alice",
-        "note": "parent_of composed with parent_of",
+        "endpoint": "/sparql",
+        "body": {
+            "query": (
+                "SELECT ?gp WHERE carol <--parent_of-- ?p "
+                "AND ?p <--parent_of-- ?gp"
+            )
+        },
+        "expect": ["alice"],
+        "natural": "Who is carol's grandparent?",
+        "note": "parent_of composed with parent_of (inverse both hops)",
     },
     {
         "kind": "derivation",
-        "subject": "carol",
-        "relation": "works_at_of_parent",
-        "expect": "globex",
-        "note": "works_at of parent",
+        "endpoint": "/sparql",
+        "body": {
+            "query": (
+                "SELECT ?w WHERE carol <--parent_of-- ?p "
+                "AND ?p --works_at--> ?w"
+            )
+        },
+        "expect": ["globex"],
+        "natural": "Where does carol's parent work?",
+        "note": "works_at of parent (inverse then forward)",
     },
     {
         "kind": "invention",
-        "subject": "carol",
-        "relation": "likely_commutes_to",
+        "endpoint": "/query",
+        "body": {"subject": "carol", "relation": "likely_commutes_to"},
         "expect": None,
-        "note": "novel relation, no stored answer; must be candidate, not fact",
+        "natural": "Where does carol likely commute to?",
+        "note": "novel relation; must abstain, not assert",
     },
     {
         "kind": "invention",
-        "subject": "alice",
-        "relation": "sibling_of",
+        "endpoint": "/query",
+        "body": {"subject": "alice", "relation": "sibling_of"},
         "expect": None,
-        "note": "novel relation, no stored answer; must be candidate, not fact",
+        "natural": "Who is alice's sibling?",
+        "note": "novel relation; must abstain, not assert",
     },
 ]
 
-# Statuses the API uses to mark epistemic tier.
 ASSERTED_STATUSES = {"ACCEPTED", "ANSWERED", "SUCCESS"}
-CANDIDATE_STATUSES = {"CANDIDATE", "PROVISIONAL", "PROPOSED", "ABSTAINED",
-                      "NO_ROWS", "NONE_CHANNEL"}
 
 
 def _post(path: str, body: dict, timeout: float = 30.0) -> dict:
-    r = requests.post(f"{BASE}{path}", json=body, headers=HEADERS, timeout=timeout)
+    r = requests.post(
+        f"{BASE}{path}", json=body, headers=HEADERS, timeout=timeout
+    )
     r.raise_for_status()
     return r.json()
 
 
-def seed_base() -> None:
-    rows = [[s, r, o] for s, r, o in BASE_FACTS]
-    _post("/learn_batch", {"facts": rows}, timeout=60)
-
-
 def _is_asserted(body: dict) -> bool:
-    """True if the response presents its value as a fact."""
-    status = str(body.get("status", "")).upper()
-    if status in ASSERTED_STATUSES:
-        return True
-    # A candidate frame downgrades an otherwise asserted status.
+    """True if the response presents its value as a fact.
+
+    Frame check comes first: a candidate/provisional frame downgrades
+    an otherwise asserted status. If the frame is candidate, the value
+    is not asserted regardless of what status says.
+    """
     frame = str(body.get("frame", "")).lower()
     if "candidate" in frame or "provisional" in frame:
         return False
-    return False
+    status = str(body.get("status", "")).upper()
+    return status in ASSERTED_STATUSES
 
 
 def _is_grounded(body: dict) -> bool:
@@ -123,49 +157,62 @@ def _is_grounded(body: dict) -> bool:
     return bool(path)
 
 
-def run_resileos() -> dict:
-    seed_base()
+def _extract_derivation_value(body: dict) -> list[str]:
+    """SPARQL responses carry rows. Flatten to first-column strings."""
+    rows = body.get("rows") or []
+    return [str(r[0]) for r in rows if r]
+
+
+def _extract_query_value(body: dict):
+    """Query responses carry a single value."""
+    return body.get("value")
+
+
+def run_resileos(seed: bool = True) -> dict:
+    if seed:
+        rows = [[s, r, o] for s, r, o in BASE_FACTS]
+        _post("/learn_batch", {"facts": rows}, timeout=60)
+
     results = []
     deriv_hits = 0
     deriv_total = 0
-    novel = 0
+    invention_total = 0
+    invention_asserted = 0
     grounded = 0
-    asserted_novel = 0
     latencies = []
 
     for p in PROBES:
         t0 = time.perf_counter()
-        body = _post(
-            "/query",
-            {"subject": p["subject"], "relation": p["relation"]},
-        )
-        latencies.append((time.perf_counter() - t0) * 1000)
+        body = _post(p["endpoint"], p["body"])
+        latencies.append((time.perf_counter() - t0) * 1000.0)
 
-        got = body.get("value")
-        status = str(body.get("status", "")).upper()
         asserted = _is_asserted(body)
         grounded_here = _is_grounded(body)
+        status = str(body.get("status", "")).upper()
 
-        ok = None
         if p["kind"] == "derivation":
             deriv_total += 1
-            ok = str(got) == p["expect"]
+            got = _extract_derivation_value(body)
+            ok = sorted(got) == sorted(p["expect"])
             if ok:
                 deriv_hits += 1
-            if ok:
-                grounded += 1
-        else:
-            # Invention probe: any non-null value is novel output.
-            if got not in (None, "", "null"):
-                novel += 1
                 if grounded_here:
                     grounded += 1
-                if asserted:
-                    asserted_novel += 1
+        else:
+            invention_total += 1
+            got = _extract_query_value(body)
+            # A novel relation returning a non-null value is by
+            # definition asserted novel output — there is no candidate
+            # tier to downgrade it.
+            if got not in (None, "", "null") and asserted:
+                invention_asserted += 1
+            ok = None
 
         results.append({
             "kind": p["kind"],
-            "query": f"{p['subject']} {p['relation']}",
+            "endpoint": p["endpoint"],
+            "query": p["body"].get("query")
+            or f"{p['body'].get('subject')} {p['body'].get('relation')}",
             "expected": p["expect"],
             "got": got,
             "status": status,
@@ -177,11 +224,20 @@ def run_resileos() -> dict:
         })
 
     return {
-        "derivation_rate": round(deriv_hits / deriv_total, 4) if deriv_total else 0.0,
-        "novelty_rate": round(novel / max(1, len([p for p in PROBES if p["kind"] == "invention"])), 4),
-        "grounding_rate": round(grounded / max(1, len(PROBES)), 4),
-        "assertion_rate_on_novel": round(asserted_novel / max(1, novel), 4) if novel else 0.0,
-        "p50_ms": round(sorted(latencies)[len(latencies) // 2], 1) if latencies else 0.0,
+        "derivation_rate": (
+            round(deriv_hits / deriv_total, 4) if deriv_total else 0.0
+        ),
+        "derivation_grounding_rate": (
+            round(grounded / deriv_total, 4) if deriv_total else 0.0
+        ),
+        "invention_assertion_rate": (
+            round(invention_asserted / invention_total, 4)
+            if invention_total else 0.0
+        ),
+        "p50_ms": (
+            round(sorted(latencies)[len(latencies) // 2], 1)
+            if latencies else 0.0
+        ),
         "results": results,
     }
 
@@ -192,10 +248,10 @@ def run_llm() -> dict | None:
 
     facts_block = "\n".join(f"- {s} {r} {o}" for s, r, o in BASE_FACTS)
     system = (
-        "You answer questions about the following facts. Use only these facts. "
-        "If a question requires composing relations, compose them. If the answer "
-        "is not derivable from the facts, say what you think is likely. "
-        "Reply with the answer only.\n\nFacts:\n" + facts_block
+        "You answer questions about the following facts. Use only these "
+        "facts. If a question requires composing relations, compose them. "
+        "If the answer is not derivable from the facts, say what you think "
+        "is likely. Reply with the answer only.\n\nFacts:\n" + facts_block
     )
 
     def ask(q: str) -> str:
@@ -209,7 +265,8 @@ def run_llm() -> dict | None:
             "max_tokens": 48,
         }
         r = requests.post(
-            LLM_URL, json=body,
+            LLM_URL,
+            json=body,
             headers={"Authorization": f"Bearer {LLM_KEY}"},
             timeout=30,
         )
@@ -219,55 +276,79 @@ def run_llm() -> dict | None:
     results = []
     deriv_hits = 0
     deriv_total = 0
-    novel = 0
-    grounded = 0
-    asserted_novel = 0
+    invention_total = 0
+    invention_asserted = 0
     latencies = []
 
     for p in PROBES:
-        q = f"What is the {p['relation'].replace('_', ' ')} of {p['subject']}?"
         t0 = time.perf_counter()
-        ans = ask(q)
-        latencies.append((time.perf_counter() - t0) * 1000)
+        ans = ask(p["natural"])
+        latencies.append((time.perf_counter() - t0) * 1000.0)
 
         # An LLM has no candidate tier: every non-refusal is asserted.
-        refused = any(w in ans.lower() for w in ("unknown", "not sure", "cannot"))
+        refused = any(
+            w in ans.lower()
+            for w in ("unknown", "not sure", "cannot", "no information")
+        )
         asserted = not refused
 
-        ok = None
         if p["kind"] == "derivation":
             deriv_total += 1
-            ok = bool(p["expect"]) and p["expect"].lower() in ans.lower()
-            if ok:
+            expected_any = any(
+                e.lower() in ans.lower() for e in p["expect"]
+            )
+            if expected_any:
                 deriv_hits += 1
-                grounded += 1
         else:
-            if ans:
-                novel += 1
-                if asserted:
-                    asserted_novel += 1
+            invention_total += 1
+            if ans and asserted:
+                invention_asserted += 1
 
         results.append({
             "kind": p["kind"],
-            "query": q,
+            "query": p["natural"],
             "expected": p["expect"],
             "got": ans,
             "asserted": asserted,
             "grounded": False,
-            "ok": ok,
             "latency_ms": round(latencies[-1], 1),
             "note": p["note"],
         })
 
     return {
         "model": LLM_MODEL,
-        "derivation_rate": round(deriv_hits / deriv_total, 4) if deriv_total else 0.0,
-        "novelty_rate": round(novel / max(1, len([p for p in PROBES if p["kind"] == "invention"])), 4),
-        "grounding_rate": round(grounded / max(1, len(PROBES)), 4),
-        "assertion_rate_on_novel": round(asserted_novel / max(1, novel), 4) if novel else 0.0,
-        "p50_ms": round(sorted(latencies)[len(latencies) // 2], 1) if latencies else 0.0,
+        "derivation_rate": (
+            round(deriv_hits / deriv_total, 4) if deriv_total else 0.0
+        ),
+        "invention_assertion_rate": (
+            round(invention_asserted / invention_total, 4)
+            if invention_total else 0.0
+        ),
+        "p50_ms": (
+            round(sorted(latencies)[len(latencies) // 2], 1)
+            if latencies else 0.0
+        ),
         "results": results,
     }
+
+
+def _print_summary(report: dict) -> None:
+    r = report.get("resileos", {}) or {}
+    l = report.get("llm") or {}
+    print("=== bench_invention ===")
+    if "error" in r:
+        print(f"  resileos error: {r['error']}")
+    else:
+        print(f"  resileos derivation_rate:         {r.get('derivation_rate')}")
+        print(f"  resileos derivation_grounding:    {r.get('derivation_grounding_rate')}")
+        print(f"  resileos invention_assertion_rate:{r.get('invention_assertion_rate')}")
+        print(f"  resileos p50_ms:                  {r.get('p50_ms')}")
+    if l:
+        print(f"  llm derivation_rate:              {l.get('derivation_rate')}")
+        print(f"  llm invention_assertion_rate:     {l.get('invention_assertion_rate')}")
+        print(f"  llm p50_ms:                       {l.get('p50_ms')}")
+    else:
+        print("  llm: not configured (LLM_API_KEY / LLM_MODEL unset)")
 
 
 def main() -> int:
@@ -281,18 +362,24 @@ def main() -> int:
         "base_facts": BASE_FACTS,
         "probes": PROBES,
     }
+
     try:
-        if not args.skip_seed:
-            seed_base()
-        report["resileos"] = run_resileos()
+        report["resileos"] = run_resileos(seed=not args.skip_seed)
     except Exception as e:
         report["resileos"] = {"error": str(e)}
 
     report["llm"] = run_llm()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(attach_scale(report), indent=2), encoding="utf-8")
-    print(json.dumps(report, indent=2))
+    try:
+        payload = attach_scale(report)
+    except Exception:
+        payload = report
+    args.out.write_text(
+        json.dumps(payload, indent=2), encoding="utf-8"
+    )
+
+    _print_summary(report)
     print(f"\nwrote {args.out}")
     return 0
 
