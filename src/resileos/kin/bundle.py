@@ -2,7 +2,7 @@
 
 Harness layer integrated: risk gates, confidence routing, verify-on-stop,
 budget/stuck guards, residual consistency, Apollo outer sensor, and the
-verification-requirement classification (zero-match rule).
+verification-requirement classification (zero-match rule, 2026-11-09).
 """
 from __future__ import annotations
 
@@ -45,7 +45,6 @@ class KinBundle:
     hermes_handler: Callable[..., Any]
     last_report: Optional[IrisReport] = None
     last_policy: Optional[MetisPolicy] = None
-    # Harness state (attached control layer)
     control: Optional[ControlPacket] = None
 
     def cycle(
