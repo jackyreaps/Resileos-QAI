@@ -1,9 +1,12 @@
 """Kin bundle — align Iris / Metis / Hermes / Eat with AgencyGroup + Zeus.
 
 Harness layer integrated: risk gates, confidence routing, verify-on-stop,
-budget/stuck guards, residual consistency, Apollo outer sensor,
-verification-requirement classification (zero-match rule, 2026-11-09),
-and Hades checkpointing on verified cycles (2026-11-09).
+budget/stuck guards, residual consistency, Apollo outer sensor, and the
+verification-requirement classification (zero-match rule, 2026-11-09).
+
+Hades checkpoint: verified cycles write a durable checkpoint (lesson +
+control_state + residual_hash). The write is non-blocking; a failed save
+does not break the cycle.
 """
 from __future__ import annotations
 
@@ -17,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from resileos.kin.eat import EatDecision, eat_and_learn, eat_filter
+from resileos.kin.hades import Hades
 from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
@@ -35,9 +39,6 @@ from resileos.harness.tools import (
 )
 from resileos.harness.cascade import CascadeRouter
 
-# Hades checkpointing
-from resileos.kin.hades import Hades, make_hades
-
 
 @dataclass
 class KinBundle:
@@ -50,7 +51,6 @@ class KinBundle:
     last_report: Optional[IrisReport] = None
     last_policy: Optional[MetisPolicy] = None
     control: Optional[ControlPacket] = None
-    _hades: Optional[Hades] = field(init=False, default=None, repr=False)
 
     def cycle(
         self,
@@ -71,9 +71,7 @@ class KinBundle:
 
         guard = budget_and_stuck_guard(self.control.to_dict())
         if not guard["ok"]:
-            self.control.append(
-                {"event": "guard_fail", "reason": guard["reason"]}
-            )
+            self.control.append({"event": "guard_fail", "reason": guard["reason"]})
             report = self.observe(metrics=metrics, agency_group=agency_group)
             policy = self.organize(report)
             self.last_report = report
@@ -115,6 +113,22 @@ class KinBundle:
             "verification_required": verification,
         })
 
+        # Hades checkpoint on verified cycles only. The lesson is the
+        # only thing that crosses attempts; history and evidence stay
+        # inside this attempt. Non-blocking: a failed save does not
+        # abort the cycle.
+        if v["verified"]:
+            try:
+                Hades().save(
+                    self.control,
+                    lesson=(
+                        f"kin_cycle turn={self.control.turn} "
+                        f"verified=True rank={self.last_policy.depth if self.last_policy else '?'}"
+                    ),
+                )
+            except Exception:
+                pass
+
         harness_summary = {
             "verified": v["verified"],
             "reason": v["reason"],
@@ -124,34 +138,6 @@ class KinBundle:
             "budget": self.control.budget_remaining,
             "guides": self.control.guides_loaded,
         }
-
-        # ── Hades checkpoint (only when verified) ──────────────────
-        # The bundle gates on `control.verified`. Hades.save itself does
-        # not gate — it will happily write a checkpoint of an unverified
-        # packet if called directly. Here we only call it when verified,
-        # so the checkpoint store reflects verified work only.
-        #
-        # Failures are best-effort: a read-only filesystem or missing
-        # attribute must not break the cycle. If the checkpoint cannot be
-        # written, the cycle still returns the harness summary.
-        if self.control.verified:
-            try:
-                if self._hades is None:
-                    self._hades = make_hades()
-                residual_hash = None
-                if residual_packet is not None:
-                    residual_hash = getattr(
-                        residual_packet, "packet_hash", None
-                    )
-                ckpt = self._hades.save(
-                    self.control,
-                    residual_packet_hash=residual_hash,
-                )
-                harness_summary["checkpoint"] = ckpt.id
-                harness_summary["lesson"] = ckpt.lesson
-            except (OSError, AttributeError, TypeError) as e:
-                harness_summary["checkpoint_error"] = str(e)
-
         return report, policy, harness_summary
 
 
@@ -223,21 +209,12 @@ def register_declining_kin(
 
 
 def bundle_scale(bundle: KinBundle) -> dict:
-    return attach_scale(
-        {"children": len(getattr(bundle, "children", []) or [])}, "kin"
-    )
+    return attach_scale({"children": len(getattr(bundle, "children", []) or [])}, "kin")
 
 
-def bundle_recursive(
-    facts: list, subject: str = "world:kin", eat_fn=None
-) -> dict:
+def bundle_recursive(facts: list, subject: str = "world:kin", eat_fn=None) -> dict:
     return improve_cycle(facts, subject=subject, eat_fn=eat_fn)
 
 
-def bundle_apollo(
-    facts: list,
-    subject: str = "world:apollo",
-    eat_fn=None,
-    art: bool = False,
-) -> dict:
+def bundle_apollo(facts: list, subject: str = "world:apollo", eat_fn=None, art: bool = False) -> dict:
     return apollo_cycle(facts, subject=subject, eat_fn=eat_fn, art=art)
