@@ -31,6 +31,11 @@ Kin cycle (registered by wire_kin):
     /api/v1/apollo                   (Apollo improve cycle)
     /api/v1/eat/*                    (Eat filter, learn functions)
 
+Harness (exposed via /api/v1/tools):
+    decision_fanout, confidence_route, risk_classify, verify_on_stop,
+    budget_and_stuck_guard, guide_load, evidence_attach,
+    residual_consistency, apollo_success
+
 Auth (fail-closed): key sources, merged:
   1. configs/api_keys.json   {"<sha256-hex>": {...}}   primary, hashed
   2. RESILEOS_API_KEYS       {"<plaintext>": {...}}    bootstrap map
@@ -104,6 +109,20 @@ from resileos.titanos.zeus import (  # noqa: E402
     run_zeus_query,
 )
 from resileos.kin.wiring import wire_kin  # noqa: E402
+
+# ── ADDITION 1: harness tool imports ───────────────────────────────────
+from resileos.harness.tools import (  # noqa: E402
+    apollo_success,
+    budget_and_stuck_guard,
+    confidence_route,
+    decision_fanout,
+    evidence_attach,
+    guide_load,
+    residual_consistency,
+    risk_classify,
+    verify_on_stop,
+)
+
 from titanos import Answer, Titanos, TitanosConfig  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -379,6 +398,33 @@ def _answer_backend() -> AnswerBackend:
     return _answer_backend_singleton
 
 
+# ── ADDITION 2: harness tool registry ──────────────────────────────────
+HARNESS_TOOLS = {
+    "decision_fanout": decision_fanout,
+    "confidence_route": confidence_route,
+    "risk_classify": risk_classify,
+    "verify_on_stop": verify_on_stop,
+    "budget_and_stuck_guard": budget_and_stuck_guard,
+    "guide_load": guide_load,
+    "evidence_attach": evidence_attach,
+    "residual_consistency": residual_consistency,
+    "apollo_success": apollo_success,
+}
+
+
+def harness_tool_schemas() -> list[dict]:
+    """Flat schema per harness tool: name + first docstring line."""
+    out: list[dict] = []
+    for name, fn in HARNESS_TOOLS.items():
+        doc = (fn.__doc__ or name).strip().split("\n")[0]
+        out.append({
+            "name": name,
+            "description": doc,
+            "parameters": {"type": "object", "properties": {}},
+        })
+    return out
+
+
 # ── SPARQL adapter ──────────────────────────────────────────────────────
 class _SPARQLAdapter:
     """Bridges Titanos to the RES-322 `_Core` Protocol.
@@ -499,16 +545,18 @@ def titanos_stats():
     return base
 
 
+# ── ADDITION 3: /api/v1/tools returns harness schemas too ──────────────
 @app.get(
     "/api/v1/tools",
     dependencies=[Depends(verify_api_key)],
 )
 def list_tools():
-    """Tool schemas for external frontier mouths + frame tags."""
+    """Tool schemas for external frontier mouths + frame tags + harness."""
     return {
         "tools": list_tool_schemas(),
         "openai": openai_tools(),
         "frames": frame_index(),
+        "harness": harness_tool_schemas(),
     }
 
 
