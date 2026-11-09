@@ -82,11 +82,6 @@ def register_kin_routes(
                 metrics = {}
         agency = get_agency() if get_agency else None
 
-        # Optional residual Packet reconstruction stub. If the caller
-        # supplies a hash, attach it as evidence so residual_consistency
-        # has something to check. The real Packet fields (Ub, Vb,
-        # Lambda, lat_s_k) are not present, so this is hash-evidence
-        # only, not a full consistency check.
         residual_packet = None
         if body.residual_packet_hash:
             residual_packet = type(
