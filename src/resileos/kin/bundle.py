@@ -1,13 +1,7 @@
 """
 Kin bundle — align Iris / Metis / Hermes / Eat with AgencyGroup + Zeus.
-
-Query routing stays with Zeus (or other answer children). Iris, Metis, and
-Hermes are **side interfaces** (RES-334): they do not win subject/relation
-routing. Optional low-weight handlers always return None so accidental
-registration cannot override Zeus answers.
-
-AgencyGroup.eat() remains the fitness prune for answer children.
-eat_filter is the **ingest** gate for new claims (different verb).
+Harness layer integrated: risk gates, confidence routing, verify-on-stop,
+budget/stuck guards, residual consistency, and Apollo as outer sensor.
 """
 from __future__ import annotations
 
@@ -25,6 +19,19 @@ from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
 
+# Harness integration
+from resileos.harness.packet import ControlPacket
+from resileos.harness.tools import (
+    budget_and_stuck_guard,
+    residual_consistency,
+    verify_on_stop,
+    risk_classify,
+    guide_load,
+    evidence_attach,
+    apollo_success,
+)
+from resileos.harness.cascade import CascadeRouter
+
 
 @dataclass
 class KinBundle:
@@ -36,6 +43,8 @@ class KinBundle:
     hermes_handler: Callable[..., Any]
     last_report: Optional[IrisReport] = None
     last_policy: Optional[MetisPolicy] = None
+    # Harness state (attached control layer)
+    control: Optional[ControlPacket] = None
 
     def cycle(
         self,
@@ -43,100 +52,21 @@ class KinBundle:
         agency_group: Any = None,
         *,
         apply_policy: bool = True,
-    ) -> tuple[IrisReport, MetisPolicy]:
-        """Iris observe → Metis organize → optional AgencyGroup weight hints."""
-        report = self.observe(metrics=metrics, agency_group=agency_group)
-        policy = self.organize(report)
-        self.last_report = report
-        self.last_policy = policy
-        if apply_policy and agency_group is not None:
-            apply_metis_to_agency(policy, agency_group)
-        return report, policy
+        residual_packet: Any = None,  # optional residual Packet for consistency
+    ) -> tuple[IrisReport, MetisPolicy, dict]:
+        """Iris → Metis + full harness guards and outer verification."""
+        # Ensure control packet exists
+        if self.control is None:
+            self.control = ControlPacket(id="kin-cycle")
 
+        # 1. Hierarchical guides (JIT context)
+        guide_load(["docs/harness/CONSTRAINTS.md", "docs/harness/AGENTS.md"], self.control.to_dict())
 
-def apply_metis_to_agency(policy: MetisPolicy, agency_group: Any) -> list[str]:
-    """
-    Apply organizer hints without calling learn.
-
-    - disable_children: mark inactive if present (does not delete)
-    - does not invent fitness; respects already-eaten names from Iris
-    """
-    changed: list[str] = []
-    children = getattr(agency_group, "children", None)
-    if not isinstance(children, dict):
-        return changed
-    for name in policy.disable_children:
-        ch = children.get(name)
-        if ch is not None and getattr(ch, "active", False):
-            ch.active = False
-            eaten = getattr(agency_group, "eaten", None)
-            if isinstance(eaten, list) and name not in eaten:
-                eaten.append(name)
-            changed.append(name)
-    # re-normalize if API exists
-    norm = getattr(agency_group, "_normalize_weights", None)
-    if callable(norm):
-        try:
-            norm()
-        except Exception:
-            pass
-    return changed
-
-
-def build_kin_bundle(
-    *,
-    hermes_max_depth: int = 2,
-    hermes_max_items: int = 8,
-) -> KinBundle:
-    observe, iris_h = make_iris_observer()
-    organize, metis_h = make_metis_organizer()
-    navigate, hermes_h = make_hermes_navigator(
-        max_depth=hermes_max_depth, max_items=hermes_max_items
-    )
-    return KinBundle(
-        observe=observe,
-        organize=organize,
-        navigate=navigate,
-        iris_handler=iris_h,
-        metis_handler=metis_h,
-        hermes_handler=hermes_h,
-    )
-
-
-def register_answer_child(
-    agency_group: Any,
-    name: str,
-    handler: Callable[..., Any],
-    weight: float = 1.0,
-) -> Any:
-    """Register a fact-answering child (e.g. Zeus). Not for Iris/Metis/Hermes."""
-    return agency_group.add_child(name, handler, weight=weight)
-
-
-def register_declining_kin(
-    agency_group: Any,
-    bundle: KinBundle,
-    *,
-    weight: float = 0.01,
-) -> None:
-    """
-    Optional: register declining handlers so snapshot lists kin names.
-    They always return None — Zeus (or others) must hold real answer weight.
-    """
-    for name, h in (
-        ("iris", bundle.iris_handler),
-        ("metis", bundle.metis_handler),
-        ("hermes", bundle.hermes_handler),
-    ):
-        if name not in getattr(agency_group, "children", {}):
-            agency_group.add_child(name, h, weight=weight)
-
-def bundle_scale(bundle: KinBundle) -> dict:
-    return attach_scale({"children": len(getattr(bundle, "children", []) or [])}, "kin")
-
-def bundle_recursive(facts: list, subject: str = "world:kin", eat_fn=None) -> dict:
-    """Run one success-prioritized improve cycle from this kin."""
-    return improve_cycle(facts, subject=subject, eat_fn=eat_fn)
-
-def bundle_apollo(facts: list, subject: str = "world:apollo", eat_fn=None, art: bool = False) -> dict:
-    return apollo_cycle(facts, subject=subject, eat_fn=eat_fn, art=art)
+        # 2. Budget + stuck guard
+        guard = budget_and_stuck_guard(self.control.to_dict())
+        if not guard["ok"]:
+            self.control.append({"event": "guard_fail", "reason": guard["reason"]})
+            # Still produce Iris/Metis but mark unverified
+            report = self.observe(metrics=metrics, agency_group=agency_group)
+            policy = self.organize(report)
+            self.last_report =
