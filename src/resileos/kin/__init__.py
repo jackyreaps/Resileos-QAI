@@ -14,10 +14,13 @@ from resileos.kin.frames import (
     classify_decision,
     hub_category,
 )
+from resileos.kin.hades import Checkpoint, Hades
+from resileos.kin.harness_wrap import harness_wrap
 from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
 from resileos.kin.mouth_policy import should_render_prose
+from resileos.kin.perception_kin import perception_cycle
 from resileos.kin.verifiers import run_verifiers
 from resileos.kin.wiring import (
     get_kin_bundle,
@@ -31,8 +34,6 @@ from resileos.harness.separated import (
     run_separated,
     zeus_head,
 )
-from resileos.kin.perception_kin import perception_cycle
-from resileos.kin.harness_wrap import harness_wrap
 
 __all__ = [
     "KinBundle",
@@ -67,4 +68,6 @@ __all__ = [
     "run_separated",
     "perception_cycle",
     "harness_wrap",
+    "Hades",
+    "Checkpoint",
 ]
