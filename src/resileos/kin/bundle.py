@@ -126,9 +126,14 @@ class KinBundle:
         }
 
         # ── Hades checkpoint (only when verified) ──────────────────
-        # The bundle gates on `control.verified`; Hades.save itself does
-        # not. If Hades creation or disk write fails, the cycle still
-        # returns — the checkpoint is best-effort, not load-bearing.
+        # The bundle gates on `control.verified`. Hades.save itself does
+        # not gate — it will happily write a checkpoint of an unverified
+        # packet if called directly. Here we only call it when verified,
+        # so the checkpoint store reflects verified work only.
+        #
+        # Failures are best-effort: a read-only filesystem or missing
+        # attribute must not break the cycle. If the checkpoint cannot be
+        # written, the cycle still returns the harness summary.
         if self.control.verified:
             try:
                 if self._hades is None:
