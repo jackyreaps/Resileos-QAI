@@ -138,7 +138,6 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("resileos.api")
 
 app = FastAPI(title="Resileos-QAI")
-# one residual core and one Kuramoto field for the process
 init_shared()
 
 STATE_FILE = ROOT / "titanos_live_state.json"
@@ -420,7 +419,6 @@ class LearnRequest(BaseModel):
     subject: str
     relation: str
     obj: str
-    # RES-332: ISO 8601 date strings, or None.
     valid_from: Optional[str] = None
     valid_to: Optional[str] = None
 
@@ -430,7 +428,6 @@ class QueryRequest(BaseModel):
     relation: str
     inverse: bool = False
     render: bool = False
-    # RES-332: ISO 8601 date, None = today, "" = full historical log.
     as_of: Optional[str] = None
 
 
@@ -444,9 +441,6 @@ class ChainRequest(BaseModel):
 
 
 class BatchLearnRequest(BaseModel):
-    # Rows may be 3-element (s, r, o) or 5-element
-    # (s, r, o, valid_from, valid_to). None is allowed for the
-    # validity fields.
     facts: list[list[Optional[str]]]
 
 
@@ -455,7 +449,6 @@ class AnswerRequest(BaseModel):
     subject: Optional[str] = None
     relation: Optional[str] = None
     inverse: bool = False
-    # RES-332: ISO 8601 date, None = today, "" = full historical log.
     as_of: Optional[str] = None
 
 
@@ -831,6 +824,7 @@ def titanos_query(payload: QueryRequest):
                 payload.subject,
                 payload.relation,
                 inverse=payload.inverse,
+                as_of=payload.as_of,
             )
         if ans is None:
             ans = (
