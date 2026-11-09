@@ -11,6 +11,7 @@ Layers:
     order parameter   Kuramoto R from theta gates confidence (RES-316)
     attractor         SDM + Hopfield denoise on recurrent state (RES-317)
     recovery          F2 phase recovery gate (RES-326 / recovery_gate.py)
+    temporal          valid-time on facts (RES-332 / chronos-kairos)
 
 Storage uses MAP triple binding:
     band += s * r * o               (elementwise, bipolar)
@@ -41,6 +42,14 @@ would otherwise pass. Disabled by default on config-level opt-in; see
 `TitanosConfig.use_recovery_gate`. The fast path (`csi_fast_path=True`)
 bypasses this gate by design; disable the fast path if the gate must
 apply to all queries.
+
+Temporal extension (RES-332):
+    Facts gain an optional validity interval `(valid_from, valid_to)`.
+    Legacy 3-tuple facts read as `(None, None)` = always valid.
+    `ask_list(..., as_of=...)` filters on validity at query time.
+    `ask()` respects current validity (as_of=None means "now").
+    Append-only: a conflicting fact with overlapping validity is
+    stored, not overwritten. Conflict surfacing is the caller's job.
 """
 from __future__ import annotations
 
@@ -50,8 +59,9 @@ import math
 import re
 import sys
 from dataclasses import dataclass, field, asdict
+from datetime import date
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 import numpy as np
 
@@ -120,19 +130,17 @@ class TitanosConfig:
     use_order_parameter_gate: bool = False
     order_parameter_floor: float = 0.5
 
-    # Attractor (RES-317). When True and at least one fact is stored,
-    # the recurrent loop denoises its hidden state through SDM +
-    # Hopfield between iterations. Empty store -> no-op.
     use_attractor: bool = True
 
-    # Recovery gate (F2 / RES-326). Additive veto alongside RES-302:
-    # ABSTAIN if the non-conservative phase field cannot recover to
-    # its synchron target, regardless of sigma / confidence. Uses
-    # recovery_loss only (no perturb probe) — the per-query cost is
-    # one |mean(exp(iθ))| evaluation.
     use_recovery_gate: bool = False
     recovery_loss_max: float = 0.15
     recovery_r_min: float = 0.85
+
+    # Temporal (RES-332): whether ask() should filter on current
+    # validity. Default True so that expired facts (valid_to in the
+    # past) are excluded from recurrent queries. Set False to query
+    # the full historical set regardless of validity.
+    temporal_filter_current: bool = True
 
     X: float = 70.0
     Y: int = 3
@@ -227,14 +235,39 @@ class Titanos:
             living_sharpness=cfg.csi_living_sharpness,
         )
         self.agency = AgencyGroup()
-        # Attractor (RES-317). Optional; failures fall back to None and
-        # the recurrent loop behaves exactly as before.
         self._attractor: AttractorMemory | None = None
         if cfg.use_attractor:
             try:
                 self._attractor = AttractorMemory(SDMConfig(dim=cfg.dim))
             except Exception:
                 self._attractor = None
+
+    # ── temporal helper (RES-332) ───────────────────────────────────
+    @staticmethod
+    def _fact_fields(fact: tuple) -> tuple[str, str, str, Optional[str], Optional[str]]:
+        """Normalise a fact tuple to (s, r, o, valid_from, valid_to).
+
+        Legacy 3-tuple facts read as (None, None) validity = always valid.
+        """
+        if len(fact) >= 5:
+            return fact[0], fact[1], fact[2], fact[3], fact[4]
+        return fact[0], fact[1], fact[2], None, None
+
+    @classmethod
+    def _fact_valid_at(cls, fact: tuple, as_of: Optional[str] = None) -> bool:
+        """True if the fact's validity interval covers `as_of`.
+
+        as_of=None means "now" (today's date in ISO 8601).
+        None valid_from means "since forever"; None valid_to means
+        "still true".
+        """
+        _s, _r, _o, valid_from, valid_to = cls._fact_fields(fact)
+        as_of_str = str(as_of) if as_of is not None else date.today().isoformat()
+        if valid_from is not None and str(valid_from) > as_of_str:
+            return False
+        if valid_to is not None and as_of_str >= str(valid_to):
+            return False
+        return True
 
     # ── accumulators ─────────────────────────────────────────────────
     @property
@@ -253,14 +286,27 @@ class Titanos:
             self._counts[relation] = 0
         return self._bands[relation]
 
-    def _slot_candidates(self, relation: str, inverse: bool) -> set[str]:
+    def _slot_candidates(self, relation: str, inverse: bool,
+                         as_of: Optional[str] = None) -> set[str]:
         """Entities occupying the queried slot for `relation`.
 
         inverse=False -> objects (forward: anchor points at them)
         inverse=True  -> subjects (inverse: they point at anchor)
+
+        Temporal: when `temporal_filter_current` is True (default) and
+        `as_of` is None, `_fact_valid_at` uses today's date — expired
+        facts are excluded. Pass an explicit `as_of` for historical
+        queries, or set `temporal_filter_current=False` on the config
+        to disable the filter.
         """
         idx = 0 if inverse else 2
-        return {f[idx] for f in self.facts if f[1] == relation}
+        use_filter = as_of is not None or self.cfg.temporal_filter_current
+        if not use_filter:
+            return {f[idx] for f in self.facts if f[1] == relation}
+        return {
+            f[idx] for f in self.facts
+            if f[1] == relation and self._fact_valid_at(f, as_of)
+        }
 
     # ── monitors ─────────────────────────────────────────────────────
     def _current_anisotropy(self) -> float:
@@ -336,20 +382,6 @@ class Titanos:
 
     # ── recovery gate (F2 / RES-326) ────────────────────────────────
     def _evaluate_recovery_gate(self) -> tuple[str, float, str]:
-        """Evaluate the F2 recovery gate on the live phase field.
-
-        Returns (action, recovery_loss, reason) where action is
-        "CONTINUE" or "ABSTAIN". Uses `evaluate_recovery_gate` from
-        `recovery_gate.py` with `perturb_probe=None`: only the
-        `recovery_loss` check runs, not the `recovery_time` probe.
-        The per-query cost is one |mean(exp(i*theta))| evaluation.
-
-        The non-conservative operator is duck-typed through `.theta`.
-        With `perturb_probe=None` the gate never touches `.r`, `.kappa`,
-        or `.omega`, so passing the operator directly is safe. If
-        `emergent=False`, no non-conservative operator exists and the
-        gate is a no-op.
-        """
         if not self.cfg.use_recovery_gate:
             return ("CONTINUE", 0.0, "")
         op = getattr(self.core, "_nonconservative", None)
@@ -370,7 +402,6 @@ class Titanos:
                 decision.reason,
             )
         except Exception:
-            # The recovery gate is additive; never break the query path.
             return ("CONTINUE", 0.0, "")
 
     # ── learned primitives ───────────────────────────────────────────
@@ -412,9 +443,20 @@ class Titanos:
         return np.where(acc >= 0, 1, -1).astype(np.int8)
 
     # ── MAP triple binding ───────────────────────────────────────────
-    def _learn_bands(self, subject: str, relation: str,
-                     obj: str) -> np.ndarray:
-        """Band update + fact log. No attractor write."""
+    def _learn_bands(
+        self,
+        subject: str,
+        relation: str,
+        obj: str,
+        valid_from: Optional[str] = None,
+        valid_to: Optional[str] = None,
+    ) -> np.ndarray:
+        """Band update + fact log with validity (RES-332).
+
+        The band accumulator adds the bound vector regardless of
+        validity — bands are time-agnostic. Validity lives on the fact
+        tuple and is applied at query time by `_fact_valid_at`.
+        """
         s = self._ent(subject)
         r = self._rel(relation)
         o = self._ent(obj)
@@ -422,22 +464,33 @@ class Titanos:
         bound = (s * r * o).astype(np.int32)
         band += bound
         self._counts[relation] += 1
-        self.facts.append((subject, relation, obj))
+        self.facts.append((subject, relation, obj, valid_from, valid_to))
         return bound
 
-    def learn(self, subject: str, relation: str, obj: str,
-              update_attractor: bool = True) -> None:
-        """band += s * r * o. Forward probe s*r retrieves o; inverse
-        probe o*r retrieves s. Because bind is self-inverse, the probe
-        recovers whichever slot the anchor occupies; direction is
-        enforced at cleanup via `_slot_candidates`.
+    def learn(
+        self,
+        subject: str,
+        relation: str,
+        obj: str,
+        *,
+        valid_from: Optional[str] = None,
+        valid_to: Optional[str] = None,
+        update_attractor: bool = True,
+    ) -> None:
+        """band += s * r * o with optional validity interval (RES-332).
 
-        `update_attractor=False` skips the SDM write. The Hopfield
-        matrix is rebuilt lazily on the first cleanup or explicit
-        flush, so individual `learn()` calls do not pay the O(N)
-        restack cost.
+        valid_from / valid_to are ISO 8601 strings or None:
+          None valid_from  -> "since forever"
+          None valid_to    -> "still true"
+
+        Append-only: a conflicting fact with overlapping validity is
+        stored, not overwritten. Conflict surfacing is the caller's
+        responsibility (see `ask_list(as_of=...)` for multi-value
+        retrieval).
         """
-        bound = self._learn_bands(subject, relation, obj)
+        bound = self._learn_bands(
+            subject, relation, obj, valid_from, valid_to,
+        )
         if self._attractor is not None and update_attractor:
             try:
                 self._attractor.store(bound.astype(np.float64))
@@ -446,24 +499,37 @@ class Titanos:
 
     def learn_many(
         self,
-        facts: Iterable[tuple[str, str, str]],
+        facts: Iterable,
         update_attractor: bool = True,
     ) -> int:
-        """Batch learn. One attractor flush at the end.
+        """Batch learn with validity (RES-332).
 
-        Equivalent to calling `learn()` for each fact followed by one
-        `self._attractor.flush()`. Use this for bulk seeding: it avoids
-        the per-call Hopfield rebuild without changing semantics.
+        Each item may be:
+          (s, r, o)                      -> validity (None, None)
+          (s, r, o, valid_from, valid_to) -> explicit validity
+
+        One attractor flush at the end. Use for bulk seeding.
         """
         n = 0
-        for subject, relation, obj in facts:
-            s = str(subject).strip()
-            r = str(relation).strip()
-            o = str(obj).strip()
+        for item in facts:
+            if len(item) == 3:
+                s, r, o = item
+                valid_from, valid_to = None, None
+            elif len(item) >= 5:
+                s, r, o, valid_from, valid_to = (
+                    item[0], item[1], item[2], item[3], item[4],
+                )
+            else:
+                continue
+            s = str(s).strip()
+            r = str(r).strip()
+            o = str(o).strip()
             if not (s and r and o):
                 continue
             try:
-                bound = self._learn_bands(s, r, o)
+                bound = self._learn_bands(
+                    s, r, o, valid_from, valid_to,
+                )
             except Exception:
                 continue
             if self._attractor is not None and update_attractor:
@@ -481,8 +547,6 @@ class Titanos:
 
     def _encode_probe(self, anchor: str, relation: str,
                       inverse: bool = False) -> np.ndarray:
-        """MAP probe: anchor * relation. Direction is enforced during
-        cleanup via `_slot_candidates`, not by the probe form."""
         return (self._ent(anchor) * self._rel(relation)).astype(np.int8)
 
     # ── scoring / cleanup ────────────────────────────────────────────
@@ -589,10 +653,6 @@ class Titanos:
             if delta < self.cfg.convergence_threshold:
                 return h_c, history, "CONVERGED", state
             h = h_c
-            # Attractor denoise (RES-317). Snap the next iterate
-            # toward the nearest stored fact vector before it feeds the
-            # next core.step. Skipped when the store is empty. The
-            # first cleanup triggers the deferred Hopfield rebuild.
             if (self._attractor is not None
                     and self._attractor.n_patterns > 0):
                 try:
@@ -702,9 +762,6 @@ class Titanos:
         self._update_csi_from_history(history)
         updated_csi = self._csi.value()
 
-        # Recovery gate (F2 / RES-326). Additive veto: if the phase
-        # field is not near its synchron target after the recurrent
-        # loop, abstain even when sigma / confidence would pass.
         rec_action, rec_loss, rec_reason = self._evaluate_recovery_gate()
         if rec_action == "ABSTAIN":
             self._recovery_veto_count += 1
@@ -815,21 +872,43 @@ class Titanos:
         return self._ask(obj, relation, inverse=True)
 
     def ask_list(self, anchor: str, relation: str,
-                 inverse: bool = False) -> list[str]:
+                 inverse: bool = False,
+                 as_of: Optional[str] = None) -> list[str]:
         """All entities in the queried slot relative to `anchor`.
 
-        SPARQL adapter (RES-322 Protocol). Forward returns objects;
-        inverse returns subjects. Exact retrieval from the fact list,
-        not VSA cleanup — this is what the query executor wants.
+        SPARQL adapter (RES-322 Protocol) with temporal filter (RES-332).
+
+        inverse=False -> objects (forward: anchor points at them)
+        inverse=True  -> subjects (inverse: they point at anchor)
+
+        as_of:
+          None          -> current state (today)
+          ISO 8601 date -> only facts valid at that moment
+          Empty string  -> all facts regardless of validity
+
+        Multi-value returns (including temporal conflicts) are returned
+        in full. Conflict surfacing is the caller's responsibility.
         """
+        use_filter = True
+        as_of_arg = as_of
+        if as_of == "":
+            use_filter = False
+
+        def _match(f: tuple) -> bool:
+            if f[1] != relation:
+                return False
+            if not use_filter:
+                return True
+            return self._fact_valid_at(f, as_of_arg)
+
         if inverse:
             return sorted({
                 f[0] for f in self.facts
-                if f[1] == relation and f[2] == anchor
+                if _match(f) and f[2] == anchor
             })
         return sorted({
             f[2] for f in self.facts
-            if f[1] == relation and f[0] == anchor
+            if _match(f) and f[0] == anchor
         })
 
     def iter_entities(self) -> list[str]:
@@ -997,12 +1076,25 @@ class Titanos:
                 "classical_threshold": float(classical),
                 "abstain_threshold": float(abstain),
             }
+
+        # Temporal (RES-332)
+        facts_with_validity = sum(
+            1 for f in self.facts
+            if len(f) >= 5 and (f[3] is not None or f[4] is not None)
+        )
+        facts_expired = sum(
+            1 for f in self.facts
+            if not self._fact_valid_at(f)
+        )
+
         return {
             "dim": self.cfg.dim,
             "core_matrix": f"{self.cfg.m}x{self.cfg.n}",
             "latent_rank": self.cfg.r,
             "max_loops": self.cfg.n_loops,
             "facts": len(self.facts),
+            "facts_with_validity": int(facts_with_validity),
+            "facts_expired": int(facts_expired),
             "entities": len(self.entities),
             "relations": len(self.relations),
             "bands": len(self._bands),
@@ -1021,6 +1113,9 @@ class Titanos:
             "recovery_loss_max": float(self.cfg.recovery_loss_max),
             "recovery_r_min": float(self.cfg.recovery_r_min),
             "recovery_veto_count": int(self._recovery_veto_count),
+            "temporal_filter_current": bool(
+                self.cfg.temporal_filter_current
+            ),
             "query_count": int(self._query_count),
             "fast_path_count": int(self._fast_path_count),
             "escalation_count": int(self._escalation_count),
@@ -1097,7 +1192,12 @@ class Titanos:
             k: np.array(v, dtype=np.int8)
             for k, v in raw["roles"].items()
         }
-        obj.facts = [tuple(t) for t in raw["facts"]]
+        # Normalise legacy 3-tuple facts to 5-tuple with (None, None)
+        obj.facts = [
+            tuple(t) if len(t) >= 5
+            else (t[0], t[1], t[2], None, None)
+            for t in raw["facts"]
+        ]
         obj._perm = np.array(raw["perm"])
         obj._perm_cache = {0: np.arange(cfg.dim)}
         obj._query_count = int(raw.get("query_count", 0))
@@ -1109,12 +1209,10 @@ class Titanos:
         if "csi_state" in raw:
             obj._csi.load_state_dict(raw["csi_state"])
 
-        # Rebuild the attractor from facts without the per-store
-        # Hopfield restack. Deferred store + one flush; no giant
-        # intermediate stack.
         if obj._attractor is not None and obj.facts:
             try:
-                for s_name, r_name, o_name in obj.facts:
+                for fact in obj.facts:
+                    s_name, r_name, o_name, _vf, _vt = obj._fact_fields(fact)
                     s_vec = obj.entities.get(s_name)
                     r_vec = obj.relations.get(r_name)
                     o_vec = obj.entities.get(o_name)
@@ -1215,3 +1313,20 @@ if __name__ == "__main__":
 
     print("\n--- Stats ---")
     print(json.dumps(titan.stats(), indent=2, default=float))
+
+    # ── Temporal demo (RES-332) ─────────────────────────────────────
+    print("\n--- Temporal demo ---")
+    tt = Titanos(TitanosConfig(dim=2000, m=50, n=40, r=4, n_loops=3, seed=0))
+    tt.learn("Athens", "capital_of", "Ottoman Empire",
+             valid_from="1458-01-01", valid_to="1834-01-01")
+    tt.learn("Athens", "capital_of", "Greece",
+             valid_from="1834-01-01", valid_to=None)
+    print("as_of 1450:", tt.ask_list("Athens", "capital_of", as_of="1450-01-01"))
+    print("as_of 1800:", tt.ask_list("Athens", "capital_of", as_of="1800-01-01"))
+    print("as_of 1900:", tt.ask_list("Athens", "capital_of", as_of="1900-01-01"))
+    print("all     :", tt.ask_list("Athens", "capital_of", as_of=""))
+    print("temporal stats:", json.dumps({
+        "facts": tt.stats()["facts"],
+        "with_validity": tt.stats()["facts_with_validity"],
+        "expired": tt.stats()["facts_expired"],
+    }, indent=2))
