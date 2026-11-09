@@ -1,10 +1,10 @@
-"""
-Optional FastAPI routes for eat + kin cycle.
+"""Optional FastAPI routes for eat + kin cycle.
 
 Mount from app.py when ready:
 
     from resileos.kin.http_routes import register_kin_routes
-    register_kin_routes(app, get_titanos=lambda: titanos_singleton, auth_dep=verify_api_key)
+    register_kin_routes(app, get_titanos=lambda: titanos_singleton,
+                        auth_dep=verify_api_key)
 """
 from __future__ import annotations
 
@@ -34,13 +34,16 @@ def register_kin_routes(
     deps = [Depends(auth_dep)] if auth_dep is not None else []
 
     class EatRequest(BaseModel):
-        claim: Any = Field(..., description="Triple string or {subject,relation,obj}")
+        claim: Any = Field(
+            ..., description="Triple string or {subject,relation,obj}"
+        )
         user_id: str = ""
         allow_sys: bool = False
 
     class CycleRequest(BaseModel):
         user_id: str = ""
         apply_policy: bool = True
+        residual_packet_hash: Optional[str] = None
 
     bundle_holder: dict[str, KinBundle] = {}
 
@@ -78,12 +81,29 @@ def register_kin_routes(
             except Exception:
                 metrics = {}
         agency = get_agency() if get_agency else None
-        report, policy = _bundle().cycle(
+
+        # Optional residual Packet reconstruction stub. If the caller
+        # supplies a hash, attach it as evidence so residual_consistency
+        # has something to check. The real Packet fields (Ub, Vb,
+        # Lambda, lat_s_k) are not present, so this is hash-evidence
+        # only, not a full consistency check.
+        residual_packet = None
+        if body.residual_packet_hash:
+            residual_packet = type(
+                "Stub", (), {"packet_hash": body.residual_packet_hash}
+            )()
+
+        report, policy, harness = _bundle().cycle(
             metrics=metrics,
             agency_group=agency,
             apply_policy=body.apply_policy,
+            residual_packet=residual_packet,
         )
-        return {"report": report.to_dict(), "policy": policy.to_dict()}
+        return {
+            "report": report.to_dict(),
+            "policy": policy.to_dict(),
+            "harness": harness,
+        }
 
     @app.post("/api/v1/eat/preview", dependencies=deps)
     def api_eat_preview(body: EatRequest) -> dict:
@@ -108,7 +128,9 @@ def register_kin_routes(
                 return rows if len(rows) > 1 else rows[0]
             return titan.ask(s, r)
 
-        return council_query(body.subject, body.relation, ask, profile=body.profile).to_dict()
+        return council_query(
+            body.subject, body.relation, ask, profile=body.profile
+        ).to_dict()
 
     class PerceiveRequest(BaseModel):
         caption: str
@@ -118,12 +140,16 @@ def register_kin_routes(
     @app.post("/api/v1/perceive", dependencies=deps)
     def api_perceive(body: PerceiveRequest) -> dict:
         from resileos.ui.perceive import perceive
-        from resileos.kin.eat import eat_filter
 
         def eat(claim):
             return eat_filter(claim)
 
-        return perceive(body.caption, subject=body.subject, eat_fn=eat, commit=body.commit)
+        return perceive(
+            body.caption,
+            subject=body.subject,
+            eat_fn=eat,
+            commit=body.commit,
+        )
 
     class TaskStep(BaseModel):
         subject: str
@@ -136,17 +162,20 @@ def register_kin_routes(
     @app.post("/api/v1/task", dependencies=deps)
     def api_task(body: TaskRequest) -> dict:
         from resileos.ui.scale_wire import task_with_scale
+
         titan = get_titanos()
 
         def ask(s, r):
             fn = getattr(titan, "ask", None)
             return fn(s, r) if callable(fn) else None
 
-        steps = [st.model_dump() if hasattr(st, "model_dump") else st.dict() for st in body.steps]
+        steps = [
+            st.model_dump() if hasattr(st, "model_dump") else st.dict()
+            for st in body.steps
+        ]
         return task_with_scale(body.goal, steps, ask)
 
     class PerceiveImageRequest(BaseModel):
-        # base64 RGB bytes or a feature dict from the client
         features: Optional[dict] = None
         subject: str = "image"
 
@@ -154,10 +183,21 @@ def register_kin_routes(
     def api_perceive_image(body: PerceiveImageRequest) -> dict:
         from resileos.ui.framework_gate import gate_candidate
         from resileos.ui.image_encoder import features_to_triples
+
         features = body.features or {}
-        triples = features_to_triples(features, subject=body.subject) if features else []
-        gated = [gate_candidate(t, stored=[], eat_accepted=False) for t in triples]
-        return {"features": features, "candidates": gated, "note": "Not facts until eat accepts and learn is called."}
+        triples = (
+            features_to_triples(features, subject=body.subject)
+            if features
+            else []
+        )
+        gated = [
+            gate_candidate(t, stored=[], eat_accepted=False) for t in triples
+        ]
+        return {
+            "features": features,
+            "candidates": gated,
+            "note": "Not facts until eat accepts and learn is called.",
+        }
 
     class WorkbenchRequest(BaseModel):
         text: str
@@ -167,7 +207,7 @@ def register_kin_routes(
     @app.post("/api/v1/workbench", dependencies=deps)
     def api_workbench(body: WorkbenchRequest) -> dict:
         from resileos.ui.workbench import formalize
-        from resileos.kin.eat import eat_filter
+
         titan = get_titanos()
 
         def eat(claim):
@@ -178,7 +218,13 @@ def register_kin_routes(
             if callable(fn):
                 fn(s, r, o)
 
-        return formalize(body.text, subject=body.subject, persona=body.persona, eat_fn=eat, learn_fn=learn)
+        return formalize(
+            body.text,
+            subject=body.subject,
+            persona=body.persona,
+            eat_fn=eat,
+            learn_fn=learn,
+        )
 
     class QdterIngestRequest(BaseModel):
         track: str
@@ -190,7 +236,7 @@ def register_kin_routes(
     @app.post("/api/v1/qdter/ingest", dependencies=deps)
     def api_qdter(body: QdterIngestRequest) -> dict:
         from resileos.ui.qdter_interface import ingest
-        from resileos.kin.eat import eat_filter
+
         claim = f"{body.track} payload {body.payload_id}"
         decision = eat_filter(claim)
         return ingest(
@@ -214,7 +260,7 @@ def register_kin_routes(
     @app.post("/api/v1/hub/learn", dependencies=deps)
     def api_hub_learn(body: HubLearnRequest) -> dict:
         from resileos.ui.hub import Hub
-        from resileos.kin.eat import eat_filter
+
         h = _HUBS.get(body.hub_id)
         if h is None:
             h = Hub(body.hub_id, kind=body.kind)
@@ -223,7 +269,9 @@ def register_kin_routes(
         def eat(claim):
             return eat_filter(claim)
 
-        event = h.learn(body.subject, body.relation, body.obj, eat_fn=eat)
+        event = h.learn(
+            body.subject, body.relation, body.obj, eat_fn=eat
+        )
         return {"event": event, "observe": h.observe()}
 
     @app.get("/api/v1/hub/{hub_id}", dependencies=deps)
@@ -241,5 +289,10 @@ def register_kin_routes(
     @app.post("/api/v1/apollo", dependencies=deps)
     def api_apollo(body: ApolloRequest) -> dict:
         from resileos.kin.apollo import apollo_cycle
-        from resileos.kin.eat import eat_filter
-        return apollo_cycle(body.facts, subject=body.subject, eat_fn=eat_filter, art=body.art)
+
+        return apollo_cycle(
+            body.facts,
+            subject=body.subject,
+            eat_fn=eat_filter,
+            art=body.art,
+        )
