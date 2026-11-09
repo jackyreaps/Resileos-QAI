@@ -1,106 +1,93 @@
-"""Wire UI perception into the kin. Image, audio, video, language, and art all
-write into Psyche, then Athena judges, then Apollo can hop on the resulting
-rows.
-
-Two paths:
-
-    wire_perception(psyche, perceived, learn_fn=titan.learn)
-        SEPARATED. Athena proposes, verifiers + council review, Zeus
-        applies only if every reviewer approves. Claims are captured by
-        a shim; the real learn function is called only in apply().
-
-    wire_perception(psyche, perceived, eat_fn=some_fn)
-        LEGACY. judge() calls eat_fn directly. No separation — the writer
-        and the applier are the same call. Emits a DeprecationWarning.
-
-Prefer learn_fn. eat_fn is kept for compatibility with existing call
-sites and tests.
-"""
-from __future__ import annotations
-
+"""Tests for wire_perception: legacy deprecation path vs separated path."""
+import sys
+from pathlib import Path
 import warnings
-from typing import Any, Callable, Optional
 
-from resileos.kin.athena import judge
-from resileos.kin.perceive_into import perceive_into
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
 from resileos.kin.psyche import Psyche
+from resileos.kin.wire_perception import wire_perception
 
 
-def wire_perception(
-    psyche: Psyche,
-    perceived: dict[str, Any],
-    *,
-    others: Optional[list[dict[str, Any]]] = None,
-    eat_fn: Optional[Callable[..., Any]] = None,
-    learn_fn: Optional[Callable[[str, str, str], None]] = None,
-    ask_fn: Optional[Callable[[str, str], Any]] = None,
-    use_council: bool = True,
-    profile: str = "personal",
-) -> dict[str, Any]:
-    """One call from any UI perceive module into the kin.
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
-    If `learn_fn` is provided, the perception runs through the separated
-    cycle (write -> review -> apply) and returns harness fields.
-    If only `eat_fn` is provided, falls back to the legacy direct write
-    and warns that the cycle is unverified.
-    """
-    if learn_fn is not None:
-        from resileos.kin.perception_kin import perception_cycle
 
-        result = perception_cycle(
-            psyche,
-            perceived,
-            learn_fn=learn_fn,
-            ask_fn=ask_fn,
-            others=others,
-            use_council=use_council,
-            profile=profile,
-        )
-        # Normalise to the legacy shape so existing callers keep working,
-        # plus the new harness fields.
-        return {
-            # Legacy keys (were always present)
-            "state": result.get("psyche_state", dict(psyche.state)),
-            "rows": result.get("hub_rows", psyche.hub_rows()),
-            "judgment": {
-                "ok": bool(result.get("applied", False)),
-                "reading": result.get("verdict", "")
-                if isinstance(result.get("verdict"), str)
-                else "",
-                "gate": {
-                    "frame": "applied" if result.get("applied") else "abstained"
-                },
-                "applied": bool(result.get("applied", False)),
-            },
-            # New keys for callers who want them
-            "applied": bool(result.get("applied", False)),
-            "learned": int(result.get("learned", 0) or 0),
-            "verification": result.get("verification", {}),
-            "verdicts": result.get("verdicts", []),
-        }
-
-    # Legacy path: write-and-approve in one call.
-    warnings.warn(
-        "wire_perception(eat_fn=...) writes facts without review. "
-        "Pass learn_fn=<titan.learn> instead to route through the "
-        "separated cycle (write -> review -> apply).",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    perceive_into(psyche, perceived)
-    percs = [perceived] + (others or [])
-    reading = judge(
-        percs,
-        subject=psyche.subject,
-        eat_fn=eat_fn,
-        frames=psyche.state.get("frames"),
-        drives=psyche.state.get("drives"),
-    )
+def _perceived():
     return {
-        "state": psyche.state,
-        "rows": psyche.hub_rows(),
-        "judgment": reading,
+        "subject": "image",
+        "address": {"belt": 1, "residual_bin": "mid_mid"},
+        "mean_luma": 0.7,
     }
 
 
-__all__ = ["wire_perception"]
+def test_legacy_eat_fn_warns_deprecation():
+    psyche = Psyche()
+    learned = []
+    def eat_fn(claim):
+        learned.append(claim)
+        return type("D", (), {"accepted": True})()
+    with pytest.warns(DeprecationWarning, match="without review"):
+        out = wire_perception(psyche, _perceived(), eat_fn=eat_fn)
+    assert "state" in out
+    assert "rows" in out
+    assert "judgment" in out
+    assert len(learned) == 1
+
+
+def test_learn_fn_path_returns_harness_fields():
+    psyche = Psyche()
+    learned = []
+    def learn_fn(s, r, o):
+        learned.append((s, r, o))
+    out = wire_perception(psyche, _perceived(), learn_fn=learn_fn)
+    assert "state" in out
+    assert "rows" in out
+    assert "judgment" in out
+    assert "applied" in out
+    assert "verification" in out
+    assert "verdicts" in out
+
+
+def test_learn_fn_path_captures_claims_not_direct_writes():
+    psyche = Psyche()
+    calls = []
+    def learn_fn(s, r, o):
+        calls.append((s, r, o))
+    out = wire_perception(psyche, _perceived(), learn_fn=learn_fn)
+    if out["applied"]:
+        assert len(calls) >= 1
+    else:
+        assert calls == []
+
+
+def test_learn_fn_path_includes_athena_in_verdicts():
+    psyche = Psyche()
+    out = wire_perception(psyche, _perceived(), learn_fn=lambda s, r, o: None)
+    reviewers = [v["reviewer"] for v in out.get("verdicts", [])]
+    assert "verifiers" in reviewers
+    assert "athena" in reviewers
+
+
+def test_learn_fn_path_unverified_by_default():
+    psyche = Psyche()
+    out = wire_perception(psyche, _perceived(), learn_fn=lambda s, r, o: None)
+    v = out.get("verification", {})
+    assert v.get("verified") is False
+    assert ("evidence" in v.get("reason", "").lower()
+            or "apollo" in v.get("reason", "").lower())
+
+
+def test_legacy_eat_fn_still_works():
+    psyche = Psyche()
+    eaten = []
+    def eat_fn(claim):
+        eaten.append(claim)
+        return type("D", (), {"accepted": True})()
+    out = wire_perception(psyche, _perceived(), eat_fn=eat_fn)
+    assert "state" in out
+    assert "rows" in out
+    assert "judgment" in out
+    assert "applied" not in out
+    assert "verification" not in out
