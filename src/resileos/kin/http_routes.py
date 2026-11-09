@@ -13,6 +13,7 @@ from typing import Any, Callable, Optional
 from resileos.kin.bundle import KinBundle, build_kin_bundle
 from resileos.kin.eat import eat_and_learn, eat_filter
 from resileos.kin.council import council_query
+from resileos.harness.separated import SeparatedCycle, zeus_head
 
 
 def register_kin_routes(
@@ -45,7 +46,15 @@ def register_kin_routes(
         apply_policy: bool = True
         residual_packet_hash: Optional[str] = None
 
+    class SeparatedCycleRequest(BaseModel):
+        writer: str = "apollo"
+        subject: str = "world:apollo"
+        facts: list = []
+        art: bool = False
+        residual_packet_hash: Optional[str] = None
+
     bundle_holder: dict[str, KinBundle] = {}
+    _sep = SeparatedCycle(id_prefix="kin")
 
     def _bundle() -> KinBundle:
         if get_bundle:
@@ -100,6 +109,60 @@ def register_kin_routes(
             "harness": harness,
         }
 
+    @app.post("/api/v1/kin/separated_cycle", dependencies=deps)
+    def api_separated_cycle(body: SeparatedCycleRequest) -> dict:
+        """Write → review → apply. Zeus is head; Athena reviews."""
+        from resileos.kin.apollo import apollo_cycle
+        from resileos.kin.athena import judge as athena_judge
+
+        titan = get_titanos()
+
+        def _writer():
+            if body.writer == "apollo":
+                return lambda **kw: apollo_cycle(
+                    body.facts, subject=body.subject, art=body.art, **kw
+                )
+            raise ValueError(f"unknown writer: {body.writer}")
+
+        proposal = _sep.propose(
+            body.writer,
+            _writer(),
+            action_type="apollo",
+        )
+
+        def athena_review(p):
+            out = athena_judge(
+                perceptions=[{"subject": body.subject,
+                              "address": {"residual_bin": "low_low"}}],
+                frames=[{"label": "review", "depth": 1}],
+            )
+            return (
+                bool(out.get("ok", False)),
+                out.get("reading", "athena judgment"),
+                [{"reviewer": "athena", "ok": out.get("ok"),
+                  "frame": out.get("gate", {}).get("frame")}],
+            )
+
+        def verifier_review(p):
+            if not p.claims:
+                return (False, "no claims to verify", [{"matched": 0}])
+            return (
+                True,
+                f"{len(p.claims)} claims captured",
+                [{"matched": len(p.claims), "passed": len(p.claims)}],
+            )
+
+        result = zeus_head(
+            proposal,
+            reviewers=[
+                ("athena", athena_review),
+                ("verifier", verifier_review),
+            ],
+            learn_fn=titan.learn,
+            cycle=_sep,
+        )
+        return result
+
     @app.post("/api/v1/eat/preview", dependencies=deps)
     def api_eat_preview(body: EatRequest) -> dict:
         """Filter only — no learn."""
@@ -126,168 +189,3 @@ def register_kin_routes(
         return council_query(
             body.subject, body.relation, ask, profile=body.profile
         ).to_dict()
-
-    class PerceiveRequest(BaseModel):
-        caption: str
-        subject: str = "image"
-        commit: bool = False
-
-    @app.post("/api/v1/perceive", dependencies=deps)
-    def api_perceive(body: PerceiveRequest) -> dict:
-        from resileos.ui.perceive import perceive
-
-        def eat(claim):
-            return eat_filter(claim)
-
-        return perceive(
-            body.caption,
-            subject=body.subject,
-            eat_fn=eat,
-            commit=body.commit,
-        )
-
-    class TaskStep(BaseModel):
-        subject: str
-        relation: str
-
-    class TaskRequest(BaseModel):
-        goal: str
-        steps: list[TaskStep]
-
-    @app.post("/api/v1/task", dependencies=deps)
-    def api_task(body: TaskRequest) -> dict:
-        from resileos.ui.scale_wire import task_with_scale
-
-        titan = get_titanos()
-
-        def ask(s, r):
-            fn = getattr(titan, "ask", None)
-            return fn(s, r) if callable(fn) else None
-
-        steps = [
-            st.model_dump() if hasattr(st, "model_dump") else st.dict()
-            for st in body.steps
-        ]
-        return task_with_scale(body.goal, steps, ask)
-
-    class PerceiveImageRequest(BaseModel):
-        features: Optional[dict] = None
-        subject: str = "image"
-
-    @app.post("/api/v1/perceive/image", dependencies=deps)
-    def api_perceive_image(body: PerceiveImageRequest) -> dict:
-        from resileos.ui.framework_gate import gate_candidate
-        from resileos.ui.image_encoder import features_to_triples
-
-        features = body.features or {}
-        triples = (
-            features_to_triples(features, subject=body.subject)
-            if features
-            else []
-        )
-        gated = [
-            gate_candidate(t, stored=[], eat_accepted=False) for t in triples
-        ]
-        return {
-            "features": features,
-            "candidates": gated,
-            "note": "Not facts until eat accepts and learn is called.",
-        }
-
-    class WorkbenchRequest(BaseModel):
-        text: str
-        subject: str = "work"
-        persona: str = ""
-
-    @app.post("/api/v1/workbench", dependencies=deps)
-    def api_workbench(body: WorkbenchRequest) -> dict:
-        from resileos.ui.workbench import formalize
-
-        titan = get_titanos()
-
-        def eat(claim):
-            return eat_filter(claim)
-
-        def learn(s, r, o):
-            fn = getattr(titan, "learn", None)
-            if callable(fn):
-                fn(s, r, o)
-
-        return formalize(
-            body.text,
-            subject=body.subject,
-            persona=body.persona,
-            eat_fn=eat,
-            learn_fn=learn,
-        )
-
-    class QdterIngestRequest(BaseModel):
-        track: str
-        payload_id: str
-        belt: int = 0
-        frame: int = 0
-        persona: str = ""
-
-    @app.post("/api/v1/qdter/ingest", dependencies=deps)
-    def api_qdter(body: QdterIngestRequest) -> dict:
-        from resileos.ui.qdter_interface import ingest
-
-        claim = f"{body.track} payload {body.payload_id}"
-        decision = eat_filter(claim)
-        return ingest(
-            body.track,
-            body.payload_id,
-            belt=body.belt,
-            frame=body.frame,
-            persona=body.persona,
-            eat_accepted=bool(getattr(decision, "accepted", False)),
-        )
-
-    _HUBS: dict = {}
-
-    class HubLearnRequest(BaseModel):
-        hub_id: str
-        subject: str
-        relation: str
-        obj: str
-        kind: str = "user"
-
-    @app.post("/api/v1/hub/learn", dependencies=deps)
-    def api_hub_learn(body: HubLearnRequest) -> dict:
-        from resileos.ui.hub import Hub
-
-        h = _HUBS.get(body.hub_id)
-        if h is None:
-            h = Hub(body.hub_id, kind=body.kind)
-            _HUBS[body.hub_id] = h
-
-        def eat(claim):
-            return eat_filter(claim)
-
-        event = h.learn(
-            body.subject, body.relation, body.obj, eat_fn=eat
-        )
-        return {"event": event, "observe": h.observe()}
-
-    @app.get("/api/v1/hub/{hub_id}", dependencies=deps)
-    def api_hub_get(hub_id: str) -> dict:
-        h = _HUBS.get(hub_id)
-        if h is None:
-            return {"hub_id": hub_id, "n_facts": 0, "n_events": 0}
-        return h.observe()
-
-    class ApolloRequest(BaseModel):
-        subject: str = "world:apollo"
-        facts: list = []
-        art: bool = False
-
-    @app.post("/api/v1/apollo", dependencies=deps)
-    def api_apollo(body: ApolloRequest) -> dict:
-        from resileos.kin.apollo import apollo_cycle
-
-        return apollo_cycle(
-            body.facts,
-            subject=body.subject,
-            eat_fn=eat_filter,
-            art=body.art,
-        )
