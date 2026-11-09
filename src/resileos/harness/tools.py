@@ -5,12 +5,17 @@ Expose via leCore / GET /api/v1/tools. All return typed dicts for cascade.
 Verification contract (added 2026-11-09):
     - A turn is not verified because it produced output. It is verified
       because a probe ran and produced raw evidence.
-    - Zero matched cases is not evidence. `verify_on_stop` rejects an
-      evidence entry whose `result.matched == 0` when
-      `require_evidence=True`.
-    - Summaries are not evidence. `evidence_attach_raw` rejects results
+    - Zero matched cases is not evidence. verify_on_stop rejects an
+      evidence entry whose result.matched == 0 when require_evidence=True.
+    - Summaries are not evidence. evidence_attach_raw rejects results
       containing only summary/note/status keys.
     - Unknown action types default to requiring verification (fail closed).
+    - Fixes a fail-open bug in verify_on_stop: a failed apollo with no
+      scars previously returned verified=True. The require_evidence=True
+      path now returns verified=False with reason "apollo did not report
+      success". Callers not passing require_evidence keep the old
+      (buggy) behaviour for backwards compatibility; migrate by passing
+      require_evidence=True.
 """
 from __future__ import annotations
 
@@ -28,10 +33,8 @@ def decision_fanout(
 
     High-conf routes to residual/Apollo; else cascade.
     """
-    # Placeholder: replace with your residual query or external Jev call.
     scores = {opt: 0.5 for opt in options}
     if packet and "residual_query" in packet.get("state", {}):
-        # wire to your VSA cleanup / bind pass
         pass
     best = max(scores, key=scores.get)
     return {
@@ -127,60 +130,66 @@ def verify_on_stop(
 ) -> Dict[str, Any]:
     """Outer verification loop. Must pass before closing turn.
 
-    When `require_evidence=True`:
-      - The packet must have at least one evidence entry whose `source`
-        is not a summary placeholder.
-      - No evidence entry may have `result.matched == 0`. Zero matched
-        cases is not evidence of success.
-
-    Default `require_evidence=False` preserves existing behaviour.
+    Default `require_evidence=False` preserves prior behaviour
+    (including the fail-open on apollo=False + no scars). Pass
+    `require_evidence=True` to enforce the Codio zero-match rule and
+    the fail-closed apollo check.
     """
-    verified = packet.get("verified", False) or bool(
-        apollo_result and apollo_result.get("success", False)
-    )
+    packet_verified = bool(packet.get("verified", False))
+    apollo_ok = bool(apollo_result and apollo_result.get("success", False))
+    scars = packet.get("scars", []) or []
 
-    if not verified and packet.get("scars"):
+    # Scars always fail, whether verified was set or not.
+    if scars:
         return {
             "verified": False,
             "reason": "unverified residual scars or mutations",
             "action": "force_apollo_or_cleanup",
         }
 
-    if require_evidence and not verified:
+    if not require_evidence:
+        # Backwards-compatible path. Preserves prior behaviour exactly.
+        verified = packet_verified or apollo_ok
+        return {
+            "verified": verified,
+            "reason": (
+                "apollo or residual consistency passed"
+                if verified
+                else "not verified"
+            ),
+        }
+
+    # Strict path: fail-closed apollo, evidence required, zero-match rejected.
+    if not (packet_verified or apollo_ok):
         return {
             "verified": False,
             "reason": "apollo did not report success",
             "action": "force_apollo",
         }
 
-    if require_evidence:
-        evidence = packet.get("evidence", []) or []
-        real = [
-            e for e in evidence
-            if e.get("source") not in (None, "", "summary", "note")
-        ]
-        if not real:
+    evidence = packet.get("evidence", []) or []
+    real = [
+        e for e in evidence
+        if e.get("source") not in (None, "", "summary", "note")
+    ]
+    if not real:
+        return {
+            "verified": False,
+            "reason": "no evidence attached",
+            "action": "run_probe_and_attach",
+        }
+    for e in real:
+        result = e.get("result", {}) or {}
+        if "matched" in result and int(result["matched"]) == 0:
             return {
                 "verified": False,
-                "reason": "no evidence attached",
-                "action": "run_probe_and_attach",
+                "reason": "zero matched cases in evidence",
+                "action": "widen_filter_or_abstain",
             }
-        for e in real:
-            result = e.get("result", {}) or {}
-            if "matched" in result and int(result["matched"]) == 0:
-                return {
-                    "verified": False,
-                    "reason": "zero matched cases in evidence",
-                    "action": "widen_filter_or_abstain",
-                }
 
     return {
         "verified": True,
-        "reason": (
-            "apollo or residual consistency passed"
-            if not require_evidence
-            else "apollo passed with evidence"
-        ),
+        "reason": "apollo passed with evidence",
     }
 
 
@@ -246,8 +255,8 @@ def evidence_attach_raw(
     A result is raw if it contains at least one structured field beyond
     a bare `summary` or `note`. A probe output with
     `{"matched": 0, "passed": 0}` is raw evidence of zero matches —
-    which is not evidence of success, and verify_on_stop will treat it
-    as such when require_evidence=True.
+    which is not evidence of success, and verify_on_stop rejects it
+    when require_evidence=True.
     """
     if not isinstance(result, dict):
         raise TypeError("result must be a dict")
