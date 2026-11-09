@@ -15,6 +15,23 @@ Part V (Language as a Gate Between the Global and the Local):
   gbx_like = rigid / exact band readout. The encoder only *labels*
   which sector a resolved triple prefers; it does not implement biology.
 
+Temporal extraction (RES-332, added 2026-11-09):
+
+- Queries that contain an explicit temporal marker ("in 1800",
+  "as of 1900", "circa 1450", "during 1750", "around 1820") extract the
+  year and return it as `as_of` on the GateSelection.
+- The date phrase is stripped from the text *before* pattern matching,
+  so "what is Zeus's domain in 1800" resolves to (Zeus, domain, forward)
+  with as_of="1800-01-01", not to a relation named "domain in 1800".
+- Extraction is coarse-grained: "in YYYY" maps to "YYYY-01-01" (start
+  of year). Callers that need finer granularity (specific month, ISO
+  date) should pass `as_of` explicitly to the route, not rely on
+  extraction from free text.
+- `as_of=None` means "current state" and is the pre-temporal default.
+- No as_of is extracted from ambiguous phrases like "the 1800s",
+  "recently", "historically" — those fall through to current-state
+  lookup.
+
 This module does not call transformers, hosted APIs, or any external
 model. Unresolvable input returns None so the route can 400 rather than
 invent structure (persistent residue is never written by the encoder).
@@ -35,7 +52,45 @@ def _tokenize(text: str) -> list[str]:
     return re.findall(r"[a-z0-9_]+", _norm(text))
 
 
-# Surface patterns -> kind tag used for inverse / sector heuristics
+# ── temporal extraction (RES-332) ──────────────────────────────────────
+# Matches 4-digit years 1000-2999, but only when preceded by a clear
+# temporal marker. The marker is stripped along with the year.
+_DATE_MARKER_RE = re.compile(
+    r"\b(?:as\s+of|in|during|circa|around|about)\s+(?P<y>1[0-9]{3}|2[0-9]{3})\b",
+    re.I,
+)
+_YEAR_SUFFIX_RE = re.compile(
+    r"\b(?P<y>1[0-9]{3}|2[0-9]{3})\s*(?:ad|ce)\b",
+    re.I,
+)
+
+
+def _extract_date(text: str) -> tuple[str, Optional[str]]:
+    """Return (text_without_date_phrase, iso_date_or_None).
+
+    Matches the first temporal phrase only. Uses "YYYY-01-01" as the
+    as_of (start of year). If multiple dates appear, only the first is
+    used; callers that need ranges should pass explicit as_of.
+    """
+    m = _DATE_MARKER_RE.search(text)
+    if m:
+        year = int(m.group("y"))
+        cleaned = (text[: m.start()] + " " + text[m.end() :]).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        return cleaned, f"{year:04d}-01-01"
+
+    m = _YEAR_SUFFIX_RE.search(text)
+    if m:
+        year = int(m.group("y"))
+        cleaned = (text[: m.start()] + " " + text[m.end() :]).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        return cleaned, f"{year:04d}-01-01"
+
+    return text, None
+
+
+# ── surface patterns ───────────────────────────────────────────────────
+# Pattern order matters. The patterns operate on the date-stripped text.
 _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(
         r"^\s*(?:what(?:'s| is| are)?)\s+(?P<sub>.+?)(?:'s|s')\s+(?P<rel>[\w\s]+?)\s*\??\s*$",
@@ -103,6 +158,11 @@ class GateSelection:
     ``sector`` is a label only: ``gbx_like`` (rigid exact) or
     ``otx_like`` (flexible path / multi-hop preferred). ``none`` means
     unresolved (syndrome zero / abstain path).
+
+    ``as_of`` (RES-332) is the extracted temporal marker, ISO 8601
+    ``YYYY-MM-DD``, or None for current-state. When non-None, the
+    route must forward this to the store's temporal filter; when
+    None, the store applies its default current-state filter.
     """
 
     subject: str
@@ -112,16 +172,15 @@ class GateSelection:
     gate_capacity_bits: float
     sector: str  # "gbx_like" | "otx_like"
     pattern_kind: str
+    as_of: Optional[str] = None
 
     def as_triple(self) -> tuple[str, str, bool]:
         return self.subject, self.relation, self.inverse
 
 
 def _sector_for(kind: str, inverse: bool, relation: str) -> str:
-    # Rigid band readout: exact attribute / forward non-relational
     if not inverse and not relation.endswith("_of"):
         return "gbx_like"
-    # Flexible / projective: inverse queries and relational "_of" chains
     return "otx_like"
 
 
@@ -133,7 +192,9 @@ def encode_question(
 ) -> Optional[tuple[str, str, bool]]:
     """Return ``(subject, relation, inverse)`` or ``None``.
 
-    Thin wrapper over ``encode_gate`` for existing call sites.
+    Thin wrapper over ``encode_gate`` for existing call sites that do
+    not need temporal metadata. Callers that want ``as_of`` (RES-332)
+    should use ``encode_gate`` directly.
     """
     g = encode_gate(text, entities=entities, relations=relations)
     return None if g is None else g.as_triple()
@@ -145,25 +206,36 @@ def encode_gate(
     entities: Iterable[str],
     relations: Iterable[str],
 ) -> Optional[GateSelection]:
-    """Full gate selection: triple + symbol index + sector + capacity.
+    """Full gate selection: triple + symbol index + sector + capacity
+    + extracted temporal marker (RES-332).
 
     ``relations`` defines the alphabet Σ. Capacity is log2 |Σ| bits per
-    Part V §7.1 (gate conveys at most that many bits per use).
+    Part V §7.1.
+
+    The temporal marker (if present) is extracted *before* pattern
+    matching, so a phrase like "domain in 1800" resolves to
+    relation="domain", as_of="1800-01-01" rather than to a relation
+    named "domain in 1800".
     """
     text = (text or "").strip()
     if not text:
         return None
+
     ents = list(entities)
     rels = list(relations)
     if not ents or not rels:
         return None
+
+    # RES-332: strip date phrase first so patterns match the semantic
+    # query, not the temporal suffix.
+    cleaned_text, as_of = _extract_date(text)
 
     n_sym = len(rels)
     capacity = math.log2(n_sym) if n_sym > 0 else 0.0
     rel_index = {r: i for i, r in enumerate(rels)}
 
     for pat, kind in _PATTERNS:
-        m = pat.search(text)
+        m = pat.search(cleaned_text)
         if not m:
             continue
         gd = m.groupdict()
@@ -188,12 +260,14 @@ def encode_gate(
             gate_capacity_bits=capacity,
             sector=_sector_for(kind, inv, rel),
             pattern_kind=kind,
+            as_of=as_of,
         )
 
-    found_e = [e for e in ents if _norm(e) in _norm(text)]
+    found_e = [e for e in ents if _norm(e) in _norm(cleaned_text)]
     found_r = [
         r for r in rels
-        if _norm(r).replace("_", " ") in _norm(text) or _norm(r) in _norm(text)
+        if _norm(r).replace("_", " ") in _norm(cleaned_text)
+        or _norm(r) in _norm(cleaned_text)
     ]
     if len(found_e) == 1 and len(found_r) == 1:
         rel = found_r[0]
@@ -205,5 +279,6 @@ def encode_gate(
             gate_capacity_bits=capacity,
             sector="gbx_like",
             pattern_kind="overlap",
+            as_of=as_of,
         )
     return None
