@@ -59,13 +59,11 @@ class KinBundle:
         if self.control is None:
             self.control = ControlPacket(id="kin-cycle")
 
-        # 1. Hierarchical guides (JIT context)
         guide_load(
             ["docs/harness/CONSTRAINTS.md", "docs/harness/AGENTS.md"],
             self.control.to_dict(),
         )
 
-        # 2. Budget + stuck guard
         guard = budget_and_stuck_guard(self.control.to_dict())
         if not guard["ok"]:
             self.control.append({"event": "guard_fail", "reason": guard["reason"]})
@@ -77,7 +75,6 @@ class KinBundle:
                 "harness": {"guard": guard, "verified": False}
             }
 
-        # 3. Iris observe -> Metis organize
         report = self.observe(metrics=metrics, agency_group=agency_group)
         policy = self.organize(report)
         self.last_report = report
@@ -86,7 +83,6 @@ class KinBundle:
         if apply_policy and agency_group is not None:
             apply_metis_to_agency(policy, agency_group)
 
-        # 4. Residual consistency sensor (if residual Packet supplied)
         consistency = residual_consistency(self.control.to_dict())
         if residual_packet is not None:
             evidence_attach(
@@ -95,7 +91,6 @@ class KinBundle:
                 self.control.to_dict(),
             )
 
-        # 5. Verification requirement + outer verification
         verification = verification_required("kin_cycle")
         apollo = apollo_success({
             "status": "ok" if consistency.get("consistent") else "scarred"
