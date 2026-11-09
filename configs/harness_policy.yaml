@@ -1,0 +1,31 @@
+# Policy-as-code (Harness Engineering recommendation)
+risk:
+  deny:
+    - "rm -rf"
+    - "drop table"
+    - "force push"
+    - "delete production"
+  ask:
+    - "write"
+    - "commit"
+    - "deploy"
+    - "send"
+    - "pay"
+  allow_default: true
+
+budgets:
+  max_steps: 50
+  max_cost: 5.0
+  max_tokens: 120000
+  compact_at_tokens: 80000
+
+verification:
+  require_apollo_on_mutation: true
+  require_residual_consistency: true
+
+guides:
+  always:
+    - "docs/harness/CONSTRAINTS.md"
+    - "docs/RES-100/architecture.md"
+  jit:
+    - "docs/harness/AGENTS.md"
