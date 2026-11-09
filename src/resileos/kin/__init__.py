@@ -1,5 +1,4 @@
-"""Zeus kin operators + eat filter + council + frames."""
-
+"""Zeus kin operators + eat filter + council + frames + separated cycle."""
 from resileos.kin.bundle import (
     KinBundle,
     apply_metis_to_agency,
@@ -20,7 +19,20 @@ from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
 from resileos.kin.mouth_policy import should_render_prose
 from resileos.kin.verifiers import run_verifiers
-from resileos.kin.wiring import get_kin_bundle, mouth_allowed_from_last_cycle, wire_kin
+from resileos.kin.wiring import (
+    get_kin_bundle,
+    mouth_allowed_from_last_cycle,
+    wire_kin,
+)
+from resileos.harness.separated import (
+    Proposal,
+    SeparatedCycle,
+    Verdict,
+    run_separated,
+    zeus_head,
+)
+from resileos.kin.perception_kin import perception_cycle
+from resileos.kin.harness_wrap import harness_wrap
 
 __all__ = [
     "KinBundle",
@@ -48,4 +60,14 @@ __all__ = [
     "get_kin_bundle",
     "mouth_allowed_from_last_cycle",
     "wire_kin",
+    # Separated cycle
+    "SeparatedCycle",
+    "Proposal",
+    "Verdict",
+    "zeus_head",
+    "run_separated",
+    # Perception kin
+    "perception_cycle",
+    # Harness wrapper for non-writer kin
+    "harness_wrap",
 ]
