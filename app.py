@@ -32,9 +32,9 @@ Kin cycle (registered by wire_kin):
     /api/v1/eat/*                    (Eat filter, learn functions)
 
 Harness (exposed via /api/v1/tools):
-    decision_fanout, confidence_route, risk_classify, verify_on_stop,
-    budget_and_stuck_guard, guide_load, evidence_attach,
-    residual_consistency, apollo_success
+    decision_fanout, confidence_route, risk_classify, verification_required,
+    verify_on_stop, budget_and_stuck_guard, guide_load, evidence_attach,
+    evidence_attach_raw, residual_consistency, apollo_success
 
 Auth (fail-closed): key sources, merged:
   1. configs/api_keys.json   {"<sha256-hex>": {...}}   primary, hashed
@@ -110,16 +110,18 @@ from resileos.titanos.zeus import (  # noqa: E402
 )
 from resileos.kin.wiring import wire_kin  # noqa: E402
 
-# ── ADDITION 1: harness tool imports ───────────────────────────────────
+# ── Harness tool imports ───────────────────────────────────────────────
 from resileos.harness.tools import (  # noqa: E402
     apollo_success,
     budget_and_stuck_guard,
     confidence_route,
     decision_fanout,
     evidence_attach,
+    evidence_attach_raw,
     guide_load,
     residual_consistency,
     risk_classify,
+    verification_required,
     verify_on_stop,
 )
 
@@ -398,15 +400,17 @@ def _answer_backend() -> AnswerBackend:
     return _answer_backend_singleton
 
 
-# ── ADDITION 2: harness tool registry ──────────────────────────────────
+# ── Harness tool registry ──────────────────────────────────────────────
 HARNESS_TOOLS = {
     "decision_fanout": decision_fanout,
     "confidence_route": confidence_route,
     "risk_classify": risk_classify,
+    "verification_required": verification_required,
     "verify_on_stop": verify_on_stop,
     "budget_and_stuck_guard": budget_and_stuck_guard,
     "guide_load": guide_load,
     "evidence_attach": evidence_attach,
+    "evidence_attach_raw": evidence_attach_raw,
     "residual_consistency": residual_consistency,
     "apollo_success": apollo_success,
 }
@@ -545,7 +549,6 @@ def titanos_stats():
     return base
 
 
-# ── ADDITION 3: /api/v1/tools returns harness schemas too ──────────────
 @app.get(
     "/api/v1/tools",
     dependencies=[Depends(verify_api_key)],
@@ -1049,7 +1052,7 @@ class SubstrateContainer:
         self.geo_head = LowRankMetricHead(hidden_dim=HIDDEN_DIM)
         self.fep_head = VerifiableFEPReductionHead(
             hidden_dim=HIDDEN_DIM,
-            L_H_kernel=kernel,
+            L_kernel=kernel,
             rank=1,
         )
         trainable = (
