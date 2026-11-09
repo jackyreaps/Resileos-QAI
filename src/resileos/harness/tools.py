@@ -1,6 +1,16 @@
 """Harness tools: decision primitives, guards, verification, context.
 
 Expose via leCore / GET /api/v1/tools. All return typed dicts for cascade.
+
+Verification contract (added 2026-11-09):
+    - A turn is not verified because it produced output. It is verified
+      because a probe ran and produced raw evidence.
+    - Zero matched cases is not evidence. `verify_on_stop` rejects an
+      evidence entry whose `result.matched == 0` when
+      `require_evidence=True`.
+    - Summaries are not evidence. `evidence_attach_raw` rejects results
+      containing only summary/note/status keys.
+    - Unknown action types default to requiring verification (fail closed).
 """
 from __future__ import annotations
 
@@ -69,23 +79,108 @@ def risk_classify(
     return {"risk_class": cls, "reason": reason, "action": action}
 
 
+_VERIFICATION_REQUIRED = {
+    "learn", "learn_batch", "save", "train_substrate",
+    "kin_cycle", "eat", "council_query", "workbench",
+    "deploy", "migrate",
+}
+_VERIFICATION_OPTIONAL = {
+    "query", "chain", "sparql", "answer", "tools", "stats",
+    "ready", "substrate_stats", "lecore_route",
+}
+
+
+def verification_required(action_type: str) -> Dict[str, Any]:
+    """Classify whether an action type demands verification evidence.
+
+    Mutation and cycle actions require evidence. Read-only actions do
+    not. Unknown actions default to required (fail closed).
+
+    Returns:
+        {"action_type": str, "requires_verification": bool, "reason": str}
+    """
+    at = (action_type or "").strip().lower()
+    if at in _VERIFICATION_OPTIONAL:
+        return {
+            "action_type": at,
+            "requires_verification": False,
+            "reason": "read-only or lookup",
+        }
+    if at in _VERIFICATION_REQUIRED:
+        return {
+            "action_type": at,
+            "requires_verification": True,
+            "reason": "mutation or cycle; evidence required before close",
+        }
+    return {
+        "action_type": at,
+        "requires_verification": True,
+        "reason": "unknown action type; fail closed",
+    }
+
+
 def verify_on_stop(
     packet: Dict[str, Any],
     apollo_result: Optional[Dict] = None,
+    *,
+    require_evidence: bool = False,
 ) -> Dict[str, Any]:
-    """Outer verification loop. Must pass before closing turn."""
-    verified = packet.get("verified", False) or (
+    """Outer verification loop. Must pass before closing turn.
+
+    When `require_evidence=True`:
+      - The packet must have at least one evidence entry whose `source`
+        is not a summary placeholder.
+      - No evidence entry may have `result.matched == 0`. Zero matched
+        cases is not evidence of success.
+
+    Default `require_evidence=False` preserves existing behaviour.
+    """
+    verified = packet.get("verified", False) or bool(
         apollo_result and apollo_result.get("success", False)
     )
+
     if not verified and packet.get("scars"):
         return {
             "verified": False,
             "reason": "unverified residual scars or mutations",
             "action": "force_apollo_or_cleanup",
         }
+
+    if require_evidence and not verified:
+        return {
+            "verified": False,
+            "reason": "apollo did not report success",
+            "action": "force_apollo",
+        }
+
+    if require_evidence:
+        evidence = packet.get("evidence", []) or []
+        real = [
+            e for e in evidence
+            if e.get("source") not in (None, "", "summary", "note")
+        ]
+        if not real:
+            return {
+                "verified": False,
+                "reason": "no evidence attached",
+                "action": "run_probe_and_attach",
+            }
+        for e in real:
+            result = e.get("result", {}) or {}
+            if "matched" in result and int(result["matched"]) == 0:
+                return {
+                    "verified": False,
+                    "reason": "zero matched cases in evidence",
+                    "action": "widen_filter_or_abstain",
+                }
+
     return {
         "verified": True,
-        "reason": "apollo or residual consistency passed",
+        "reason": (
+            "apollo or residual consistency passed"
+            if not require_evidence
+            else "apollo passed with evidence"
+        ),
     }
 
 
@@ -139,6 +234,32 @@ def evidence_attach(
     })
     packet["evidence"] = evidence[-50:]
     return {"evidence": packet["evidence"]}
+
+
+def evidence_attach_raw(
+    result: Dict[str, Any],
+    source: str,
+    packet: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Attach raw evidence. Rejects summary-only payloads.
+
+    A result is raw if it contains at least one structured field beyond
+    a bare `summary` or `note`. A probe output with
+    `{"matched": 0, "passed": 0}` is raw evidence of zero matches —
+    which is not evidence of success, and verify_on_stop will treat it
+    as such when require_evidence=True.
+    """
+    if not isinstance(result, dict):
+        raise TypeError("result must be a dict")
+    if not result:
+        raise ValueError("empty result is not evidence")
+    keys = set(result.keys())
+    if keys <= {"summary", "note", "status"}:
+        raise ValueError(
+            f"result contains only {sorted(keys)}; "
+            f"attach the raw probe output, not a summary"
+        )
+    return evidence_attach(result, source, packet)
 
 
 def residual_consistency(packet: Dict[str, Any]) -> Dict[str, Any]:
@@ -204,3 +325,18 @@ def apollo_success(result: Dict[str, Any]) -> Dict[str, Any]:
         "status": status or "unknown",
         "reason": f"outer sensor status {status!r} not in success set",
     }
+
+
+__all__ = [
+    "decision_fanout",
+    "confidence_route",
+    "risk_classify",
+    "verification_required",
+    "verify_on_stop",
+    "budget_and_stuck_guard",
+    "guide_load",
+    "evidence_attach",
+    "evidence_attach_raw",
+    "residual_consistency",
+    "apollo_success",
+]
