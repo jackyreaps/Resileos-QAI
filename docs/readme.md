@@ -8,8 +8,8 @@ referenced_by: [RES-100]
 
 **Version:** see [`/version`](../version) · **Changelog:** [`/changelog.md`](../changelog.md)
 
-**Status vocabulary.** Documents carry one of: `draft`, `stable`, `deprecated`,
-`conditional`, `conjectural`, `candidate`, `proposal`, `heuristic`.
+**Status vocabulary.** `draft`, `stable`, `deprecated`, `conditional`,
+`conjectural`, `candidate`, `proposal`, `heuristic`.
 
 ## Reading order
 
@@ -56,28 +56,29 @@ Titanos application layer:
 32. [Zeus Child](320-titanos/zeus-child.md) — RES-324
 33. [Eat Strategy](320-titanos/eat-strategy.md) — RES-325
 34. [Answer Route and Pluggable Backends](320-titanos/answer.md) — RES-327
+35. [Temporal Semantics](320-titanos/temporal.md) — RES-332
 
 Operations:
-35. [Capacity Contract](400-operations/capacity-contract.md) — RES-330
-36. [Capacity Acceptance Results](400-operations/capacity-results.md) — RES-331
-37. [Run Config](400-operations/run-config.md) — RES-400
-38. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-401
+36. [Capacity Contract](400-operations/capacity-contract.md) — RES-330
+37. [Capacity Acceptance Results](400-operations/capacity-results.md) — RES-331
+38. [Run Config](400-operations/run-config.md) — RES-400
+39. [phi-compress redesign](400-operations/phi-compress-redesign.md) — RES-401
 
 Notes and roadmap:
-39. [Behavioral Notes](500-notes/behavioral.md) — RES-500
-40. [Roadmap](500-notes/roadmap.md) — RES-501
-41. [Hardened Roadmap](500-notes/hardened-roadmap.md) — RES-502
+40. [Behavioral Notes](500-notes/behavioral.md) — RES-500
+41. [Roadmap](500-notes/roadmap.md) — RES-501
+42. [Hardened Roadmap](500-notes/hardened-roadmap.md) — RES-502
 
 QD-TER bridge:
-42. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
-43. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
-44. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
-45. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
-46. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
-47. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
-48. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
-49. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
-50. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
+43. [FEP Reduction Bridge](600-qdter/fep-reduction.md) — RES-600
+44. [Non-Dual Adaptation Layer](600-qdter/non-dual-adaptation.md) — RES-601
+45. [Two-Head Integration Note](600-qdter/integration.md) — RES-602
+46. [Speculative Cross-Stream](600-qdter/speculative-cross-stream.md) — RES-603
+47. [QD-TER Bridge Status](600-qdter/status.md) — RES-604
+48. [leCore Integration Bridge](600-qdter/lecore-bridge.md) — RES-605
+49. [Metric Bridge Candidate Derivations](600-qdter/metric-bridge-derivations.md) — RES-606
+50. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
+51. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
 
 Harness:
 - [`docs/harness/AGENTS.md`](harness/AGENTS.md) — standing instructions
@@ -85,7 +86,7 @@ Harness:
 - [`docs/harness/INTEGRATION.md`](harness/INTEGRATION.md) — integration checklist
 
 Reference:
-51. [Glossary](900-reference/glossary.md) — RES-900
+52. [Glossary](900-reference/glossary.md) — RES-900
 
 ## Categories
 
@@ -101,33 +102,6 @@ Reference:
 | 600 | QD-TER Bridge | [Status](600-qdter/status.md) |
 | 900 | Reference | [Glossary](900-reference/glossary.md) |
 
-## 300-series substrate modules
-
-| Doc | Module | Status | Notes |
-|---|---|---|---|
-| RES-304 | `triad.md` | draft | Structure-Flux-Mode triad; basin metrics |
-| RES-305 | `sandbox.py` | proposal | Causal Sandbox Index; metric defined, not derived |
-| RES-306 | `phasor.py` | stable | Phasor graph, band carriers, banded memory; Lean-backed |
-| RES-307 | `agency.py` | heuristic | Routing layer; thresholds are operational parameters |
-| RES-308 | `constructive-head.md` | proposal | Directional head; quantum-shaped math, no QPU |
-| RES-309 | `entanglement-pipeline.md` | conjectural | Shared-prefix structure as coarse-grained correlation; CHSH test proposed |
-| RES-316 | `order-parameter-gate.md` | proposal | Kuramoto-R confidence gate; off by default |
-| RES-317 | `sdm-hopfield.md` | draft | Parameter-free attractor cleanup; reduces chain crosstalk |
-| RES-318 | `engine-group.md` | draft | N-engine composition; triad at group level; prerequisite for multi-stream training |
-| RES-319 | `engine-group-results.md` | draft | First measured result: aggregate ΔMI +1.24 nats; per-engine ΔMI 0 (Cause A) |
-| RES-326 | `pathb-mechanism.md` | stable | Path B confirmed across 4 readouts; pretrained transfer +0.0996 NLL (3 seeds, t=5.91) |
-
-## 310-series hierarchy modules
-
-| Doc | Module | Status | Notes |
-|---|---|---|---|
-| RES-310 | `hierarchical-encoding.md` | draft | Tree of packets; capacity-driven levels |
-| RES-311 | `streaming-state.md` | draft | Running stream_hv; decay and level weighting |
-| RES-312 | `mask-stack.md` | draft | Layered masks; mask-to-sheath transition |
-| RES-313 | `capacity-law.md` | draft | Composition bound; trillion-token negative result |
-| RES-314 | `error-bound.md` | draft | Empirical error model; redundancy contract |
-| RES-315 | `modulation-interface.md` | draft | Carrier spec; what the modulation does |
-
 ## 320-series Titanos modules
 
 | Doc | Module | Status | Notes |
@@ -139,13 +113,14 @@ Reference:
 | RES-324 | `zeus-child.md` | draft | AgencyChild residual specialist; declines when unfit |
 | RES-325 | `eat-strategy.md` | draft | Titanos vs transformers: A/B achievable, C not |
 | RES-327 | `answer.md` | stable | `/answer` route; pluggable backends; RAG scaling measured |
+| RES-332 | `temporal.md` | draft | Chronos/kairos; valid-time on facts; AS OF query |
 
 ## 400-series operations modules
 
 | Doc | Module | Status | Notes |
 |---|---|---|---|
-| RES-330 | `capacity-contract.md` | proposed | Capacity rules C0–C8; metrics M1–M8 |
-| RES-331 | `capacity-results.md` | stable | M1–M4 measured, all pass; M5–M8 deferred |
+| RES-330 | `capacity-contract.md` | proposed | Capacity rules C0–C8; metrics M1–M9 |
+| RES-331 | `capacity-results.md` | stable | M1–M4 measured, all pass; M5–M9 deferred |
 | RES-401 | `phi-compress-redesign.md` | draft | Golden-ladder contraction under R-gating |
 
 ## 600-series QD-TER bridge
@@ -201,7 +176,8 @@ RES-320 ─▶ RES-321 ─▶ RES-322 ─▶ RES-323
                                     │
                                     ├──▶ RES-324
                                     ├──▶ RES-325
-                                    └──▶ RES-327
+                                    ├──▶ RES-327
+                                    └──▶ RES-332
     │
     ▼
 RES-330 ─▶ RES-331 ─▶ RES-401
