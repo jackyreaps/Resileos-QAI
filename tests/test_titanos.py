@@ -39,6 +39,24 @@ def _kb():
     return t
 
 
+def _temporal_kb():
+    """KB with temporal facts (RES-332). All dates ISO 8601 YYYY-MM-DD."""
+    t = Titanos(_cfg())
+    t.learn(
+        "Athens", "capital_of", "Ottoman Empire",
+        valid_from="1458-01-01", valid_to="1834-01-01",
+    )
+    t.learn(
+        "Athens", "capital_of", "Greece",
+        valid_from="1834-01-01", valid_to=None,
+    )
+    t.learn(
+        "Rome", "capital_of", "Roman Empire",
+        valid_from=None, valid_to="476-01-01",
+    )
+    return t
+
+
 # ── Single-hop ──────────────────────────────────────────────────────────
 def test_single_hop():
     t = _kb()
@@ -148,3 +166,157 @@ def test_core_is_read_only_from_titanos():
     t.ask("Zeus", "domain")
     assert t.core.schedule_index >= step_before
     assert t.core.Lambda.shape == Lambda_before.shape
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Temporal (RES-332)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_temporal_fact_tuple_shape():
+    """learn() always appends a 5-tuple, even for legacy 3-arg calls."""
+    t = Titanos(_cfg())
+    t.learn("A", "r", "B")
+    assert len(t.facts) == 1
+    assert len(t.facts[0]) == 5
+    s, r, o, vf, vt = t.facts[0]
+    assert (s, r, o) == ("A", "r", "B")
+    assert vf is None and vt is None
+
+
+def test_temporal_legacy_learn_unchanged():
+    """3-arg learn() with no validity kwargs still works as before."""
+    t = _kb()
+    assert t.stats()["facts"] == 11
+    assert t.ask_list("Zeus", "domain") == ["sky"]
+
+
+def test_ask_list_as_of_filters():
+    """as_of resolves to the fact valid at that moment."""
+    t = _temporal_kb()
+    assert t.ask_list("Athens", "capital_of", as_of="1800-01-01") == [
+        "Ottoman Empire"
+    ]
+    assert t.ask_list("Athens", "capital_of", as_of="1900-01-01") == [
+        "Greece"
+    ]
+    # Before either fact: no chronos-valid match
+    assert t.ask_list("Athens", "capital_of", as_of="1450-01-01") == []
+
+
+def test_ask_list_as_of_empty_returns_all():
+    """as_of='' disables the temporal filter — append-only log view."""
+    t = _temporal_kb()
+    rows = t.ask_list("Athens", "capital_of", as_of="")
+    assert set(rows) == {"Ottoman Empire", "Greece"}
+
+
+def test_ask_list_default_uses_today():
+    """as_of=None means today. Ottoman is expired, Greece is current."""
+    t = _temporal_kb()
+    rows = t.ask_list("Athens", "capital_of")
+    assert rows == ["Greece"]
+
+
+def test_temporal_half_open_interval():
+    """valid_to is exclusive: [valid_from, valid_to)."""
+    t = _temporal_kb()
+    # Day before Ottoman ends: still valid, Greece not yet
+    assert t.ask_list("Athens", "capital_of", as_of="1833-12-31") == [
+        "Ottoman Empire"
+    ]
+    # Day Ottoman ends: Ottoman excluded, Greece included
+    assert t.ask_list("Athens", "capital_of", as_of="1834-01-01") == [
+        "Greece"
+    ]
+
+
+def test_temporal_unbounded_from():
+    """Fact with only valid_until (unbounded valid_from) works."""
+    t = _temporal_kb()
+    assert t.ask_list("Rome", "capital_of", as_of="100-01-01") == [
+        "Roman Empire"
+    ]
+    assert t.ask_list("Rome", "capital_of", as_of="500-01-01") == []
+
+
+def test_temporal_ask_respects_current_validity():
+    """ask() excludes expired facts when temporal_filter_current=True."""
+    t = _temporal_kb()
+    # Athens -> Ottoman Empire is expired; ask() must not return it
+    a = t.ask("Athens", "capital_of")
+    assert a.value != "Ottoman Empire"
+
+
+def test_temporal_filter_disabled():
+    """temporal_filter_current=False makes ask() return regardless of validity."""
+    cfg = _cfg()
+    cfg.temporal_filter_current = False
+    t = Titanos(cfg)
+    t.learn(
+        "Athens", "capital_of", "Ottoman Empire",
+        valid_from="1458-01-01", valid_to="1834-01-01",
+    )
+    a = t.ask("Athens", "capital_of")
+    assert a.status == "ACCEPTED"
+    assert a.value == "Ottoman Empire"
+
+
+def test_learn_many_accepts_both_shapes():
+    """learn_many accepts 3-tuple and 5-tuple items in the same batch."""
+    t = Titanos(_cfg())
+    n = t.learn_many([
+        ("A", "r", "B"),                                       # 3-tuple
+        ("X", "r", "Y", "1800-01-01", "1900-01-01"),           # 5-tuple
+    ])
+    assert n == 2
+    assert len(t.facts) == 2
+    assert t.facts[0] == ("A", "r", "B", None, None)
+    assert t.facts[1] == ("X", "r", "Y", "1800-01-01", "1900-01-01")
+
+
+def test_load_normalises_legacy_facts(tmp_path):
+    """Legacy 3-tuple facts in JSON are read as (None, None) validity."""
+    t = Titanos(_cfg())
+    t.learn("A", "r", "B")
+    p = tmp_path / "state.json"
+    t.save(p)
+    # Simulate a legacy state file by rewriting the facts array
+    import json
+    raw = json.loads(p.read_text())
+    raw["facts"] = [["A", "r", "B"]]  # 3-tuple, no validity
+    p.write_text(json.dumps(raw))
+    t2 = Titanos.load(p)
+    assert len(t2.facts) == 1
+    assert t2.facts[0] == ("A", "r", "B", None, None)
+    assert t2.ask_list("A", "r") == ["B"]
+
+
+def test_stats_reports_temporal_counts():
+    """stats() includes facts_with_validity and facts_expired."""
+    t = _temporal_kb()
+    s = t.stats()
+    assert "facts_with_validity" in s
+    assert "facts_expired" in s
+    assert "temporal_filter_current" in s
+    # 2 Athens facts + 1 Rome fact = 3 all have at least one bound set
+    assert s["facts_with_validity"] == 3
+    # Ottoman Empire (ends 1834) and Roman Empire (ends 476) are expired
+    assert s["facts_expired"] == 2
+
+
+def test_temporal_save_load_roundtrip(tmp_path):
+    """Validity intervals survive save/load."""
+    t = _temporal_kb()
+    p = tmp_path / "state.json"
+    t.save(p)
+    t2 = Titanos.load(p)
+    assert len(t2.facts) == 3
+    for f in t2.facts:
+        assert len(f) == 5
+    assert t2.ask_list("Athens", "capital_of", as_of="1800-01-01") == [
+        "Ottoman Empire"
+    ]
+    assert t2.ask_list("Athens", "capital_of", as_of="1900-01-01") == [
+        "Greece"
+    ]
