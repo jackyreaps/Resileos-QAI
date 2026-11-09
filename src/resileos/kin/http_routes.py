@@ -1,11 +1,4 @@
-"""Optional FastAPI routes for eat + kin cycle.
-
-Mount from app.py when ready:
-
-    from resileos.kin.http_routes import register_kin_routes
-    register_kin_routes(app, get_titanos=lambda: titanos_singleton,
-                        auth_dep=verify_api_key)
-"""
+"""Optional FastAPI routes for eat + kin cycle."""
 from __future__ import annotations
 
 from typing import Any, Callable, Optional
@@ -13,7 +6,7 @@ from typing import Any, Callable, Optional
 from resileos.kin.bundle import KinBundle, build_kin_bundle
 from resileos.kin.eat import eat_and_learn, eat_filter
 from resileos.kin.council import council_query
-from resileos.harness.separated import SeparatedCycle, zeus_head
+from resileos.harness.separated import run_separated
 
 
 def register_kin_routes(
@@ -35,9 +28,7 @@ def register_kin_routes(
     deps = [Depends(auth_dep)] if auth_dep is not None else []
 
     class EatRequest(BaseModel):
-        claim: Any = Field(
-            ..., description="Triple string or {subject,relation,obj}"
-        )
+        claim: Any = Field(..., description="Triple string or {subject,relation,obj}")
         user_id: str = ""
         allow_sys: bool = False
 
@@ -51,10 +42,11 @@ def register_kin_routes(
         subject: str = "world:apollo"
         facts: list = []
         art: bool = False
-        residual_packet_hash: Optional[str] = None
+        use_council: bool = True
+        use_athena: bool = False
+        profile: str = "personal"
 
     bundle_holder: dict[str, KinBundle] = {}
-    _sep = SeparatedCycle(id_prefix="kin")
 
     def _bundle() -> KinBundle:
         if get_bundle:
@@ -63,16 +55,23 @@ def register_kin_routes(
             bundle_holder["b"] = build_kin_bundle()
         return bundle_holder["b"]
 
+    def _ask_fn(titan):
+        def ask(s: str, r: str):
+            ask_list = getattr(titan, "ask_list", None)
+            if callable(ask_list):
+                rows = ask_list(s, r)
+                if not rows:
+                    return None
+                return rows if len(rows) > 1 else rows[0]
+            return titan.ask(s, r)
+        return ask
+
     @app.post("/api/v1/eat", dependencies=deps)
     def api_eat(body: EatRequest) -> dict:
         titan = get_titanos()
-
-        def learn(s: str, r: str, o: str) -> None:
-            titan.learn(s, r, o)
-
         decision = eat_and_learn(
             body.claim,
-            learn,
+            lambda s, r, o: titan.learn(s, r, o),
             user_id=body.user_id or "",
             seed_record=bool(body.user_id),
             allow_sys=body.allow_sys,
@@ -85,7 +84,6 @@ def register_kin_routes(
         if body.user_id and not metrics:
             try:
                 from resileos.seed.metrics import metrics_for
-
                 metrics = metrics_for(body.user_id)
             except Exception:
                 metrics = {}
@@ -111,61 +109,33 @@ def register_kin_routes(
 
     @app.post("/api/v1/kin/separated_cycle", dependencies=deps)
     def api_separated_cycle(body: SeparatedCycleRequest) -> dict:
-        """Write → review → apply. Zeus is head; Athena reviews."""
+        """Write → verifiers → council → (athena) → Zeus apply."""
         from resileos.kin.apollo import apollo_cycle
-        from resileos.kin.athena import judge as athena_judge
 
         titan = get_titanos()
 
-        def _writer():
-            if body.writer == "apollo":
-                return lambda **kw: apollo_cycle(
-                    body.facts, subject=body.subject, art=body.art, **kw
-                )
-            raise ValueError(f"unknown writer: {body.writer}")
+        if body.writer == "apollo":
+            writer_fn = apollo_cycle
+            writer_kwargs = {"subject": body.subject, "art": body.art}
+            writer_args = (body.facts,)
+        else:
+            return {"applied": False, "reason": f"unknown writer: {body.writer}"}
 
-        proposal = _sep.propose(
-            body.writer,
-            _writer(),
+        return run_separated(
+            writer_fn,
+            writer_name=body.writer,
             action_type="apollo",
-        )
-
-        def athena_review(p):
-            out = athena_judge(
-                perceptions=[{"subject": body.subject,
-                              "address": {"residual_bin": "low_low"}}],
-                frames=[{"label": "review", "depth": 1}],
-            )
-            return (
-                bool(out.get("ok", False)),
-                out.get("reading", "athena judgment"),
-                [{"reviewer": "athena", "ok": out.get("ok"),
-                  "frame": out.get("gate", {}).get("frame")}],
-            )
-
-        def verifier_review(p):
-            if not p.claims:
-                return (False, "no claims to verify", [{"matched": 0}])
-            return (
-                True,
-                f"{len(p.claims)} claims captured",
-                [{"matched": len(p.claims), "passed": len(p.claims)}],
-            )
-
-        result = zeus_head(
-            proposal,
-            reviewers=[
-                ("athena", athena_review),
-                ("verifier", verifier_review),
-            ],
             learn_fn=titan.learn,
-            cycle=_sep,
+            ask_fn=_ask_fn(titan),
+            use_council=body.use_council,
+            use_athena=body.use_athena,
+            profile=body.profile,
+            writer_args=writer_args,
+            writer_kwargs=writer_kwargs,
         )
-        return result
 
     @app.post("/api/v1/eat/preview", dependencies=deps)
     def api_eat_preview(body: EatRequest) -> dict:
-        """Filter only — no learn."""
         return eat_filter(body.claim, allow_sys=body.allow_sys).to_dict()
 
     class CouncilRequest(BaseModel):
@@ -176,16 +146,7 @@ def register_kin_routes(
     @app.post("/api/v1/council/query", dependencies=deps)
     def api_council(body: CouncilRequest) -> dict:
         titan = get_titanos()
-
-        def ask(s: str, r: str):
-            ask_list = getattr(titan, "ask_list", None)
-            if callable(ask_list):
-                rows = ask_list(s, r)
-                if not rows:
-                    return None
-                return rows if len(rows) > 1 else rows[0]
-            return titan.ask(s, r)
-
         return council_query(
-            body.subject, body.relation, ask, profile=body.profile
+            body.subject, body.relation, _ask_fn(titan),
+            profile=body.profile,
         ).to_dict()
