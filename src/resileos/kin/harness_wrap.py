@@ -1,59 +1,92 @@
-"""Harness wrapping for individual kin handlers.
+"""Wire UI perception into the kin. Image, audio, video, language, and art all
+write into Psyche, then Athena judges, then Apollo can hop on the resulting
+rows.
 
-For kin that are read-only or observation-class, this attaches a
-ControlPacket, runs the guard, and returns a harness summary alongside
-the handler's result. For mutating kin, use SeparatedCycle instead.
+Two paths:
+
+    wire_perception(psyche, perceived, learn_fn=titan.learn)
+        SEPARATED. Athena proposes, verifiers + council review, Zeus
+        applies only if every reviewer approves.
+
+    wire_perception(psyche, perceived, eat_fn=some_fn)
+        LEGACY. judge() calls eat_fn directly. Emits a DeprecationWarning.
+
+Prefer learn_fn. eat_fn is kept for compatibility.
 """
 from __future__ import annotations
 
-from uuid import uuid4
-from typing import Any, Callable
+import warnings
+from typing import Any, Callable, Optional
 
-from resileos.harness.packet import ControlPacket
-from resileos.harness.tools import (
-    apollo_success,
-    budget_and_stuck_guard,
-    evidence_attach_raw,
-    guide_load,
-    verification_required,
-    verify_on_stop,
-)
-
-_GUIDES = ["docs/harness/CONSTRAINTS.md", "docs/harness/AGENTS.md"]
+from resileos.kin.athena import judge
+from resileos.kin.perceive_into import perceive_into
+from resileos.kin.psyche import Psyche
 
 
-def harness_wrap(
-    handler: Callable[..., Any],
-    action_type: str,
+def wire_perception(
+    psyche: Psyche,
+    perceived: dict[str, Any],
     *,
-    capture_evidence: bool = True,
-) -> Callable[..., dict]:
-    def wrapped(*args: Any, **kwargs: Any) -> dict:
-        packet = ControlPacket(id=f"{action_type}-{uuid4().hex[:8]}")
-        guide_load(_GUIDES, packet.to_dict())
+    others: Optional[list[dict[str, Any]]] = None,
+    eat_fn: Optional[Callable[..., Any]] = None,
+    learn_fn: Optional[Callable[[str, str, str], None]] = None,
+    ask_fn: Optional[Callable[[str, str], Any]] = None,
+    use_council: bool = True,
+    profile: str = "personal",
+) -> dict[str, Any]:
+    """One call from any UI perceive module into the kin."""
+    if learn_fn is not None:
+        from resileos.kin.perception_kin import perception_cycle
 
-        guard = budget_and_stuck_guard(packet.to_dict())
-        if not guard["ok"]:
-            return {
-                "error": "guard_fail",
-                "reason": guard["reason"],
-                "harness": {"verified": False},
-            }
-
-        result = handler(*args, **kwargs)
-
-        if capture_evidence and isinstance(result, dict) and result:
-            try:
-                evidence_attach_raw(result, action_type, packet.to_dict())
-            except (ValueError, TypeError):
-                pass
-
-        verification = verification_required(action_type)
-        v = verify_on_stop(
-            packet.to_dict(),
-            apollo_success(result if isinstance(result, dict) else {}),
-            require_evidence=verification["requires_verification"],
+        result = perception_cycle(
+            psyche,
+            perceived,
+            learn_fn=learn_fn,
+            ask_fn=ask_fn,
+            others=others,
+            use_council=use_council,
+            profile=profile,
         )
-        return {"result": result, "harness": v}
+        return {
+            "state": result.get("psyche_state", dict(psyche.state)),
+            "rows": result.get("hub_rows", psyche.hub_rows()),
+            "judgment": {
+                "ok": bool(result.get("applied", False)),
+                "reading": result.get("verdict", "")
+                if isinstance(result.get("verdict"), str)
+                else "",
+                "gate": {
+                    "frame": "applied" if result.get("applied") else "abstained"
+                },
+                "applied": bool(result.get("applied", False)),
+            },
+            "applied": bool(result.get("applied", False)),
+            "learned": int(result.get("learned", 0) or 0),
+            "verification": result.get("verification", {}),
+            "verdicts": result.get("verdicts", []),
+        }
 
-    return wrapped
+    warnings.warn(
+        "wire_perception(eat_fn=...) writes facts without review. "
+        "Pass learn_fn=<titan.learn> instead to route through the "
+        "separated cycle (write -> review -> apply).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    perceive_into(psyche, perceived)
+    percs = [perceived] + (others or [])
+    reading = judge(
+        percs,
+        subject=psyche.subject,
+        eat_fn=eat_fn,
+        frames=psyche.state.get("frames"),
+        drives=psyche.state.get("drives"),
+    )
+    return {
+        "state": psyche.state,
+        "rows": psyche.hub_rows(),
+        "judgment": reading,
+    }
+
+
+__all__ = ["wire_perception"]
