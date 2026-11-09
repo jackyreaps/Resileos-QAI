@@ -6,15 +6,12 @@ Two paths:
 
     wire_perception(psyche, perceived, learn_fn=titan.learn)
         SEPARATED. Athena proposes, verifiers + council review, Zeus
-        applies only if every reviewer approves. Claims are captured by
-        a shim; the real learn function is called only in apply().
+        applies only if every reviewer approves.
 
     wire_perception(psyche, perceived, eat_fn=some_fn)
-        LEGACY. judge() calls eat_fn directly. No separation — the writer
-        and the applier are the same call. Emits a DeprecationWarning.
+        LEGACY. judge() calls eat_fn directly. Emits a DeprecationWarning.
 
-Prefer learn_fn. eat_fn is kept for compatibility with existing call
-sites and tests.
+Prefer learn_fn. eat_fn is kept for compatibility.
 """
 from __future__ import annotations
 
@@ -37,13 +34,7 @@ def wire_perception(
     use_council: bool = True,
     profile: str = "personal",
 ) -> dict[str, Any]:
-    """One call from any UI perceive module into the kin.
-
-    If `learn_fn` is provided, the perception runs through the separated
-    cycle (write → review → apply) and returns harness fields.
-    If only `eat_fn` is provided, falls back to the legacy direct write
-    and warns that the cycle is unverified.
-    """
+    """One call from any UI perceive module into the kin."""
     if learn_fn is not None:
         from resileos.kin.perception_kin import perception_cycle
 
@@ -56,10 +47,7 @@ def wire_perception(
             use_council=use_council,
             profile=profile,
         )
-        # Normalise to the legacy shape so existing callers keep working,
-        # plus the new harness fields.
         return {
-            # Legacy keys (were always present)
             "state": result.get("psyche_state", dict(psyche.state)),
             "rows": result.get("hub_rows", psyche.hub_rows()),
             "judgment": {
@@ -72,14 +60,12 @@ def wire_perception(
                 },
                 "applied": bool(result.get("applied", False)),
             },
-            # New keys for callers who want them
             "applied": bool(result.get("applied", False)),
             "learned": int(result.get("learned", 0) or 0),
             "verification": result.get("verification", {}),
             "verdicts": result.get("verdicts", []),
         }
 
-    # Legacy path: write-and-approve in one call.
     warnings.warn(
         "wire_perception(eat_fn=...) writes facts without review. "
         "Pass learn_fn=<titan.learn> instead to route through the "
