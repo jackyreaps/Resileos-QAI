@@ -1,7 +1,7 @@
 # Deploy Resileos landing + billing
 
-This folder is a **standalone** landing + billing stack. It does not modify
-`Resileos-QAI` until you copy files over. Do not commit secrets.
+This folder is the landing and billing stack in `Resileos-QAI`. Do not commit
+secrets.
 
 ## Architecture
 
@@ -78,7 +78,7 @@ Optional:
 ## 3. Run locally
 
 ```bash
-cd /workspace/resileos-landing
+cd landing
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r api/requirements.txt
 mkdir -p data
@@ -136,6 +136,25 @@ If Pages/Netlify serves only `public/`:
 ```
 
 3. Set `RESILEOS_LANDING_ORIGIN` on the API to your Pages origin.
+
+
+## 5a. Cloudflare Pages (current live deploy)
+
+The marketing site is deployed as Cloudflare Pages project `resileos`.
+
+- Production URL: https://resileos.pages.dev
+- Custom domains: https://resileosai.fun and https://www.resileosai.fun
+- Static assets: `public/` (exclude `public/assets/gods/cc0/`)
+- Functions: `functions/api/config.js`, `free-key.js`, `create-checkout-session.js`, `claim/[session_id].js`
+- KV namespace `resileos-keys` bound as `KEYS` (hashed keys, email cap, IP rate limit, one-time claim)
+- Plaintext env: `STRIPE_PRICE_*`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`, `RESILEOS_SITE_URL`, `RESILEOS_API_BASE_URL`, `FREE_KEY_RATE_PER_HOUR`
+- Encrypted secret: `STRIPE_SECRET_KEY` (Stripe **test** mode)
+- Success URL: `https://resileosai.fun/?checkout=success`
+- Cancel URL: `https://resileosai.fun/#pricing`
+- Claim does not require a webhook: it retrieves the Checkout Session from Stripe, mints once, and stores the hash in KV
+- Redeploy from the project root: `wrangler pages deploy public --project-name resileos`
+
+The local `api/server.py` path remains available for development.
 
 ## 6. Go-live checklist
 

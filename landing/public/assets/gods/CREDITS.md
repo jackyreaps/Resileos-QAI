@@ -28,6 +28,7 @@ credited below. They are not the files shown on the page.
 | `metis.webp` | Metis | AI-generated (no sculpture reference) | — |
 | `momus.webp` | Momus | AI-generated (no sculpture reference) | — |
 | `hephaestus.webp` | Hephaestus | AI-generated (no sculpture reference) | — |
+| `titanos.webp` | Titanos | AI-generated figurehead (no single sculpture reference; series-matched to Zeus and Atlas) | — |
 
 Metis, Momus, and Hephaestus had no suitable public-domain sculpture photograph
 in this set, so those three portraits are invented in the same series style.

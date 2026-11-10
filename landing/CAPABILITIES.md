@@ -85,7 +85,7 @@ Invent-rate (real Titanos, 2026-11-08): **0.0** on 20 unknowns / exact-match **1
 
 ## Commits since `56e9ebc` (selected)
 
-Free-key script, framework gate, make_world, search/explain/remember, recursive improve, Apollo kin + art encoders, video_codex, success_improve, Studio Make tab, hub/apollo/workbench/qdter HTTP routes, expanded bench unknowns, tests for the new modules. Full list: 36 commits, 29 files changed (+923/−24).
+Free-key script, framework_gate, make_world, search/explain/remember, recursive improve, Apollo kin + art encoders, video_codex, success_improve, Studio Make tab, hub/apollo/workbench/qdter HTTP routes, expanded bench unknowns, tests for the new modules. Full list: 36 commits, 29 files changed (+923/−24).
 
 ---
 
@@ -101,7 +101,7 @@ Free-key script, framework gate, make_world, search/explain/remember, recursive 
 | Hubs `user:` / `world:` / `org:` | `hub_train.py`, `hub_address.py` | learn under prefix; `POST /api/v1/hub/learn`, Studio User id | `test_hub_*` | Yes → `user:alice prefers exact_answers` |
 | float32 default | `state_dtype.py` | env `RESILEOS_STATE_DTYPE` unset | used across substrate | Yes → `float32` |
 | Studio (learn/ask without code) | `ui/studio_app.py`, `ui_studio.py` | Streamlit Chat/Search/Media/Make | UI structure present; exercised via module demos | Code path verified; full Streamlit UI not headed in this run |
-| Epistemic gate frames | `ui` framework gate module | used by train_seed, scale, kin | covered indirectly | Yes → `exact` / `abstained` |
+| Epistemic gate frames | `ui/framework_gate.py` | used by train_seed, scale, kin | covered indirectly | Yes → `exact` / `abstained` |
 | Explain + remember helpers | `ui/explain_remember.py` | Studio Search explain path | `test_search_flow` related | Yes |
 | Hub-first search + web URL | `ui/search_flow.py` | Studio Search | `test_search_flow.py` | Yes → hub hit `workspace` |
 | Free-key mint (CLI) | `scripts/issue_free_key.py` | CLI (not HTTP in main API) | none | Yes → prints key + sha256 |

@@ -19,6 +19,8 @@
         <span></span><span></span><span></span>
       </button>
       <div class="nav-links" id="nav-menu">
+        <a href="#titanos"><span class="nav-el">Titanos</span><span class="nav-en">Engine</span></a>
+        <a href="#structure"><span class="nav-el">Order</span><span class="nav-en">Structure</span></a>
         <a href="#does"><span class="nav-el">Zeus</span><span class="nav-en">Core</span></a>
         <a href="#bench"><span class="nav-el">Apollo</span><span class="nav-en">Proof</span></a>
         <a href="#studio"><span class="nav-el">Hades</span><span class="nav-en">Studio</span></a>
@@ -107,11 +109,76 @@
     </div>
   </div>
 
+  <section id="titanos">
+    <div class="meander" aria-hidden="true"></div>
+    <figure class="titanos-figure img-hover">
+      <img src="/assets/gods/titanos.webp" width="1280" height="720" alt="AI-generated marble figurehead of Titanos with circuit traces and a voxel dissolve" />
+    </figure>
+    <p class="patron-kicker"><strong>Titanos</strong>, Engine</p>
+    <h2>The figurehead</h2>
+    <p class="sub">Titanos is the engine over the deterministic residual core. It exposes <code>ask</code>, <code>ask_list</code>, and <code>chain</code>. Those calls return <strong>ACCEPTED</strong>, <strong>ABSTAINED</strong>, or <strong>CONFLICT</strong>.</p>
+  </section>
+
+  <section class="alt" id="structure">
+    <div class="inner">
+      <div class="meander" aria-hidden="true"></div>
+      <p class="patron-kicker"><strong>Order</strong>, Structure</p>
+      <h2>How the gods are structured</h2>
+      <p class="sub">Not a circle of equals. Titanos sits at the top as the engine. Zeus routing stands over the residual core, which is the deterministic leaf and the source of truth. Kin stand as side-interfaces to that core. Demi-gods are summoned for one check and then dismissed. Legions serve under one Kin.</p>
+      <div class="hierarchy" aria-label="Hierarchy of Titanos, Zeus routing, the residual core, Kin, Demi-gods, and Legions">
+        <div class="h-spine" aria-hidden="true"></div>
+        <div class="h-stack">
+          <div class="h-node h-top">
+            <span class="h-kicker">Engine</span>
+            <strong>Titanos</strong>
+            <span><code>ask</code> · <code>ask_list</code> · <code>chain</code> return ACCEPTED, ABSTAINED, or CONFLICT</span>
+          </div>
+          <div class="h-node">
+            <span class="h-kicker">Routing</span>
+            <strong>Zeus</strong>
+            <span>Writes apply only after reviewers approve</span>
+          </div>
+          <div class="h-node h-core">
+            <span class="h-kicker">Source of truth</span>
+            <strong>Residual core</strong>
+            <span>Deterministic leaf. Exact store, derivation, and abstention consult this core.</span>
+          </div>
+        </div>
+        <p class="h-label">Kin — standing side-interfaces</p>
+        <ul class="h-kin">
+          <li><strong>Iris</strong><span>Senses, sensors, and log readers</span></li>
+          <li><strong>Metis</strong><span>Policy: routers and risk classifiers; output is policy only</span></li>
+          <li><strong>Hermes</strong><span>Navigators and reviewers within budget</span></li>
+          <li><strong>Hades</strong><span>Memory: checkpoint, restore, and lesson notes</span></li>
+          <li><strong>Apollo</strong><span>Verification gate</span></li>
+          <li><strong>Athena</strong><span>Judgment: fail-closed when Apollo does not succeed</span></li>
+          <li><strong>Eat / perception</strong><span>Ingest gated before residual writes</span></li>
+        </ul>
+        <p class="h-label">Demi-gods — summoned for one check, then dismissed</p>
+        <ul class="h-demi">
+          <li>Themis</li>
+          <li>Momus</li>
+          <li>Hephaestus</li>
+          <li>Nike</li>
+          <li>Atlas</li>
+        </ul>
+        <p class="h-label">Legions <span class="pending">BETA</span></p>
+        <p class="h-note">Bounded tools registered under one Kin via <code>register_legion</code>. They inherit that Kin's constraints. Example legions are optional and off by default.</p>
+        <p class="h-label">Future legions <span class="pending">PLANNED · NOT SHIPPED</span></p>
+        <ul class="h-plan">
+          <li><strong>Superpowers loop</strong> <span>A plan / test / debug loop on Hermes and SeparatedCycle. Not shipped.</span></li>
+          <li><strong>Graphify</strong> <span>Document-to-triples ingest under Iris and Eat. Not shipped.</span></li>
+          <li><strong>Forge</strong> <span>A video legion that would draft, then verify, then upscale, for Higgsfield / Seedance. Not shipped.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section id="pantheon">
     <div class="meander" aria-hidden="true"></div>
     <p class="patron-kicker"><strong>Pantheon</strong>, Map</p>
     <h2>Find a section by its patron</h2>
-    <p class="sub">Each part of the site has a patron. Open any card to jump there. <a href="#kin">Legions under Kin</a> are merged on main and in beta.</p>
+    <p class="sub">Titanos is the engine above this map. Each part of the site has a patron. Open any card to jump there. <a href="#kin">Legions under Kin</a> are merged on main and in beta.</p>
     <div class="pantheon-grid">
       <a class="pantheon-card" href="#does">
         <span class="frame img-hover"><img src="/assets/gods/zeus.webp" width="864" height="1152" alt="AI-enhanced marble portrait of Zeus Ammon with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" /></span>
@@ -853,7 +920,9 @@ curl -sS -X POST "$BASE/learn" \
     <p class="credits">Site portraits are AI-generated compositions of classical marble with code-like traces. Where a public-domain sculpture was used as a reference, the original photograph is kept and credited. <a href="/assets/gods/CREDITS.md">Full credits</a>.</p>
   </footer>
 
+  <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
   <script>window.RESILEOS_BILLING = window.RESILEOS_BILLING || "";</script>
+  <script src="/assets/vendor/lenis.min.js"></script>
   <script src="/assets/site.js"></script>
 </body>
 </html>

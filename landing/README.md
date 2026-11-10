@@ -1,30 +1,38 @@
 # Resileos landing
 
-Exact-memory product site. Theme: **Own the record. Control the story.**
+Theme: **Own the record. Control the story.**
 
-Studio loop, hubs (`user:` / `world:` / `org:`), float32 default, a free key,
-and Stripe Checkout for Builder and Team. Product behavior, benches, and the
-god hierarchy are in the repo root [README.md](../README.md).
-
-## Public site
-
-The site will be live at [https://resileosai.fun](https://resileosai.fun)
-on Cloudflare Pages, in Stripe **test** mode. Pages serves the static tree
-under `public/`. The billing process in `api/` is separate and reads secrets
-from the host environment, not from the Pages build.
+Exact-memory product site. Titanos (`ask` / `ask_list` / `chain`), the god
+hierarchy, the Studio loop, hubs (`user:` / `world:` / `org:`), float32
+default, a free key, and Stripe Checkout for Builder and Team. Self-hosted
+OFL fonts: Instrument Serif, Inter, and JetBrains Mono. Portraits are in
+`public/assets/gods/` (`CREDITS.md`). Lenis is vendored at
+`public/assets/vendor/`. Product behavior and benches are in the repo root
+[README.md](../README.md).
 
 ```
-public/                 static site (index, self-hosted fonts, portraits)
-public/assets/gods/     AI-styled god portraits; see CREDITS.md
-api/                    free-key mint and Stripe Checkout / webhook
+public/                 static site (Cloudflare Pages output)
+public/assets/gods/     AI-styled portraits, including titanos.webp
+public/assets/fonts/    Instrument Serif, Inter, JetBrains Mono
+public/assets/vendor/   vendored Lenis
+functions/api/          Cloudflare Pages Functions (free key, checkout, claim)
+api/                    local FastAPI server for the same billing routes
 scripts/stripe_setup.py idempotent Stripe product and price creator
+wrangler.toml           Pages project and the KEYS KV binding
 artifacts/              measured bench reports
 CAPABILITIES.md         capability notes
 DEPLOY.md               go-live notes
 ```
 
-The old single `index.html` at the landing root is gone. The page lives at
-`public/index.html`. Locally, one process serves that directory and the API.
+## Public site
+
+The site is live at [https://resileosai.fun](https://resileosai.fun) and
+[https://www.resileosai.fun](https://www.resileosai.fun) on Cloudflare Pages
+(also [https://resileos.pages.dev](https://resileos.pages.dev)), in Stripe
+**test** mode. Pages serves `public/`. Billing routes are Pages Functions in
+`functions/api/`, with the KV binding `KEYS` from `wrangler.toml`.
+`STRIPE_SECRET_KEY` is an encrypted Pages secret, not a file in this tree.
+Checkout success and cancel URLs point at https://resileosai.fun.
 
 ## Run locally in test mode
 
@@ -83,5 +91,6 @@ Open http://127.0.0.1:8787
   `http://127.0.0.1:8787/api/stripe/webhook` and put that forwarder’s signing
   secret in `STRIPE_WEBHOOK_SECRET`.
 
-`.env` and `.env.live` are gitignored. Keep live-mode values in `.env.live`
-or the host secret store, never in the repo.
+The live Pages claim route does not need that webhook. It reads the Checkout
+Session and stores the key hash in KV. `.env` and `.env.live` are gitignored.
+Keep live-mode values in `.env.live` or the host secret store, never in the repo.

@@ -246,4 +246,72 @@
       document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", t === tab ? "true" : "false"));
     });
   });
+
+  // Motion: Lenis, reveal, card glow, figurehead parallax
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduceMotion) {
+    document.documentElement.classList.add("js-motion");
+
+    if (typeof Lenis === "function") {
+      const lenis = new Lenis({ lerp: 0.12, wheelMultiplier: 0.92, smoothWheel: true });
+      function raf(time) {
+        lenis.raf(time);
+        requestAnimationFrame(raf);
+      }
+      requestAnimationFrame(raf);
+      document.documentElement.classList.add("lenis");
+    }
+
+    const revealIo = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-in");
+          revealIo.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+    );
+    const revealables = document.querySelectorAll(
+      "#titanos, #structure, #pantheon, #kin, .hierarchy, .titanos-figure, .pantheon-card, .patron, section .card, .demi-card, .price-card"
+    );
+    revealables.forEach((el, i) => {
+      el.classList.add("reveal");
+      el.style.transitionDelay = ((i % 10) * 0.045).toFixed(3) + "s";
+      revealIo.observe(el);
+    });
+
+    document.querySelectorAll(".card, .pantheon-card, .price-card").forEach((card) => {
+      card.addEventListener("pointermove", (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty("--mx", e.clientX - r.left + "px");
+        card.style.setProperty("--my", e.clientY - r.top + "px");
+      });
+    });
+
+    const titanImg = document.querySelector(".titanos-figure img");
+    const titanFrame = document.querySelector(".titanos-figure");
+    if (titanImg && titanFrame) {
+      let ticking = false;
+      const shift = () => {
+        ticking = false;
+        const r = titanFrame.getBoundingClientRect();
+        const mid = r.top + r.height / 2 - window.innerHeight / 2;
+        const y = Math.max(-28, Math.min(28, mid * -0.07));
+        titanImg.style.transform = "translate3d(0," + y.toFixed(1) + "px,0) scale(1.05)";
+      };
+      window.addEventListener(
+        "scroll",
+        () => {
+          if (!ticking) {
+            ticking = true;
+            requestAnimationFrame(shift);
+          }
+        },
+        { passive: true }
+      );
+      shift();
+    }
+  }
+
 })();
