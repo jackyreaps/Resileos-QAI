@@ -51,13 +51,11 @@ Run on 2026-11-10 against `http://127.0.0.1:8000/api/v1` with `RESILEOS_AUTH_BYP
 | Metric | Value |
 |--------|-------|
 | derivation_rate | 0.0 |
-| novelty_rate | 0.0 |
-| grounding_rate | 0.0 |
-| assertion_rate_on_novel | 0.0 |
-| p50_ms (script field) | 3.5 |
-| llm | null |
+| derivation_grounding_rate | 0.0 |
+| invention_assertion_rate | 0.0 |
+| p50_ms | 3.4 |
 
-All four probes returned `ABSTAINED` and `got: null`. The two derivation probes (`carol grandparent_of`, `carol works_at_of_parent`) were not answered. The script's `p50_ms` is `sorted(latencies)[len//2]` of 3.1, 3.2, 3.5, and 43.9 ms, which selected 3.5.
+The two derivation probes are SPARQL compositions. Both returned no rows (`got: []`), so the derivation rate is 0. The two invention probes (`carol likely_commutes_to`, `alice sibling_of`) returned `ABSTAINED` and null, so nothing invented was asserted. Latencies were 2.7, 2.0, 3.4, and 44.7 ms. The script's `p50_ms` is 3.4. No LLM key was set.
 
 ## What would make the candidate tier real
 

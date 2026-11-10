@@ -1,5 +1,4 @@
-"""Zeus kin operators + eat filter + council + frames."""
-
+"""Zeus kin operators + eat filter + council + frames + separated cycle."""
 from resileos.kin.bundle import (
     KinBundle,
     apply_metis_to_agency,
@@ -15,12 +14,27 @@ from resileos.kin.frames import (
     classify_decision,
     hub_category,
 )
+from resileos.kin.hades import Checkpoint, Hades
+from resileos.harness.harness_wrap import harness_wrap
+from resileos.kin.wire_perception import wire_perception
 from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
 from resileos.kin.mouth_policy import should_render_prose
+from resileos.kin.perception_kin import perception_cycle
 from resileos.kin.verifiers import run_verifiers
-from resileos.kin.wiring import get_kin_bundle, mouth_allowed_from_last_cycle, wire_kin
+from resileos.kin.wiring import (
+    get_kin_bundle,
+    mouth_allowed_from_last_cycle,
+    wire_kin,
+)
+from resileos.harness.separated import (
+    Proposal,
+    SeparatedCycle,
+    Verdict,
+    run_separated,
+    zeus_head,
+)
 
 __all__ = [
     "KinBundle",
@@ -48,4 +62,14 @@ __all__ = [
     "get_kin_bundle",
     "mouth_allowed_from_last_cycle",
     "wire_kin",
+    "SeparatedCycle",
+    "Proposal",
+    "Verdict",
+    "zeus_head",
+    "run_separated",
+    "perception_cycle",
+    "harness_wrap",
+    "wire_perception",
+    "Hades",
+    "Checkpoint",
 ]

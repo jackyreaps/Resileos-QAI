@@ -25,8 +25,8 @@ Run on 2026-11-10 with `PYTHONPATH=src python scripts/ops/bench_vs_llm.py`. The 
 |--------|----------|--------------|
 | Exact-match rate on 3 known facts | 1.0 | not run |
 | Invent rate on 12 unknown pairs | 0.0 | not run |
-| p50 latency of the 3 known queries (ms) | 43.270759 | not run |
-| Mean latency of those 3 queries (ms) | 46.241553 | not run |
+| p50 latency of the 3 known queries (ms) | 35.093815 | not run |
+| Mean latency of those 3 queries (ms) | 35.693131 | not run |
 | Cost per 1,000 queries | not measured | not measured |
 
 The p50 is the median of the three per-query times. It is not the batch time divided by 3.

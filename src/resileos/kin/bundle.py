@@ -1,13 +1,12 @@
-"""
-Kin bundle — align Iris / Metis / Hermes / Eat with AgencyGroup + Zeus.
+"""Kin bundle — align Iris / Metis / Hermes / Eat with AgencyGroup + Zeus.
 
-Query routing stays with Zeus (or other answer children). Iris, Metis, and
-Hermes are **side interfaces** (RES-334): they do not win subject/relation
-routing. Optional low-weight handlers always return None so accidental
-registration cannot override Zeus answers.
+Harness layer integrated: risk gates, confidence routing, verify-on-stop,
+budget/stuck guards, residual consistency, Apollo outer sensor, and the
+verification-requirement classification (zero-match rule, 2026-11-09).
 
-AgencyGroup.eat() remains the fitness prune for answer children.
-eat_filter is the **ingest** gate for new claims (different verb).
+Hades checkpoint: verified cycles write a durable checkpoint (lesson +
+control_state + residual_hash). The write is non-blocking; a failed save
+does not break the cycle.
 """
 from __future__ import annotations
 
@@ -21,9 +20,24 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from resileos.kin.eat import EatDecision, eat_and_learn, eat_filter
+from resileos.kin.hades import Hades, make_hades
 from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
+
+# Harness integration
+from resileos.harness.packet import ControlPacket
+from resileos.harness.tools import (
+    apollo_success,
+    budget_and_stuck_guard,
+    evidence_attach,
+    guide_load,
+    residual_consistency,
+    risk_classify,
+    verification_required,
+    verify_on_stop,
+)
+from resileos.harness.cascade import CascadeRouter
 
 
 @dataclass
@@ -36,6 +50,7 @@ class KinBundle:
     hermes_handler: Callable[..., Any]
     last_report: Optional[IrisReport] = None
     last_policy: Optional[MetisPolicy] = None
+    control: Optional[ControlPacket] = None
 
     def cycle(
         self,
@@ -43,24 +58,102 @@ class KinBundle:
         agency_group: Any = None,
         *,
         apply_policy: bool = True,
-    ) -> tuple[IrisReport, MetisPolicy]:
-        """Iris observe → Metis organize → optional AgencyGroup weight hints."""
+        residual_packet: Any = None,
+    ) -> tuple[IrisReport, MetisPolicy, dict]:
+        """Iris -> Metis + full harness guards and outer verification."""
+        if self.control is None:
+            self.control = ControlPacket(id="kin-cycle")
+
+        guide_load(
+            ["docs/harness/CONSTRAINTS.md", "docs/harness/AGENTS.md"],
+            self.control.to_dict(),
+        )
+
+        guard = budget_and_stuck_guard(self.control.to_dict())
+        if not guard["ok"]:
+            self.control.append({"event": "guard_fail", "reason": guard["reason"]})
+            report = self.observe(metrics=metrics, agency_group=agency_group)
+            policy = self.organize(report)
+            self.last_report = report
+            self.last_policy = policy
+            return report, policy, {
+                "harness": {"guard": guard, "verified": False}
+            }
+
         report = self.observe(metrics=metrics, agency_group=agency_group)
         policy = self.organize(report)
         self.last_report = report
         self.last_policy = policy
+
         if apply_policy and agency_group is not None:
             apply_metis_to_agency(policy, agency_group)
-        return report, policy
+
+        consistency = residual_consistency(self.control.to_dict())
+        if residual_packet is not None:
+            evidence_attach(
+                {"packet_hash": getattr(residual_packet, "packet_hash", None)},
+                "residual_core",
+                self.control.to_dict(),
+            )
+
+        verification = verification_required("kin_cycle")
+        apollo = apollo_success({
+            "status": "ok" if consistency.get("consistent") else "scarred"
+        })
+        v = verify_on_stop(
+            self.control.to_dict(),
+            apollo,
+            require_evidence=verification["requires_verification"],
+        )
+        self.control.verified = v["verified"]
+        self.control.append({
+            "event": "verify",
+            "result": v,
+            "consistency": consistency,
+            "verification_required": verification,
+        })
+
+        # Hades checkpoint on verified cycles only. The lesson is the
+        # only thing that crosses attempts. A failed save does not
+        # abort the cycle.
+        checkpoint_id = None
+        lesson = None
+        checkpoint_error = None
+        if v["verified"]:
+            rank = getattr(self.last_policy, "depth", None)
+            if rank is None:
+                rank = getattr(self.last_policy, "rank", "?")
+            lesson = (
+                f"kin_cycle turn={self.control.turn} "
+                f"verified=True rank={rank}"
+            )
+            try:
+                if getattr(self, "_hades", None) is None:
+                    self._hades = make_hades()
+                ckpt = self._hades.save(self.control, lesson=lesson)
+                checkpoint_id = ckpt.id
+                lesson = ckpt.lesson
+            except Exception as exc:
+                checkpoint_error = str(exc)
+
+        harness_summary = {
+            "verified": v["verified"],
+            "reason": v["reason"],
+            "verification_required": verification["requires_verification"],
+            "consistency": consistency,
+            "apollo": apollo,
+            "budget": self.control.budget_remaining,
+            "guides": self.control.guides_loaded,
+        }
+        if checkpoint_id is not None:
+            harness_summary["checkpoint"] = checkpoint_id
+            harness_summary["lesson"] = lesson
+        if checkpoint_error is not None:
+            harness_summary["checkpoint_error"] = checkpoint_error
+        return report, policy, harness_summary
 
 
 def apply_metis_to_agency(policy: MetisPolicy, agency_group: Any) -> list[str]:
-    """
-    Apply organizer hints without calling learn.
-
-    - disable_children: mark inactive if present (does not delete)
-    - does not invent fitness; respects already-eaten names from Iris
-    """
     changed: list[str] = []
     children = getattr(agency_group, "children", None)
     if not isinstance(children, dict):
@@ -73,7 +166,6 @@ def apply_metis_to_agency(policy: MetisPolicy, agency_group: Any) -> list[str]:
             if isinstance(eaten, list) and name not in eaten:
                 eaten.append(name)
             changed.append(name)
-    # re-normalize if API exists
     norm = getattr(agency_group, "_normalize_weights", None)
     if callable(norm):
         try:
@@ -100,6 +192,7 @@ def build_kin_bundle(
         iris_handler=iris_h,
         metis_handler=metis_h,
         hermes_handler=hermes_h,
+        control=ControlPacket(id="kin-bundle"),
     )
 
 
@@ -109,7 +202,6 @@ def register_answer_child(
     handler: Callable[..., Any],
     weight: float = 1.0,
 ) -> Any:
-    """Register a fact-answering child (e.g. Zeus). Not for Iris/Metis/Hermes."""
     return agency_group.add_child(name, handler, weight=weight)
 
 
@@ -119,10 +211,6 @@ def register_declining_kin(
     *,
     weight: float = 0.01,
 ) -> None:
-    """
-    Optional: register declining handlers so snapshot lists kin names.
-    They always return None — Zeus (or others) must hold real answer weight.
-    """
     for name, h in (
         ("iris", bundle.iris_handler),
         ("metis", bundle.metis_handler),
@@ -131,12 +219,14 @@ def register_declining_kin(
         if name not in getattr(agency_group, "children", {}):
             agency_group.add_child(name, h, weight=weight)
 
+
 def bundle_scale(bundle: KinBundle) -> dict:
     return attach_scale({"children": len(getattr(bundle, "children", []) or [])}, "kin")
 
+
 def bundle_recursive(facts: list, subject: str = "world:kin", eat_fn=None) -> dict:
-    """Run one success-prioritized improve cycle from this kin."""
     return improve_cycle(facts, subject=subject, eat_fn=eat_fn)
+
 
 def bundle_apollo(facts: list, subject: str = "world:apollo", eat_fn=None, art: bool = False) -> dict:
     return apollo_cycle(facts, subject=subject, eat_fn=eat_fn, art=art)

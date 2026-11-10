@@ -58,7 +58,7 @@ Three published benchmarks, each with the script that regenerates its numbers.
 - **Compositional generalization** — [docs/benchmarks/compositional-generalization.md](docs/benchmarks/compositional-generalization.md) — derivation rate on novel queries, Resileos vs an LLM baseline. Regenerate: `python scripts/ops/bench_compositional.py`
 - **Assertion rate on novel output** — [docs/benchmarks/invention-without-hallucination.md](docs/benchmarks/invention-without-hallucination.md) — how often does each system present something it invented as though it were a fact. Resileos abstains; the LLM baseline asserts. Regenerate: `python scripts/ops/bench_invention.py`
 
-All scripts write to `artifacts/` (gitignored). The tables in `docs/benchmarks/` were filled from a local run on 2026-11-10. The two API benches used `RESILEOS_AUTH_BYPASS=1` against `http://127.0.0.1:8000/api/v1`. No LLM key was set, so the LLM columns are empty.
+All scripts write to `artifacts/` (gitignored). The tables in `docs/benchmarks/` were filled from a local run on 2026-11-10 after merging `cc81021`. The API benches used `RESILEOS_AUTH_BYPASS=1` against `http://127.0.0.1:8000/api/v1`. No LLM key was set, so the LLM columns are empty. The temporal probe `scripts/run_temporal_probe.py` reported reference M9 0.0 (0/141) and synthetic overlap 2/2.
 
 ## Documentation
 

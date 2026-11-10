@@ -1,8 +1,8 @@
 """Query language and execution engine for Titanos (RES-322).
 
-Grammar (v1):
+Grammar (v2, adds AS OF):
 
-    query    := SELECT targets WHERE clauses
+    query    := SELECT targets WHERE clauses [AS OF string]
     targets  := var (',' var)*
     clauses  := clause (AND clause)*
     clause   := term ARROW term
@@ -12,6 +12,7 @@ Grammar (v1):
     NAME     := identifier (letters, digits, '_', '.')
     ARROW    := '--' relation '-->'
     LARROW   := '<--' relation '--'
+    string   := '"' chars '"' | "'" chars "'"
 
 Semantics: each clause is a pattern over the graph. Variables bind to
 entity names. Clauses are joined on shared variables via nested-loop
@@ -21,9 +22,16 @@ Inverse patterns: `?s <--rel-- X` means "find S such that S --rel--> X".
 The parser normalises this to anchor=X with inverse=True, so the
 executor reads it as an inverse lookup anchored at X.
 
+Temporal query (RES-332): the optional `AS OF "<iso>"` suffix filters
+the retrieved rows by valid-time. The executor forwards `as_of` to
+`core.ask()` if that method accepts it. If the core does not implement
+the temporal extension, an `AS OF` clause raises `QueryBindingError`
+with a clear message. Queries without `AS OF` are unchanged.
+
 Errors:
     QuerySyntaxError   malformed input
     QueryBindingError  unbound variable in a position requiring a name
+    QueryBindingError  AS OF used on a core without temporal support
 """
 from __future__ import annotations
 
@@ -34,7 +42,8 @@ from typing import Optional, Protocol
 # ── tokens ──────────────────────────────────────────────────────────
 TOKEN_RE = re.compile(
     r"""
-    (?P<ws>\s+)
+    (?P<asof>\bAS\s+OF\b)
+  | (?P<ws>\s+)
   | (?P<select>\bSELECT\b)
   | (?P<where>\bWHERE\b)
   | (?P<and>\bAND\b)
@@ -42,6 +51,7 @@ TOKEN_RE = re.compile(
   | (?P<var>\?[A-Za-z_][A-Za-z0-9_]*)
   | (?P<arrow>--[A-Za-z_][A-Za-z0-9_.]*-->)
   | (?P<larrow><--[A-Za-z_][A-Za-z0-9_.]*--)
+  | (?P<string>"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')
   | (?P<name>[A-Za-z_][A-Za-z0-9_.]*)
     """,
     re.VERBOSE,
@@ -61,6 +71,14 @@ class Token:
     kind: str
     value: str
     pos: int
+
+
+def _unquote(s: str) -> str:
+    if len(s) < 2:
+        return s
+    if (s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'"):
+        return s[1:-1]
+    return s
 
 
 def tokenize(src: str) -> list[Token]:
@@ -106,6 +124,7 @@ class Pattern:
 class Query:
     targets: tuple[Var, ...]
     clauses: tuple[Pattern, ...]
+    as_of: Optional[str] = None
 
 
 # ── parser ──────────────────────────────────────────────────────────
@@ -185,11 +204,26 @@ class _Parser:
         while self.peek("and") is not None:
             self.i += 1
             clauses.append(self.parse_clause())
+
+        as_of: Optional[str] = None
+        if self.peek("asof") is not None:
+            self.i += 1
+            s = self.eat("string")
+            as_of = _unquote(s.value)
+            if not as_of:
+                raise QuerySyntaxError(
+                    "AS OF requires a non-empty quoted ISO 8601 string"
+                )
+
         if self.i != len(self.toks):
             raise QuerySyntaxError(
                 f"trailing tokens starting at {self.toks[self.i].pos}"
             )
-        return Query(targets=tuple(targets), clauses=tuple(clauses))
+        return Query(
+            targets=tuple(targets),
+            clauses=tuple(clauses),
+            as_of=as_of,
+        )
 
 
 def parse(query_src: str) -> Query:
@@ -199,7 +233,11 @@ def parse(query_src: str) -> Query:
 # ── executor ────────────────────────────────────────────────────────
 class _Core(Protocol):
     def ask(
-        self, anchor: str, relation: str, inverse: bool = False
+        self,
+        anchor: str,
+        relation: str,
+        inverse: bool = False,
+        as_of: Optional[str] = None,
     ) -> list[str]: ...
 
 
@@ -213,9 +251,45 @@ def _resolve(term: Term, binding: dict[str, str]) -> str:
     )
 
 
+def _call_ask(
+    core: _Core,
+    anchor: str,
+    relation: str,
+    inverse: bool,
+    as_of: Optional[str],
+) -> list[str]:
+    """Call core.ask() with as_of when provided.
+
+    Backwards compatible: no as_of -> call without it, matching the
+    pre-2026-11-09 signature. With as_of -> forward it; if the core
+    rejects the kwarg, raise a clear QueryBindingError rather than
+    silently dropping the temporal filter.
+    """
+    if as_of is None:
+        return core.ask(
+            anchor=anchor, relation=relation, inverse=inverse
+        )
+    try:
+        return core.ask(
+            anchor=anchor,
+            relation=relation,
+            inverse=inverse,
+            as_of=as_of,
+        )
+    except TypeError as e:
+        raise QueryBindingError(
+            "core.ask() does not accept as_of=; the temporal extension "
+            "(RES-332) is not applied to this store. Remove the AS OF "
+            "clause or apply the extension."
+        ) from e
+
+
 def execute(core: _Core, q: Query) -> list[tuple[str, ...]]:
     """Execute a parsed query. Returns a list of tuples, one per row,
-    ordered as in the SELECT clause."""
+    ordered as in the SELECT clause.
+
+    If q.as_of is set, each core.ask() call carries the temporal filter.
+    """
     bindings: list[dict[str, str]] = [{}]
     for clause in q.clauses:
         next_bindings: list[dict[str, str]] = []
@@ -226,10 +300,12 @@ def execute(core: _Core, q: Query) -> list[tuple[str, ...]]:
                 # Unbound anchor. v1 does not support full scans;
                 # skip this binding rather than scan.
                 continue
-            results = core.ask(
+            results = _call_ask(
+                core,
                 anchor=anchor_name,
                 relation=clause.relation,
                 inverse=clause.inverse,
+                as_of=q.as_of,
             )
             for r in results:
                 nb = dict(b)

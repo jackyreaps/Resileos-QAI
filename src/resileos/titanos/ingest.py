@@ -1,4 +1,4 @@
-"""External ingestion (RES-323).
+"""External ingestion (RES-323, RES-332 temporal).
 
 Ingest external sources — LLM outputs, corpora, structured data — into
 the substrate. The substrate is the parent; sources are the children
@@ -33,6 +33,26 @@ Accumulation policy:
     uses _fold() (private) instead, to keep its own accumulation
     policy. Do not mix the two on the same stream during ingestion.
 
+Temporal extraction (RES-332):
+    The extractor may return a list of items where each item is either:
+        3-tuple (s, r, o)                   -> current-state fact
+        5-tuple (s, r, o, valid_from, valid_to) -> temporally scoped fact
+
+    valid_from / valid_to are ISO 8601 date strings or None.
+    Both forms are mixed freely in one return list. 3-tuple facts are
+    learned with (None, None) validity, matching the pre-temporal
+    behaviour exactly.
+
+    Temporal facts count toward `facts_written` (total) and separately
+    toward `facts_written_temporal` (subset). Existing callers that
+    read `facts_written` see the same total as before; the new field
+    is additive.
+
+    If Titanos does not support temporal arguments (pre-RES-332 store),
+    the ingestor falls back to 3-tuple `learn(s, r, o)` and the
+    temporal fact is stored as current-state. A warning is logged once
+    per ingestor instance, not per fact.
+
 Off states (explicit):
     generation          off. The ingestor does not generate text.
     lossless claim      off. Ingestion is a projection; the source is
@@ -43,9 +63,12 @@ Off states (explicit):
     coherence gate      off. `coherence_min` is reserved, not enforced.
     ladder coherence    off. §5 of RES-401 describes a second gate on
                         surviving addresses; not implemented here.
+    temporal extraction off by default. Extractors that do not return
+                        5-tuples produce current-state facts as before.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -57,6 +80,8 @@ from ..hierarchy import (
     HierarchicalPacket,
     StreamState,
 )
+
+log = logging.getLogger("resileos.ingest")
 
 
 # ── φ-weight ────────────────────────────────────────────────────────────
@@ -84,8 +109,13 @@ def _normalize(hv: np.ndarray) -> np.ndarray:
 #   (self-consistency proxy).
 QualityFn = Callable[[HierarchicalPacket, float], tuple[float, float]]
 
-# extractor(packet) -> list of (subject, relation, object)
-ExtractorFn = Callable[[HierarchicalPacket], list[tuple[str, str, str]]]
+# extractor(packet) -> list of items
+#   Each item is either:
+#       3-tuple (s, r, o)
+#       5-tuple (s, r, o, valid_from, valid_to)
+#   valid_from / valid_to are ISO 8601 strings or None.
+#   Mixed 3- and 5-tuples in the same return list are allowed.
+ExtractorFn = Callable[[HierarchicalPacket], list[tuple]]
 
 
 # ── config ──────────────────────────────────────────────────────────────
@@ -149,6 +179,7 @@ class IngestionResult:
     facts_written: int
     field_R_at_ingest: float
     max_level_accepted: int
+    facts_written_temporal: int = 0
     rejection_reasons: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -158,6 +189,7 @@ class IngestionResult:
             "packets_accepted": int(self.packets_accepted),
             "packets_rejected": int(self.packets_rejected),
             "facts_written": int(self.facts_written),
+            "facts_written_temporal": int(self.facts_written_temporal),
             "field_R_at_ingest": float(self.field_R_at_ingest),
             "max_level_accepted": int(self.max_level_accepted),
             "rejection_reasons": dict(self.rejection_reasons),
@@ -208,6 +240,7 @@ class SourceIngestor:
         self.titanos = titanos
         self.cfg = cfg or IngestionConfig()
         self._field_R_fn = field_R_fn
+        self._warned_no_temporal = False
 
     # ── gate on level ───────────────────────────────────────────────
     def _max_level_for_R(self, R: float) -> int:
@@ -223,6 +256,49 @@ class SourceIngestor:
             # supply a field_R_fn that reads the live Kuramoto field.
             return 1.0
         return float(self._field_R_fn())
+
+    # ── extractor → Titanos ────────────────────────────────────────
+    def _write_fact(self, item: tuple) -> tuple[bool, bool]:
+        """Write one extractor item to Titanos.
+
+        Returns (written, is_temporal).
+        """
+        if len(item) == 3:
+            s, r_, o = item
+            try:
+                self.titanos.learn(str(s), str(r_), str(o))
+                return (True, False)
+            except Exception:
+                return (False, False)
+
+        if len(item) >= 5:
+            s, r_, o = item[0], item[1], item[2]
+            vf, vt = item[3], item[4]
+            try:
+                self.titanos.learn(
+                    str(s), str(r_), str(o),
+                    valid_from=vf, valid_to=vt,
+                )
+                return (True, True)
+            except TypeError:
+                # Store does not accept temporal kwargs. Fall back to
+                # current-state learn. Warn once per ingestor.
+                if not self._warned_no_temporal:
+                    log.warning(
+                        "Titanos.learn() does not accept valid_from/"
+                        "valid_to; temporal facts will be stored as "
+                        "current-state. Apply RES-332 to the store."
+                    )
+                    self._warned_no_temporal = True
+                try:
+                    self.titanos.learn(str(s), str(r_), str(o))
+                    return (True, False)
+                except Exception:
+                    return (False, False)
+            except Exception:
+                return (False, False)
+
+        return (False, False)
 
     # ── fold with φ-weight ──────────────────────────────────────────
     def _fold(self, packet: HierarchicalPacket) -> None:
@@ -280,6 +356,7 @@ class SourceIngestor:
         accepted = 0
         rejected = 0
         facts_written = 0
+        facts_written_temporal = 0
         highest_accepted_level = 0
         reasons: dict[str, int] = {}
 
@@ -319,13 +396,16 @@ class SourceIngestor:
             )
 
             if extractor is not None and self.titanos is not None:
-                triples = extractor(packet)
-                for s, r_, o in triples:
-                    try:
-                        self.titanos.learn(str(s), str(r_), str(o))
+                try:
+                    items = extractor(packet)
+                except Exception:
+                    items = []
+                for item in items:
+                    written, is_temporal = self._write_fact(item)
+                    if written:
                         facts_written += 1
-                    except Exception:
-                        pass
+                        if is_temporal:
+                            facts_written_temporal += 1
 
         return IngestionResult(
             source_id=source_id,
@@ -335,6 +415,7 @@ class SourceIngestor:
             facts_written=facts_written,
             field_R_at_ingest=R_now,
             max_level_accepted=highest_accepted_level,
+            facts_written_temporal=facts_written_temporal,
             rejection_reasons=reasons,
         )
 
@@ -364,6 +445,7 @@ class SourceIngestor:
                 "exploring_threshold": self.cfg.exploring_threshold,
             },
             "phi_inv": float(PHI_INV),
+            "temporal_supported": not self._warned_no_temporal,
         }
 
 

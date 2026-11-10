@@ -7,6 +7,22 @@ Order (early reject wins):
 
 Each checker returns None (pass) or a reason string (fail).
 No LLM. Auditable reason trail on EatDecision.
+
+Temporal extension (RES-332, 2026-11-09):
+    Claim gains valid_from in addition to valid_until. check_temporal
+    validates ISO 8601 format and interval well-formedness
+    (valid_from <= valid_until). Historical facts (valid_until in the
+    past) are legitimate under RES-332 §2; the old "reject expired"
+    behaviour is opt-in via ctx['reject_expired']=True.
+
+    check_contradiction skips the single_valued check when the claim is
+    temporal (valid_from OR valid_until set), because append-only
+    permits overlaps that resolve at query time (RES-332 §2). Facts
+    with only valid_until (e.g. "was true until 1834") are temporal
+    too — see RES-332 §2, unbounded valid_from.
+
+    Date-only and datetime forms are both accepted. Missing / empty
+    fields mean "unbounded" (None = since forever / still true).
 """
 from __future__ import annotations
 
@@ -36,8 +52,11 @@ class Claim:
     relation: str
     obj: str
     source: str = ""
-    valid_until: str = ""  # ISO date optional
+    valid_until: str = ""  # ISO date or datetime; "" = still true
     hub: str = ""  # user: | world: | org: hint
+    valid_from: str = ""   # ISO date or datetime; "" = since forever
+                           # (RES-332 §2; appended after `hub` to preserve
+                           # positional compatibility with prior callers)
 
 
 @dataclass
@@ -58,6 +77,28 @@ def _hub_of(subject: str) -> str:
     if subject.startswith("org:"):
         return "org"
     return "default"
+
+
+def _parse_iso(s: str) -> Optional[datetime]:
+    """Parse ISO 8601 date or datetime. Returns UTC-aware datetime or None.
+
+    Accepts "2026-11-09", "2026-11-09T12:00:00", both with or without
+    "Z" / timezone offset. Date-only strings are normalised to
+    midnight UTC on that date for comparison purposes.
+    """
+    if not s:
+        return None
+    try:
+        raw = s.strip().replace("Z", "+00:00")
+        if "T" in raw:
+            dt = datetime.fromisoformat(raw)
+        else:
+            dt = datetime.fromisoformat(raw + "T00:00:00+00:00")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
 
 
 def check_schema(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
@@ -89,7 +130,20 @@ def check_size(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
 
 
 def check_contradiction(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
-    """Reject if store has explicit not_<relation> or inverse conflict when provided."""
+    """Reject if store has explicit not_<relation> or inverse conflict when provided.
+
+    Temporal claims (claim.valid_from OR claim.valid_until set) skip the
+    single_valued check. Under RES-332 §2, append-only permits a
+    historical fact to overlap with a current fact; the conflict
+    resolves at query time via AS OF, not by rejecting the write.
+    Callers who want strict rejection even for temporal claims set
+    ctx['single_valued_temporal']=True.
+
+    Both bounds trigger temporal mode: a fact with only valid_until is
+    "was true since forever, stopped at T" — a legitimate historical
+    shape that must not be rejected by the current-state contradiction
+    check.
+    """
     ask = ctx.get("ask_fn")  # (s, r) -> value | list | None
     if not callable(ask):
         return CheckResult(True, "", "contradiction")
@@ -102,22 +156,26 @@ def check_contradiction(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
         vals = existing_neg if isinstance(existing_neg, list) else [existing_neg]
         if claim.obj in [str(v) for v in vals] or str(existing_neg) == claim.obj:
             return CheckResult(False, "contradicts_not_relation", "contradiction")
-    # same relation different locked value when ctx says single-valued
+    # Same relation different locked value when ctx says single-valued.
+    # Skip if claim is temporal (either bound set) unless caller
+    # explicitly requests strict temporal contradiction.
+    is_temporal = bool(claim.valid_from or claim.valid_until)
+    if is_temporal and not ctx.get("single_valued_temporal"):
+        return CheckResult(True, "", "contradiction")
     if ctx.get("single_valued"):
         try:
             cur = ask(claim.subject, claim.relation)
         except Exception:
             cur = None
         if cur is not None and cur != [] and str(cur) != claim.obj:
-            if not isinstance(cur, list) or (len(cur) == 1 and str(cur[0]) != claim.obj):
-                if not isinstance(cur, list):
-                    return CheckResult(
-                        False, "contradicts_existing_value", "contradiction"
-                    )
-                if len(cur) == 1 and str(cur[0]) != claim.obj:
-                    return CheckResult(
-                        False, "contradicts_existing_value", "contradiction"
-                    )
+            if not isinstance(cur, list):
+                return CheckResult(
+                    False, "contradicts_existing_value", "contradiction"
+                )
+            if len(cur) == 1 and str(cur[0]) != claim.obj:
+                return CheckResult(
+                    False, "contradicts_existing_value", "contradiction"
+                )
     return CheckResult(True, "", "contradiction")
 
 
@@ -135,22 +193,41 @@ def check_provenance(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
 
 
 def check_temporal(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
-    if not claim.valid_until:
-        return CheckResult(True, "", "temporal")
-    try:
-        # date or datetime
-        vu = claim.valid_until.replace("Z", "+00:00")
-        if "T" in vu:
-            dt = datetime.fromisoformat(vu)
-        else:
-            dt = datetime.fromisoformat(vu + "T23:59:59+00:00")
-        now = datetime.now(timezone.utc)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        if dt < now:
+    """Validate valid_from / valid_until as ISO 8601 and check well-formedness.
+
+    Under RES-332 §2, historical facts are legitimate. A fact with
+    valid_from=1800, valid_until=1900 is not expired — it is a valid
+    temporal fact. So this check validates *format* and *interval
+    well-formedness* only.
+
+    Legacy behaviour: ctx['reject_expired']=True restores the pre-RES-332
+    rule that rejects claims whose valid_until is in the past. Off by
+    default so historical writes are permitted.
+    """
+    from_dt: Optional[datetime] = None
+    to_dt: Optional[datetime] = None
+
+    if claim.valid_from:
+        from_dt = _parse_iso(claim.valid_from)
+        if from_dt is None:
+            return CheckResult(False, "invalid_valid_from", "temporal")
+
+    if claim.valid_until:
+        to_dt = _parse_iso(claim.valid_until)
+        if to_dt is None:
+            return CheckResult(False, "invalid_valid_until", "temporal")
+
+    if from_dt is not None and to_dt is not None:
+        if from_dt >= to_dt:
+            return CheckResult(
+                False, "valid_from_not_before_valid_until", "temporal"
+            )
+
+    # Legacy: reject expired facts if requested (pre-RES-332 behaviour)
+    if ctx.get("reject_expired") and to_dt is not None:
+        if to_dt < datetime.now(timezone.utc):
             return CheckResult(False, "expired_valid_until", "temporal")
-    except Exception:
-        return CheckResult(False, "invalid_valid_until", "temporal")
+
     return CheckResult(True, "", "temporal")
 
 
@@ -212,6 +289,8 @@ class VerifierReport:
             "frame": self.frame,
             "dim": self.dim,
             "source": self.claim.source if self.claim else "",
+            "valid_from": self.claim.valid_from if self.claim else "",
+            "valid_until": self.claim.valid_until if self.claim else "",
         }
 
 
@@ -228,8 +307,12 @@ def parse_claim(raw: str | dict[str, Any]) -> Optional[Claim]:
             relation=r,
             obj=o,
             source=str(raw.get("source") or ""),
-            valid_until=str(raw.get("valid_until") or ""),
+            # Accept both names: valid_until is current, valid_to is RES-332
+            valid_until=str(
+                raw.get("valid_until") or raw.get("valid_to") or ""
+            ),
             hub=str(raw.get("hub") or ""),
+            valid_from=str(raw.get("valid_from") or ""),
         )
     text = (raw or "").strip()
     if not text:

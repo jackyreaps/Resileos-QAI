@@ -12,6 +12,13 @@ i.e. `handler(parent, subject, relation, inverse) -> Answer | None`.
 `parent.ask_inverse`, and `parent.chain`. It returns whatever those
 methods return, or `None` to decline.
 
+Temporal (RES-332): `run_zeus_query` accepts `as_of` and sets
+`parent._route_as_of` around the handler call. The handler reads that
+attribute and threads it into `parent.ask` / `parent.ask_inverse`.
+`parent.chain` is called with `as_of=` only if its signature accepts
+it; otherwise called without, so chain temporal support can be added
+independently.
+
 Mode A (structured composer) is the whole of this module. Mode B
 (carrier-modulated prose via RES-315) is reserved for the RES-315
 experiment and not implemented here. If a `carrier` object is passed
@@ -27,6 +34,7 @@ Off states (explicit):
 """
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -73,8 +81,8 @@ def make_zeus_handler(
                               parent.chain(subject, hops). Otherwise it
                               runs parent.ask / parent.ask_inverse.
         field_R_fn            callable returning the current R. If None,
-                              Zeus treats the field as locked (R=1.0) and
-                              never declines on the R gate.
+                              Zeus treats the field as locked (R=1.0)
+                              and never declines on the R gate.
         stream                optional StreamState. Reserved for Mode B.
         stack                 optional MaskStack. Reserved for Mode B.
         carrier               optional carrier MLP. Reserved for Mode B;
@@ -87,9 +95,29 @@ def make_zeus_handler(
     composite = dict(composite_relations) if composite_relations else {}
     config = cfg or ZeusConfig()
 
+    # Chain signature cached once; used to decide whether to pass as_of.
+    try:
+        _chain_accepts_as_of = "as_of" in inspect.signature(
+            _dummy_chain_signature
+        ).parameters
+    except Exception:
+        _chain_accepts_as_of = False
+
+    def _call_chain(parent, subject, hops, as_of):
+        """Call parent.chain, passing as_of if the method accepts it."""
+        try:
+            if "as_of" in inspect.signature(parent.chain).parameters:
+                return parent.chain(subject, hops, as_of=as_of)
+        except (TypeError, ValueError):
+            pass
+        return parent.chain(subject, hops)
+
     def handler(
         parent: Any, subject: str, relation: str, inverse: bool
     ) -> Any:
+        # Temporal: read as_of from parent context if set by run_zeus_query.
+        as_of = getattr(parent, "_route_as_of", None)
+
         # 0. Sector policy (Tier A). Parent may set _route_sector.
         #    On gbx_like, decline cheaply so fitness still records a
         #    query while exact band stays on the parent path.
@@ -115,15 +143,23 @@ def make_zeus_handler(
             if not (1 <= len(hops) <= config.max_hops):
                 return None
             try:
-                return parent.chain(subject, hops)
+                return _call_chain(parent, subject, hops, as_of)
             except Exception:
                 return None
 
-        # 3. Fallback: single-hop lookup.
+        # 3. Fallback: single-hop lookup with as_of threaded.
         try:
             if inverse:
-                return parent.ask_inverse(subject, relation)
-            return parent.ask(subject, relation)
+                return parent.ask_inverse(subject, relation, as_of=as_of)
+            return parent.ask(subject, relation, as_of=as_of)
+        except TypeError:
+            # ask() does not accept as_of in this build; call without.
+            try:
+                if inverse:
+                    return parent.ask_inverse(subject, relation)
+                return parent.ask(subject, relation)
+            except Exception:
+                return None
         except Exception:
             return None
 
@@ -138,6 +174,11 @@ def make_zeus_handler(
     return handler
 
 
+def _dummy_chain_signature(as_of: Optional[str] = None) -> None:
+    """Placeholder used only for signature reflection at import time."""
+    return None
+
+
 # ── call loop helper ────────────────────────────────────────────────────
 def run_zeus_query(
     group,
@@ -147,13 +188,15 @@ def run_zeus_query(
     inverse: bool = False,
     csi_fn: Optional[Callable[[], float]] = None,
     prune: bool = False,
+    as_of: Optional[str] = None,
 ) -> Any:
     """Run one query through the agency group's select -> invoke ->
     record -> (optional) prune loop.
 
-    AgencyGroup does not wrap this loop internally; the caller is
-    expected to do select/handler/record/prune manually. This helper
-    makes the correct sequence hard to get wrong.
+    Temporal (RES-332): `as_of` is set on `parent._route_as_of` around
+    the handler call so Zeus can thread it into parent.ask /
+    parent.ask_inverse. The previous value is restored in a finally
+    block, so nested or re-entrant calls are safe.
 
     Args:
         group      AgencyGroup instance
@@ -167,6 +210,8 @@ def run_zeus_query(
                    csi=1.0 is recorded.
         prune      if True, call group.evaluate_and_prune() after the
                    record.
+        as_of      ISO 8601 date string, or None = today, or "" = full
+                   historical log.
 
     Returns:
         The Answer from the selected child, or None if no child was
@@ -176,10 +221,22 @@ def run_zeus_query(
     if child is None:
         return None
 
+    if parent is None:
+        csi = float(csi_fn()) if csi_fn is not None else 1.0
+        group.record(child.name, csi=csi, accepted=False)
+        if prune:
+            group.evaluate_and_prune()
+        return None
+
+    prev_as_of = getattr(parent, "_route_as_of", None)
+    parent._route_as_of = as_of
+
     try:
         answer = child.handler(parent, subject, relation, inverse)
     except Exception:
         answer = None
+    finally:
+        parent._route_as_of = prev_as_of
 
     accepted = answer is not None
     csi = float(csi_fn()) if csi_fn is not None else 1.0

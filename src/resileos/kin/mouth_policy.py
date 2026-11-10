@@ -1,11 +1,12 @@
-"""
-Mouth (prose render) gate driven by Metis policy.
+"""Mouth (prose render) gate driven by Metis policy.
 
-Use in /answer after retrieval:
+When a cycle runs, the harness verification state is checked. An
+unverified cycle does not authorize prose: the writer may have produced
+output, but the probes that would confirm it either did not run or did
+not match anything.
 
-    from resileos.kin.mouth_policy import should_render_prose
-    if not should_render_prose(request_render_flag, metrics=...):
-        # return structured rows only
+Set `require_verified=False` only if you explicitly want the older
+behaviour where any Metis policy authorises prose.
 """
 from __future__ import annotations
 
@@ -21,22 +22,33 @@ def should_render_prose(
     agency_group: Any = None,
     run_cycle: bool = False,
     default_if_no_policy: bool = True,
+    require_verified: bool = True,
 ) -> bool:
-    """
-    Prose mouth only if client asked AND Metis allows (when policy exists).
-
-    If run_cycle=True, refresh Iris/Metis from metrics first.
-    If no cycle has run and default_if_no_policy=True, allow when client asks
-    (backward compatible until kin cycle is used in production).
-    """
+    """Prose mouth only if client asked AND Metis allows AND cycle verified."""
     if not client_requested:
         return False
+
+    harness: Optional[dict[str, Any]] = None
     if run_cycle:
-        get_kin_bundle().cycle(
-            metrics=metrics or {},
-            agency_group=agency_group,
-            apply_policy=True,
-        )
+        try:
+            _, _, harness = get_kin_bundle().cycle(
+                metrics=metrics or {},
+                agency_group=agency_group,
+                apply_policy=True,
+            )
+        except Exception:
+            harness = None
+
+        if require_verified:
+            if harness is None:
+                return False
+            if not bool(harness.get("verified", False)):
+                return False
+
     if get_kin_bundle().last_policy is None:
         return bool(default_if_no_policy)
+
     return mouth_allowed_from_last_cycle(default=False)
+
+
+__all__ = ["should_render_prose"]

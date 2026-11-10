@@ -6,7 +6,7 @@ rows + optional recurrent-path metadata) and returns a single string.
 
     structured  — template renderer, no model, ships everywhere
     local_hf    — frozen HF decoder + retrieved-rows prompt, needs
-                  ``transformers`` and ≥8 GB (or a GPU)
+                  ``transformers`` and >=8 GB (or a GPU)
     hosted      — OpenAI-compatible chat completion, needs
                   ``RESILEOS_ANSWER_API_KEY``
 
@@ -16,6 +16,11 @@ renders them. For recurrent-loop semantics (sigma gate, CSI fast path,
 order-parameter gate), use ``/api/v1/query``. When ``render=true`` is
 passed to ``/query``, the same mouth is applied to the full ``Answer``
 (path, loop_history, gate_state).
+
+Temporal (RES-332): when ``AnswerContext.as_of`` is a date string, the
+structured backend prefixes the sentence with "As of {date}:" and the
+model backends include the as-of moment in the prompt. Empty-string
+as_of (diagnostic mode) is treated as "no as_of annotation".
 
 Environment
 -----------
@@ -36,7 +41,7 @@ from resileos.ui.attach_scale import attach_scale
 import logging
 import os
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Optional, Protocol
 
 import torch
 
@@ -66,6 +71,14 @@ class AnswerContext:
     - ``path``          — the chain of entities, not just the leaf
     - ``loop_history``  — recurrent-trace records (depth = len)
     - ``gate_state``    — final gate state string (e.g. LOCKED / MIXED)
+    - ``sector``        — "gbx_like" | "otx_like" | "" (Part V dual residue)
+
+    Temporal (RES-332):
+
+    - ``as_of``         — ISO 8601 date the query resolved at.
+                          None = current state (no annotation).
+                          ""   = full historical log (no annotation).
+                          date = rendered as "As of {date}: ..."
     """
 
     question: str
@@ -79,6 +92,7 @@ class AnswerContext:
     loop_history: tuple = ()
     gate_state: str = ""
     sector: str = ""  # "gbx_like" | "otx_like" | "" (Part V dual residue label)
+    as_of: Optional[str] = None
 
     @property
     def n_rows(self) -> int:
@@ -105,7 +119,7 @@ class AnswerBackend(Protocol):
 
 
 def humanize_relation(relation: str) -> str:
-    """``parent_of`` → ``parent of``. No other transformation."""
+    """``parent_of`` -> ``parent of``. No other transformation."""
     return relation.replace("_", " ").strip()
 
 
@@ -125,14 +139,25 @@ def build_prompt(ctx: AnswerContext) -> str:
 
     Retrieved rows go in verbatim. The model is told to answer only from
     them. Greedy decoding in the backends keeps output deterministic.
+
+    Temporal (RES-332): when as_of is a date string, the prompt states
+    the temporal scope so the model does not answer as if the facts
+    were current.
     """
     q = question_from_context(ctx)
     if ctx.rows:
         facts = "\n".join(f"- {r}" for r in ctx.rows)
     else:
         facts = "(no retrieved rows)"
+
+    temporal = ""
+    as_of = (ctx.as_of or "").strip()
+    if as_of:
+        temporal = f"These facts were valid as of {as_of}. "
+
     return (
         f"Retrieved facts:\n{facts}\n\n"
+        f"{temporal}"
         f"Question: {q}\n"
         f"Answer using only the retrieved facts above. "
         f"Reply with one short sentence, nothing else.\n"
@@ -147,12 +172,17 @@ def context_from_answer(
     relation: str,
     inverse: bool = False,
     question: str = "",
+    as_of: Optional[str] = None,
 ) -> AnswerContext:
     """Build an ``AnswerContext`` from a recurrent ``Answer``.
 
     Used by ``/api/v1/query?render=true``. Maps ``Answer.value`` into
     ``rows`` (single element or empty) so every backend can render
     without special-casing the recurrent path.
+
+    Temporal: `as_of` is passed explicitly because `Answer` does not
+    carry it — the query request does. The caller (app.py) must pass
+    `as_of=payload.as_of`.
     """
     value = getattr(ans, "value", None)
     rows: tuple[str, ...] = (str(value),) if value else ()
@@ -170,6 +200,7 @@ def context_from_answer(
         loop_history=tuple(hist_raw),
         gate_state=str(getattr(ans, "gate_state", "") or ""),
         sector=str(getattr(ans, "sector", "") or ""),
+        as_of=as_of,
     )
 
 
@@ -195,9 +226,12 @@ class StructuredBackend:
     When framework fields are present (path / loop_history / gate_state)
     the sentence is enriched:
 
-    - multi-hop ``path``  → "Starting from A, via B and C, we reach D."
-    - deep recurrent loop → "(resolved after N recurrent steps)" when N > 5
-    - non-LOCKED gate     → "with partial confidence"
+    - multi-hop ``path``  -> "Starting from A, via B and C, we reach D."
+    - deep recurrent loop -> "(resolved after N recurrent steps)" when N > 5
+    - non-LOCKED gate     -> "with partial confidence"
+    - date ``as_of``      -> prefixed with "As of {date}: "
+
+    Empty-string as_of (diagnostic mode) is treated as no annotation.
     """
 
     name = "structured"
@@ -241,6 +275,12 @@ class StructuredBackend:
                 base = f"Entities with {rel} pointing at {s}: {values}."
             else:
                 base = f"{s}'s {rel}: {values}."
+
+        # ── temporal prefix (RES-332) ───────────────────────────────
+        # Empty-string as_of = diagnostic "full log" mode; no annotation.
+        as_of = (ctx.as_of or "").strip()
+        if as_of:
+            base = f"As of {as_of}: {base}"
 
         # ── framework annotations (only when data is present) ───────
         # Part V: gating is transient; residue writing is persistent (LI1).
@@ -403,7 +443,7 @@ def build_backend(name: str) -> AnswerBackend:
 
 
 def select_backend(name: str | None = None) -> AnswerBackend:
-    """Pick a backend. ``auto`` tries local_hf → hosted → structured.
+    """Pick a backend. ``auto`` tries local_hf -> hosted -> structured.
 
     If ``name`` is given (or ``RESILEOS_ANSWER_BACKEND`` is set), try
     that backend first. If it is unavailable, log and fall through to
@@ -445,6 +485,7 @@ def list_backends() -> list[dict]:
         b = build_backend(name)
         out.append({"name": name, "available": bool(b.available())})
     return out
+
 
 def context_scale(ctx: AnswerContext) -> dict:
     return attach_scale({"subject": ctx.subject, "relation": ctx.relation}, ctx.subject)

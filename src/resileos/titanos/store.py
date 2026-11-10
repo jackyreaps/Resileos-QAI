@@ -1,13 +1,38 @@
-"""Disk-backed storage engine for Titanos (RES-320).
+"""Disk-backed storage engine for Titanos (RES-320, RES-332 temporal).
 
 Replaces the in-memory band dicts with memory-mapped int32 accumulators,
 one file per relation. Facts append to a binary WAL with fixed-width
 24-byte records (3 x int64). Metadata writes on flush() or close(), not
 per operation.
 
+Temporal extension (RES-332):
+
+    Validity intervals live in a parallel append-only sidecar,
+    `titanos_validity.bin`, with fixed-width 16-byte records
+    (2 x int64: valid_from_days, valid_to_days since 1970-01-01).
+    A sentinel far below any real day count means None
+    ("since forever" / "still true"). Negative day counts are real
+    pre-1970 dates, including 1969-12-31.
+
+    The sidecar is created lazily on the first append that carries a
+    non-None validity. On creation, sentinels are backfilled for
+    existing WAL facts so the two files stay index-aligned.
+
+    Existing stores without the sidecar read all facts as
+    (None, None) — no migration required. This preserves backwards
+    compatibility with stores written before the temporal extension.
+
+    The WAL stays exactly 24 bytes per record; no format change.
+    Band accumulators are time-agnostic (they add the bound vector
+    regardless of validity). Temporal filtering happens at query time
+    in Titanos.ask_list().
+
 Layout under data_dir:
     titanos_metadata.json    versioned metadata (relations, counts)
-    titanos_wal.bin          append-only fact log
+    titanos_wal.bin          append-only fact log (24 bytes/record)
+    titanos_validity.bin     append-only validity log (16 bytes/record)
+                             — optional, present after first temporal
+                             append
     band_<relation>.bin      int32 accumulator, dimension * 4 bytes
 
 The WAL is load-bearing: rebuild_from_wal() reconstructs the accumulators
@@ -20,8 +45,10 @@ from __future__ import annotations
 import json
 import mmap
 import os
+import re
 import struct
 import threading
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Generator, Iterable, Optional
 
@@ -31,13 +58,50 @@ DIM_MIN = 8
 META_VERSION = 1
 WAL_RECORD = struct.Struct("<3q")
 WAL_RECORD_SIZE = WAL_RECORD.size
+VALIDITY_RECORD = struct.Struct("<2q")
+VALIDITY_RECORD_SIZE = VALIDITY_RECORD.size
 NAME_MAX = 128
+
+# Sentinel for None validity. Far below any civil day count, so it
+# does not collide with 1969-12-31 (day -1) or earlier dates.
+_SENTINEL = -(2**62)
+_EPOCH = date(1970, 1, 1)
 
 
 def _safe_name(name: str) -> str:
     if not name or len(name) > NAME_MAX:
         raise ValueError(f"relation name must be 1..{NAME_MAX} chars")
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
+
+
+def _iso_to_days(s: Optional[str]) -> int:
+    """Convert an ISO date to days since 1970-01-01.
+
+    None or empty is the unbounded sentinel. A datetime prefix uses
+    the calendar date. An unparseable value is rejected.
+    """
+    if s is None:
+        return _SENTINEL
+    text = str(s).strip()
+    if not text:
+        return _SENTINEL
+    day_text = text[:10]
+    short = re.fullmatch(r"(-?)(\d{1,3})(-\d{2}-\d{2})", day_text)
+    if short:
+        sign, year, rest = short.groups()
+        day_text = f"{sign}{int(year):04d}{rest}"
+    try:
+        parsed = date.fromisoformat(day_text)
+    except ValueError as exc:
+        raise ValueError(f"unparseable date {s!r}") from exc
+    return (parsed - _EPOCH).days
+
+
+def _days_to_iso(d: int) -> Optional[str]:
+    """Inverse of _iso_to_days. The sentinel is None. Negative days are dates."""
+    if int(d) == _SENTINEL:
+        return None
+    return (_EPOCH + timedelta(days=int(d))).isoformat()
 
 
 class DiskBandStore:
@@ -50,6 +114,13 @@ class DiskBandStore:
         store.append_fact(sid, rid, oid)
         store.flush()
         store.close()
+
+    Temporal:
+        store.append_fact(sid, rid, oid,
+                          valid_from="1458-01-01",
+                          valid_to="1834-01-01")
+        for s, r, o, vf, vt in store.iter_facts(include_validity=True):
+            ...
 
     Or as a context manager:
         with DiskBandStore("data/titanos", 10000) as store:
@@ -73,14 +144,17 @@ class DiskBandStore:
 
         self._meta_path = self.data_dir / "titanos_metadata.json"
         self._wal_path = self.data_dir / "titanos_wal.bin"
+        self._validity_path = self.data_dir / "titanos_validity.bin"
 
         self._bands: dict[str, mmap.mmap] = {}
         self._band_fds: dict[str, int] = {}
         self._wal_fd: Optional[int] = None
+        self._validity_fd: Optional[int] = None
         self._lock = threading.RLock()
         self._closed = False
 
         self._meta = self._load_meta()
+        self._reconcile_validity_length()
         self._open_wal()
 
     # ── metadata ────────────────────────────────────────────────────
@@ -112,11 +186,77 @@ class DiskBandStore:
         tmp.write_text(json.dumps(self._meta, indent=2), encoding="utf-8")
         tmp.replace(self._meta_path)
 
+    def _count_wal_records(self) -> int:
+        if not self._wal_path.exists():
+            return 0
+        return self._wal_path.stat().st_size // WAL_RECORD_SIZE
+
+    def _count_validity_records(self) -> int:
+        if not self._validity_path.exists():
+            return 0
+        return self._validity_path.stat().st_size // VALIDITY_RECORD_SIZE
+
+    def _reconcile_validity_length(self) -> None:
+        """If the validity sidecar exists but is shorter than the WAL,
+        pad with sentinels so index alignment holds. No-op if sidecar
+        is absent or already aligned."""
+        if self.read_only:
+            return
+        if not self._validity_path.exists():
+            return
+        n_wal = self._count_wal_records()
+        n_val = self._count_validity_records()
+        if n_val < n_wal:
+            with open(self._validity_path, "ab") as f:
+                f.write(
+                    VALIDITY_RECORD.pack(_SENTINEL, _SENTINEL)
+                    * (n_wal - n_val)
+                )
+
     def _open_wal(self) -> None:
         flags = os.O_RDONLY if self.read_only else (
             os.O_RDWR | os.O_CREAT | os.O_APPEND
         )
         self._wal_fd = os.open(str(self._wal_path), flags, 0o644)
+
+        # Open validity sidecar if it exists (present after first
+        # temporal append or after _reconcile_validity_length).
+        if self._validity_path.exists():
+            flags = os.O_RDONLY if self.read_only else (
+                os.O_RDWR | os.O_APPEND
+            )
+            self._validity_fd = os.open(
+                str(self._validity_path), flags, 0o644
+            )
+
+    def _ensure_validity_file(self) -> None:
+        """Lazily create the validity sidecar on the first temporal
+        append. Backfills sentinels for any existing WAL facts so the
+        two files are index-aligned. No-op if already open or
+        read-only."""
+        if self._validity_fd is not None:
+            return
+        if self.read_only:
+            return
+
+        n_wal = self._count_wal_records()
+
+        if not self._validity_path.exists():
+            # Fresh sidecar: write sentinels for existing WAL facts
+            if n_wal > 0:
+                with open(self._validity_path, "wb") as f:
+                    f.write(
+                        VALIDITY_RECORD.pack(_SENTINEL, _SENTINEL)
+                        * n_wal
+                    )
+            else:
+                # Touch the file so open with O_APPEND succeeds
+                self._validity_path.touch()
+
+        flags = os.O_RDWR | os.O_APPEND
+        self._validity_fd = os.open(
+            str(self._validity_path), flags, 0o644
+        )
 
     # ── band files ──────────────────────────────────────────────────
     def _band_path(self, relation: str) -> Path:
@@ -172,37 +312,124 @@ class DiskBandStore:
         return list(self._meta["relations"])
 
     # ── WAL ─────────────────────────────────────────────────────────
-    def append_fact(self, subject_id: int, relation_id: int, object_id: int) -> None:
-        """Append one fact to the WAL. 24 bytes. Atomic on POSIX for
-        writes under PIPE_BUF."""
+    def append_fact(
+        self,
+        subject_id: int,
+        relation_id: int,
+        object_id: int,
+        *,
+        valid_from: Optional[str] = None,
+        valid_to: Optional[str] = None,
+    ) -> None:
+        """Append one fact to the WAL with optional validity (RES-332).
+
+        valid_from / valid_to: ISO 8601 date strings, or None for
+        "since forever" / "still true".
+
+        If either validity field is non-None and the validity sidecar
+        does not yet exist, it is created and backfilled with sentinels
+        for existing WAL facts so the two files stay index-aligned.
+        """
         if self.read_only:
             raise PermissionError("store is read-only")
         if self._wal_fd is None:
             raise RuntimeError("WAL is not open")
+
+        has_validity = (valid_from is not None) or (valid_to is not None)
+        if has_validity and self._validity_fd is None:
+            self._ensure_validity_file()
+
         buf = WAL_RECORD.pack(int(subject_id), int(relation_id), int(object_id))
         os.write(self._wal_fd, buf)
         self._meta["total_facts"] = int(self._meta["total_facts"]) + 1
 
-    def append_facts(self, facts: Iterable[tuple[int, int, int]]) -> int:
-        """Batch append. One write per call, one metadata update."""
+        if self._validity_fd is not None:
+            vf = _iso_to_days(valid_from)
+            vt = _iso_to_days(valid_to)
+            os.write(self._validity_fd, VALIDITY_RECORD.pack(vf, vt))
+
+    def append_facts(self, facts: Iterable) -> int:
+        """Batch append. Facts may be:
+            3-tuples (s, r, o)                -> validity (None, None)
+            5-tuples (s, r, o, vf, vt)        -> explicit validity
+        One write per call per file, one metadata update.
+        """
         if self.read_only:
             raise PermissionError("store is read-only")
         if self._wal_fd is None:
             raise RuntimeError("WAL is not open")
-        buf = bytearray()
+
+        wal_buf = bytearray()
+        val_buf = bytearray()
         n = 0
-        for s, r, o in facts:
-            buf += WAL_RECORD.pack(int(s), int(r), int(o))
+        has_any_validity = False
+
+        for item in facts:
+            if len(item) == 3:
+                s, r, o = item
+                vf_str, vt_str = None, None
+            elif len(item) >= 5:
+                s, r, o = item[0], item[1], item[2]
+                vf_str, vt_str = item[3], item[4]
+            else:
+                continue
+            wal_buf += WAL_RECORD.pack(int(s), int(r), int(o))
+            vf = _iso_to_days(vf_str)
+            vt = _iso_to_days(vt_str)
+            if vf != _SENTINEL or vt != _SENTINEL:
+                has_any_validity = True
+            val_buf += VALIDITY_RECORD.pack(vf, vt)
             n += 1
-        if n:
-            os.write(self._wal_fd, bytes(buf))
-            self._meta["total_facts"] = int(self._meta["total_facts"]) + n
+
+        if n == 0:
+            return 0
+
+        if has_any_validity and self._validity_fd is None:
+            self._ensure_validity_file()
+
+        os.write(self._wal_fd, bytes(wal_buf))
+        self._meta["total_facts"] = int(self._meta["total_facts"]) + n
+
+        if self._validity_fd is not None:
+            os.write(self._validity_fd, bytes(val_buf))
+
         return n
 
-    def iter_facts(self) -> Generator[tuple[int, int, int], None, None]:
-        """Yield every fact in the WAL, in order."""
+    def _iter_validity(self) -> Generator[tuple[int, int], None, None]:
+        """Yield (valid_from_days, valid_to_days) aligned with WAL order.
+        Facts beyond the validity file's end yield sentinels."""
+        n_wal = self._count_wal_records()
+        n_val = self._count_validity_records()
+
+        if n_val > 0:
+            with open(self._validity_path, "rb") as f:
+                for _ in range(min(n_val, n_wal)):
+                    chunk = f.read(VALIDITY_RECORD_SIZE)
+                    if len(chunk) != VALIDITY_RECORD_SIZE:
+                        break
+                    yield VALIDITY_RECORD.unpack(chunk)
+
+        for _ in range(max(0, n_wal - n_val)):
+            yield (_SENTINEL, _SENTINEL)
+
+    def iter_facts(
+        self,
+        include_validity: bool = False,
+    ) -> Generator[tuple, None, None]:
+        """Yield every fact in the WAL, in order.
+
+        include_validity=False (default): 3-tuples (s, r, o) —
+            backwards compatible with existing callers including
+            rebuild_from_wal().
+
+        include_validity=True: 5-tuples
+            (s, r, o, valid_from_iso_or_None, valid_to_iso_or_None).
+        """
         if not self._wal_path.exists():
             return
+
+        validity_iter = self._iter_validity() if include_validity else None
+
         with open(self._wal_path, "rb") as f:
             while True:
                 chunk = f.read(WAL_RECORD_SIZE)
@@ -210,10 +437,34 @@ class DiskBandStore:
                     break
                 if len(chunk) != WAL_RECORD_SIZE:
                     break
-                yield WAL_RECORD.unpack(chunk)
+                s, r, o = WAL_RECORD.unpack(chunk)
+                if include_validity:
+                    vf_days, vt_days = next(validity_iter, (_SENTINEL, _SENTINEL))
+                    yield (
+                        s, r, o,
+                        _days_to_iso(vf_days),
+                        _days_to_iso(vt_days),
+                    )
+                else:
+                    yield (s, r, o)
 
     def fact_count(self) -> int:
         return int(self._meta["total_facts"])
+
+    def temporal_count(self) -> int:
+        """Number of facts with non-None validity (either bound)."""
+        if not self._validity_path.exists():
+            return 0
+        n = 0
+        with open(self._validity_path, "rb") as f:
+            while True:
+                chunk = f.read(VALIDITY_RECORD_SIZE)
+                if len(chunk) != VALIDITY_RECORD_SIZE:
+                    break
+                vf, vt = VALIDITY_RECORD.unpack(chunk)
+                if vf != _SENTINEL or vt != _SENTINEL:
+                    n += 1
+        return n
 
     def rebuild_from_wal(
         self,
@@ -222,6 +473,10 @@ class DiskBandStore:
         relation_id_to_name: dict[int, str],
     ) -> int:
         """Reconstruct accumulators by replaying the WAL.
+
+        Bands are time-agnostic: validity is ignored during replay.
+        The temporal log lives in the validity sidecar and is read at
+        query time, not at rebuild time.
 
         entity_vectors:   id -> bipolar int32 vector (dim,)
         relation_vectors: id -> bipolar int32 vector (dim,)
@@ -234,7 +489,7 @@ class DiskBandStore:
         for name in self._meta["relations"]:
             self.write_band(name, np.zeros(self.dimension, dtype=np.int32))
         n = 0
-        for s_id, r_id, o_id in self.iter_facts():
+        for s_id, r_id, o_id in self.iter_facts(include_validity=False):
             name = relation_id_to_name.get(r_id)
             if name is None:
                 continue
@@ -255,6 +510,18 @@ class DiskBandStore:
         with self._lock:
             for mm in self._bands.values():
                 mm.flush()
+            # os.write to WAL and validity are already kernel-buffered;
+            # fsync for durability
+            if self._wal_fd is not None:
+                try:
+                    os.fsync(self._wal_fd)
+                except OSError:
+                    pass
+            if self._validity_fd is not None:
+                try:
+                    os.fsync(self._validity_fd)
+                except OSError:
+                    pass
             self._save_meta()
 
     def close(self) -> None:
@@ -280,6 +547,12 @@ class DiskBandStore:
                 except OSError:
                     pass
                 self._wal_fd = None
+            if self._validity_fd is not None:
+                try:
+                    os.close(self._validity_fd)
+                except OSError:
+                    pass
+                self._validity_fd = None
             self._save_meta()
             self._closed = True
 
@@ -296,4 +569,9 @@ class DiskBandStore:
             pass
 
 
-__all__ = ["DiskBandStore", "WAL_RECORD_SIZE", "META_VERSION"]
+__all__ = [
+    "DiskBandStore",
+    "WAL_RECORD_SIZE",
+    "VALIDITY_RECORD_SIZE",
+    "META_VERSION",
+]

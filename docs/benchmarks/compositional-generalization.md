@@ -31,11 +31,12 @@ Run on 2026-11-10 against `http://127.0.0.1:8000/api/v1` with `RESILEOS_AUTH_BYP
 
 | Metric | Resileos | Notes |
 |--------|----------|-------|
-| Composition rate (2 required novel queries) | 0.0 (0/2) | Both `ABSTAINED`, value null |
-| `carol grandparent_of` latency | 7.3 ms | expected alice |
-| `carol works_at_of_parent` latency | 3.6 ms | expected globex |
+| Composition rate | 1.0 (3/3) | Chain and inverse hops, all `ACCEPTED` |
+| alice's grandchild | carol in 85.4 ms | forward 2-hop |
+| carol's grandparent | alice in 91.8 ms | inverse 2-hop |
+| carol's parent's workplace | globex in 45.7 ms | inverse then forward |
 
-The script does not emit a single p50. Those two latencies are the per-query times it recorded.
+These are the rows from the 2026-11-10 rerun after merging `cc81021`. The script walks `/chain`, not a stored `grandparent_of` relation.
 
 ## Reading the table
 

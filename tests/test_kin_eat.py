@@ -106,7 +106,7 @@ def test_kin_bundle_cycle_and_agency():
     register_declining_kin(g, b, weight=0.01)
     assert "iris" in g.children
     assert g.children["iris"].handler(None, "Zeus", "domain", False) is None
-    report, policy = b.cycle(
+    report, policy, _harness = b.cycle(
         metrics={"hits": 10, "misses": 1, "teaches": 5, "hit_rate": 0.9, "sessions": 2},
         agency_group=g,
     )
@@ -114,7 +114,7 @@ def test_kin_bundle_cycle_and_agency():
     assert policy.prefer_structured is True
     g.children["zeus"].active = False
     g.eaten.append("zeus")
-    report2, _ = b.cycle(
+    report2, _, _harness2 = b.cycle(
         metrics={"hits": 0, "misses": 0, "hit_rate": 0.0},
         agency_group=g,
     )
