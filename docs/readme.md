@@ -85,6 +85,7 @@ Harness:
 - [`docs/harness/CONSTRAINTS.md`](harness/CONSTRAINTS.md) — permanent corrections
 - [`docs/harness/INTEGRATION.md`](harness/INTEGRATION.md) — integration checklist
 - [Demi-god skill layer](320-titanos/demigods.md) — RES-343
+- [Legions under Kin](320-titanos/legions.md) — RES-345
 - [Equal-budget measurement](benchmarks/equal_budget.md)
 
 Reference:
