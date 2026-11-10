@@ -6,58 +6,70 @@
     <title>Resileos Studio</title>
     <style>
         :root {
-            --bg: #fcfcfc; --panel: #ffffff; --text: #1a1a1a; --muted: #666;
+            --bg: #f9f9f8; --panel: #ffffff; --text: #111111; --muted: #666666;
             --accent: #1a4d8f; --accent-hover: #143c70; --border: #e5e5e5;
-            --user-bg: #1a4d8f; --user-text: #fff; --bot-bg: #ffffff;
-            --danger: #d93838; --success: #0d9463; --warning: #d97706;
+            --user-bg: #1a4d8f; --user-text: #ffffff; --bot-bg: #ffffff;
+            --danger: #d93838; --success: #0d9463;
         }
         [data-theme="dark"] {
-            --bg: #121212; --panel: #1e1e1e; --text: #ededed; --muted: #a0a0a0;
-            --accent: #3b82f6; --accent-hover: #2563eb; --border: #333;
-            --user-bg: #2563eb; --user-text: #fff; --bot-bg: #1e1e1e;
+            --bg: #111111; --panel: #1a1a1a; --text: #ededed; --muted: #a0a0a0;
+            --accent: #3b82f6; --accent-hover: #2563eb; --border: #333333;
+            --user-bg: #2563eb; --user-text: #ffffff; --bot-bg: #1a1a1a;
         }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.3s; }
 
-        .header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel); z-index: 10; }
-        .header-title { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        /* Header */
+        .header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel); z-index: 10; }
+        .header-title { font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--text); letter-spacing: -0.3px; }
         .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; transition: background 0.3s; }
         .dot.online { background: var(--success); }
         .dot.offline { background: var(--danger); }
-        .btn-icon { background: none; border: none; color: var(--text); font-size: 1.2rem; cursor: pointer; padding: 4px; }
+        
+        .header-actions { display: flex; gap: 4px; }
+        .btn-icon { background: none; border: none; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .btn-icon:hover { background: var(--bg); color: var(--text); }
 
-        #chat { flex: 1; overflow-y: auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; }
-        .msg-row { display: flex; gap: 12px; max-width: 800px; margin: 0 auto; width: 100%; }
+        /* Chat Area */
+        #chat { flex: 1; overflow-y: auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; scroll-behavior: smooth; }
+        .msg-row { display: flex; gap: 14px; max-width: 800px; margin: 0 auto; width: 100%; }
         .msg-row.user { justify-content: flex-end; }
-        .avatar { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; flex-shrink: 0; }
+        
+        .avatar { width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .avatar.bot { background: var(--accent); color: #fff; }
         .avatar.user { background: #e5e5e0; color: #333; }
         [data-theme="dark"] .avatar.user { background: #333; color: #fff; }
-        .bubble { padding: 12px 16px; border-radius: 12px; font-size: 0.95rem; line-height: 1.5; max-width: 85%; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        
+        .bubble { padding: 12px 18px; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; max-width: 82%; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
         .bubble.user { background: var(--user-bg); color: var(--user-text); border-bottom-right-radius: 2px; }
         .bubble.bot { background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
-        .bubble strong { color: var(--accent); }
-        .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; font-family: ui-monospace, monospace; background: rgba(0,0,0,0.03); padding: 6px; border-radius: 4px; }
-        [data-theme="dark"] .meta { background: rgba(255,255,255,0.05); }
+        .bubble strong { font-weight: 600; color: var(--accent); }
+        
+        .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; font-family: ui-monospace, monospace; border-top: 1px solid var(--border); padding-top: 6px; }
 
         /* Panels */
-        .panel { background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 16px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px; }
+        .panel { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 20px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px; }
         .panel.open { display: flex; }
-        .tool-chip { background: var(--bg); border: 1px solid var(--border); padding: 6px 12px; border-radius: 16px; cursor: pointer; color: var(--text); transition: all 0.2s; font-size: 0.8rem;}
-        .tool-chip:hover { border-color: var(--accent); color: var(--accent); }
-        .tool-chip.legion { border-color: var(--accent); font-weight: 500; background: rgba(26, 77, 143, 0.05); }
+        .tool-chip { background: var(--bg); border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text); transition: all 0.2s; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; }
+        .tool-chip:hover { border-color: var(--accent); }
+        .tool-chip.legion { border-color: var(--accent); background: rgba(26, 77, 143, 0.05); }
         [data-theme="dark"] .tool-chip.legion { background: rgba(59, 130, 246, 0.1); }
-        .group-row { width: 100%; margin-bottom: 6px; }
+        .group-row { width: 100%; margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .group-label { font-weight: 600; color: var(--muted); width: 60px; }
 
+        /* Input Area */
         .input-wrap { padding: 16px; background: var(--bg); display: flex; justify-content: center; }
-        .input-box { width: 100%; max-width: 768px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: flex-end; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .input-box { width: 100%; max-width: 768px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: flex-end; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
         .input-box:focus-within { border-color: var(--accent); }
-        input[type="text"] { flex: 1; border: none; background: transparent; padding: 10px; font-size: 1rem; color: var(--text); outline: none; }
-        button.send { background: var(--accent); color: white; border: none; border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin: 4px; }
+        input[type="text"] { flex: 1; border: none; background: transparent; padding: 12px; font-size: 1rem; color: var(--text); outline: none; }
+        button.send { background: var(--accent); color: white; border: none; border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin: 4px; transition: background 0.2s; }
+        button.send:hover { background: var(--accent-hover); }
         button.send:disabled { background: #999; }
 
-        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; max-width: 600px; margin-left: auto; margin-right: auto;}
-        .suggestion { background: var(--panel); border: 1px solid var(--border); padding: 8px 14px; border-radius: 16px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+        /* Suggestions */
+        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; max-width: 600px; margin-left: auto; margin-right: auto;}
+        .suggestion { background: var(--panel); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; color: var(--muted); }
         .suggestion:hover { border-color: var(--accent); color: var(--accent); }
 
         .typing { display: flex; gap: 4px; align-items: center; height: 20px; }
@@ -66,8 +78,7 @@
         .typing span:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
         
-        pre { background: #f4f4f0; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; }
-        [data-theme="dark"] pre { background: #111; }
+        pre { background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -77,27 +88,35 @@
             <div class="dot" id="status"></div>
             Resileos Studio
         </div>
-        <div>
-            <button class="btn-icon" onclick="toggleTools()" title="Show Tools">🛠️</button>
-            <button class="btn-icon" onclick="toggleKin()" title="Show Kin">🕸️</button>
-            <button class="btn-icon" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+        <div class="header-actions">
+            <button class="btn-icon" onclick="toggleTools()" title="Tools">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+            </button>
+            <button class="btn-icon" onclick="toggleKin()" title="Kin Network">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            </button>
+            <button class="btn-icon" onclick="toggleTheme()" title="Toggle Theme">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
         </div>
     </div>
 
-    <!-- Tools Panel -->
     <div id="tools-panel" class="panel"></div>
 
-    <!-- Kin Panel -->
     <div id="kin-panel" class="panel">
-        <strong>Kin:</strong>
-        <span class="tool-chip" onclick="runKinCycle()">Iris → Metis → Hermes</span>
-        <span class="tool-chip" onclick="listCheckpoints()">Hades checkpoints</span>
-        <span class="tool-chip" onclick="runResidualCheck()">Residual consistency</span>
+        <div class="group-row">
+            <span class="group-label">Kin:</span>
+            <span class="tool-chip" onclick="runKinCycle()">Iris → Metis → Hermes</span>
+            <span class="tool-chip" onclick="listCheckpoints()">Hades Checkpoints</span>
+            <span class="tool-chip" onclick="runResidualCheck()">Residual Check</span>
+        </div>
     </div>
 
     <div id="chat">
         <div class="msg-row bot">
-            <div class="avatar bot">R</div>
+            <div class="avatar bot">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            </div>
             <div class="bubble bot">
                 Exact residual memory engine. Facts as residual packets. Unknowns abstained. Kin + harness available.
             </div>
@@ -108,7 +127,6 @@
             <div class="suggestion" onclick="quickAsk('who is zeus')">Test abstention</div>
             <div class="suggestion" onclick="runKinCycle()">Run Kin cycle</div>
             <div class="suggestion" onclick="quickAsk('/tool residual_consistency')">Residual check</div>
-            <div class="suggestion" onclick="runVideoLegion(prompt('Video prompt:'))">Video legion</div>
         </div>
     </div>
 
@@ -164,7 +182,7 @@
                     .filter(([_, arr]) => arr.length)
                     .map(([kin, arr]) => `
                         <div class="group-row">
-                            <strong>${kin}:</strong>
+                            <span class="group-label">${kin}:</span>
                             ${arr.map(t => `
                                 <span class="tool-chip ${t.legion ? 'legion' : ''}" 
                                       onclick="runTool('${t.name}')" 
@@ -208,7 +226,13 @@
             row.className = `msg-row ${sender}`;
             const avatar = document.createElement('div');
             avatar.className = `avatar ${sender}`;
-            avatar.innerText = sender === 'user' ? 'U' : 'R';
+            
+            if (sender === 'user') {
+                avatar.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+            } else {
+                avatar.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>`;
+            }
+
             const bubble = document.createElement('div');
             bubble.className = `bubble ${sender}`;
             bubble.innerHTML = text + (meta ? `<div class="meta">${meta}</div>` : "");
@@ -293,33 +317,6 @@
 
         async function runResidualCheck() {
             return runTool("residual_consistency");
-        }
-
-        async function runVideoLegion(promptText, draft = true) {
-            if (!promptText) return;
-            const safePrompt = promptText.replace(/'/g, "\\'").replace(/"/g, '\\"');
-            addMsg(`Video legion (${draft ? 'draft' : 'final'}): ${promptText}`, 'user');
-            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
-            try {
-                const r = await fetch(`${API_URL}/tools/video_generate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-                    body: JSON.stringify({
-                        prompt: promptText,
-                        draft,
-                        model: "seedance-2.5",
-                        resolution: draft ? "480p" : "1080p",
-                        duration: 5
-                    })
-                });
-                const d = await r.json();
-                if (!r.ok) throw new Error(d.detail || "failed");
-                bubble.innerHTML = `Video ${draft ? 'draft' : 'final'} ready.<br>
-                    <pre>${JSON.stringify(d, null, 2)}</pre>
-                    ${draft ? `<button class="tool-chip" onclick="runVideoLegion('${safePrompt}', false)">Upscale to 1080p</button>` : ''}`;
-            } catch (e) {
-                bubble.innerHTML = `Video legion failed: ${e.message}`;
-            }
         }
 
         async function runTool(name) {
