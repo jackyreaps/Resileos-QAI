@@ -38,9 +38,13 @@ titanos = "titanos:main"
 
 [tool.setuptools]
 py-modules = ["app", "titanos", "run_hybrid"]
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"resileos.kin.demigods" = ["guides/*.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "scripts", "."]

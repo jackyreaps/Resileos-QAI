@@ -32,6 +32,7 @@ from resileos.harness.separated import (
     Proposal,
     SeparatedCycle,
     Verdict,
+    maker_blind_verifier_cycle,
     run_separated,
     zeus_head,
 )
@@ -67,6 +68,7 @@ __all__ = [
     "Verdict",
     "zeus_head",
     "run_separated",
+    "maker_blind_verifier_cycle",
     "perception_cycle",
     "harness_wrap",
     "wire_perception",

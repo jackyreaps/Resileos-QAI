@@ -175,6 +175,13 @@ def verify_on_stop(
     }
 
 
+# evidence_attach keeps this many entries. Hephaestus treats it as a hard cap.
+EVIDENCE_CAP = 50
+
+# Persona text injected with a guide id. Shared by guide_load and Demi-gods.
+GUIDE_BODY_CAP = 4000
+
+
 def budget_and_stuck_guard(packet: Dict[str, Any]) -> Dict[str, Any]:
     """Budgeted loop + simple stuck detection."""
     budget = packet.get("budget_remaining", {})
@@ -198,17 +205,59 @@ def budget_and_stuck_guard(packet: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "budget": budget}
 
 
+def _guide_containers(packet: Any) -> tuple[list, dict]:
+    """Return the caller's live guides list and body dict.
+
+    Accepts a ControlPacket or a dict the caller keeps. Lists and dicts
+    are mutated in place. ControlPacket.to_dict() shares those objects,
+    so an in-place edit also updates the packet the dict was taken from.
+    """
+    from resileos.harness.packet import ControlPacket
+
+    if isinstance(packet, ControlPacket):
+        if not isinstance(packet.guide_bodies, dict):
+            packet.guide_bodies = {}
+        if not isinstance(packet.guides_loaded, list):
+            packet.guides_loaded = list(packet.guides_loaded or [])
+        return packet.guides_loaded, packet.guide_bodies
+    if isinstance(packet, dict):
+        loaded = packet.get("guides_loaded")
+        if not isinstance(loaded, list):
+            loaded = list(loaded or [])
+            packet["guides_loaded"] = loaded
+        stored = packet.get("guide_bodies")
+        if not isinstance(stored, dict):
+            stored = {}
+            packet["guide_bodies"] = stored
+        return loaded, stored
+    raise TypeError("guide_load packet must be a ControlPacket or a dict")
+
+
 def guide_load(
-    guides: List[str],
-    packet: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Hierarchical / JIT context (AGENTS.md / CONSTRAINTS.md pattern)."""
-    loaded = packet.get("guides_loaded", [])
+    guides: list[str],
+    packet: Any,
+    *,
+    bodies: dict[str, str] | None = None,
+    body_cap: int = GUIDE_BODY_CAP,
+) -> dict[str, Any]:
+    """Hierarchical / JIT context (AGENTS.md / CONSTRAINTS.md pattern).
+
+    Filenames (or guide ids) are recorded on ``guides_loaded``. When
+    ``bodies`` is provided, each body is stored under ``guide_bodies``,
+    truncated to ``body_cap`` characters. The cap is the single injection
+    point for Demi-god persona text and any other bounded guide.
+    """
+    if body_cap < 0:
+        raise ValueError("body_cap must be >= 0")
+    loaded, stored = _guide_containers(packet)
     for g in guides:
         if g not in loaded:
             loaded.append(g)
-    packet["guides_loaded"] = loaded
-    return {"loaded": loaded, "packet": packet}
+    if bodies:
+        for key, body in bodies.items():
+            text = body if isinstance(body, str) else str(body)
+            stored[str(key)] = text[:body_cap]
+    return {"loaded": loaded, "bodies": dict(stored), "packet": packet}
 
 
 def evidence_attach(
@@ -223,7 +272,7 @@ def evidence_attach(
         "result": result,
         "turn": packet.get("turn", 0),
     })
-    packet["evidence"] = evidence[-50:]
+    packet["evidence"] = evidence[-EVIDENCE_CAP:]
     return {"evidence": packet["evidence"]}
 
 
@@ -301,6 +350,8 @@ __all__ = [
     "verification_required",
     "verify_on_stop",
     "budget_and_stuck_guard",
+    "GUIDE_BODY_CAP",
+    "EVIDENCE_CAP",
     "guide_load",
     "evidence_attach",
     "evidence_attach_raw",

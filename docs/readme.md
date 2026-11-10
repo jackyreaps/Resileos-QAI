@@ -84,6 +84,7 @@ Harness:
 - [`docs/harness/AGENTS.md`](harness/AGENTS.md) — standing instructions
 - [`docs/harness/CONSTRAINTS.md`](harness/CONSTRAINTS.md) — permanent corrections
 - [`docs/harness/INTEGRATION.md`](harness/INTEGRATION.md) — integration checklist
+- [Demi-god skill layer](320-titanos/demigods.md) — RES-343
 
 Reference:
 52. [Glossary](900-reference/glossary.md) — RES-900
@@ -114,6 +115,7 @@ Reference:
 | RES-325 | `eat-strategy.md` | draft | Titanos vs transformers: A/B achievable, C not |
 | RES-327 | `answer.md` | stable | `/answer` route; pluggable backends; RAG scaling measured |
 | RES-332 | `temporal.md` | draft | Chronos/kairos; valid-time on facts; AS OF query |
+| RES-343 | `demigods.md` | implemented | Summoned checks under Kin; persona text, not a model |
 
 ## 400-series operations modules
 

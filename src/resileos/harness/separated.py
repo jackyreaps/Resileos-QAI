@@ -399,7 +399,150 @@ def run_separated(
     return zeus_head(proposal, reviewers, learn_fn, cycle=sc)
 
 
+def _claims_from_artefact(artefact: Any) -> list[tuple[str, str, str]]:
+    """Triples the maker returned. Zeus learns these only after approval."""
+    claims: list[tuple[str, str, str]] = []
+    if not isinstance(artefact, dict):
+        return claims
+    raw: list[Any] = []
+    if isinstance(artefact.get("claims"), list):
+        raw.extend(artefact["claims"])
+    rows = artefact.get("hub_rows") or artefact.get("rows")
+    if isinstance(rows, list):
+        raw.extend(rows)
+    for item in raw:
+        subject = relation = obj = None
+        if isinstance(item, (list, tuple)) and len(item) >= 3:
+            subject, relation, obj = item[0], item[1], item[2]
+        elif isinstance(item, dict):
+            subject = item.get("subject")
+            relation = item.get("relation")
+            obj = item.get("obj")
+            if obj is None:
+                obj = item.get("object")
+        if subject and relation and obj is not None and str(obj) != "":
+            claims.append((str(subject), str(relation), str(obj)))
+    return claims
+
+
+def _noop_learn(_subject: str, _relation: str, _obj: str) -> None:
+    return None
+
+
+def maker_blind_verifier_cycle(
+    task: str,
+    maker_fn: Callable[..., Any],
+    residual_packet: Any = None,
+    hades: Any = None,
+    *,
+    spec: Any = None,
+    learn_fn: Callable[[str, str, str], None] | None = None,
+) -> dict[str, Any]:
+    """Maker produces an artefact. Momus reviews it blind. Zeus learns.
+
+    Shared durable state is the residual hash and, when the maker packet
+    is verified, the Hades lesson. ``control.verified is False`` skips
+    the checkpoint and leaves the lesson unset. Momus receives the
+    artefact, the spec (or the task text), and the residual hash. It does
+    not receive control history or author notes. ``learn_fn`` runs only
+    when Zeus applies an approved verdict.
+    """
+    from resileos.kin.demigods.checks import momus_review
+    from resileos.kin.demigods.hierarchy import durable_cross_attempt
+    from resileos.kin.demigods.router import demigod_dismiss, demigod_summon
+
+    control = ControlPacket(id="maker")
+    artefact = maker_fn(task, control)
+
+    residual_hash = None
+    if residual_packet is not None:
+        residual_hash = getattr(residual_packet, "packet_hash", None)
+        if residual_hash is None and isinstance(residual_packet, dict):
+            residual_hash = residual_packet.get("packet_hash")
+
+    lesson = None
+    lesson_skipped = None
+    if hades is not None and control.verified:
+        checkpoint = hades.save(control, residual_packet_hash=residual_hash)
+        lesson = checkpoint.lesson
+    elif not control.verified:
+        lesson_skipped = "control.verified is false"
+    else:
+        lesson_skipped = "no hades store"
+
+    review_spec = task if spec is None else spec
+    review_packet = ControlPacket(id="reviewer")
+    review_packet.append(
+        {
+            "event": "blind_review",
+            "artefact_chars": len(str(artefact)),
+            "residual_hash": residual_hash,
+            "lesson": lesson,
+        }
+    )
+    summoned = demigod_summon("momus", review_packet)
+    captured: dict[str, Any] = {}
+
+    def _review(proposal: Proposal) -> Verdict:
+        result = momus_review(artefact, review_spec, residual_hash)
+        captured["result"] = result
+        return Verdict(
+            proposal.id,
+            "momus",
+            bool(result.verified),
+            result.reason,
+            evidence=list(result.evidence),
+        )
+
+    proposal = Proposal(
+        id=control.id,
+        writer="maker",
+        action_type="maker_blind",
+        result=artefact if isinstance(artefact, dict) else {"artefact": artefact},
+        claims=_claims_from_artefact(artefact),
+        packet=control,
+    )
+    try:
+        head = zeus_head(
+            proposal,
+            [("momus", _review)],
+            learn_fn or _noop_learn,
+        )
+    finally:
+        demigod_dismiss("momus", review_packet)
+
+    reviewed = captured.get("result")
+    if reviewed is None:
+        findings = {
+            "demigod": "momus",
+            "verified": False,
+            "success": False,
+            "reason": "review did not run",
+            "evidence": [],
+            "defects": [],
+        }
+    else:
+        findings = reviewed.to_dict()
+    durable = durable_cross_attempt(
+        {"lesson": lesson, "residual_packet_hash": residual_hash}
+    )
+    return {
+        "artefact": artefact,
+        "lesson": lesson,
+        "lesson_skipped": lesson_skipped,
+        "residual_hash": residual_hash,
+        "findings": findings,
+        "durable": durable,
+        "guide_chars": int(summoned.get("body_chars") or 0),
+        "review_guides": list(review_packet.guides_loaded),
+        "head": head,
+        "hierarchy": (
+            "maker served; Momus served under Hermes; residual core final"
+        ),
+    }
+
+
 __all__ = [
     "Proposal", "Verdict", "SeparatedCycle", "zeus_head",
-    "run_separated", "_capture_eat",
+    "run_separated", "maker_blind_verifier_cycle", "_capture_eat",
 ]

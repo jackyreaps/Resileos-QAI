@@ -15,6 +15,9 @@ class ControlPacket:
     risk_class: Optional[str] = None  # "allow" | "ask" | "deny"
     verified: bool = False
     guides_loaded: List[str] = field(default_factory=list)
+    # Bounded guide text keyed by the same id stored in guides_loaded.
+    # Same object is shared through to_dict() so in-place edits persist.
+    guide_bodies: Dict[str, str] = field(default_factory=dict)
     budget_remaining: Dict[str, float] = field(default_factory=lambda: {"steps": 50, "cost": 5.0, "tokens": 120000})
     evidence: List[Dict[str, Any]] = field(default_factory=list)
     scars: List[str] = field(default_factory=list)  # residual scars / constraints applied
@@ -34,6 +37,7 @@ class ControlPacket:
             "risk_class": self.risk_class,
             "verified": self.verified,
             "guides_loaded": self.guides_loaded,
+            "guide_bodies": self.guide_bodies,
             "budget_remaining": self.budget_remaining,
             "evidence": self.evidence,
             "scars": self.scars,
