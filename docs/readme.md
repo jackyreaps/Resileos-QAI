@@ -85,6 +85,7 @@ Harness:
 - [`docs/harness/CONSTRAINTS.md`](harness/CONSTRAINTS.md) — permanent corrections
 - [`docs/harness/INTEGRATION.md`](harness/INTEGRATION.md) — integration checklist
 - [Demi-god skill layer](320-titanos/demigods.md) — RES-343
+- [Equal-budget measurement](benchmarks/equal_budget.md)
 
 Reference:
 52. [Glossary](900-reference/glossary.md) — RES-900

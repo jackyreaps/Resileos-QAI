@@ -18,6 +18,10 @@ from resileos.harness.tools import (
     budget_and_stuck_guard,
     residual_consistency,
 )
+from resileos.hierarchy.encoder import default_capacity
+from resileos.hierarchy.mask import DEFAULT_K, MaskStackConfig
+from resileos.hierarchy.prime_tower import PrimeTower
+from resileos.hierarchy.primorial import n_usable_primorials
 from resileos.kin.hermes import HermesBudget
 from resileos.kin.verifiers import Claim, check_capacity
 
@@ -26,7 +30,20 @@ from .hierarchy import (
     demigod_duty,
     residual_hash_only,
 )
-from .results import Defect, finish
+from .results import (
+    NEED_MISSING_REQUIREMENT,
+    NEED_MISSING_RESIDUAL_HASH,
+    NEED_MISSING_SPEC_FIELD,
+    OUTCOME_APPROVED,
+    OUTCOME_FAIL,
+    OUTCOME_NEED_MORE,
+    Defect,
+    NeedMore,
+    finish,
+)
+
+# One supplement round. maker_blind_verifier_cycle refuses a higher cap.
+MAX_NEED_MORE_ROUNDS = 1
 
 _VERIFIED_TRUE = re.compile(r"verified\s*=\s*true\b", re.IGNORECASE)
 _VERIFIED_FALSE = re.compile(r"verified\s*=\s*false\b", re.IGNORECASE)
@@ -297,10 +314,39 @@ def _requirements_from_spec(spec: Any) -> list[dict[str, Any]]:
     return []
 
 
-def _requirement_defect(artefact: Any, req: dict[str, Any]) -> Defect | None:
+def _path_exists(obj: Any, path: str) -> bool:
+    current = obj
+    for part in str(path).split("."):
+        if not part or not isinstance(current, dict) or part not in current:
+            return False
+        current = current[part]
+    return True
+
+
+def _set_path(obj: dict, path: str, value: Any) -> None:
+    parts = [part for part in str(path).split(".") if part]
+    if not parts:
+        return
+    current = obj
+    for part in parts[:-1]:
+        nxt = current.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            current[part] = nxt
+        current = nxt
+    current[parts[-1]] = value
+
+
+def _judge_requirement(artefact: Any, req: dict[str, Any]) -> Defect | NeedMore | None:
     location = str(req.get("location") or "artefact")
     severity = _severity(req.get("severity"))
     if "equals" in req:
+        if not _path_exists(artefact, location):
+            return NeedMore(
+                NEED_MISSING_SPEC_FIELD,
+                location,
+                f"spec field {location} is absent",
+            )
         actual = _lookup(artefact, location)
         expected = req.get("equals")
         if str(actual) != str(expected):
@@ -316,28 +362,42 @@ def _requirement_defect(artefact: Any, req: dict[str, Any]) -> Defect | None:
             return Defect(location, severity, f"missing {needle!r}")
         return None
     if req.get("present") is True:
-        if _lookup(artefact, location) is None:
-            return Defect(location, severity, "required value is absent")
+        if not _path_exists(artefact, location):
+            return NeedMore(
+                NEED_MISSING_SPEC_FIELD,
+                location,
+                f"spec field {location} is absent",
+            )
         return None
-    return Defect(location, "error", "requirement has no equals, contains, or present check")
+    return Defect(
+        location,
+        "error",
+        "requirement has no equals, contains, or present check",
+    )
 
 
-def _hash_defects(residual_hash: Any, *, have_requirements: bool) -> tuple[list[Defect], int]:
+def _hash_findings(
+    residual_hash: Any, *, have_requirements: bool
+) -> tuple[list[Defect], list[NeedMore], int]:
     if residual_hash is None:
         if not have_requirements:
-            return [], 0
-        return [
-            Defect("residual_hash", "error", "missing residual hash")
+            return [], [], 0
+        return [], [
+            NeedMore(
+                NEED_MISSING_RESIDUAL_HASH,
+                "residual_hash",
+                "residual hash was not supplied",
+            )
         ], 1
     if isinstance(residual_hash, str) and _HASH.fullmatch(residual_hash):
-        return [], 1
+        return [], [], 1
     return [
         Defect(
             "residual_hash",
             "error",
             "residual hash is not 64 lowercase hex characters",
         )
-    ], 1
+    ], [], 1
 
 
 def momus_review(
@@ -364,41 +424,102 @@ def momus_review(
         spec_view = _strip_blind(spec, stripped)
         requirements = _requirements_from_spec(spec_view)
         defects: list[Defect] = []
+        needs: list[NeedMore] = []
         for req in requirements:
-            found = _requirement_defect(seen, req)
-            if found is not None:
-                defects.append(found)
-        hash_defects, hash_checks = _hash_defects(
+            judged = _judge_requirement(seen, req)
+            if isinstance(judged, Defect):
+                defects.append(judged)
+            elif isinstance(judged, NeedMore):
+                needs.append(judged)
+        hash_defects, hash_needs, hash_checks = _hash_findings(
             residual_hash, have_requirements=bool(requirements)
         )
         defects.extend(hash_defects)
+        needs.extend(hash_needs)
         requirement_checks = len(requirements)
         checks_run = requirement_checks + hash_checks
-        if requirement_checks == 0 and checks_run == 0:
-            ok = False
+        if requirement_checks == 0:
+            needs.append(
+                NeedMore(
+                    NEED_MISSING_REQUIREMENT,
+                    "spec",
+                    "no explicit requirements to check",
+                )
+            )
+        if defects:
+            outcome = OUTCOME_FAIL
+            reason = f"{len(defects)} defect(s)"
+        elif requirement_checks == 0 and checks_run == 0:
+            outcome = OUTCOME_NEED_MORE
             reason = "no checks to run"
         elif requirement_checks == 0:
-            ok = False
+            outcome = OUTCOME_NEED_MORE
             reason = "no requirement checks to run"
-        elif defects:
-            ok = False
-            reason = f"{len(defects)} defect(s)"
+        elif needs:
+            outcome = OUTCOME_NEED_MORE
+            reason = "; ".join(item.message for item in needs)
         else:
-            ok = False if defects else True
+            outcome = OUTCOME_APPROVED
             reason = f"{requirement_checks} requirement(s) hold"
-        # Approval is impossible when nothing was checked or a defect remains.
-        if requirement_checks == 0 or defects:
-            ok = False
+        # NEED_MORE is not approval. Defects are not approval.
+        ok = outcome == OUTCOME_APPROVED and not needs and not defects
         evidence = [
             {
                 "source": "momus",
+                "outcome": outcome,
                 "checks_run": checks_run,
                 "requirement_checks": requirement_checks,
                 "stripped": sorted(set(stripped)),
                 "defects": [item.to_dict() for item in defects],
+                "need_more": [item.to_dict() for item in needs],
             }
         ]
-        return finish("momus", ok, reason, evidence, defects)
+        return finish(
+            "momus",
+            ok,
+            reason,
+            evidence,
+            defects,
+            outcome=outcome,
+            need_more=needs,
+        )
+
+
+def apply_blind_supplement(
+    artefact: Any,
+    spec: Any,
+    residual_hash: str | None,
+    need_more: list[NeedMore] | tuple[NeedMore, ...],
+    supplied: Any,
+) -> tuple[Any, Any, str | None]:
+    """Copy only the fields Momus asked for. Blind keys are dropped first."""
+    stripped: list[str] = []
+    clean = _strip_blind(supplied if isinstance(supplied, dict) else {}, stripped)
+    if not isinstance(clean, dict):
+        clean = {}
+    if isinstance(artefact, dict):
+        art = {
+            key: value
+            for key, value in artefact.items()
+            if key not in _BLIND_KEYS
+        }
+    else:
+        art = {} if artefact is None else {"value": artefact}
+    new_spec = spec
+    new_hash = residual_hash
+    for item in need_more:
+        if item.code == NEED_MISSING_SPEC_FIELD and item.location in clean:
+            _set_path(art, item.location, clean[item.location])
+        elif item.code == NEED_MISSING_RESIDUAL_HASH and isinstance(
+            clean.get("residual_hash"), str
+        ):
+            new_hash = clean["residual_hash"]
+        elif item.code == NEED_MISSING_REQUIREMENT:
+            if "requirements" in clean:
+                new_spec = {"requirements": clean["requirements"]}
+            elif "spec" in clean:
+                new_spec = clean["spec"]
+    return art, new_spec, new_hash
 
 
 def _hermes_limits(budget: Any) -> tuple[bool, dict[str, Any]]:
@@ -429,15 +550,13 @@ def hephaestus_check(
     packet: Any,
     *,
     hermes_budget: Any = None,
-    n_facts: int | None = None,
-    hopfield_count: int | None = None,
     residual_packet: Any = None,
 ) -> Any:
-    """Pass only when consistency, scars, budget, and capacity all hold.
+    """Pass only when consistency, scars, and budget all hold.
 
-    Uses ``residual_consistency``, ``budget_and_stuck_guard``,
-    ``check_capacity``, and ``hopfield_cap``. A declared fact load is
-    compared with ``hopfield_cap``. Evidence length uses ``EVIDENCE_CAP``.
+    Uses ``residual_consistency`` and ``budget_and_stuck_guard``.
+    Capacity belongs to Atlas. A Hermes budget, when supplied, is part
+    of the spend check.
     """
     with demigod_duty("hephaestus"):
         if packet is None:
@@ -472,45 +591,6 @@ def hephaestus_check(
             if not guard.get("ok"):
                 failures.append(str(guard.get("reason") or "budget exhausted"))
 
-        state = pkt.get("state") if isinstance(pkt.get("state"), dict) else {}
-        facts_count = n_facts
-        if facts_count is None and "n_facts" in state:
-            facts_count = state.get("n_facts")
-        hop_count = hopfield_count
-        if hop_count is None and "hopfield_count" in state:
-            hop_count = state.get("hopfield_count")
-        cap = hopfield_cap()
-        ctx: dict[str, Any] = {}
-        if facts_count is not None:
-            ctx["facts_cap"] = cap
-            ctx["facts_count"] = int(facts_count)
-        if hop_count is not None:
-            ctx["hopfield_cap"] = cap
-            ctx["hopfield_count"] = int(hop_count)
-        claim = Claim(subject="demigod:hephaestus", relation="checks", obj="packet")
-        cap_result = check_capacity(claim, ctx)
-        evidence_len = len(pkt.get("evidence") or [])
-        over_evidence = evidence_len > EVIDENCE_CAP
-        evidence.append(
-            {
-                "check": "capacity",
-                "hopfield_cap": cap,
-                "facts_count": facts_count,
-                "hopfield_count": hop_count,
-                "ok": cap_result.ok and not over_evidence,
-                "reason": cap_result.reason,
-                "checker": cap_result.checker,
-                "evidence_len": evidence_len,
-                "evidence_cap": EVIDENCE_CAP,
-            }
-        )
-        if not cap_result.ok:
-            failures.append(cap_result.reason or "capacity exceeded")
-        if over_evidence:
-            failures.append(
-                f"evidence length {evidence_len} exceeds cap {EVIDENCE_CAP}"
-            )
-
         over_hermes, hermes_ev = _hermes_limits(hermes_budget)
         evidence.append({"check": "hermes_budget", **hermes_ev})
         if over_hermes:
@@ -526,7 +606,232 @@ def hephaestus_check(
         return finish(
             "hephaestus",
             True,
-            "residual consistent, no scars, budget holds, within capacity",
+            "residual consistent, no scars, budget holds",
+            evidence,
+        )
+
+
+def _packet_state(pkt: dict[str, Any]) -> dict[str, Any]:
+    state = pkt.get("state")
+    return state if isinstance(state, dict) else {}
+
+
+def _declared(explicit: Any, state: dict[str, Any], key: str) -> Any:
+    if explicit is not None:
+        return explicit
+    if key in state:
+        return state[key]
+    return None
+
+
+def atlas_check(
+    packet: Any,
+    *,
+    n_facts: int | None = None,
+    hopfield_count: int | None = None,
+    dim: int | None = None,
+    n_layers: int | None = None,
+    tower_level: int | None = None,
+    primorial_k: int | None = None,
+    encoder_load: int | None = None,
+    mask_k: int | None = None,
+    residual_packet: Any = None,
+) -> Any:
+    """Hierarchy capacity. Declared loads only; nothing is invented.
+
+    Hopfield uses ``check_capacity`` against ``hopfield_cap``. The mask
+    stack uses ``MaskStackConfig``, which requires ``n_layers`` to be
+    within ``PrimeTower.n_usable``. A declared tower level uses
+    ``PrimeTower.max_usable_level``. Primorial depth uses
+    ``n_usable_primorials``. Encoder load uses ``default_capacity``.
+    Evidence length uses ``EVIDENCE_CAP``.
+    """
+    with demigod_duty("atlas"):
+        if packet is None:
+            return finish("atlas", False, "missing control packet", [])
+        pkt = _as_dict(packet)
+        state = _packet_state(pkt)
+        digest = residual_hash_only(residual_packet)
+        failures: list[str] = []
+        evidence: list[dict] = []
+
+        facts_count = _declared(n_facts, state, "n_facts")
+        hop_count = _declared(hopfield_count, state, "hopfield_count")
+        dim_v = _declared(dim, state, "dim")
+        layers_v = _declared(n_layers, state, "n_layers")
+        level_v = _declared(tower_level, state, "tower_level")
+        prim_v = _declared(primorial_k, state, "primorial_k")
+        enc_v = _declared(encoder_load, state, "encoder_load")
+        k_v = _declared(mask_k, state, "k")
+
+        cap = hopfield_cap()
+        ctx: dict[str, Any] = {}
+        if facts_count is not None:
+            ctx["facts_cap"] = cap
+            ctx["facts_count"] = int(facts_count)
+        if hop_count is not None:
+            ctx["hopfield_cap"] = cap
+            ctx["hopfield_count"] = int(hop_count)
+        claim = Claim(subject="demigod:atlas", relation="checks", obj="packet")
+        cap_result = check_capacity(claim, ctx)
+        evidence.append(
+            {
+                "check": "hopfield",
+                "function": "check_capacity",
+                "hopfield_cap": cap,
+                "facts_count": facts_count,
+                "hopfield_count": hop_count,
+                "declared": facts_count is not None or hop_count is not None,
+                "ok": cap_result.ok,
+                "reason": cap_result.reason,
+                "checker": cap_result.checker,
+            }
+        )
+        if not cap_result.ok:
+            failures.append(cap_result.reason or "capacity exceeded")
+
+        evidence_len = len(pkt.get("evidence") or [])
+        over_evidence = evidence_len > EVIDENCE_CAP
+        evidence.append(
+            {
+                "check": "evidence_cap",
+                "function": "EVIDENCE_CAP",
+                "evidence_len": evidence_len,
+                "evidence_cap": EVIDENCE_CAP,
+                "ok": not over_evidence,
+            }
+        )
+        if over_evidence:
+            failures.append(
+                f"evidence length {evidence_len} exceeds cap {EVIDENCE_CAP}"
+            )
+
+        if dim_v is not None and layers_v is not None:
+            try:
+                MaskStackConfig(
+                    dim=int(dim_v),
+                    n_layers=int(layers_v),
+                    k=int(k_v) if k_v is not None else DEFAULT_K,
+                )
+                mask_ok = True
+                mask_reason = ""
+            except ValueError as exc:
+                mask_ok = False
+                mask_reason = str(exc)
+            evidence.append(
+                {
+                    "check": "mask_stack",
+                    "function": "MaskStackConfig",
+                    "dim": dim_v,
+                    "n_layers": layers_v,
+                    "ok": mask_ok,
+                    "reason": mask_reason,
+                }
+            )
+            if not mask_ok:
+                failures.append(mask_reason)
+        else:
+            evidence.append(
+                {
+                    "check": "mask_stack",
+                    "function": "MaskStackConfig",
+                    "declared": False,
+                }
+            )
+
+        if dim_v is not None and level_v is not None:
+            tower = PrimeTower(max_level=max(128, int(level_v) + 1))
+            limit = tower.max_usable_level(int(dim_v))
+            level_ok = int(level_v) <= limit
+            evidence.append(
+                {
+                    "check": "prime_tower",
+                    "function": "PrimeTower.max_usable_level",
+                    "dim": dim_v,
+                    "tower_level": level_v,
+                    "max_usable_level": limit,
+                    "n_usable": tower.n_usable(int(dim_v)),
+                    "ok": level_ok,
+                }
+            )
+            if not level_ok:
+                failures.append(
+                    f"tower_level {level_v} exceeds "
+                    f"PrimeTower.max_usable_level({dim_v})={limit}"
+                )
+        else:
+            evidence.append(
+                {
+                    "check": "prime_tower",
+                    "function": "PrimeTower.n_usable",
+                    "declared": False,
+                }
+            )
+
+        if dim_v is not None and prim_v is not None:
+            usable_p = n_usable_primorials(int(dim_v))
+            prim_ok = int(prim_v) <= usable_p
+            evidence.append(
+                {
+                    "check": "primorial",
+                    "function": "n_usable_primorials",
+                    "dim": dim_v,
+                    "primorial_k": prim_v,
+                    "n_usable": usable_p,
+                    "ok": prim_ok,
+                }
+            )
+            if not prim_ok:
+                failures.append(
+                    f"primorial_k {prim_v} exceeds "
+                    f"n_usable_primorials({dim_v})={usable_p}"
+                )
+        else:
+            evidence.append(
+                {
+                    "check": "primorial",
+                    "function": "n_usable_primorials",
+                    "declared": False,
+                }
+            )
+
+        if dim_v is not None and enc_v is not None:
+            enc_cap = default_capacity(int(dim_v))
+            enc_ok = int(enc_v) <= enc_cap
+            evidence.append(
+                {
+                    "check": "encoder",
+                    "function": "default_capacity",
+                    "dim": dim_v,
+                    "encoder_load": enc_v,
+                    "capacity": enc_cap,
+                    "ok": enc_ok,
+                }
+            )
+            if not enc_ok:
+                failures.append(
+                    f"encoder_load {enc_v} exceeds "
+                    f"default_capacity({dim_v})={enc_cap}"
+                )
+        else:
+            evidence.append(
+                {
+                    "check": "encoder",
+                    "function": "default_capacity",
+                    "declared": False,
+                }
+            )
+
+        if digest is not None:
+            evidence.append(
+                {"check": "residual_packet_hash", "packet_hash": digest}
+            )
+        if failures:
+            return finish("atlas", False, "; ".join(failures), evidence)
+        return finish(
+            "atlas",
+            True,
+            "declared loads sit within the real capacity functions",
             evidence,
         )
 
