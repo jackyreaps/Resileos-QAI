@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Resileos Studio</title>
+    <style>
+        :root {
+            --bg-main: #fafaf8;
+            --bg-sidebar: #f4f4f0;
+            --bg-card: #ffffff;
+            --text-main: #111111;
+            --text-muted: #666666;
+            --accent: #1a4d8f;
+            --accent-hover: #143c70;
+            --border: #e5e5e0;
+            --user-bubble: #1a4d8f;
+            --user-text: #ffffff;
+            --bot-bubble: #ffffff;
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font-main); background: var(--bg-main); color: var(--text-main); height: 100vh; height: 100dvh; display: flex; overflow: hidden; }
+
+        /* ── Sidebar Layout ── */
+        #sidebar {
+            width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; transition: transform 0.3s ease; z-index: 10;
+        }
+        .sidebar-header { padding: 20px; display: flex; align-items: center; justify-content: space-between; }
+        .sidebar-brand { font-weight: 600; font-size: 1.1rem; color: var(--accent); letter-spacing: -0.5px; }
+        .new-chat-btn {
+            margin: 0 20px 20px 20px; padding: 10px 15px; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text-main); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: background 0.2s;
+        }
+        .new-chat-btn:hover { background: #fff; border-color: #ddd; }
+        .sidebar-nav { flex: 1; overflow-y: auto; padding: 0 10px; }
+        .nav-item { padding: 10px 15px; border-radius: 8px; color: var(--text-muted); font-size: 0.9rem; cursor: pointer; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-main); }
+        .nav-item.active { background: rgba(26, 77, 143, 0.08); color: var(--accent); font-weight: 500; }
+        .sidebar-footer { padding: 20px; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-muted); }
+
+        /* ── Main Chat Layout ── */
+        #main-area { flex: 1; display: flex; flex-direction: column; position: relative; height: 100%; }
+        .top-bar {
+            padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px;
+            background: rgba(250, 250, 248, 0.9); backdrop-filter: blur(5px); position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+        }
+        .menu-btn { display: none; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-main); }
+        .model-selector { font-weight: 500; font-size: 0.95rem; display: flex; align-items: center; gap: 5px; }
+        .model-dot { width: 8px; height: 8px; border-radius: 50%; background: #0a7; }
+
+        /* ── Chat History ── */
+        #chat-container { flex: 1; overflow-y: auto; padding: 80px 20px 120px 20px; display: flex; flex-direction: column; gap: 24px; align-items: center; }
+        .message-wrapper { width: 100%; max-width: 768px; display: flex; gap: 16px; }
+        .message-wrapper.user { justify-content: flex-end; }
+        
+        .avatar { width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; flex-shrink: 0; }
+        .avatar.bot { background: var(--accent); color: white; }
+        .avatar.user { background: #e5e5e0; color: #333; }
+        
+        .message-content { padding: 12px 18px; border-radius: 12px; font-size: 1rem; line-height: 1.5; max-width: 85%; }
+        .message-content.user { background: var(--user-bubble); color: var(--user-text); border-bottom-right-radius: 4px; }
+        .message-content.bot { background: var(--bot-bubble); color: var(--text-main); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        
+        .bot strong { font-weight: 600; color: var(--accent); }
+        .bot code { background: #f0f0ec; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        
+        .typing-indicator { display: flex; gap: 4px; align-items: center; height: 24px; }
+        .typing-indicator span { width: 6px; height: 6px; background: var(--text-muted); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        /* ── Input Area ── */
+        #input-wrapper { position: absolute; bottom: 0; left: 0; right: 0; padding: 20px; background: linear-gradient(to top, var(--bg-main) 70%, transparent); display: flex; justify-content: center; }
+        .input-box {
+            width: 100%; max-width: 768px; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; align-items: flex-end;
+            padding: 8px; transition: border-color 0.2s;
+        }
+        .input-box:focus-within { border-color: var(--accent); }
+        #user-input {
+            flex: 1; border: none; background: transparent; padding: 12px; font-size: 1rem; font-family: inherit;
+            resize: none; outline: none; max-height: 150px; min-height: 24px; line-height: 1.5;
+        }
+        #send-btn {
+            background: var(--accent); color: white; border: none; border-radius: 8px;
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; margin: 4px; transition: background 0.2s; flex-shrink: 0;
+        }
+        #send-btn:hover { background: var(--accent-hover); }
+        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .send-icon { width: 18px; height: 18px; fill: currentColor; }
+
+        /* ── Empty State ── */
+        .empty-state { text-align: center; max-width: 600px; margin-top: 10vh; }
+        .empty-state h1 { font-size: 2rem; font-weight: 500; margin-bottom: 10px; letter-spacing: -0.5px; }
+        .empty-state p { color: var(--text-muted); margin-bottom: 30px; font-size: 1.1rem; }
+        .suggestion-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+        .suggestion-card { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; border-radius: 12px; cursor: pointer; transition: border-color 0.2s; }
+        .suggestion-card:hover { border-color: var(--accent); }
+        .suggestion-card h4 { font-size: 0.95rem; margin-bottom: 4px; color: var(--text-main); }
+        .suggestion-card p { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+        /* ── Mobile Responsive ── */
+        @media (max-width: 768px) {
+            #sidebar { position: absolute; height: 100%; transform: translateX(-100%); }
+            #sidebar.open { transform: translateX(0); box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
+            .menu-btn { display: block; }
+            .suggestion-grid { grid-template-columns: 1fr; }
+            .message-content { max-width: 90%; }
+            #chat-container { padding: 70px 15px 100px 15px; }
+            .message-wrapper { gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">Resileos Studio</div>
+            <button class="menu-btn" onclick="toggleSidebar()" style="display:none;">✕</button>
+        </div>
+        <button class="new-chat-btn" onclick="startNewChat()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New Conversation
+        </button>
+        <div class="sidebar-nav">
+            <div class="nav-item active">Current Session</div>
+            <div class="nav-item" style="opacity: 0.5; cursor: default;">Past sessions (Pro)</div>
+            <div class="nav-item" style="opacity: 0.5; cursor: default;">Saved Memories</div>
+            <div class="nav-item" style="opacity: 0.5; cursor: default;">API Dashboard</div>
+        </div>
+        <div class="sidebar-footer">
+            Exact Memory Engine<br>Demo Mode
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main id="main-area">
+        <div class="top-bar">
+            <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+            <div class="model-selector">
+                <div class="model-dot"></div>
+                Resileos Exact
+            </div>
+        </div>
+
+        <div id="chat-container">
+            <!-- Empty State / Welcome Screen -->
+            <div class="empty-state" id="empty-state">
+                <h1>What can I help you remember?</h1>
+                <p>No hallucinations. No guessing. Just exact, verifiable memory.</p>
+                <div class="suggestion-grid">
+                    <div class="suggestion-card" onclick="useSuggestion('remember alice works_at acme')">
+                        <h4>Teach a fact</h4>
+                        <p>"remember alice works_at acme"</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('alice works_at')">
+                        <h4>Ask a question</h4>
+                        <p>"alice works_at"</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('where does bob work')">
+                        <h4>Test the parser</h4>
+                        <p>"where does bob work"</p>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('who is zues')">
+                        <h4>Test abstention</h4>
+                        <p>"who is zeus"</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Messages injected here -->
+        </div>
+
+        <!-- Input Area -->
+        <div id="input-wrapper">
+            <div class="input-box">
+                <textarea id="user-input" rows="1" placeholder="Message Resileos..." oninput="autoResize(this)" onkeydown="handleKeyDown(event)"></textarea>
+                <button id="send-btn" onclick="sendMessage()">
+                    <svg class="send-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Baked-in Demo API Key (100 requests quota)
+        const API_KEY = "No4dymPJ4tfRn0BZFuNL07kTnMyCeu5xHw2mpsWmjwk"; 
+        const API_URL = "https://api.resileosai.fun/api/v1";
+        
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const emptyState = document.getElementById('empty-state');
+        const sidebar = document.getElementById('sidebar');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+        }
+
+        function startNewChat() {
+            chatContainer.innerHTML = '';
+            chatContainer.appendChild(emptyState);
+            emptyState.style.display = 'block';
+            if (window.innerWidth <= 768) sidebar.classList.remove('open');
+        }
+
+        function useSuggestion(text) {
+            userInput.value = text;
+            sendMessage();
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = (textarea.scrollHeight) + 'px';
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function formatText(text) {
+            // Basic formatting for markdown-style bold and code
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function addMessage(text, sender) {
+            emptyState.style.display = 'none';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = `message-wrapper ${sender}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${sender}`;
+            avatar.innerText = sender === 'user' ? 'You' : 'R';
+
+            const content = document.createElement('div');
+            content.className = `message-content ${sender}`;
+            content.innerHTML = formatText(text);
+
+            if (sender === 'user') {
+                wrapper.appendChild(content);
+                wrapper.appendChild(avatar);
+            } else {
+                wrapper.appendChild(avatar);
+                wrapper.appendChild(content);
+            }
+
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return content;
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            addMessage(text, 'user');
+            userInput.value = '';
+            autoResize(userInput);
+            sendBtn.disabled = true;
+
+            // Show typing indicator
+            const botContent = addMessage('<div class="typing-indicator"><span></span><span></span><span></span></div>', 'bot');
+
+            try {
+                let endpoint = '/query';
+                let body = {};
+
+                // Check if user is trying to teach the system
+                if (text.toLowerCase().startsWith('remember ')) {
+                    const parts = text.substring(9).trim().split(' ');
+                    if (parts.length >= 3) {
+                        endpoint = '/learn';
+                        body = { subject: parts[0], relation: parts[1], obj: parts.slice(2).join(' ') };
+                    }
+                } else {
+                    // Basic parsing for query: "alice works_at"
+                    const parts = text.trim().split(' ');
+                    if (parts.length >= 2 && !text.includes(' ')) {
+                         // Fallback for simple single word
+                         body = { question: text }; 
+                         endpoint = '/answer';
+                    } else if (parts.length >= 2) {
+                        body = { subject: parts[0], relation: parts[1] };
+                    } else {
+                        body = { question: text }; 
+                        endpoint = '/answer';
+                    }
+                }
+
+                const response = await fetch(`${API_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await response.json();
+                botContent.innerHTML = ''; // Clear typing indicator
+
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        botContent.innerHTML = "⚠️ <strong>Demo limit reached.</strong> The public demo key has hit its 100 request limit. Please check back later or use your own key in settings.";
+                    } else if (response.status === 401 || response.status === 403) {
+                         botContent.innerHTML = "⚠️ <strong>Demo Key Invalid.</strong> The system is online, but the public demo key is not recognized. Please try again later.";
+                    } else {
+                        botContent.innerHTML = `⚠️ Error: ${data.detail || 'Server error occurred.'}`;
+                    }
+                    return;
+                }
+
+                if (endpoint === '/learn') {
+                    botContent.innerHTML = `🧠 Learned! I now know that <strong>${body.subject} ${body.relation} ${body.obj}</strong>.`;
+                } else if (data.status === 'ACCEPTED' || data.status === 'ANSWERED') {
+                    let ans = data.value || data.answer_text;
+                    botContent.innerHTML = `<strong>${ans}</strong>`;
+                } else if (data.status === 'ABSTAINED' || data.status === 'NO_ROWS' || data.status === 'NONE_CHANNEL') {
+                    botContent.innerHTML = `I don't have that in my exact memory. I choose not to guess.`;
+                } else if (data.detail) {
+                    botContent.innerHTML = `Error: ${data.detail}`;
+                } else {
+                    botContent.innerHTML = `Result: <code>${JSON.stringify(data)}</code>`;
+                }
+
+            } catch (error) {
+                botContent.innerHTML = "⚠️ Network error. Please try again.";
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>
