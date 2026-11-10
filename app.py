@@ -67,7 +67,7 @@ from typing import Optional
 
 import numpy as np
 import torch
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from resileos.ui.shared_state import init_shared
 from resileos.ui.query_scale import with_scale
 from fastapi.security.api_key import APIKeyHeader
@@ -117,19 +117,12 @@ from resileos.titanos.zeus import (  # noqa: E402
 )
 from resileos.kin.wiring import wire_kin  # noqa: E402
 
-# ── Harness tool imports ───────────────────────────────────────────────
-from resileos.harness.tools import (  # noqa: E402
-    apollo_success,
-    budget_and_stuck_guard,
-    confidence_route,
-    decision_fanout,
-    evidence_attach,
-    evidence_attach_raw,
-    guide_load,
-    residual_consistency,
-    risk_classify,
-    verification_required,
-    verify_on_stop,
+# ── Harness tool surface ───────────────────────────────────────────────
+# ALWAYS_VISIBLE_TOOLS is the catalog. DEMIGOD_TOOLS stays off it and is
+# reached through search_tool_surface (?q=) or demigod_summon.
+from resileos.harness.surface import (  # noqa: E402
+    ALWAYS_VISIBLE_TOOLS as HARNESS_TOOLS,
+    search_tool_surface,
 )
 
 from titanos import Answer, Titanos, TitanosConfig  # noqa: E402
@@ -361,21 +354,6 @@ def _answer_backend() -> AnswerBackend:
     return _answer_backend_singleton
 
 
-HARNESS_TOOLS = {
-    "decision_fanout": decision_fanout,
-    "confidence_route": confidence_route,
-    "risk_classify": risk_classify,
-    "verification_required": verification_required,
-    "verify_on_stop": verify_on_stop,
-    "budget_and_stuck_guard": budget_and_stuck_guard,
-    "guide_load": guide_load,
-    "evidence_attach": evidence_attach,
-    "evidence_attach_raw": evidence_attach_raw,
-    "residual_consistency": residual_consistency,
-    "apollo_success": apollo_success,
-}
-
-
 def harness_tool_schemas() -> list[dict]:
     out: list[dict] = []
     for name, fn in HARNESS_TOOLS.items():
@@ -515,13 +493,17 @@ def titanos_stats():
     "/api/v1/tools",
     dependencies=[Depends(verify_api_key)],
 )
-def list_tools():
-    return {
+def list_tools(q: Optional[str] = Query(default=None)):
+    payload = {
         "tools": list_tool_schemas(),
         "openai": openai_tools(),
         "frames": frame_index(),
         "harness": harness_tool_schemas(),
     }
+    # Search is opt-in. A request with no q keeps the always-visible catalog.
+    if q is not None:
+        payload["search"] = search_tool_surface(q)
+    return payload
 
 
 @app.get("/api/v1/ready")
