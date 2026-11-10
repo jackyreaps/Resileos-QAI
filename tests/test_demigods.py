@@ -23,9 +23,12 @@ from resileos.harness.surface import (
 )
 from resileos.harness.tools import GUIDE_BODY_CAP, guide_load
 from resileos.kin.demigods import (
+    MAX_NEED_MORE_ROUNDS,
+    OUTCOME_NEED_MORE,
     DemigodError,
     DemigodHierarchyError,
     active_demigod,
+    atlas_check,
     demigod_dismiss,
     demigod_duty,
     demigod_search,
@@ -81,7 +84,7 @@ def test_summon_then_dismiss_on_control_packet():
     assert "demigod:themis" in packet.guides_loaded
     body = packet.guide_bodies["demigod:themis"]
     assert body.startswith("# Themis")
-    assert "measured justice" in body
+    assert "Hades lesson" in body
     assert len(body) <= GUIDE_BODY_CAP
     dismissed = demigod_dismiss("themis", packet)
     assert dismissed["dismissed"] is True
@@ -195,11 +198,11 @@ def test_roster_is_package_data_not_cwd():
     assert text.is_file()
     assert text.read_text(encoding="utf-8").startswith("# Themis")
     names = {item["name"] for item in list_demigods()}
-    assert names == {"themis", "momus", "hephaestus", "nike"}
+    assert names == {"themis", "momus", "hephaestus", "nike", "atlas"}
 
 
 def test_search_finds_by_description_and_rejects_blank_query():
-    found = demigod_search("justice")
+    found = demigod_search("certifies")
     assert [item["name"] for item in found["results"]] == ["themis"]
     with pytest.raises(DemigodError, match="empty demigod search"):
         demigod_search("  ")
@@ -364,31 +367,29 @@ def test_momus_rejects_a_bad_residual_hash():
 # ── Hephaestus ──────────────────────────────────────────────────────
 
 
-def test_hephaestus_passes_within_limits():
-    result = hephaestus_check(_packet(), n_facts=hopfield_cap() - 1)
+def test_hephaestus_passes_joints_without_capacity():
+    result = hephaestus_check(_packet())
     assert result.verified is True
     assert result.success is True
     checks = {item["check"] for item in result.evidence}
-    assert {"residual_consistency", "scars", "budget", "capacity"} <= checks
+    assert {"residual_consistency", "scars", "budget"} <= checks
+    assert "capacity" not in checks
+    assert "hopfield" not in checks
 
 
-def test_hephaestus_fails_scar_budget_capacity_and_hermes():
-    scarred = hephaestus_check(_packet(scars=["uncleaned"]), n_facts=1)
+def test_hephaestus_fails_scar_budget_and_hermes():
+    scarred = hephaestus_check(_packet(scars=["uncleaned"]))
     assert scarred.verified is False
     assert "scar" in scarred.reason
 
     broke = _packet()
     broke.budget_remaining = {"steps": 0, "cost": 1.0, "tokens": 10}
-    budget = hephaestus_check(broke, n_facts=1)
+    budget = hephaestus_check(broke)
     assert budget.verified is False
     assert "budget" in budget.reason
 
-    over = hephaestus_check(_packet(), n_facts=hopfield_cap())
-    assert over.verified is False
-    assert "cap" in over.reason
-
     hermes = HermesBudget(max_items=1, used=4)
-    over_hermes = hephaestus_check(_packet(), n_facts=1, hermes_budget=hermes)
+    over_hermes = hephaestus_check(_packet(), hermes_budget=hermes)
     assert over_hermes.verified is False
     assert "hermes" in over_hermes.reason
 
@@ -396,9 +397,56 @@ def test_hephaestus_fails_scar_budget_capacity_and_hermes():
     bad_hash.evidence = [
         {"source": "residual_core", "result": {"packet_hash": None}},
     ]
-    inconsistent = hephaestus_check(bad_hash, n_facts=1)
+    inconsistent = hephaestus_check(bad_hash)
     assert inconsistent.verified is False
     assert inconsistent.evidence[0]["result"]["consistent"] is False
+
+
+def test_atlas_capacity_uses_real_limits():
+    under = atlas_check(_packet(), n_facts=hopfield_cap() - 1, dim=64, n_layers=3)
+    assert under.verified is True
+    names = {item["check"] for item in under.evidence}
+    assert "hopfield" in names
+    assert "mask_stack" in names
+
+    over = atlas_check(_packet(), n_facts=hopfield_cap())
+    assert over.verified is False
+    assert over.success is False
+    assert "cap" in over.reason
+
+    mask = atlas_check(_packet(), dim=64, n_layers=11)
+    assert mask.verified is False
+    assert any(
+        item["check"] == "mask_stack" and item["ok"] is False
+        for item in mask.evidence
+    )
+
+    level = atlas_check(_packet(), dim=64, tower_level=20)
+    assert level.verified is False
+    assert "max_usable_level" in level.reason
+
+    prim = atlas_check(_packet(), dim=64, primorial_k=4)
+    assert prim.verified is False
+    assert "n_usable_primorials" in prim.reason
+
+    encoder = atlas_check(_packet(), dim=256, encoder_load=10_000)
+    assert encoder.verified is False
+    assert "default_capacity" in encoder.reason
+
+    quiet = atlas_check(_packet())
+    assert quiet.verified is True
+    hop = next(item for item in quiet.evidence if item["check"] == "hopfield")
+    assert hop["declared"] is False
+
+
+def test_atlas_does_not_keep_the_residual_core():
+    class Core:
+        packet_hash = HASH
+        secret = "atlas-must-not-keep"
+
+    result = atlas_check(_packet(), n_facts=1, residual_packet=Core())
+    assert result.verified is True
+    assert "atlas-must-not-keep" not in json.dumps(result.to_dict())
 
 
 # ── Nike ────────────────────────────────────────────────────────────
@@ -456,6 +504,17 @@ def test_nike_field_needs_residual_or_apollo_backing():
 # ── hierarchy ───────────────────────────────────────────────────────
 
 
+def test_atlas_cannot_learn_or_summon():
+    packet = ControlPacket(id="p")
+    with demigod_duty("atlas"):
+        with pytest.raises(DemigodHierarchyError, match="cannot call learn"):
+            refuse_learn("A", "r", "b")
+        with pytest.raises(DemigodHierarchyError, match="cannot summon"):
+            demigod_summon("hephaestus", packet)
+    assert packet.guides_loaded == []
+    assert active_demigod() is None
+
+
 def test_demigod_cannot_call_learn():
     with demigod_duty("nike"):
         with pytest.raises(DemigodHierarchyError, match="cannot call learn"):
@@ -472,6 +531,145 @@ def test_demigod_cannot_own_the_residual_core():
         refuse_residual_ownership(Core())
     with pytest.raises(DemigodHierarchyError, match="cannot own the residual core"):
         momus_review({"status": "ok"}, None, HASH, residual_packet=Core())
+
+
+def test_guides_stay_under_the_hygiene_cap():
+    """Persona cards are rule text, well under the injection cap."""
+    hygiene = 1200
+    assert hygiene < GUIDE_BODY_CAP
+    root = files("resileos.kin.demigods").joinpath("guides")
+    for item in list_demigods():
+        text = root.joinpath(f"{item['name']}.md").read_text(encoding="utf-8")
+        assert len(text) <= hygiene
+        assert len(text) < GUIDE_BODY_CAP
+        assert "## Check" in text
+        assert "## Evidence" in text
+
+
+def test_momus_need_more_is_not_approval():
+    spec = {"requirements": [{"location": "status", "equals": "ok"}]}
+    missing_hash = momus_review({"status": "ok"}, spec, None)
+    assert missing_hash.verified is False
+    assert missing_hash.success is False
+    assert missing_hash.outcome == OUTCOME_NEED_MORE
+    assert any(item.code == "missing_residual_hash" for item in missing_hash.need_more)
+
+    missing_field = momus_review({}, spec, HASH)
+    assert missing_field.verified is False
+    assert missing_field.outcome == OUTCOME_NEED_MORE
+    assert missing_field.need_more[0].code == "missing_spec_field"
+    assert missing_field.need_more[0].location == "status"
+
+    bare = momus_review("wing", None, None)
+    assert bare.outcome == OUTCOME_NEED_MORE
+    assert bare.verified is False
+    assert any(item.code == "missing_requirement" for item in bare.need_more)
+
+    # A wrong present value is a fail, not a request for more fields.
+    wrong = momus_review({"status": "bad"}, spec, HASH)
+    assert wrong.outcome == "fail"
+    assert wrong.verified is False
+    assert wrong.need_more == ()
+
+
+def test_need_more_round_fills_only_requested_fields(tmp_path):
+    hades = Hades(store_dir=tmp_path / "hades")
+    learned: list = []
+    seen: list = []
+
+    def maker(task, control):
+        control.verified = True
+        control.evidence = [{"source": "probe", "result": {"matched": 1}}]
+        control.append({"event": "note", "author_notes": "SECRET-HISTORY"})
+        return {"claims": [("Zeus", "domain", "sky")]}
+
+    def supplement(request):
+        seen.append(request)
+        return {
+            "status": "ok",
+            "history": [{"note": "SECRET-HISTORY"}],
+            "author_notes": "SECRET-HISTORY",
+            "extra": "not-requested",
+            "residual_hash": HASH,
+        }
+
+    spec = {"requirements": [{"location": "status", "equals": "ok"}]}
+    out = maker_blind_verifier_cycle(
+        "make it",
+        maker,
+        residual_packet=None,
+        hades=hades,
+        spec=spec,
+        learn_fn=lambda s, r, o: learned.append((s, r, o)),
+        supplement_fn=supplement,
+    )
+    assert out["need_more_rounds"] == 1
+    assert len(seen) == 1
+    blob = json.dumps(seen[0])
+    assert "SECRET-HISTORY" not in blob
+    assert seen[0]["need_more"][0]["code"] == "missing_spec_field"
+    assert "history" not in out["artefact"]
+    assert "author_notes" not in out["artefact"]
+    assert "extra" not in out["artefact"]
+    assert out["artefact"]["status"] == "ok"
+    assert out["findings"]["verified"] is True
+    assert out["findings"]["outcome"] == "approved"
+    assert learned == [("Zeus", "domain", "sky")]
+    assert out["head"]["applied"] is True
+
+
+def test_need_more_without_supplement_does_not_learn():
+    learned: list = []
+
+    def maker(task, control):
+        control.verified = False
+        return {}
+
+    spec = {"requirements": [{"location": "status", "equals": "ok"}]}
+    out = maker_blind_verifier_cycle(
+        "make it",
+        maker,
+        spec=spec,
+        learn_fn=lambda s, r, o: learned.append((s, r, o)),
+        residual_packet=type("Residual", (), {"packet_hash": HASH})(),
+    )
+    assert out["outcome"] == OUTCOME_NEED_MORE
+    assert out["findings"]["verified"] is False
+    assert out["need_more_rounds"] == 0
+    assert out["head"]["applied"] is False
+    assert learned == []
+
+
+def test_need_more_round_cap_is_enforced():
+    def maker(task, control):
+        return {}
+
+    with pytest.raises(DemigodError, match="capped"):
+        maker_blind_verifier_cycle(
+            "make it",
+            maker,
+            spec={"requirements": [{"location": "status", "equals": "ok"}]},
+            max_rounds=MAX_NEED_MORE_ROUNDS + 1,
+        )
+
+    calls = {"n": 0}
+
+    def supplement(_request):
+        calls["n"] += 1
+        return {}
+
+    out = maker_blind_verifier_cycle(
+        "make it",
+        maker,
+        spec={"requirements": [{"location": "status", "equals": "ok"}]},
+        residual_packet=type("Residual", (), {"packet_hash": HASH})(),
+        supplement_fn=supplement,
+        max_rounds=1,
+    )
+    assert calls["n"] == 1
+    assert out["need_more_rounds"] == 1
+    assert out["findings"]["verified"] is False
+    assert out["outcome"] == OUTCOME_NEED_MORE
 
 
 def test_demigod_cannot_summon_another():

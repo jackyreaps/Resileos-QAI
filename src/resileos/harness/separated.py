@@ -437,6 +437,8 @@ def maker_blind_verifier_cycle(
     *,
     spec: Any = None,
     learn_fn: Callable[[str, str, str], None] | None = None,
+    supplement_fn: Callable[[dict[str, Any]], Any] | None = None,
+    max_rounds: int = 1,
 ) -> dict[str, Any]:
     """Maker produces an artefact. Momus reviews it blind. Zeus learns.
 
@@ -444,12 +446,30 @@ def maker_blind_verifier_cycle(
     is verified, the Hades lesson. ``control.verified is False`` skips
     the checkpoint and leaves the lesson unset. Momus receives the
     artefact, the spec (or the task text), and the residual hash. It does
-    not receive control history or author notes. ``learn_fn`` runs only
-    when Zeus applies an approved verdict.
+    not receive control history or author notes.
+
+    A ``need_more`` result is not approval. The cycle may ask the maker,
+    once, for only the listed fields. ``max_rounds`` cannot exceed
+    ``MAX_NEED_MORE_ROUNDS``. ``learn_fn`` runs only when the final Momus
+    outcome is ``approved`` and Zeus applies that verdict.
     """
-    from resileos.kin.demigods.checks import momus_review
-    from resileos.kin.demigods.hierarchy import durable_cross_attempt
+    from resileos.kin.demigods.checks import (
+        MAX_NEED_MORE_ROUNDS,
+        OUTCOME_APPROVED,
+        apply_blind_supplement,
+        momus_review,
+    )
+    from resileos.kin.demigods.hierarchy import DemigodError, durable_cross_attempt
     from resileos.kin.demigods.router import demigod_dismiss, demigod_summon
+
+    if not isinstance(max_rounds, int) or isinstance(max_rounds, bool):
+        raise DemigodError(
+            f"need_more rounds are capped at {MAX_NEED_MORE_ROUNDS}"
+        )
+    if max_rounds < 0 or max_rounds > MAX_NEED_MORE_ROUNDS:
+        raise DemigodError(
+            f"need_more rounds are capped at {MAX_NEED_MORE_ROUNDS}"
+        )
 
     control = ControlPacket(id="maker")
     artefact = maker_fn(task, control)
@@ -481,28 +501,53 @@ def maker_blind_verifier_cycle(
         }
     )
     summoned = demigod_summon("momus", review_packet)
-    captured: dict[str, Any] = {}
-
-    def _review(proposal: Proposal) -> Verdict:
+    rounds = 0
+    try:
         result = momus_review(artefact, review_spec, residual_hash)
-        captured["result"] = result
-        return Verdict(
-            proposal.id,
-            "momus",
-            bool(result.verified),
-            result.reason,
-            evidence=list(result.evidence),
+        while (
+            result.outcome == "need_more"
+            and rounds < max_rounds
+            and supplement_fn is not None
+        ):
+            # The request is the code list only. No packet history.
+            request = {
+                "round": rounds + 1,
+                "need_more": [item.to_dict() for item in result.need_more],
+            }
+            supplied = supplement_fn(request)
+            artefact, review_spec, residual_hash = apply_blind_supplement(
+                artefact,
+                review_spec,
+                residual_hash,
+                result.need_more,
+                supplied,
+            )
+            rounds += 1
+            result = momus_review(artefact, review_spec, residual_hash)
+
+        approved = (
+            result.outcome == OUTCOME_APPROVED
+            and bool(result.verified)
+            and not result.need_more
         )
 
-    proposal = Proposal(
-        id=control.id,
-        writer="maker",
-        action_type="maker_blind",
-        result=artefact if isinstance(artefact, dict) else {"artefact": artefact},
-        claims=_claims_from_artefact(artefact),
-        packet=control,
-    )
-    try:
+        def _review(proposal: Proposal) -> Verdict:
+            return Verdict(
+                proposal.id,
+                "momus",
+                approved,
+                result.reason,
+                evidence=list(result.evidence),
+            )
+
+        proposal = Proposal(
+            id=control.id,
+            writer="maker",
+            action_type="maker_blind",
+            result=artefact if isinstance(artefact, dict) else {"artefact": artefact},
+            claims=_claims_from_artefact(artefact),
+            packet=control,
+        )
         head = zeus_head(
             proposal,
             [("momus", _review)],
@@ -511,18 +556,7 @@ def maker_blind_verifier_cycle(
     finally:
         demigod_dismiss("momus", review_packet)
 
-    reviewed = captured.get("result")
-    if reviewed is None:
-        findings = {
-            "demigod": "momus",
-            "verified": False,
-            "success": False,
-            "reason": "review did not run",
-            "evidence": [],
-            "defects": [],
-        }
-    else:
-        findings = reviewed.to_dict()
+    findings = result.to_dict()
     durable = durable_cross_attempt(
         {"lesson": lesson, "residual_packet_hash": residual_hash}
     )
@@ -532,6 +566,9 @@ def maker_blind_verifier_cycle(
         "lesson_skipped": lesson_skipped,
         "residual_hash": residual_hash,
         "findings": findings,
+        "outcome": result.outcome,
+        "need_more": [item.to_dict() for item in result.need_more],
+        "need_more_rounds": rounds,
         "durable": durable,
         "guide_chars": int(summoned.get("body_chars") or 0),
         "review_guides": list(review_packet.guides_loaded),
