@@ -20,7 +20,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.3s; }
 
-        /* Header */
         .header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel); z-index: 10; }
         .header-title { font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--text); letter-spacing: -0.3px; }
         .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; transition: background 0.3s; }
@@ -31,7 +30,6 @@
         .btn-icon { background: none; border: none; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .btn-icon:hover { background: var(--bg); color: var(--text); }
 
-        /* Chat Area */
         #chat { flex: 1; overflow-y: auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; scroll-behavior: smooth; }
         .msg-row { display: flex; gap: 14px; max-width: 800px; margin: 0 auto; width: 100%; }
         .msg-row.user { justify-content: flex-end; }
@@ -48,7 +46,6 @@
         
         .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; font-family: ui-monospace, monospace; border-top: 1px solid var(--border); padding-top: 6px; }
 
-        /* Panels */
         .panel { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 20px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px; }
         .panel.open { display: flex; }
         .tool-chip { background: var(--bg); border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text); transition: all 0.2s; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; }
@@ -58,7 +55,6 @@
         .group-row { width: 100%; margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
         .group-label { font-weight: 600; color: var(--muted); width: 60px; }
 
-        /* Input Area */
         .input-wrap { padding: 16px; background: var(--bg); display: flex; justify-content: center; }
         .input-box { width: 100%; max-width: 768px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: flex-end; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
         .input-box:focus-within { border-color: var(--accent); }
@@ -67,7 +63,6 @@
         button.send:hover { background: var(--accent-hover); }
         button.send:disabled { background: #999; }
 
-        /* Suggestions */
         .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; max-width: 600px; margin-left: auto; margin-right: auto;}
         .suggestion { background: var(--panel); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; color: var(--muted); }
         .suggestion:hover { border-color: var(--accent); color: var(--accent); }
@@ -124,7 +119,7 @@
         <div class="suggestions">
             <div class="suggestion" onclick="quickAsk('remember alice works_at acme')">Teach fact</div>
             <div class="suggestion" onclick="quickAsk('alice works_at')">Query fact</div>
-            <div class="suggestion" onclick="quickAsk('who is zeus')">Test abstention</div>
+            <div class="suggestion" onclick="quickAsk('Who won the Super Bowl in 2024?')">Test web search</div>
             <div class="suggestion" onclick="runKinCycle()">Run Kin cycle</div>
             <div class="suggestion" onclick="quickAsk('/tool residual_consistency')">Residual check</div>
         </div>
@@ -132,7 +127,7 @@
 
     <div class="input-wrap">
         <div class="input-box">
-            <input type="text" id="input" placeholder="remember s r o  |  s r  |  question  |  /tool name" onkeypress="handleEnter(event)">
+            <input type="text" id="input" placeholder="Ask anything..." onkeypress="handleEnter(event)">
             <button class="send" id="send" onclick="sendMsg()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
             </button>
@@ -161,7 +156,6 @@
             else throw new Error();
         }).catch(() => statusDot.classList.add('offline'));
 
-        // ── Tools & Kin Panels ──
         async function loadTools() {
             try {
                 const r = await fetch(`${API_URL}/tools`, { headers: { 'X-API-Key': API_KEY } });
@@ -184,9 +178,7 @@
                         <div class="group-row">
                             <span class="group-label">${kin}:</span>
                             ${arr.map(t => `
-                                <span class="tool-chip ${t.legion ? 'legion' : ''}" 
-                                      onclick="runTool('${t.name}')" 
-                                      title="${t.legion ? 'Legion under ' + kin : 'Tool'}">
+                                <span class="tool-chip ${t.legion ? 'legion' : ''}" onclick="runTool('${t.name}')">
                                     ${t.name}${t.legion ? ' ✦' : ''}
                                 </span>
                             `).join('')}
@@ -217,7 +209,6 @@
             toolsPanel.classList.remove('open');
         }
 
-        // ── Actions ──
         function quickAsk(text) { input.value = text; sendMsg(); }
         function handleEnter(e) { if (e.key === 'Enter') sendMsg(); }
 
@@ -255,20 +246,10 @@
                 });
                 const d = await r.json();
                 if (!r.ok) throw new Error(d.detail || "failed");
-                
                 const h = d.harness || {};
                 const verified = h.verified ?? d.verified ?? "n/a";
                 const lesson = h.lesson || d.lesson || "—";
-                const checkpoint = h.checkpoint || d.checkpoint;
-                const residual = d.residual_hash || h.residual_hash;
-                
                 bubble.innerHTML = `Kin cycle complete.<br>Verified: <strong>${verified}</strong><br>Lesson: ${lesson}`;
-                
-                if (h.risk_class || h.confidence || h.budget_remaining) {
-                    bubble.innerHTML += `<div class="meta">risk: ${h.risk_class || "—"} · confidence: ${h.confidence ?? "—"} · budget: ${h.budget_remaining ?? "—"}</div>`;
-                } else if (checkpoint || residual) {
-                    bubble.innerHTML += `<div class="meta">${checkpoint ? "hades: " + checkpoint : "residual: " + (residual || "").slice(0,12) + "…"}</div>`;
-                }
             } catch (e) { 
                 bubble.innerHTML = `Kin cycle error: ${e.message}`; 
             }
@@ -281,16 +262,9 @@
                 const r = await fetch(`${API_URL}/kin/hades/list`, { headers: { 'X-API-Key': API_KEY } });
                 const d = await r.json();
                 const cps = d.checkpoints || d || [];
-                if (!cps.length) {
-                    bubble.innerHTML = "No checkpoints.";
-                    return;
-                }
+                if (!cps.length) { bubble.innerHTML = "No checkpoints."; return; }
                 bubble.innerHTML = cps.map(cp => 
-                    `<div style="margin:6px 0">
-                        <code>${cp.id || cp.name || 'unnamed'}</code>
-                        <button class="tool-chip" style="margin-left:8px" 
-                                onclick="restoreCheckpoint('${cp.id || cp.name}')">Restore fresh</button>
-                    </div>`
+                    `<div style="margin:6px 0"><code>${cp.id || cp.name}</code> <button class="tool-chip" style="margin-left:8px" onclick="restoreCheckpoint('${cp.id || cp.name}')">Restore fresh</button></div>`
                 ).join('');
             } catch (e) {
                 bubble.innerHTML = "No checkpoints endpoint or empty.";
@@ -298,7 +272,7 @@
         }
 
         async function restoreCheckpoint(id) {
-            addMsg(`Restoring from Hades checkpoint ${id} (fresh context)…`, 'user');
+            addMsg(`Restoring checkpoint ${id}…`, 'user');
             const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
             try {
                 const r = await fetch(`${API_URL}/kin/hades/restore`, {
@@ -307,17 +281,13 @@
                     body: JSON.stringify({ checkpoint_id: id, fresh: true })
                 });
                 const d = await r.json();
-                bubble.innerHTML = r.ok 
-                    ? `Restored. Lesson: ${d.lesson || '—'}<br>Residual: ${(d.residual_hash || '').slice(0,12)}…`
-                    : `Restore failed: ${d.detail || 'unknown'}`;
+                bubble.innerHTML = r.ok ? `Restored. Lesson: ${d.lesson || '—'}` : `Restore failed.`;
             } catch (e) {
                 bubble.innerHTML = "Restore failed.";
             }
         }
 
-        async function runResidualCheck() {
-            return runTool("residual_consistency");
-        }
+        async function runResidualCheck() { return runTool("residual_consistency"); }
 
         async function runTool(name) {
             addMsg(`Calling tool ${name}…`, 'user');
@@ -351,35 +321,25 @@
                     return;
                 }
 
-                let endpoint = '/answer';
-                let body = { question: text };
-
-                if (text.toLowerCase().startsWith('remember ')) {
-                    const parts = text.substring(9).trim().split(/\s+/);
-                    if (parts.length >= 3) {
-                        endpoint = '/learn';
-                        body = { subject: parts[0], relation: parts[1], obj: parts.slice(2).join(' ') };
-                    }
-                } else {
-                    const parts = text.split(/\s+/);
-                    if (parts.length === 2) {
-                        endpoint = '/query';
-                        body = { subject: parts[0], relation: parts[1] };
-                    }
-                }
-
-                const r = await fetch(`${API_URL}${endpoint}`, {
+                // Call the NEW autonomous agent loop
+                const r = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify({ message: text, history: [] })
                 });
                 const d = await r.json();
 
-                if (!r.ok) bubble.innerHTML = `⚠️ ${d.detail || 'Error'}`;
-                else if (endpoint === '/learn') bubble.innerHTML = `Learned <strong>${body.subject} ${body.relation} ${body.obj}</strong>`;
-                else if (d.status === 'ACCEPTED' || d.status === 'ANSWERED' || d.value || d.answer_text) {
-                    bubble.innerHTML = `<strong>${d.value || d.answer_text}</strong>`;
-                } else bubble.innerHTML = "Abstained. No matching residual fact.";
+                if (!r.ok) {
+                    bubble.innerHTML = `⚠️ ${d.detail || 'Error'}`;
+                } else if (d.status === 'ANSWERED') {
+                    let html = `<strong>${d.value}</strong>`;
+                    if (d.tool_calls && d.tool_calls.length > 0) {
+                        html += `<div class="meta">Source: ${d.source} · Verified: ${d.verified}</div>`;
+                    }
+                    bubble.innerHTML = html;
+                } else {
+                    bubble.innerHTML = "Abstained. No matching residual fact or search result.";
+                }
             } catch (e) {
                 bubble.innerHTML = '⚠️ Network error. Check CORS.';
             } finally {
