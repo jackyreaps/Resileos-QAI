@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -132,12 +133,14 @@ def git_diff() -> dict[str, Any]:
 
 
 def git_commit(message: str) -> dict[str, Any]:
-    if not message.strip():
+    if not str(message).strip():
         return {"ok": False, "error": "empty message"}
-    add = run_shell("git add -A")
+    if "\n" in message or "\x00" in message:
+        return {"ok": False, "error": "invalid message"}
+    add = _run_argv(["git", "add", "-A"])
     if not add.get("ok"):
         return add
-    return run_shell(f'git commit -m "{message}"')
+    return _run_argv(["git", "commit", "-m", message])
 
 
 def guild_board(guild_id: str, title: str, body: str = "") -> dict[str, Any]:
@@ -214,7 +217,7 @@ def run_next() -> dict[str, Any]:
     if kind == "worker":
         result = run_worker(payload.get("code", ""))
     elif kind == "learn":
-        result = {"ok": True, "facts": payload.get("facts", []), "note": "queued for hub learn"}
+        result = learn_into_hub(payload.get("facts", []))
     else:
         result = {"ok": False, "error": f"unknown kind {kind}"}
     board.complete(task["id"], result)
@@ -229,39 +232,112 @@ def advance(steps: int = 3) -> list[dict[str, Any]]:
             break
         out.append(run_next())
     return out
-    """Take the next queued task and run it."""
-    open_tasks = board.open()
-    if not open_tasks:
-        return {"ok": False, "note": "no open tasks"}
-    task = open_tasks[0]
-    kind = task.get("kind")
-    payload = task.get("payload", {})
-    if kind == "worker":
-        result = run_worker(payload.get("code", ""))
-    elif kind == "learn":
-        result = {"ok": True, "facts": payload.get("facts", []), "note": "queued for hub learn"}
-    else:
-        result = {"ok": False, "error": f"unknown kind {kind}"}
-    board.complete(task["id"], result)
-    return {"task": task["id"], "result": result}
 
 
-def run_shell(cmd: str, timeout: int = 60) -> dict[str, Any]:
-    """Scoped shell in the workspace. No cd outside. Timeout enforced."""
-    if any(x in cmd for x in ("..", "sudo", "rm -rf /", "shutdown")):
-        return {"ok": False, "error": "command blocked"}
+_GIT_ALLOWED = {
+    "status": lambda args: args in ([], ["--short"]),
+    "diff": lambda args: args == [],
+    "log": lambda args: args == [] or args == ["--oneline"],
+    "add": lambda args: args == ["-A"],
+    "commit": lambda args: len(args) == 2 and args[0] == "-m",
+}
+
+
+def _argv_from(cmd: str | list | tuple) -> list[str]:
+    if isinstance(cmd, (list, tuple)):
+        return [str(part) for part in cmd]
+    return shlex.split(str(cmd), posix=True)
+
+
+def _argv_allowed(argv: list[str]) -> str | None:
+    """Allowlisted git invocations. No shell."""
+    if not argv:
+        return "empty command"
+    if Path(argv[0]).name != "git":
+        return "command not allowed"
+    if len(argv) < 2 or argv[1] not in _GIT_ALLOWED:
+        return "git subcommand not allowed"
+    if not _GIT_ALLOWED[argv[1]](argv[2:]):
+        return "git arguments not allowed"
+    return None
+
+
+def _run_argv(argv: list[str], timeout: int = 60) -> dict[str, Any]:
+    reason = _argv_allowed(argv)
+    if reason:
+        return {"ok": False, "error": reason}
     try:
         proc = subprocess.run(
-            cmd,
-            shell=True,
+            argv,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,
             cwd=str(WORKSPACE),
         )
-        return {"ok": proc.returncode == 0, "code": proc.returncode, "out": proc.stdout[-800:], "err": proc.stderr[-400:]}
+        return {
+            "ok": proc.returncode == 0,
+            "code": proc.returncode,
+            "out": proc.stdout[-800:],
+            "err": proc.stderr[-400:],
+        }
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+def run_shell(cmd: str | list | tuple, timeout: int = 60) -> dict[str, Any]:
+    """Run an allowlisted argv in the workspace. Never uses a shell."""
+    try:
+        argv = _argv_from(cmd)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return _run_argv(argv, timeout=timeout)
+
+
+_HUB = None
+
+
+def hub_workbench():
+    """Small in-process hub. Not the live API store."""
+    global _HUB
+    if _HUB is None:
+        from resileos.answer.workbench import Workbench
+        from titanos import Titanos, TitanosConfig
+        titan = Titanos(TitanosConfig(
+            dim=256, m=16, n=16, r=4, n_loops=2, seed=0, use_attractor=False,
+        ))
+        _HUB = Workbench(titan=titan)
+    return _HUB
+
+
+def _hub_triples(facts: list) -> list[tuple[str, str, str]]:
+    rows = []
+    for fact in facts or []:
+        if isinstance(fact, dict):
+            subject = fact.get("subject")
+            relation = fact.get("relation")
+            obj = fact.get("obj", fact.get("object"))
+        else:
+            subject, relation, obj = fact
+        subject, relation, obj = str(subject), str(relation), str(obj)
+        if not subject.startswith(("user:", "world:", "org:")):
+            subject = f"world:{subject}"
+        rows.append((subject, relation, obj))
+    return rows
+
+
+def learn_into_hub(facts: list) -> dict[str, Any]:
+    """Write queued facts into the hub workbench."""
+    from resileos.answer.hub_train import train_hub
+    triples = _hub_triples(facts)
+    if not triples:
+        return {"ok": True, "learned": 0, "subjects": []}
+    try:
+        n = train_hub(hub_workbench(), triples, require_hub_prefix=True)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "learned": 0}
+    subjects = sorted({s for s, _, _ in triples})
+    return {"ok": True, "learned": n, "subjects": subjects}
 
 
 def diagnostics(rel: str) -> dict[str, Any]:

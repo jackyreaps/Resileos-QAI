@@ -633,6 +633,22 @@ class Titanos:
             self._csi.update(v, e_int)
             prev = (h["scar_energy"], h["delta"])
 
+    def _value_consistent_with_store(
+        self, anchor: str, relation: str, inverse: bool, proposed,
+    ):
+        """A value ask_list would return for this query, or None.
+
+        Empty fact list -> abstain. One stored object -> that object,
+        even when cleanup proposed a neighbor. Several stored objects
+        -> the proposal only when it is one of them.
+        """
+        stored = self.ask_list(anchor, relation, inverse=inverse)
+        if proposed in stored:
+            return proposed
+        if len(stored) == 1:
+            return stored[0]
+        return None
+
     # ── single query ─────────────────────────────────────────────────
     def _ask(self, subject: str, relation: str, inverse: bool,
              conf_mode_override: str | None = None) -> Answer:
@@ -676,10 +692,13 @@ class Titanos:
                 and fast_conf_gated >= classical_thresh
                 and fast_conf_blend >= self.cfg.csi_fast_threshold
                 and current_csi >= self.cfg.csi_health_threshold):
-            self._fast_path_count += 1
-            path = ([(fast_best, relation, subject)] if inverse
-                    else [(subject, relation, fast_best)])
-            return Answer(fast_best, fast_conf_gated, "ACCEPTED", "FAST",
+            aligned = self._value_consistent_with_store(
+                subject, relation, inverse, fast_best)
+            if aligned is not None:
+                self._fast_path_count += 1
+                path = ([(aligned, relation, subject)] if inverse
+                        else [(subject, relation, aligned)])
+                return Answer(aligned, fast_conf_gated, "ACCEPTED", "FAST",
                           0, path=path,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -792,9 +811,27 @@ class Titanos:
                           reason=f"post-quantum gated conf {conf:.4f} "
                                  f"< {abstain_thresh:.4f}")
 
-        path = ([(best, relation, subject)] if inverse
-                else [(subject, relation, best)])
-        return Answer(best, conf, "ACCEPTED", mode, len(history),
+        aligned = self._value_consistent_with_store(
+            subject, relation, inverse, best)
+        if aligned is None:
+            return Answer(None, conf, "ABSTAINED", "ABSTAIN", len(history),
+                          loop_history=history, gate_state=gate_state,
+                          noise_sigma=sigma_eff,
+                          noise_sigma_base=sigma_base,
+                          anisotropy=anisotropy,
+                          band_count=self._counts.get(relation, 0),
+                          emergent=self.cfg.emergent,
+                          csi=updated_csi,
+                          fast_confidence=fast_conf_blend,
+                          fast_path_used=False, escalated=True,
+                          order_parameter=R,
+                          raw_confidence=raw_conf,
+                          order_parameter_scale=scale,
+                          recovery_loss=rec_loss,
+                          reason="not a stored fact")
+        path = ([(aligned, relation, subject)] if inverse
+                else [(subject, relation, aligned)])
+        return Answer(aligned, conf, "ACCEPTED", mode, len(history),
                       path=path, loop_history=history, gate_state=gate_state,
                       noise_sigma=sigma_eff, noise_sigma_base=sigma_base,
                       anisotropy=anisotropy,

@@ -22,10 +22,20 @@ def test_ready_endpoint_returns_ok(client):
     assert isinstance(body["facts"], int)
 
 
+def _expected_closed_status() -> int:
+    """503 when nothing is configured. 401 when keys exist and the header is absent."""
+    from app import _AUTH_BYPASS, _configured_key_count
+    if _AUTH_BYPASS:
+        return 200
+    if _configured_key_count() == 0:
+        return 503
+    return 401
+
+
 def test_sparql_endpoint_returns_rows(client):
     """Single-hop SPARQL against a known fact.
 
-    Without a key the middleware returns 503. That is the fail-closed path.
+    No keys configured -> 503. Keys configured and no header -> 401.
     """
     r_learn = client.post(
         "/api/v1/learn",
@@ -33,7 +43,7 @@ def test_sparql_endpoint_returns_rows(client):
         headers=_auth_headers(),
     )
     if not _auth_headers():
-        assert r_learn.status_code == 503
+        assert r_learn.status_code == _expected_closed_status()
         return
     assert r_learn.status_code in (200, 201)
 
@@ -49,13 +59,30 @@ def test_sparql_endpoint_returns_rows(client):
 
 
 def test_sparql_endpoint_rejects_syntax_error(client):
-    """Malformed query returns 400 when auth is present, else 503."""
+    """Malformed query returns 400 when auth is present.
+
+    With no header: 503 if no keys are configured, 401 if keys are.
+    """
     r = client.post(
         "/api/v1/sparql",
         json={"query": "not a valid query"},
         headers=_auth_headers(),
     )
     if not _auth_headers():
-        assert r.status_code == 503
+        assert r.status_code == _expected_closed_status()
     else:
         assert r.status_code == 400
+
+
+def test_sparql_missing_header_is_401_when_keys_configured(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "_AUTH_BYPASS", False)
+    monkeypatch.setenv(
+        "RESILEOS_API_KEYS",
+        '{"audit-key":{"name":"audit","tier":"free","quota":10}}',
+    )
+    r = client.post(
+        "/api/v1/sparql",
+        json={"query": "SELECT ?o WHERE alice --knows--> ?o"},
+    )
+    assert r.status_code == 401

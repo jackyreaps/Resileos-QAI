@@ -10,7 +10,7 @@ It is the metric for recognition and governance. It is not spent.
 | Lives on | `guild:<id>` relation `merit` |
 | Transferable | No |
 | Purchasable | No |
-| Signed | By the guild process |
+| Signed | Not in this repository. `record_merit` emits an unsigned candidate. |
 
 ## Credit
 

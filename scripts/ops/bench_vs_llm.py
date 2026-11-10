@@ -42,16 +42,28 @@ UNKNOWN = [
 ]
 
 
-def run_store_bench(learn_fn, query_fn) -> dict:
+def median(values: list[float]) -> float:
+    """Midpoint of the sorted sample. Even counts average the two middle values."""
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return float(ordered[mid])
+    return float(ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def run_store_bench(learn_fn, query_fn, *, backend: str) -> dict:
     for s, r, o in KNOWN:
         learn_fn(s, r, o)
-    t0 = time.perf_counter()
     hits = 0
+    latencies = []
     for s, r, o in KNOWN:
+        t0 = time.perf_counter()
         v = query_fn(s, r)
+        latencies.append((time.perf_counter() - t0) * 1000)
         if str(v) == o:
             hits += 1
-    known_ms = (time.perf_counter() - t0) * 1000
     invent = 0
     for s, r, _ in UNKNOWN:
         v = query_fn(s, r)
@@ -60,8 +72,9 @@ def run_store_bench(learn_fn, query_fn) -> dict:
     return {
         "exact_match_rate": hits / len(KNOWN),
         "invent_rate": invent / len(UNKNOWN),
-        "p50_latency_ms_known_batch": known_ms / max(len(KNOWN), 1),
-        "backend": "titanos_or_stub",
+        "p50_latency_ms_known": median(latencies),
+        "mean_latency_ms_known": sum(latencies) / max(len(latencies), 1),
+        "backend": backend,
     }
 
 
@@ -70,6 +83,7 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=Path("artifacts/report_memory_vs_llm.json"))
     args = ap.parse_args()
     store: dict[tuple[str, str], str] = {}
+    backend = "dict_stub"
 
     def learn(s, r, o):
         store[(s, r)] = o
@@ -82,16 +96,19 @@ def main() -> int:
         from titanos import Titanos, TitanosConfig  # type: ignore
 
         t = Titanos(TitanosConfig())
+
         def learn(s, r, o):
             t.learn(s, r, o)
 
         def query(s, r):
             ans = t.ask(s, r)
             return getattr(ans, "value", ans)
+
+        backend = "titanos"
     except Exception as exc:
         print(f"bench: Titanos unavailable ({exc}); using dict stub")
 
-    resileos = run_store_bench(learn, query)
+    resileos = run_store_bench(learn, query, backend=backend)
     llm = {
         "exact_match_rate": None,
         "invent_rate": None,

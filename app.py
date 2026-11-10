@@ -410,6 +410,8 @@ class QueryRequest(BaseModel):
     relation: str
     inverse: bool = False
     render: bool = False
+    member: str | None = None
+    used_free: int = 0
 
 
 class SparqlRequest(BaseModel):
@@ -763,11 +765,11 @@ def titanos_query(payload: QueryRequest):
     """
     try:
         from resileos.ui.use_gate import allow_use
-        member = getattr(payload, "member", None) or "anon"
-        used = int(getattr(payload, "used_free", 0) or 0)
-        decision = allow_use(member, units=1, used_free=used, what="query")
+        member = payload.member or "anon"
+        decision = allow_use(
+            member, units=1, used_free=payload.used_free, what="query",
+        )
         if not decision.get("ok"):
-            from fastapi import HTTPException
             raise HTTPException(status_code=402, detail="credit required")
 
         # Sector from gate encoder (routing label only).
@@ -914,6 +916,8 @@ def titanos_query(payload: QueryRequest):
             out["answer_text"] = text
             out["backend"] = backend.name
         return with_scale(out, payload.subject, payload.relation)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 

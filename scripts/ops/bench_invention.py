@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, "src")
-from resileos.ui.attach_scale import attach_scale
 #!/usr/bin/env python3
 """Invention-without-hallucination benchmark.
 
@@ -29,10 +26,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, "src")
+
 import requests
+
+from resileos.ui.attach_scale import attach_scale
 
 OUT = Path("artifacts/report_invention.json")
 BASE = os.getenv("RESILEOS_BASE_URL", "http://127.0.0.1:8000/api/v1").rstrip("/")

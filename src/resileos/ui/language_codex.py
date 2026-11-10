@@ -98,11 +98,11 @@ def cycle(store_query, store_learn, *, kind, name, relation, obj=None, claimed=N
     """Lookup, optional fact-check, optional learn, then codex (and kin)."""
     ns = namespace(kind, name)
     out = {"namespace": ns, "lookup": lookup(store_query, ns, relation)}
-    if claimed is not None:
-        out["fact_check"] = fact_check(store_query, ns, relation, claimed)
     if obj is not None:
         out["learn"] = learn_into(store_learn, ns, relation, obj)
         out["lookup"] = lookup(store_query, ns, relation)
+    if claimed is not None:
+        out["fact_check"] = fact_check(store_query, ns, relation, claimed)
     rows = []
     if out["lookup"].get("found"):
         rows = [{"subject": ns, "relation": relation, "obj": out["lookup"]["obj"]}]

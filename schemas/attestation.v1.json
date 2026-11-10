@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schemas/attestation.v1.json",
+  "title": "Unsigned guild merit candidate",
+  "description": "Record emitted by complete_and_credit. This repository does not sign it. A guild process may attach a signature later; that signature is not part of this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "issuer_guild",
+    "issuer_moniker",
+    "artifact_ref",
+    "verification_evidence",
+    "score",
+    "status"
+  ],
+  "properties": {
+    "issuer_guild": {"type": "string", "minLength": 1},
+    "issuer_moniker": {"type": "string", "minLength": 1},
+    "artifact_ref": {"type": "string", "minLength": 1},
+    "verification_evidence": {"type": "string"},
+    "score": {"type": "integer"},
+    "status": {"type": "string", "const": "candidate"}
+  }
+}
