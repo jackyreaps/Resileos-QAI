@@ -7,6 +7,25 @@ from __future__ import annotations
 import os
 
 
+def register_studio_candidate(
+    kind: str,
+    path: str,
+    title: str,
+    world_id: str = "studio",
+    note: str = "",
+) -> dict:
+    """Library record for a sampled image. Does not call learn or the hub."""
+    from resileos.studio.candidates import register_candidate
+
+    return register_candidate(
+        kind=kind,
+        path=path,
+        title=title,
+        world_id=world_id,
+        note=note,
+    )
+
+
 def main() -> None:
     """Run the Streamlit surface. Mode via RESILEOS_UI_MODE (studio|chat)."""
     mode = os.getenv("RESILEOS_UI_MODE", "studio")
@@ -190,7 +209,18 @@ def _run_surface(mode: str) -> None:
         return generate_image_pollinations(prompt, width=width, height=height)
 
 
-    def register_media(key: str, kind: str, path: str, title: str, world_id: str = "default", note: str = "") -> dict:
+    def register_media(
+        key: str,
+        kind: str,
+        path: str,
+        title: str,
+        world_id: str = "default",
+        note: str = "",
+        *,
+        candidate: bool = False,
+    ) -> dict:
+        if candidate:
+            return register_studio_candidate(kind, path, title, world_id=world_id or "studio", note=note)
         aid = f"a_{uuid.uuid4().hex[:10]}"
         wid = world_id or "default"
         sc, sb = api_post(
@@ -308,7 +338,9 @@ def _run_surface(mode: str) -> None:
             sc, sb = api_post("/learn_batch", key, {"facts": demo})
             st.success(str(sb)) if sc == 200 else st.error(f"{sc}: {sb}")
 
-    tab_chat, tab_search, tab_media, tab_make, tab_lang, tab_tools, tab_diag, tab_help = st.tabs(["Chat", "Search", "Media", "Make", "Language", "Tools", "Diagnostics", "Help"])
+    tab_chat, tab_search, tab_media, tab_codec, tab_make, tab_lang, tab_tools, tab_diag, tab_help = st.tabs(
+        ["Chat", "Search", "Media", "Residual codec", "Make", "Language", "Tools", "Diagnostics", "Help"]
+    )
 
     with tab_chat:
         for msg in st.session_state.messages:
@@ -462,9 +494,19 @@ def _run_surface(mode: str) -> None:
             st.info("Video generation is not bundled. Register MP4/WebM URLs to preview and store.")
         with b:
             st.markdown("#### Library")
+            st.caption(f"{len(st.session_state.assets_local)} item(s) in this session")
             for asset in st.session_state.assets_local[:12]:
-                st.markdown(f"**{asset.get('title') or asset.get('id')}** · `{asset.get('kind')}`")
+                status = asset.get("status")
+                badge = " · candidate" if status == "candidate" else ""
+                st.markdown(f"**{asset.get('title') or asset.get('id')}** · `{asset.get('kind')}`{badge}")
                 p = asset.get("path") or ""
+                if asset.get("image") is not None:
+                    st.image(asset["image"], width=128)
+                    st.caption("Candidate. Not a stored fact.")
+                elif p and not p.startswith("http") and not p.startswith("candidate://"):
+                    st.image(p, width=128)
+                    if status == "candidate":
+                        st.caption("Candidate. Not a stored fact.")
                 if p.startswith("http"):
                     if asset.get("kind") == "video" or p.lower().endswith((".mp4", ".webm", ".mov")):
                         st.video(p)
@@ -480,6 +522,33 @@ def _run_surface(mode: str) -> None:
 
 
     
+    with tab_codec:
+        from resileos.studio.panel import render_residual_codec
+
+        def _keep(record: dict, image: Any) -> None:
+            import numpy as np
+            from pathlib import Path
+            from PIL import Image
+
+            shown = np.clip(np.asarray(image, dtype=np.float64), 0.0, 1.0)
+            shown = (np.repeat(np.repeat(shown, 8, axis=0), 8, axis=1) * 255.0).astype(np.uint8)
+            folder = Path("/tmp/resileos-studio-candidates")
+            folder.mkdir(parents=True, exist_ok=True)
+            file_path = folder / f"{record.get('asset_id') or 'candidate'}.png"
+            Image.fromarray(shown, mode="L").save(file_path)
+            assets = list(st.session_state.get("assets_local") or [])
+            assets.insert(0, {
+                "id": record.get("asset_id"),
+                "kind": record.get("kind", "image"),
+                "path": str(file_path),
+                "title": record.get("title"),
+                "status": "candidate",
+                "learned": False,
+            })
+            st.session_state.assets_local = assets
+
+        render_residual_codec(st, on_candidate=_keep)
+
     with tab_make:
         st.subheader("Make a world")
         prompt = st.text_input("What should it look like", key="make_prompt")
@@ -658,6 +727,7 @@ def _run_surface(mode: str) -> None:
         | Fact memory | `/learn`, `/learn_batch`, `/query`, `/answer` |
         | Search | Answer + Triple + SPARQL + Chain (live API) |
         | Images | Pollinations HTTP generate + auto `/learn_batch` register |
+        | Residual codec | 8×8 PCA packet, per-component scales. Samples stay candidates |
         | Video | Register/preview URLs (bring your own encoder) |
         | Product | Same API keys as paid hosting |
 
