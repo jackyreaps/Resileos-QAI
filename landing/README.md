@@ -3,7 +3,15 @@
 Exact-memory product site. Theme: **Own the record. Control the story.**
 
 Studio loop, hubs (`user:` / `world:` / `org:`), float32 default, a free key,
-and Stripe Checkout for Builder and Team. Not superintelligence.
+and Stripe Checkout for Builder and Team. Product behavior, benches, and the
+god hierarchy are in the repo root [README.md](../README.md).
+
+## Public site
+
+The site will be live at [https://resileosai.fun](https://resileosai.fun)
+on Cloudflare Pages, in Stripe **test** mode. Pages serves the static tree
+under `public/`. The billing process in `api/` is separate and reads secrets
+from the host environment, not from the Pages build.
 
 ```
 public/                 static site (index, self-hosted fonts, portraits)
