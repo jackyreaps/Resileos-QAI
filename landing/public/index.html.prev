@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resileos — Own the record. Control the story.</title>
+  <meta name="description" content="A machine that keeps exact facts, refuses to invent, and gets more capable as your hubs fill. Stores, derives, and abstains. Studio + free key." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="#top"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <div class="nav-links">
+        <a class="hide-sm" href="#sells">What it does</a>
+        <a class="hide-sm" href="#studio">Studio</a>
+        <a class="hide-sm" href="#hubs">Hubs</a>
+        <a class="hide-sm" href="#bench">Proof</a>
+        <a class="hide-sm" href="#roadmap">Next</a>
+        <a href="#pricing">Pricing</a>
+        <a class="nav-cta" href="#start">Get free key</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div>
+      <div class="eyebrow">Stores · derives · abstains</div>
+      <h1>Remembers exactly.<br><span class="line2">Grows with your hub.</span></h1>
+      <p class="lede">
+        A machine that <strong>keeps exact facts</strong>, <strong>refuses to invent</strong>, and gets
+        <strong>more capable as hubs fill</strong>. Learn a fact, ask it back, get that fact.
+        Ask the unknown — get a clear empty answer. Open <strong>Studio</strong> or call the API. Free key to start.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#start">Get a free key</a>
+        <a class="btn btn-ghost" href="#hubs">See hubs grow</a>
+      </div>
+      <p class="micro">Frontier models approximate and can invent on structured truth. This one stores, derives, and abstains.</p>
+    </div>
+    <aside class="panel" aria-label="What it does">
+      <div class="tag">WHAT IT DOES</div>
+      <div class="row m"># Remembers exactly</div>
+      <div class="row">learn Zeus · domain · sky</div>
+      <div class="row k">→ ask “Zeus domain” → sky</div>
+      <br />
+      <div class="row m"># Does not make things up</div>
+      <div class="row">ask “Zeus ssn”</div>
+      <div class="row c">→ empty / ABSTAINED</div>
+      <br />
+      <div class="row m"># Grows with your hub</div>
+      <div class="row">user: · world: · org: fill with your facts</div>
+      <div class="row k">→ more facts → more you can ask and derive</div>
+    </aside>
+  </header>
+
+  <div class="strip">
+    <div class="strip-inner">
+      <div><strong>Remembers exactly</strong> — same fact out that you put in</div>
+      <div><strong>Refuses to invent</strong> — unknowns stay empty</div>
+      <div><strong>Grows with hubs</strong> — capability scales with what you store</div>
+      <div><strong>Studio + API</strong> — learn and ask without a contract</div>
+    </div>
+  </div>
+
+  <section id="sells">
+    <h2>What it does</h2>
+    <p class="sub">
+      Keeps exact facts. Refuses to invent. Gets more capable as your hubs fill.
+      On structured truth, frontier models approximate and invent — this one stores, derives, and abstains.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <span class="badge badge-ok">REMEMBERS</span>
+        <h3>Exact store</h3>
+        <p>Learn a triple. Ask it back. Get that object — the same fact you stored.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-ok">ABSTAINS</span>
+        <h3>Refuses to invent</h3>
+        <p>Unknowns return empty / ABSTAINED / NO_ROWS. Derivations stay tied to what you put in.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-ok">GROWS</span>
+        <h3>Hubs fill → more capability</h3>
+        <p>Every fact in <code>user:</code>, <code>world:</code>, or <code>org:</code> is another answer you can ask for — and another hop you can derive.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-ok">STUDIO</span>
+        <h3>Learn and ask without code</h3>
+        <p>Open Studio, save a fact, ask it back. Same API keys as paid hosting.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-ok">START</span>
+        <h3>Free key + API</h3>
+        <p>No contract to begin. Send <code>X-API-Key</code> on every protected route. Mouth off by default — the store comes first.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-ok">HARDWARE</span>
+        <h3>float32 on normal hosts</h3>
+        <p>Default state width is float32. Ordinary CPU is enough for the record. float64 is opt-in.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt" id="studio">
+    <div class="inner">
+      <h2>Studio — learn, ask, get the fact or empty</h2>
+      <p class="sub">
+        For non-technical visitors: open Studio, save a fact, ask it back.
+        Developers can use the same routes with curl; Docker and self-host stay in the repo docs, not here.
+      </p>
+      <div class="studio-mock" aria-label="Studio loop mock from real UI">
+        <div class="studio-chrome">
+          <div class="studio-dot"></div><div class="studio-dot"></div><div class="studio-dot"></div>
+          <span>Resileos Studio · streamlit run ui_studio.py</span>
+        </div>
+        <div class="studio-body">
+          <aside class="studio-side">
+            <div class="studio-label">Sidebar</div>
+            <div class="studio-field"><span>API key</span><code>••••••••</code></div>
+            <div class="studio-field"><span>User id</span><code>anon</code></div>
+            <div class="studio-field"><span>Persona</span><code>Honest</code></div>
+            <div class="studio-teach">
+              <div class="studio-label">Save fact</div>
+              <div><code>Zeus</code> · <code>domain</code> · <code>sky</code></div>
+              <div class="studio-btn">Save fact</div>
+              <div class="studio-btn ghost">Seed demo facts</div>
+            </div>
+            <div class="studio-metrics">
+              <div>API <strong>Ready</strong></div>
+              <div>Facts <strong>6+</strong></div>
+            </div>
+          </aside>
+          <div class="studio-main">
+            <div class="studio-tabs">
+              <span class="on">Chat</span><span>Search</span><span>Media</span><span>Diagnostics</span><span>Help</span>
+            </div>
+            <div class="studio-chat">
+              <div class="bubble asst">Resileos Studio — exact memory. Try <code>Zeus domain</code> or <code>remember Zeus domain sky</code>.</div>
+              <div class="bubble user">remember Zeus domain sky</div>
+              <div class="bubble asst ok">Saved <strong>Zeus —domain→ sky</strong></div>
+              <div class="bubble user">Zeus domain</div>
+              <div class="bubble asst ok">sky</div>
+              <div class="bubble user">Zeus ssn</div>
+              <div class="bubble asst empty">No rows · ABSTAINED — unknown stays empty</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:14px">
+        Mock built from <code>src/resileos/ui/studio_app.py</code> (sidebar Save fact / Seed demo / Chat tabs).
+        Seed demo facts match the UI button: Zeus/Poseidon/Athena domains + olympian links.
+      </p>
+
+      <div class="grid-2" style="margin-top:28px" id="start">
+        <div>
+          <h2 style="font-size:1.25rem;margin-bottom:12px">Three steps — free</h2>
+          <div class="steps">
+            <div class="step"><div><h3>Get a free key</h3><p>No card. Key is shown once. Send as <code>X-API-Key</code>.</p></div></div>
+            <div class="step"><div><h3>Open Studio or call learn</h3><p>Paste the key. Save a fact (or use Seed demo facts).</p></div></div>
+            <div class="step"><div><h3>Ask it back</h3><p>Known → the object. Unknown → empty. That is the product.</p></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <span class="badge badge-ok">FREE · NO CARD</span>
+          <h3>Issue your API key</h3>
+          <p style="margin-bottom:12px">Optional email for recovery. Mouth stays off by default.</p>
+          <form class="form" id="free-key-form">
+            <label for="email">Email (optional)</label>
+            <input id="email" name="email" type="email" placeholder="you@lab.dev" autocomplete="email" />
+            <label for="name">Label</label>
+            <input id="name" name="name" type="text" placeholder="my-laptop" maxlength="64" />
+            <button class="btn btn-primary btn-block" type="submit">Get free key</button>
+            <div class="msg" id="free-key-msg" aria-live="polite"></div>
+          </form>
+          <div class="key-reveal" id="key-reveal" role="status"></div>
+          <p class="micro" style="margin-top:12px">
+            Shared public demo namespace: <span class="pending">COMING SOON</span> —
+            seed your own facts (or Studio “Seed demo facts”) today.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="hubs">
+    <h2>Hubs fill — capability grows</h2>
+    <p class="sub">
+      Your memory lives under <code>user:</code>, <code>world:</code>, and <code>org:</code>.
+      As those basins fill with verified facts, you can ask more — and derive more — without inventing.
+    </p>
+    <div class="hub-grow" aria-label="Hub growth">
+      <div class="hub-stage">
+        <div class="hub-label">Day 1</div>
+        <div class="hub-bar"><span style="width:18%"></span></div>
+        <div class="hub-facts">A few facts · answer what you just learned</div>
+      </div>
+      <div class="hub-stage">
+        <div class="hub-label">As you teach</div>
+        <div class="hub-bar"><span style="width:48%"></span></div>
+        <div class="hub-facts">Project world: fills · chains across stored relations</div>
+      </div>
+      <div class="hub-stage active">
+        <div class="hub-label">Hubs filled</div>
+        <div class="hub-bar"><span style="width:86%"></span></div>
+        <div class="hub-facts">user: · world: · org: dense · more asks, still no invention</div>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:18px">
+      <div class="card">
+        <span class="badge">user:</span>
+        <h3><code>user:&lt;id&gt;</code></h3>
+        <p>Your personal basin — preferences, notes, what Studio’s User id writes.</p>
+      </div>
+      <div class="card">
+        <span class="badge">world:</span>
+        <h3><code>world:&lt;id&gt;</code></h3>
+        <p>Shared project memory. Seed example: <code>world:materials</code> status / store / mouth.</p>
+      </div>
+      <div class="card">
+        <span class="badge">org:</span>
+        <h3><code>org:&lt;id&gt;</code></h3>
+        <p>Team basin — org facts that stay off the global seed.</p>
+      </div>
+    </div>
+    <div class="codebox" style="margin-top:16px">
+      <pre>learn  user:alice  prefers  exact_answers
+ask    user:alice  prefers  →  exact_answers
+
+# More hub facts → more you can ask and derive
+# Still abstains when the hub has no answer</pre>
+    </div>
+  </section>
+
+  <section class="alt" id="quickstart">
+    <div class="inner">
+      <h2>API quickstart (same store Studio uses)</h2>
+      <p class="sub">For builders. Visitors can skip this and stay in Studio. Header: <code>X-API-Key</code>.</p>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="learn" type="button">1 · Learn</button>
+        <button class="tab" data-tab="query" type="button">2 · Query</button>
+        <button class="tab" data-tab="chain" type="button">3 · Chain</button>
+      </div>
+      <div class="codebox" data-panel="learn">
+        <button class="copy" type="button" data-copy="learn">Copy</button>
+        <pre id="code-learn">export BASE="https://api.yourdomain.dev/api/v1"
+export KEY="rsk_…"
+
+curl -sS -X POST "$BASE/learn" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $KEY" \
+  -d '{"subject":"Zeus","relation":"domain","obj":"sky"}'</pre>
+      </div>
+      <div class="codebox" data-panel="query" hidden>
+        <button class="copy" type="button" data-copy="query">Copy</button>
+        <pre id="code-query">curl -sS -X POST "$BASE/query" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $KEY" \
+  -d '{"subject":"Zeus","relation":"domain"}'
+# Known → ACCEPTED + value · Unknown → ABSTAINED / empty</pre>
+      </div>
+      <div class="codebox" data-panel="chain" hidden>
+        <button class="copy" type="button" data-copy="chain">Copy</button>
+        <pre id="code-chain">curl -sS -X POST "$BASE/chain" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $KEY" \
+  -d '{"start":"Zeus","relations":["parent_of","domain"]}'
+# Body: start + relations[] · returns value, status, path</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="bench">
+    <h2>Invent rate — measured on the real bench</h2>
+    <p class="sub">
+      The honest-abstention harness learns known facts, then asks unknowns.
+      Invent rate is how often the system returns a non-empty answer when it should abstain.
+      We publish the number after a clean host run of the real bench — not before.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <span class="badge badge-soon">PUBLISHING SOON</span>
+        <h3>Invent rate</h3>
+        <p>Measured on the real bench (<code>scripts/ops/bench_vs_llm.py</code> / Titanos learn+ask).
+          The public figure lands here once the upstream harness runs clean on a host and the report is reviewed.</p>
+        <p class="micro" style="margin-top:12px">
+          What it measures: exact match on stored facts, and invent rate on unknowns
+          (empty / ABSTAINED expected). LLM baseline optional via <code>BENCH_LLM_URL</code>.
+        </p>
+      </div>
+      <div class="card">
+        <span class="badge">WHY IT MATTERS</span>
+        <h3>Stores, derives, abstains</h3>
+        <p>On structured truth, approximating models can invent under pressure.
+          This system’s claim is operational: keep exact facts, derive from them, refuse the rest —
+          and get stronger as hubs fill.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-soon">ALSO PENDING</span>
+        <h3>Composition &amp; assertion</h3>
+        <p>Compositional and invention-without-hallucination tables stay empty until host runs populate them.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt" id="roadmap">
+    <div class="inner">
+      <h2>Next <span class="pending">ROADMAP · NOT SHIPPED</span></h2>
+      <p class="sub">Labeled clearly so buyers do not confuse ambition with the deliverable.</p>
+      <div class="grid">
+        <div class="card">
+          <span class="badge badge-soon">NEXT</span>
+          <h3>Persona on the hub</h3>
+          <p>Deeper persona packs living under <code>user:</code> with tone that never overrides store rows.</p>
+        </div>
+        <div class="card">
+          <span class="badge badge-soon">NEXT</span>
+          <h3>Kin cycle on the hub</h3>
+          <p>Iris → Metis → Hermes / eat cycle scoped to hub basins (routes exist; hub-native UX next).</p>
+        </div>
+        <div class="card">
+          <span class="badge badge-soon">NEXT</span>
+          <h3>Speculative mouth behind the gate</h3>
+          <p>Language only from stored rows — mouth renders; gate still owns truth.</p>
+        </div>
+        <div class="card">
+          <span class="badge badge-soon">NEXT</span>
+          <h3>More hubs · more facts</h3>
+          <p>Capability grows with seeded basins and verified facts — not with model size theatre.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <h2>Pricing</h2>
+    <p class="sub">From <code>docs/marketing/pricing.md</code>. Free is the funnel. Stripe for Builder &amp; Team. Org is contract. Guild/world consoles not sold until mounted.</p>
+    <div class="price-grid">
+      <div class="price-card" id="plan-free">
+        <span class="badge badge-ok">FUNNEL</span>
+        <h3>Free</h3>
+        <div class="price">$0 <span>/ start</span></div>
+        <ul>
+          <li>1 API key · 5,000 req/mo</li>
+          <li>Hard 429 at quota</li>
+          <li>Personal + world: hubs</li>
+          <li>Structured mouth only</li>
+          <li>Studio + API</li>
+        </ul>
+        <a class="btn btn-ghost btn-block" href="#start">Get free key</a>
+      </div>
+      <div class="price-card featured" id="plan-builder">
+        <span class="badge">BUILDER · PRO TIER</span>
+        <h3>Builder</h3>
+        <div class="price">$29 <span>/ mo</span></div>
+        <ul>
+          <li>3 keys · 100,000 req/mo</li>
+          <li>Overage $0.50 / 10k</li>
+          <li>Shared worlds · durable volume</li>
+          <li>+ small RAG mouth budget</li>
+          <li>Email support</li>
+        </ul>
+        <p class="soon-note">Founding Builder: $19/mo · 12 months · cap 50</p>
+        <button class="btn btn-primary btn-block" type="button" data-checkout="builder">Checkout with Stripe</button>
+        <a class="micro" id="link-builder" href="#" hidden style="margin-top:8px;text-align:center">Or open Payment Link</a>
+      </div>
+      <div class="price-card" id="plan-team">
+        <span class="badge">TEAM</span>
+        <h3>Team</h3>
+        <div class="price">$99 <span>/ mo</span></div>
+        <ul>
+          <li>10 keys · 500,000 req/mo</li>
+          <li>Overage $0.40 / 10k</li>
+          <li>Multi-guild seats*</li>
+          <li>Higher mouth budget</li>
+          <li>Priority email · 99.5% target†</li>
+        </ul>
+        <button class="btn btn-ghost btn-block" type="button" data-checkout="team">Checkout with Stripe</button>
+        <a class="micro" id="link-team" href="#" hidden style="margin-top:8px;text-align:center">Or open Payment Link</a>
+      </div>
+      <div class="price-card" id="plan-org">
+        <span class="badge badge-muted">ENTERPRISE</span>
+        <h3>Org</h3>
+        <div class="price">Custom</div>
+        <ul>
+          <li>Custom keys &amp; quota</li>
+          <li>Unlimited hubs*</li>
+          <li>Dedicated / multi-region</li>
+          <li>BYO mouth key</li>
+          <li>Slack / contract</li>
+        </ul>
+        <a class="btn btn-ghost btn-block" href="mailto:hello@resileos.dev?subject=Resileos%20Org">Contact sales</a>
+      </div>
+    </div>
+    <p class="micro" style="margin-top:18px">
+      * Guild / world asset routes exist in source but are <strong>not mounted</strong> on the hosted API — not sold yet.
+      † Internal target, not an SLA. Key map: Free→<code>free</code>/5000 · Builder/Team→<code>pro</code> · Org→<code>enterprise</code>.
+    </p>
+    <div class="msg" id="checkout-msg" style="margin-top:10px" aria-live="polite"></div>
+  </section>
+
+  <section id="faq" class="faq">
+    <h2>FAQ</h2>
+    <details open>
+      <summary>What does Resileos do?</summary>
+      <p>It remembers exact facts you teach it, derives from those facts, and abstains when it does not know.
+        Capability grows as your hubs fill. It does not invent answers to fill the gap.</p>
+    </details>
+    <details>
+      <summary>Do I need Docker to try it?</summary>
+      <p>No. Visitors use Studio + a free key. Docker and compose are for developers self-hosting — see the GitHub HOSTING docs.</p>
+    </details>
+    <details>
+      <summary>What is float32 about?</summary>
+      <p>The classical core defaults to float32 state (<code>RESILEOS_STATE_DTYPE</code> unset) so storage and RAM stay practical on normal hardware. float64 is opt-in.</p>
+    </details>
+    <details>
+      <summary>Where is the free-key API?</summary>
+      <p>Issued by this site’s billing service (<code>POST /api/free-key</code>). The main Resileos API still authenticates with hashed keys in <code>configs/api_keys.json</code> — point both at the same file when you deploy.</p>
+    </details>
+  </section>
+
+  <footer>
+    <div>
+      Resileos-QAI · Exact memory ·
+      <a href="https://github.com/jackyreaps/Resileos-QAI">GitHub</a> ·
+      <a href="https://github.com/jackyreaps/Resileos-QAI/blob/main/docs/marketing/pricing.md">Pricing source</a>
+    </div>
+    <div>No trackers · float32 default · Mouth optional · Hubs grow capability</div>
+  </footer>
+
+  <script>window.RESILEOS_BILLING = window.RESILEOS_BILLING || "";</script>
+  <script src="/assets/site.js"></script>
+</body>
+</html>

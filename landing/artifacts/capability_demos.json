@@ -1,0 +1,350 @@
+{
+  "query_known": {
+    "value": "sky",
+    "status": "ACCEPTED",
+    "mode": "CLASSICAL"
+  },
+  "abstain": {
+    "value": null,
+    "status": "ABSTAINED"
+  },
+  "chain": {
+    "value": "wisdom",
+    "status": "ACCEPTED",
+    "path": [
+      [
+        "Zeus",
+        "parent_of",
+        "Athena"
+      ],
+      [
+        "Athena",
+        "domain",
+        "wisdom"
+      ]
+    ]
+  },
+  "hubs": {
+    "value": "exact_answers",
+    "status": "ACCEPTED"
+  },
+  "dtype": "float32",
+  "gate": {
+    "triple": {
+      "subject": "Zeus",
+      "relation": "domain",
+      "obj": "sky"
+    },
+    "debt": 0,
+    "frame": "exact"
+  },
+  "explain_hit": {
+    "text": "sky",
+    "source": "hub",
+    "query": "Zeus domain"
+  },
+  "explain_miss": {
+    "text": "Not in your hub yet. Look up: Zeus ssn",
+    "source": "none",
+    "query": "Zeus ssn"
+  },
+  "remember": {
+    "subject": "user:alice",
+    "relation": "prefers",
+    "obj": "exact_answers",
+    "scale": {
+      "belt": 0,
+      "frame": 0,
+      "residual_bin": "r00_s0",
+      "mean_luma": 0.0,
+      "edge_density": 0.0,
+      "debt": 1.0,
+      "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+    }
+  },
+  "search_hub": {
+    "query": "materials",
+    "hub": [
+      "workspace"
+    ],
+    "hub_hit": true,
+    "web_url": "https://duckduckgo.com/html/?q=materials",
+    "offer_save": false,
+    "scale": {
+      "address": {
+        "belt": 0,
+        "frame": 0,
+        "residual_bin": "r00_s0",
+        "mean_luma": 0.0,
+        "edge_density": 0.0,
+        "debt": 1.0,
+        "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+      },
+      "gate": {
+        "triple": {
+          "subject": "world:materials",
+          "relation": "residual_address",
+          "obj": "belt0_frame0_r00_s0"
+        },
+        "debt": 1,
+        "frame": "abstained"
+      }
+    }
+  },
+  "web_url": "https://duckduckgo.com/html/?q=Zeus+domain",
+  "make_still": {
+    "kind": "still",
+    "prompt": "bronze mechanism",
+    "world_id": "world:demo",
+    "address": {
+      "belt": 0,
+      "frame": 0,
+      "residual_bin": "r00_s0",
+      "mean_luma": 0.0,
+      "edge_density": 0.0,
+      "debt": 1.0,
+      "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+    },
+    "pattern_shape": [
+      32,
+      32,
+      3
+    ],
+    "rows": [
+      {
+        "subject": "world:demo",
+        "relation": "has_scene",
+        "obj": "bronze mechanism"
+      },
+      {
+        "subject": "world:demo",
+        "relation": "looks_like",
+        "obj": "bronze mechanism"
+      },
+      {
+        "subject": "world:demo",
+        "relation": "address",
+        "obj": "belt0_frame0_r00_s0"
+      }
+    ],
+    "backend": "fallback"
+  },
+  "scene_rows": [
+    {
+      "subject": "world:demo",
+      "relation": "has_scene",
+      "obj": "bronze mechanism"
+    },
+    {
+      "subject": "world:demo",
+      "relation": "looks_like",
+      "obj": "bronze mechanism"
+    },
+    {
+      "subject": "world:demo",
+      "relation": "address",
+      "obj": "belt0_frame0_r00_s0"
+    }
+  ],
+  "music": {
+    "kind": "music",
+    "title": "scale",
+    "address": {
+      "belt": 0,
+      "frame": 0,
+      "residual_bin": "r00_s0",
+      "mean_luma": 0.0,
+      "edge_density": 0.0,
+      "debt": 1.0,
+      "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+    },
+    "apollo": {
+      "subject": "world:music",
+      "hops": 1,
+      "kept": 1,
+      "facts": [
+        {
+          "subject": "world:music",
+          "relation": "music",
+          "obj": "scale: C E G",
+          "weight": 1.0,
+          "phase": 0.0,
+          "address": {
+            "belt": 0,
+            "frame": 0,
+            "residual_bin": "r00_s0",
+            "mean_luma": 0.0,
+            "edge_density": 0.0,
+            "debt": 1.0,
+            "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+          },
+          "gate": {
+            "triple": {
+              "subject": "world:music",
+              "relation": "music",
+              "obj": "scale: C E G"
+            },
+            "debt": 1,
+            "frame": "reconstructed"
+          },
+          "healing": 1.0
+        }
+      ],
+      "lifts": [],
+      "prediction": {
+        "phase": 0.0,
+        "weight": 1.0,
+        "note": "next hop predicted from golden ladder"
+      },
+      "art": true,
+      "healing": 39.5,
+      "note": "Failure lifts by the healing factor. Art skips pure-truth gate."
+    }
+  },
+  "art": {
+    "kind": "art",
+    "title": "bronze",
+    "address": {
+      "belt": 0,
+      "frame": 0,
+      "residual_bin": "r00_s0",
+      "mean_luma": 0.0,
+      "edge_density": 0.0,
+      "debt": 1.0,
+      "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+    },
+    "apollo": {
+      "subject": "world:art",
+      "hops": 1,
+      "kept": 1,
+      "facts": [
+        {
+          "subject": "world:art",
+          "relation": "art",
+          "obj": "bronze: cinematic bronze on marble",
+          "weight": 1.0,
+          "phase": 0.0,
+          "address": {
+            "belt": 0,
+            "frame": 0,
+            "residual_bin": "r00_s0",
+            "mean_luma": 0.0,
+            "edge_density": 0.0,
+            "debt": 1.0,
+            "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+          },
+          "gate": {
+            "triple": {
+              "subject": "world:art",
+              "relation": "art",
+              "obj": "bronze: cinematic bronze on marble"
+            },
+            "debt": 1,
+            "frame": "reconstructed"
+          },
+          "healing": 1.0
+        }
+      ],
+      "lifts": [],
+      "prediction": {
+        "phase": 0.0,
+        "weight": 1.0,
+        "note": "next hop predicted from golden ladder"
+      },
+      "art": true,
+      "healing": 39.5,
+      "note": "Failure lifts by the healing factor. Art skips pure-truth gate."
+    }
+  },
+  "rewrite": [
+    {
+      "subject": "world:demo",
+      "relation": "has_scene",
+      "obj": "bronze",
+      "address": {
+        "belt": 0,
+        "frame": 0,
+        "residual_bin": "r00_s0",
+        "mean_luma": 0.0,
+        "edge_density": 0.0,
+        "debt": 1.0,
+        "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+      }
+    }
+  ],
+  "refine": [],
+  "apollo": {
+    "subject": "world:apollo",
+    "hops": 1,
+    "kept": 1,
+    "facts": [
+      {
+        "subject": "world:apollo",
+        "relation": "status",
+        "obj": "ok",
+        "weight": 1.0,
+        "phase": 0.0,
+        "address": {
+          "belt": 0,
+          "frame": 0,
+          "residual_bin": "r00_s0",
+          "mean_luma": 0.0,
+          "edge_density": 0.0,
+          "debt": 1.0,
+          "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+        },
+        "gate": {
+          "triple": {
+            "subject": "world:apollo",
+            "relation": "status",
+            "obj": "ok"
+          },
+          "debt": 1,
+          "frame": "reconstructed"
+        },
+        "healing": 1.0
+      }
+    ],
+    "lifts": [],
+    "prediction": {
+      "phase": 0.0,
+      "weight": 1.0,
+      "note": "next hop predicted from golden ladder"
+    },
+    "art": false,
+    "healing": 39.5,
+    "note": "Failure lifts by the healing factor. Art skips pure-truth gate."
+  },
+  "video_recess": {
+    "keys": [
+      "codex",
+      "world_id",
+      "recesses",
+      "rows",
+      "note"
+    ],
+    "n_recesses": 3
+  },
+  "issue_free_key": [
+    "key: 4KadMKdf72uvbVRjlP_w45rhKZPpsr7E",
+    "sha256: c4ff9e70bfe1397f3d49712cea41c9f8facbdf66190d97980243592c3878026c",
+    "RESILEOS_API_KEYS={\"4KadMKdf72uvbVRjlP_w45rhKZPpsr7E\": {\"name\": \"free\", \"tier\": \"free\", \"quota\": 0}}"
+  ],
+  "bench_real": {
+    "exact_match_rate": 1.0,
+    "invent_rate": 0.0,
+    "n_known": 10,
+    "n_unknown": 20,
+    "p50_latency_ms_known_batch": 31.301697099843295,
+    "backend": "titanos",
+    "dtype": "float32",
+    "date": "2026-11-08",
+    "tz": "America/Chicago (UTC-6)",
+    "where": "local box /workspace/Resileos-QAI",
+    "config": "Titanos(TitanosConfig()); float32 default; 10 known + 20 unknown probes; no LLM baseline",
+    "note": "Upstream bench_vs_llm.py Titanos() lacks cfg and falls back to dict stub; this is the real Titanos run.",
+    "unknown_statuses": [
+      "ABSTAINED"
+    ]
+  }
+}

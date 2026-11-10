@@ -80,13 +80,18 @@ QD-TER bridge:
 50. [Spectral Skeleton](600-qdter/spectral-skeleton.md) — RES-607
 51. [leCore as Stomach](600-qdter/lecore-stomach.md) — RES-608
 
-Harness:
+Harness and current product surface (code on main; some numbered docs above still say draft or deferred):
 - [`docs/harness/AGENTS.md`](harness/AGENTS.md) — standing instructions
 - [`docs/harness/CONSTRAINTS.md`](harness/CONSTRAINTS.md) — permanent corrections
 - [`docs/harness/INTEGRATION.md`](harness/INTEGRATION.md) — integration checklist
-- [Demi-god skill layer](320-titanos/demigods.md) — RES-343
-- [Legions under Kin](320-titanos/legions.md) — RES-345
-- [Equal-budget measurement](benchmarks/equal_budget.md)
+- [Demi-god skill layer](320-titanos/demigods.md) — RES-343, implemented
+- [Legions under Kin](320-titanos/legions.md) — RES-345, registration implemented; examples off unless enabled
+- [Kin operators and eat](320-titanos/kin-eat-build.md) — RES-338, implemented
+- [Verifier swarm](320-titanos/verifier-swarm.md) — RES-340, implemented
+- [Equal-budget measurement](benchmarks/equal_budget.md) — RES-344, measured 2026-11-10
+- [Studio residual codec study](studio/research.md) — STUDIO-001
+- [External samplers and the MiniMax-H3-Image license](studio/external-samplers.md) — STUDIO-002
+- [Exact memory bench](benchmarks/memory-vs-llm.md), [chain composition](benchmarks/compositional-generalization.md), [invention bench](benchmarks/invention-without-hallucination.md) — 2026-11-10 runs; no model key was set
 
 Reference:
 52. [Glossary](900-reference/glossary.md) — RES-900
@@ -114,17 +119,20 @@ Reference:
 | RES-322 | `query.py` | draft | SPARQL-like grammar and nested-loop executor |
 | RES-323 | `ingest.py` | draft | External ingestion; φ-ladder, R-gate, filter |
 | RES-324 | `zeus-child.md` | draft | AgencyChild residual specialist; declines when unfit |
-| RES-325 | `eat-strategy.md` | draft | Titanos vs transformers: A/B achievable, C not |
+| RES-325 | `eat-strategy.md` | draft | Eat strategy. Read the doc for its own limits. |
 | RES-327 | `answer.md` | stable | `/answer` route; pluggable backends; RAG scaling measured |
-| RES-332 | `temporal.md` | draft | Chronos/kairos; valid-time on facts; AS OF query |
-| RES-343 | `demigods.md` | implemented | Summoned checks under Kin; persona text, not a model |
+| RES-332 | `temporal.md` | draft | Doc status is draft. `scripts/titanos.py` implements `valid_from` / `valid_to` and `as_of`. The probe reports reference M9 0/141. |
+| RES-338 | `kin-eat-build.md` | implemented | Iris, Metis, Hermes, Eat |
+| RES-340 | `verifier-swarm.md` | implemented | Deterministic checkers used by `SeparatedCycle` |
+| RES-343 | `demigods.md` | implemented | Themis, Momus, Hephaestus, Nike, Atlas: summon, one check, dismiss |
+| RES-345 | `legions.md` | implemented | `register_legion`; examples off unless `enable=True` |
 
 ## 400-series operations modules
 
 | Doc | Module | Status | Notes |
 |---|---|---|---|
 | RES-330 | `capacity-contract.md` | proposed | Capacity rules C0–C8; metrics M1–M9 |
-| RES-331 | `capacity-results.md` | stable | M1–M4 measured, all pass; M5–M9 deferred |
+| RES-331 | `capacity-results.md` | stable | M1–M4 pass on 2026-11-03. The note still marks M5–M9 deferred. `scripts/run_temporal_probe.py` on this tree reports reference M9 0/141 and synthetic overlap 2/2. |
 | RES-401 | `phi-compress-redesign.md` | draft | Golden-ladder contraction under R-gating |
 
 ## 600-series QD-TER bridge

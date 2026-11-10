@@ -48,6 +48,7 @@ data/
 # tracked; the real file is a runtime secret.
 configs/api_keys.json
 .env
+.env.live
 .env.local
 .env.*.local
 
