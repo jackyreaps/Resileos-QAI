@@ -1,0 +1,23 @@
+{
+  "resileos": {
+    "exact_match_rate": 1.0,
+    "invent_rate": 0.0,
+    "n_known": 10,
+    "n_unknown": 20,
+    "p50_latency_ms_known_batch": 31.301697099843295,
+    "backend": "titanos",
+    "dtype": "float32",
+    "date": "2026-11-08",
+    "tz": "America/Chicago (UTC-6)",
+    "where": "local box /workspace/Resileos-QAI",
+    "config": "Titanos(TitanosConfig()); float32 default; 10 known + 20 unknown probes; no LLM baseline",
+    "note": "Upstream bench_vs_llm.py Titanos() lacks cfg and falls back to dict stub; this is the real Titanos run.",
+    "unknown_statuses": [
+      "ABSTAINED"
+    ]
+  },
+  "llm_baseline": {
+    "invent_rate": null,
+    "note": "BENCH_LLM_URL unset"
+  }
+}
