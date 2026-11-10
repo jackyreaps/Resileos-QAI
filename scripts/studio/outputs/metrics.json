@@ -1,0 +1,2323 @@
+{
+  "run": {
+    "script": "scripts/studio/measure.py",
+    "seconds": 11.753607927000076,
+    "numpy": "2.5.4",
+    "sklearn": "1.9.1",
+    "split_seed": 0,
+    "test_per_class": 36,
+    "n_images": 1797,
+    "n_train": 1437,
+    "n_test": 360,
+    "shape": [
+      8,
+      8
+    ],
+    "normalization": "sklearn digits / 16, so the peak for PSNR is 1",
+    "dataset": "sklearn.datasets.load_digits, values divided by 16",
+    "psnr": "psnr_from_mean_mse is 10 log10(1 / mean squared error) on the holdout. psnr_mean_of_images is the mean of per-image PSNRs and is not the number to quote: it explodes when some images are exact.",
+    "global_ssim": "single window = the whole 8x8 image, N-1 variances, L=1. Not local-window SSIM.",
+    "codec_quality": "PSNR/SSIM are computed from unpack(pack(packet)), scales stored as float32",
+    "shared_bases_not_in_per_image_bits": true,
+    "highlight_declared_before_the_sweep_was_read": {
+      "rank": 4,
+      "n_layers": 4,
+      "scale_mode": "layer",
+      "basis": "pca_bipolar"
+    }
+  },
+  "control_packet_gap": {
+    "config": {
+      "rank": 4,
+      "n_layers": 4,
+      "basis": "random",
+      "seed": 0
+    },
+    "n_images": 32,
+    "res201_naive_Ub_at_Vb_mse_vs_image_mean": 6.009681701660156,
+    "studio_decode_mse_vs_engine_reconstruction_mean": 6.240176207443685e-17,
+    "note": "The RES-201 packet stores layer 0 Ub and Vb only. Ub @ Vb is not the residual-stack reconstruction. The studio packet's decode matches the engine reconstruction."
+  },
+  "codec": [
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 1,
+      "logical_bits": 48,
+      "packed_bytes": 20,
+      "mse": 0.16344749397701688,
+      "psnr_from_mean_mse": 7.866217337578031,
+      "psnr_mean_of_images": 7.9470991583711115,
+      "psnr_median": 7.9528163748653515,
+      "global_ssim_mean": 0.05935627150237429
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 2,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.13659529453143476,
+      "psnr_from_mean_mse": 8.645642610807728,
+      "psnr_mean_of_images": 8.833681951491455,
+      "psnr_median": 8.604509934663117,
+      "global_ssim_mean": 0.24059631824036015
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 4,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.12778770232197556,
+      "psnr_from_mean_mse": 8.935109385929959,
+      "psnr_mean_of_images": 9.18432347313154,
+      "psnr_median": 8.91263302604395,
+      "global_ssim_mean": 0.3071795281398674
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 8,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.12653951438635205,
+      "psnr_from_mean_mse": 8.977738365414213,
+      "psnr_mean_of_images": 9.240551541546365,
+      "psnr_median": 8.923517565359452,
+      "global_ssim_mean": 0.3147435309726605
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 1,
+      "logical_bits": 64,
+      "packed_bytes": 22,
+      "mse": 0.19718502681955005,
+      "psnr_from_mean_mse": 7.051260661520721,
+      "psnr_mean_of_images": 7.227496408066091,
+      "psnr_median": 6.95651090816842,
+      "global_ssim_mean": 0.0908380993171484
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 2,
+      "logical_bits": 128,
+      "packed_bytes": 30,
+      "mse": 0.19010550089196895,
+      "psnr_from_mean_mse": 7.21005316209448,
+      "psnr_mean_of_images": 7.405104452137832,
+      "psnr_median": 7.168867696248893,
+      "global_ssim_mean": 0.11663486457930412
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 4,
+      "logical_bits": 256,
+      "packed_bytes": 46,
+      "mse": 0.18476807669931858,
+      "psnr_from_mean_mse": 7.3337306185480315,
+      "psnr_mean_of_images": 7.543409015887874,
+      "psnr_median": 7.337437441422535,
+      "global_ssim_mean": 0.13916339328892965
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 8,
+      "logical_bits": 512,
+      "packed_bytes": 78,
+      "mse": 0.18258887579211144,
+      "psnr_from_mean_mse": 7.385256853409761,
+      "psnr_mean_of_images": 7.623665478148921,
+      "psnr_median": 7.3573324714338115,
+      "global_ssim_mean": 0.14887743017643418
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 1,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.20199999993353343,
+      "psnr_from_mean_mse": 6.946486306962775,
+      "psnr_mean_of_images": 7.046500893394149,
+      "psnr_median": 6.960013287134692,
+      "global_ssim_mean": 0.07481297442164371
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 2,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.19499753512596504,
+      "psnr_from_mean_mse": 7.099708783193162,
+      "psnr_mean_of_images": 7.217237742178758,
+      "psnr_median": 7.092036040401348,
+      "global_ssim_mean": 0.10230442115694471
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 4,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.18624286858609054,
+      "psnr_from_mean_mse": 7.299203478038541,
+      "psnr_mean_of_images": 7.437242640927742,
+      "psnr_median": 7.3324881580727705,
+      "global_ssim_mean": 0.1404854163597341
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 8,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.18151598891479664,
+      "psnr_from_mean_mse": 7.410851139246692,
+      "psnr_mean_of_images": 7.56708790558541,
+      "psnr_median": 7.461337350966207,
+      "global_ssim_mean": 0.16215529231068598
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 1,
+      "logical_bits": 160,
+      "packed_bytes": 34,
+      "mse": 0.1931582695651727,
+      "psnr_from_mean_mse": 7.140866939408933,
+      "psnr_mean_of_images": 7.2636988307950965,
+      "psnr_median": 7.127155128224035,
+      "global_ssim_mean": 0.08315462617729251
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 2,
+      "logical_bits": 320,
+      "packed_bytes": 54,
+      "mse": 0.17717146124209168,
+      "psnr_from_mean_mse": 7.516062329188129,
+      "psnr_mean_of_images": 7.76027705193584,
+      "psnr_median": 7.441722766446354,
+      "global_ssim_mean": 0.17364830709175622
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 4,
+      "logical_bits": 640,
+      "packed_bytes": 94,
+      "mse": 0.16663959515339974,
+      "psnr_from_mean_mse": 7.78221798166276,
+      "psnr_mean_of_images": 8.099299936481279,
+      "psnr_median": 7.721537778207686,
+      "global_ssim_mean": 0.23717888781056784
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 8,
+      "logical_bits": 1280,
+      "packed_bytes": 174,
+      "mse": 0.15982520615876775,
+      "psnr_from_mean_mse": 7.9635472669664775,
+      "psnr_mean_of_images": 8.341878008975025,
+      "psnr_median": 7.893679572339185,
+      "global_ssim_mean": 0.27513428864663364
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 1,
+      "logical_bits": 48,
+      "packed_bytes": 20,
+      "mse": 0.16344749397701688,
+      "psnr_from_mean_mse": 7.866217337578031,
+      "psnr_mean_of_images": 7.9470991583711115,
+      "psnr_median": 7.9528163748653515,
+      "global_ssim_mean": 0.05935627150237429
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 2,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.13667176955689986,
+      "psnr_from_mean_mse": 8.643211825192145,
+      "psnr_mean_of_images": 8.829697804697378,
+      "psnr_median": 8.604509934663117,
+      "global_ssim_mean": 0.24021097502552988
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 4,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.1276959720938079,
+      "psnr_from_mean_mse": 8.938228014446626,
+      "psnr_mean_of_images": 9.184855146890454,
+      "psnr_median": 8.923238808540422,
+      "global_ssim_mean": 0.3077859613390257
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 8,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.12636616731790587,
+      "psnr_from_mean_mse": 8.983691864486472,
+      "psnr_mean_of_images": 9.24479313724574,
+      "psnr_median": 8.944786314559789,
+      "global_ssim_mean": 0.31588168504845726
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 1,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.17710621680982452,
+      "psnr_from_mean_mse": 7.517661938702602,
+      "psnr_mean_of_images": 7.710034325220494,
+      "psnr_median": 7.469459971486678,
+      "global_ssim_mean": 0.15258411637225136
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 2,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.1568238823288188,
+      "psnr_from_mean_mse": 8.045877989613997,
+      "psnr_mean_of_images": 8.340501903212605,
+      "psnr_median": 7.983979214592185,
+      "global_ssim_mean": 0.24175645279035654
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 4,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.13974432460616104,
+      "psnr_from_mean_mse": 8.546658209533613,
+      "psnr_mean_of_images": 8.967483078883843,
+      "psnr_median": 8.553491095703006,
+      "global_ssim_mean": 0.3298145841297781
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 8,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.13260519789944364,
+      "psnr_from_mean_mse": 8.774394519885476,
+      "psnr_mean_of_images": 9.300999855183834,
+      "psnr_median": 8.860218231547996,
+      "global_ssim_mean": 0.3660339684295653
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 1,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.12315295170322524,
+      "psnr_from_mean_mse": 9.095551746242238,
+      "psnr_mean_of_images": 9.356542427065241,
+      "psnr_median": 9.062447573254534,
+      "global_ssim_mean": 0.3336568252901247
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 2,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.08822822042717636,
+      "psnr_from_mean_mse": 10.543924804519683,
+      "psnr_mean_of_images": 10.918449427922654,
+      "psnr_median": 10.633688669708112,
+      "global_ssim_mean": 0.574872703956837
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 4,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.06719672155324345,
+      "psnr_from_mean_mse": 11.72651915131711,
+      "psnr_mean_of_images": 12.300441267890845,
+      "psnr_median": 11.971814846513604,
+      "global_ssim_mean": 0.6954826427472901
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 8,
+      "logical_bits": 1536,
+      "packed_bytes": 206,
+      "mse": 0.051477789307048445,
+      "psnr_from_mean_mse": 12.883801119689938,
+      "psnr_mean_of_images": 13.690719213104119,
+      "psnr_median": 13.47600027056667,
+      "global_ssim_mean": 0.7735329798432045
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 1,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.10045977920590256,
+      "psnr_from_mean_mse": 9.98007780683373,
+      "psnr_mean_of_images": 10.289181817449746,
+      "psnr_median": 10.048475126121739,
+      "global_ssim_mean": 0.488021256576774
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 2,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.05724201185587354,
+      "psnr_from_mean_mse": 12.422851107167743,
+      "psnr_mean_of_images": 12.924235400536402,
+      "psnr_median": 12.462316917552123,
+      "global_ssim_mean": 0.7442773341119192
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 4,
+      "logical_bits": 1536,
+      "packed_bytes": 206,
+      "mse": 0.030042896528548576,
+      "psnr_from_mean_mse": 15.222581979753883,
+      "psnr_mean_of_images": 15.95652497796826,
+      "psnr_median": 15.45099956651157,
+      "global_ssim_mean": 0.8758343980013211
+    },
+    {
+      "method": "studio_codec",
+      "basis": "random",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 8,
+      "logical_bits": 3072,
+      "packed_bytes": 398,
+      "mse": 0.011504203402462807,
+      "psnr_from_mean_mse": 19.39143448259326,
+      "psnr_mean_of_images": 20.640081091429728,
+      "psnr_median": 20.053150993425874,
+      "global_ssim_mean": 0.9547974506970945
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 1,
+      "logical_bits": 48,
+      "packed_bytes": 20,
+      "mse": 0.14014869001176622,
+      "psnr_from_mean_mse": 8.534109572923512,
+      "psnr_mean_of_images": 8.569318873024203,
+      "psnr_median": 8.505216449741672,
+      "global_ssim_mean": 0.3288006772364908
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 2,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.0823450305706097,
+      "psnr_from_mean_mse": 10.843626048838253,
+      "psnr_mean_of_images": 11.000790772784429,
+      "psnr_median": 10.952077449003108,
+      "global_ssim_mean": 0.6126561749154972
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 4,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.0741725117013137,
+      "psnr_from_mean_mse": 11.297570142395019,
+      "psnr_mean_of_images": 11.54055091767317,
+      "psnr_median": 11.504482016038168,
+      "global_ssim_mean": 0.6550678373109666
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 8,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.07284673019086073,
+      "psnr_from_mean_mse": 11.37589937263052,
+      "psnr_mean_of_images": 11.635777050350448,
+      "psnr_median": 11.574690835782047,
+      "global_ssim_mean": 0.6623739433049336
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 1,
+      "logical_bits": 64,
+      "packed_bytes": 22,
+      "mse": 0.18774972122929603,
+      "psnr_from_mean_mse": 7.264206991635721,
+      "psnr_mean_of_images": 7.423408770055572,
+      "psnr_median": 7.297303173407091,
+      "global_ssim_mean": 0.12277131725156802
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 2,
+      "logical_bits": 128,
+      "packed_bytes": 30,
+      "mse": 0.17724044255129376,
+      "psnr_from_mean_mse": 7.514371742500799,
+      "psnr_mean_of_images": 7.741607488378587,
+      "psnr_median": 7.503567107889244,
+      "global_ssim_mean": 0.18543194603893215
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 4,
+      "logical_bits": 256,
+      "packed_bytes": 46,
+      "mse": 0.171050399074317,
+      "psnr_from_mean_mse": 7.66875908233835,
+      "psnr_mean_of_images": 7.9726231944142105,
+      "psnr_median": 7.5587903938170395,
+      "global_ssim_mean": 0.21843979069315367
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 8,
+      "logical_bits": 512,
+      "packed_bytes": 78,
+      "mse": 0.16881714165526465,
+      "psnr_from_mean_mse": 7.725834573056152,
+      "psnr_mean_of_images": 8.072581305930813,
+      "psnr_median": 7.567701620962614,
+      "global_ssim_mean": 0.22874547698552006
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 1,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.20594576404391932,
+      "psnr_from_mean_mse": 6.862471363187341,
+      "psnr_mean_of_images": 6.9294857803204675,
+      "psnr_median": 6.846055753532273,
+      "global_ssim_mean": 0.056254299661997326
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 2,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.19422564382341947,
+      "psnr_from_mean_mse": 7.116934302685886,
+      "psnr_mean_of_images": 7.216707431432083,
+      "psnr_median": 7.07611813025119,
+      "global_ssim_mean": 0.10855485849500995
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 4,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.18494794330177555,
+      "psnr_from_mean_mse": 7.329504938574071,
+      "psnr_mean_of_images": 7.487916427420825,
+      "psnr_median": 7.261150189191076,
+      "global_ssim_mean": 0.15601887895280037
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 8,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.18077926631399185,
+      "psnr_from_mean_mse": 7.428513805076157,
+      "psnr_mean_of_images": 7.6351067264429355,
+      "psnr_median": 7.312522830410894,
+      "global_ssim_mean": 0.17812509678578034
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 1,
+      "logical_bits": 160,
+      "packed_bytes": 34,
+      "mse": 0.218775313775965,
+      "psnr_from_mean_mse": 6.600016846042798,
+      "psnr_mean_of_images": 6.655277917840567,
+      "psnr_median": 6.609953552259601,
+      "global_ssim_mean": 0.01849353023076853
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 2,
+      "logical_bits": 320,
+      "packed_bytes": 54,
+      "mse": 0.21062147238283357,
+      "psnr_from_mean_mse": 6.764973555531284,
+      "psnr_mean_of_images": 6.839564705852701,
+      "psnr_median": 6.7950785684703074,
+      "global_ssim_mean": 0.048221146282918355
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 4,
+      "logical_bits": 640,
+      "packed_bytes": 94,
+      "mse": 0.2040832477340173,
+      "psnr_from_mean_mse": 6.901926430804529,
+      "psnr_mean_of_images": 6.999274416290099,
+      "psnr_median": 6.877017925616244,
+      "global_ssim_mean": 0.0769332374636825
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 8,
+      "logical_bits": 1280,
+      "packed_bytes": 174,
+      "mse": 0.2001561501494497,
+      "psnr_from_mean_mse": 6.986310608927094,
+      "psnr_mean_of_images": 7.105530194369531,
+      "psnr_median": 6.955271969456424,
+      "global_ssim_mean": 0.0930167252197566
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 1,
+      "logical_bits": 48,
+      "packed_bytes": 20,
+      "mse": 0.14014869001176622,
+      "psnr_from_mean_mse": 8.534109572923512,
+      "psnr_mean_of_images": 8.569318873024203,
+      "psnr_median": 8.505216449741672,
+      "global_ssim_mean": 0.3288006772364908
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 2,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.0823450305706097,
+      "psnr_from_mean_mse": 10.843626048838253,
+      "psnr_mean_of_images": 11.000790772784429,
+      "psnr_median": 10.952077449003108,
+      "global_ssim_mean": 0.6126561749154972
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 4,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.07417529755618311,
+      "psnr_from_mean_mse": 11.29740702823737,
+      "psnr_mean_of_images": 11.540114441160135,
+      "psnr_median": 11.504482016038168,
+      "global_ssim_mean": 0.655007738044338
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 8,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.07284006892098484,
+      "psnr_from_mean_mse": 11.376296519492037,
+      "psnr_mean_of_images": 11.636106879890653,
+      "psnr_median": 11.574690835782047,
+      "global_ssim_mean": 0.6623576513723696
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 1,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.126154990496611,
+      "psnr_from_mean_mse": 8.990955647875392,
+      "psnr_mean_of_images": 9.089421056400548,
+      "psnr_median": 8.888122996018101,
+      "global_ssim_mean": 0.4078872975401462
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 2,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.07269404136095174,
+      "psnr_from_mean_mse": 11.385011862539598,
+      "psnr_mean_of_images": 11.616886641884987,
+      "psnr_median": 11.483283436912547,
+      "global_ssim_mean": 0.6705980228492027
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 4,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.06042791204845696,
+      "psnr_from_mean_mse": 12.187624115681814,
+      "psnr_mean_of_images": 12.469478684707102,
+      "psnr_median": 12.398777795493228,
+      "global_ssim_mean": 0.7329417844596474
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 8,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.055693452949164945,
+      "psnr_from_mean_mse": 12.541958553679034,
+      "psnr_mean_of_images": 12.89970863494077,
+      "psnr_median": 12.67028918643998,
+      "global_ssim_mean": 0.756227734395348
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 1,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.11460917657094549,
+      "psnr_from_mean_mse": 9.407806077214165,
+      "psnr_mean_of_images": 9.518266197288568,
+      "psnr_median": 9.324680166400483,
+      "global_ssim_mean": 0.4719283930979311
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 2,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.06296594674599244,
+      "psnr_from_mean_mse": 12.008942622721053,
+      "psnr_mean_of_images": 12.30217106802247,
+      "psnr_median": 12.32398802810476,
+      "global_ssim_mean": 0.7236923489628417
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 4,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.04382544785594205,
+      "psnr_from_mean_mse": 13.582736371196095,
+      "psnr_mean_of_images": 13.974526645731753,
+      "psnr_median": 13.843310087020733,
+      "global_ssim_mean": 0.8154394089997877
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 8,
+      "logical_bits": 1536,
+      "packed_bytes": 206,
+      "mse": 0.03187199544944441,
+      "psnr_from_mean_mse": 14.96590745263214,
+      "psnr_mean_of_images": 15.587582303186407,
+      "psnr_median": 15.260687647523593,
+      "global_ssim_mean": 0.8691031331646014
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 1,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.09696169692102687,
+      "psnr_from_mean_mse": 10.133997925487732,
+      "psnr_mean_of_images": 10.318950361803868,
+      "psnr_median": 10.018424906786624,
+      "global_ssim_mean": 0.5629174068106271
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 2,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.04770327267088399,
+      "psnr_from_mean_mse": 13.214518252753823,
+      "psnr_mean_of_images": 13.605779691252776,
+      "psnr_median": 13.360500994094458,
+      "global_ssim_mean": 0.7973174939292585
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 4,
+      "logical_bits": 1536,
+      "packed_bytes": 206,
+      "mse": 0.02506886934942538,
+      "psnr_from_mean_mse": 16.008652530532967,
+      "psnr_mean_of_images": 16.55111415208859,
+      "psnr_median": 16.223600311671568,
+      "global_ssim_mean": 0.8996218804892923
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_bipolar",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 8,
+      "logical_bits": 3072,
+      "packed_bytes": 398,
+      "mse": 0.009835512566771084,
+      "psnr_from_mean_mse": 20.072030023821856,
+      "psnr_mean_of_images": 21.10618615711719,
+      "psnr_median": 20.739374287321635,
+      "global_ssim_mean": 0.9624037444777224
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 1,
+      "logical_bits": 48,
+      "packed_bytes": 20,
+      "mse": 0.14014869001176622,
+      "psnr_from_mean_mse": 8.534109572923512,
+      "psnr_mean_of_images": 8.569318873024203,
+      "psnr_median": 8.505216449741672,
+      "global_ssim_mean": 0.3288006772364908
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 2,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.08545429381645388,
+      "psnr_from_mean_mse": 10.682661104278354,
+      "psnr_mean_of_images": 10.83196135963052,
+      "psnr_median": 10.640041569435327,
+      "global_ssim_mean": 0.606013673188273
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 4,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.07440273028634894,
+      "psnr_from_mean_mse": 11.28411127269458,
+      "psnr_mean_of_images": 11.491559460367656,
+      "psnr_median": 11.213561145173843,
+      "global_ssim_mean": 0.665018418011137
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 1,
+      "n_layers": 8,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.072593741617444,
+      "psnr_from_mean_mse": 11.391008186685887,
+      "psnr_mean_of_images": 11.622468638574789,
+      "psnr_median": 11.329663113701605,
+      "global_ssim_mean": 0.6744718017657492
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 1,
+      "logical_bits": 64,
+      "packed_bytes": 22,
+      "mse": 0.18897053882474488,
+      "psnr_from_mean_mse": 7.236058985948572,
+      "psnr_mean_of_images": 7.401214070069937,
+      "psnr_median": 7.241329092307435,
+      "global_ssim_mean": 0.11910385373042015
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 2,
+      "logical_bits": 128,
+      "packed_bytes": 30,
+      "mse": 0.1783596428835498,
+      "psnr_from_mean_mse": 7.48703405877594,
+      "psnr_mean_of_images": 7.71475056495907,
+      "psnr_median": 7.474815483447937,
+      "global_ssim_mean": 0.17928899623018033
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 4,
+      "logical_bits": 256,
+      "packed_bytes": 46,
+      "mse": 0.17399829071662867,
+      "psnr_from_mean_mse": 7.594550180161494,
+      "psnr_mean_of_images": 7.889489435113296,
+      "psnr_median": 7.544852851191451,
+      "global_ssim_mean": 0.2058847223474887
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 2,
+      "n_layers": 8,
+      "logical_bits": 512,
+      "packed_bytes": 78,
+      "mse": 0.17169148588121266,
+      "psnr_from_mean_mse": 7.652512408116419,
+      "psnr_mean_of_images": 8.023362521447535,
+      "psnr_median": 7.5513040049148765,
+      "global_ssim_mean": 0.21733074203211017
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 1,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.20721585665168873,
+      "psnr_from_mean_mse": 6.835770144053802,
+      "psnr_mean_of_images": 6.915795740307514,
+      "psnr_median": 6.811674999175382,
+      "global_ssim_mean": 0.05592135327630708
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 2,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.19702593957938486,
+      "psnr_from_mean_mse": 7.0547659274917205,
+      "psnr_mean_of_images": 7.168988080151621,
+      "psnr_median": 7.005252032674348,
+      "global_ssim_mean": 0.10222981011292956
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 4,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.1887929638410083,
+      "psnr_from_mean_mse": 7.240141955356517,
+      "psnr_mean_of_images": 7.3862013502598645,
+      "psnr_median": 7.184304809111045,
+      "global_ssim_mean": 0.14705455897031408
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 4,
+      "n_layers": 8,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.18448736459826548,
+      "psnr_from_mean_mse": 7.3403337299089655,
+      "psnr_mean_of_images": 7.545956315975827,
+      "psnr_median": 7.277146031311859,
+      "global_ssim_mean": 0.1701858341263507
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 1,
+      "logical_bits": 160,
+      "packed_bytes": 34,
+      "mse": 0.21750854877841633,
+      "psnr_from_mean_mse": 6.625236692181621,
+      "psnr_mean_of_images": 6.682781633665895,
+      "psnr_median": 6.631160135696643,
+      "global_ssim_mean": 0.020382525989923093
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 2,
+      "logical_bits": 320,
+      "packed_bytes": 54,
+      "mse": 0.20746103349922893,
+      "psnr_from_mean_mse": 6.8306346292993725,
+      "psnr_mean_of_images": 6.904952392129584,
+      "psnr_median": 6.825141466495111,
+      "global_ssim_mean": 0.052254686183350225
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 4,
+      "logical_bits": 640,
+      "packed_bytes": 94,
+      "mse": 0.1985579543831144,
+      "psnr_from_mean_mse": 7.021127100833681,
+      "psnr_mean_of_images": 7.119350190048573,
+      "psnr_median": 6.994999551473068,
+      "global_ssim_mean": 0.090411826480374
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "layer",
+      "rank": 8,
+      "n_layers": 8,
+      "logical_bits": 1280,
+      "packed_bytes": 174,
+      "mse": 0.19211703673142885,
+      "psnr_from_mean_mse": 7.164341206647316,
+      "psnr_mean_of_images": 7.28489243236157,
+      "psnr_median": 7.151784991763947,
+      "global_ssim_mean": 0.12091497544837702
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 1,
+      "logical_bits": 48,
+      "packed_bytes": 20,
+      "mse": 0.14014869001176622,
+      "psnr_from_mean_mse": 8.534109572923512,
+      "psnr_mean_of_images": 8.569318873024203,
+      "psnr_median": 8.505216449741672,
+      "global_ssim_mean": 0.3288006772364908
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 2,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.08545429381645388,
+      "psnr_from_mean_mse": 10.682661104278354,
+      "psnr_mean_of_images": 10.83196135963052,
+      "psnr_median": 10.640041569435327,
+      "global_ssim_mean": 0.606013673188273
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 4,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.07440273028634894,
+      "psnr_from_mean_mse": 11.28411127269458,
+      "psnr_mean_of_images": 11.491559460367656,
+      "psnr_median": 11.213561145173843,
+      "global_ssim_mean": 0.6650184180113922
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 1,
+      "n_layers": 8,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.072593741617444,
+      "psnr_from_mean_mse": 11.391008186685887,
+      "psnr_mean_of_images": 11.622468638574789,
+      "psnr_median": 11.329663113701605,
+      "global_ssim_mean": 0.674471801766701
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 1,
+      "logical_bits": 96,
+      "packed_bytes": 26,
+      "mse": 0.1249632172692922,
+      "psnr_from_mean_mse": 9.032178020942258,
+      "psnr_mean_of_images": 9.1323848632436,
+      "psnr_median": 8.92385616765295,
+      "global_ssim_mean": 0.41485130390862063
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 2,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.07198463726244568,
+      "psnr_from_mean_mse": 11.427601794583119,
+      "psnr_mean_of_images": 11.665603700559334,
+      "psnr_median": 11.521660001867394,
+      "global_ssim_mean": 0.6776312304343636
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 4,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.05794422535856742,
+      "psnr_from_mean_mse": 12.369898387318202,
+      "psnr_mean_of_images": 12.654462365597526,
+      "psnr_median": 12.440189961175827,
+      "global_ssim_mean": 0.7505417051122447
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 2,
+      "n_layers": 8,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.0532821653685399,
+      "psnr_from_mean_mse": 12.734181339034649,
+      "psnr_mean_of_images": 13.062097416113644,
+      "psnr_median": 12.759590414099113,
+      "global_ssim_mean": 0.7733949240306685
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 1,
+      "logical_bits": 192,
+      "packed_bytes": 38,
+      "mse": 0.11271999219526346,
+      "psnr_from_mean_mse": 9.479990499692653,
+      "psnr_mean_of_images": 9.60632569888902,
+      "psnr_median": 9.35114074814131,
+      "global_ssim_mean": 0.482431195425591
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 2,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.06096601637634637,
+      "psnr_from_mean_mse": 12.149121815943216,
+      "psnr_mean_of_images": 12.43511096849886,
+      "psnr_median": 12.347267973053519,
+      "global_ssim_mean": 0.7350787782232951
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 4,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.040887237366490366,
+      "psnr_from_mean_mse": 13.884122324884922,
+      "psnr_mean_of_images": 14.257455407497536,
+      "psnr_median": 14.061707388146843,
+      "global_ssim_mean": 0.831861419534947
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 4,
+      "n_layers": 8,
+      "logical_bits": 1536,
+      "packed_bytes": 206,
+      "mse": 0.02877124732283214,
+      "psnr_from_mean_mse": 15.410413096883783,
+      "psnr_mean_of_images": 16.019241433790093,
+      "psnr_median": 15.88114188172697,
+      "global_ssim_mean": 0.8857075331444108
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 1,
+      "logical_bits": 384,
+      "packed_bytes": 62,
+      "mse": 0.09795870245501258,
+      "psnr_from_mean_mse": 10.08956976103062,
+      "psnr_mean_of_images": 10.290186395445053,
+      "psnr_median": 9.996742523740886,
+      "global_ssim_mean": 0.5597724045857556
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 2,
+      "logical_bits": 768,
+      "packed_bytes": 110,
+      "mse": 0.04653975134610631,
+      "psnr_from_mean_mse": 13.321759414038745,
+      "psnr_mean_of_images": 13.689731751205237,
+      "psnr_median": 13.32764332181489,
+      "global_ssim_mean": 0.8043365291015669
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 4,
+      "logical_bits": 1536,
+      "packed_bytes": 206,
+      "mse": 0.023779337248937635,
+      "psnr_from_mean_mse": 16.23800253718179,
+      "psnr_mean_of_images": 16.815877868565103,
+      "psnr_median": 16.549851157737756,
+      "global_ssim_mean": 0.9039145744030355
+    },
+    {
+      "method": "studio_codec",
+      "basis": "pca_real",
+      "scale_mode": "component",
+      "rank": 8,
+      "n_layers": 8,
+      "logical_bits": 3072,
+      "packed_bytes": 398,
+      "mse": 0.008158024559878884,
+      "psnr_from_mean_mse": 20.88414991565649,
+      "psnr_mean_of_images": 22.037533767954294,
+      "psnr_median": 21.477612482821847,
+      "global_ssim_mean": 0.9688742196334544
+    }
+  ],
+  "truncated_svd": [
+    {
+      "method": "truncated_svd",
+      "rank": 1,
+      "logical_bits": 544,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 0.04719779761855902,
+      "psnr_from_mean_mse": 13.260782662901196,
+      "psnr_mean_of_images": 13.50992299996599,
+      "psnr_median": 13.146386239122776,
+      "global_ssim_mean": 0.7881699651182988
+    },
+    {
+      "method": "truncated_svd",
+      "rank": 2,
+      "logical_bits": 1088,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 0.017208148419651285,
+      "psnr_from_mean_mse": 17.642658568304043,
+      "psnr_mean_of_images": 18.338577760017056,
+      "psnr_median": 17.66070006112492,
+      "global_ssim_mean": 0.9318014453354458
+    },
+    {
+      "method": "truncated_svd",
+      "rank": 3,
+      "logical_bits": 1632,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 0.005621824856285569,
+      "psnr_from_mean_mse": 22.501226886349393,
+      "psnr_mean_of_images": 23.76672431952209,
+      "psnr_median": 22.834862074609383,
+      "global_ssim_mean": 0.9787391728139738
+    },
+    {
+      "method": "truncated_svd",
+      "rank": 4,
+      "logical_bits": 2176,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 0.0011960214401896803,
+      "psnr_from_mean_mse": 29.222610350026166,
+      "psnr_mean_of_images": 41.03591085243529,
+      "psnr_median": 30.088323561240635,
+      "global_ssim_mean": 0.99555826113571
+    },
+    {
+      "method": "truncated_svd",
+      "rank": 5,
+      "logical_bits": 2720,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 0.00016424042606541042,
+      "psnr_from_mean_mse": 37.8451993700804,
+      "psnr_mean_of_images": 84.40467381630751,
+      "psnr_median": 41.06356505200286,
+      "global_ssim_mean": 0.999392218622064
+    },
+    {
+      "method": "truncated_svd",
+      "rank": 6,
+      "logical_bits": 3264,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 2.6377718434491223e-06,
+      "psnr_from_mean_mse": 55.78762771873903,
+      "psnr_mean_of_images": 291.05688186089407,
+      "psnr_median": 309.02128196434285,
+      "global_ssim_mean": 0.9999904026699205
+    },
+    {
+      "method": "truncated_svd",
+      "rank": 7,
+      "logical_bits": 3808,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 1.850979306173768e-31,
+      "psnr_from_mean_mse": 307.3259843660354,
+      "psnr_mean_of_images": 308.9576807117258,
+      "psnr_median": 309.227795299519,
+      "global_ssim_mean": 1.0
+    },
+    {
+      "method": "truncated_svd",
+      "rank": 8,
+      "logical_bits": 4352,
+      "storage": "float32 U, s, Vt per image",
+      "mse": 1.850979306173768e-31,
+      "psnr_from_mean_mse": 307.3259843660354,
+      "psnr_mean_of_images": 308.9576807117258,
+      "psnr_median": 309.227795299519,
+      "global_ssim_mean": 1.0
+    }
+  ],
+  "jpeg": {
+    "per_image_8x8": [
+      {
+        "quality": 5,
+        "bytes_mean": 339.1722222222222,
+        "bytes_min": 335,
+        "bytes_max": 343,
+        "bits_mean": 2713.3777777777777,
+        "vs_uint8_quantized": {
+          "mse": 0.03028744486629074,
+          "psnr_from_mean_mse": 15.1873736342109,
+          "psnr_mean_of_images": 15.358578460025026,
+          "psnr_median": 15.116146532255975,
+          "global_ssim_mean": 0.8745226513739495
+        },
+        "vs_float_original": {
+          "mse": 0.030333236217845064,
+          "psnr_from_mean_mse": 15.180812528421352,
+          "psnr_mean_of_images": 15.352427624576983,
+          "psnr_median": 15.110359791168191,
+          "global_ssim_mean": 0.8743934598851152
+        }
+      },
+      {
+        "quality": 10,
+        "bytes_mean": 341.65277777777777,
+        "bytes_min": 336,
+        "bytes_max": 346,
+        "bits_mean": 2733.222222222222,
+        "vs_uint8_quantized": {
+          "mse": 0.02297291973706694,
+          "psnr_from_mean_mse": 16.387838047564898,
+          "psnr_mean_of_images": 16.59955747677182,
+          "psnr_median": 16.364556319075284,
+          "global_ssim_mean": 0.9051737157991526
+        },
+        "vs_float_original": {
+          "mse": 0.023014722488483495,
+          "psnr_from_mean_mse": 16.379942574611608,
+          "psnr_mean_of_images": 16.591902784518933,
+          "psnr_median": 16.36608714192464,
+          "global_ssim_mean": 0.9050474674114124
+        }
+      },
+      {
+        "quality": 20,
+        "bytes_mean": 346.3305555555556,
+        "bytes_min": 340,
+        "bytes_max": 350,
+        "bits_mean": 2770.6444444444446,
+        "vs_uint8_quantized": {
+          "mse": 0.01268963059079841,
+          "psnr_from_mean_mse": 18.965510205146707,
+          "psnr_mean_of_images": 19.18510203110405,
+          "psnr_median": 18.981837859985433,
+          "global_ssim_mean": 0.9490717260724788
+        },
+        "vs_float_original": {
+          "mse": 0.012712233078027046,
+          "psnr_from_mean_mse": 18.95778152964536,
+          "psnr_mean_of_images": 19.17789641530597,
+          "psnr_median": 18.976767916915584,
+          "global_ssim_mean": 0.9490035868554938
+        }
+      },
+      {
+        "quality": 30,
+        "bytes_mean": 350.6222222222222,
+        "bytes_min": 342,
+        "bytes_max": 354,
+        "bits_mean": 2804.9777777777776,
+        "vs_uint8_quantized": {
+          "mse": 0.007570066534238968,
+          "psnr_from_mean_mse": 21.209003034159302,
+          "psnr_mean_of_images": 21.40698916153799,
+          "psnr_median": 21.32822784318205,
+          "global_ssim_mean": 0.9703953585134719
+        },
+        "vs_float_original": {
+          "mse": 0.007583518394304975,
+          "psnr_from_mean_mse": 21.201292554876552,
+          "psnr_mean_of_images": 21.399297343795656,
+          "psnr_median": 21.322996012093714,
+          "global_ssim_mean": 0.970355969737551
+        }
+      },
+      {
+        "quality": 50,
+        "bytes_mean": 356.50555555555553,
+        "bytes_min": 346,
+        "bytes_max": 361,
+        "bits_mean": 2852.0444444444443,
+        "vs_uint8_quantized": {
+          "mse": 0.003641359893630655,
+          "psnr_from_mean_mse": 24.387363954704316,
+          "psnr_mean_of_images": 24.511341181061944,
+          "psnr_median": 24.385611675698208,
+          "global_ssim_mean": 0.9860197182400845
+        },
+        "vs_float_original": {
+          "mse": 0.0036441846644895194,
+          "psnr_from_mean_mse": 24.383996238129853,
+          "psnr_mean_of_images": 24.50783552308927,
+          "psnr_median": 24.38898264300004,
+          "global_ssim_mean": 0.9860135826795572
+        }
+      },
+      {
+        "quality": 70,
+        "bytes_mean": 363.44166666666666,
+        "bytes_min": 349,
+        "bytes_max": 368,
+        "bits_mean": 2907.5333333333333,
+        "vs_uint8_quantized": {
+          "mse": 0.001446621091246956,
+          "psnr_from_mean_mse": 28.39645207325868,
+          "psnr_mean_of_images": 28.470844768563257,
+          "psnr_median": 28.40928179683133,
+          "global_ssim_mean": 0.9945253258844825
+        },
+        "vs_float_original": {
+          "mse": 0.0014462842676069099,
+          "psnr_from_mean_mse": 28.397463379407775,
+          "psnr_mean_of_images": 28.471809759050554,
+          "psnr_median": 28.4049617129256,
+          "global_ssim_mean": 0.9945278734918042
+        }
+      },
+      {
+        "quality": 90,
+        "bytes_mean": 380.64722222222224,
+        "bytes_min": 364,
+        "bytes_max": 387,
+        "bits_mean": 3045.177777777778,
+        "vs_uint8_quantized": {
+          "mse": 0.00016864774232132942,
+          "psnr_from_mean_mse": 37.73019468313804,
+          "psnr_mean_of_images": 37.81051529230985,
+          "psnr_median": 37.80096765796071,
+          "global_ssim_mean": 0.9993700679666109
+        },
+        "vs_float_original": {
+          "mse": 0.00016883580694541228,
+          "psnr_from_mean_mse": 37.72535442131715,
+          "psnr_mean_of_images": 37.804908077621334,
+          "psnr_median": 37.78179627493682,
+          "global_ssim_mean": 0.9993693444394435
+        }
+      },
+      {
+        "quality": 95,
+        "bytes_mean": 394.1611111111111,
+        "bytes_min": 373,
+        "bytes_max": 403,
+        "bits_mean": 3153.288888888889,
+        "vs_uint8_quantized": {
+          "mse": 4.311309218676572e-05,
+          "psnr_from_mean_mse": 43.65390827262342,
+          "psnr_mean_of_images": 43.73820259080047,
+          "psnr_median": 43.71287068489992,
+          "global_ssim_mean": 0.999839515396311
+        },
+        "vs_float_original": {
+          "mse": 4.3631808883769274e-05,
+          "psnr_from_mean_mse": 43.60196781696775,
+          "psnr_mean_of_images": 43.684359541563886,
+          "psnr_median": 43.683926386008736,
+          "global_ssim_mean": 0.9998374623338981
+        }
+      }
+    ],
+    "mosaic": [
+      {
+        "quality": 5,
+        "file_bytes": 3374,
+        "bytes_per_image": 9.372222222222222,
+        "bits_per_image": 74.97777777777777,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 0.03028744486629074,
+          "psnr_from_mean_mse": 15.1873736342109,
+          "psnr_mean_of_images": 15.358578460025026,
+          "psnr_median": 15.116146532255975,
+          "global_ssim_mean": 0.8745226513739495
+        },
+        "vs_float_original": {
+          "mse": 0.030333236217845064,
+          "psnr_from_mean_mse": 15.180812528421352,
+          "psnr_mean_of_images": 15.352427624576983,
+          "psnr_median": 15.110359791168191,
+          "global_ssim_mean": 0.8743934598851152
+        }
+      },
+      {
+        "quality": 10,
+        "file_bytes": 4255,
+        "bytes_per_image": 11.819444444444445,
+        "bits_per_image": 94.55555555555556,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 0.02297291973706694,
+          "psnr_from_mean_mse": 16.387838047564898,
+          "psnr_mean_of_images": 16.59955747677182,
+          "psnr_median": 16.364556319075284,
+          "global_ssim_mean": 0.9051737157991526
+        },
+        "vs_float_original": {
+          "mse": 0.023014722488483495,
+          "psnr_from_mean_mse": 16.379942574611608,
+          "psnr_mean_of_images": 16.591902784518933,
+          "psnr_median": 16.36608714192464,
+          "global_ssim_mean": 0.9050474674114124
+        }
+      },
+      {
+        "quality": 20,
+        "file_bytes": 5950,
+        "bytes_per_image": 16.52777777777778,
+        "bits_per_image": 132.22222222222223,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 0.01268963059079841,
+          "psnr_from_mean_mse": 18.965510205146707,
+          "psnr_mean_of_images": 19.18510203110405,
+          "psnr_median": 18.981837859985433,
+          "global_ssim_mean": 0.9490717260724788
+        },
+        "vs_float_original": {
+          "mse": 0.012712233078027046,
+          "psnr_from_mean_mse": 18.95778152964536,
+          "psnr_mean_of_images": 19.17789641530597,
+          "psnr_median": 18.976767916915584,
+          "global_ssim_mean": 0.9490035868554938
+        }
+      },
+      {
+        "quality": 30,
+        "file_bytes": 7480,
+        "bytes_per_image": 20.77777777777778,
+        "bits_per_image": 166.22222222222223,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 0.007570066534238968,
+          "psnr_from_mean_mse": 21.209003034159302,
+          "psnr_mean_of_images": 21.40698916153799,
+          "psnr_median": 21.32822784318205,
+          "global_ssim_mean": 0.9703953585134719
+        },
+        "vs_float_original": {
+          "mse": 0.007583518394304975,
+          "psnr_from_mean_mse": 21.201292554876552,
+          "psnr_mean_of_images": 21.399297343795656,
+          "psnr_median": 21.322996012093714,
+          "global_ssim_mean": 0.970355969737551
+        }
+      },
+      {
+        "quality": 50,
+        "file_bytes": 9605,
+        "bytes_per_image": 26.680555555555557,
+        "bits_per_image": 213.44444444444446,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 0.003641359893630655,
+          "psnr_from_mean_mse": 24.387363954704316,
+          "psnr_mean_of_images": 24.511341181061944,
+          "psnr_median": 24.385611675698208,
+          "global_ssim_mean": 0.9860197182400845
+        },
+        "vs_float_original": {
+          "mse": 0.0036441846644895194,
+          "psnr_from_mean_mse": 24.383996238129853,
+          "psnr_mean_of_images": 24.50783552308927,
+          "psnr_median": 24.38898264300004,
+          "global_ssim_mean": 0.9860135826795572
+        }
+      },
+      {
+        "quality": 70,
+        "file_bytes": 12041,
+        "bytes_per_image": 33.44722222222222,
+        "bits_per_image": 267.5777777777778,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 0.001446621091246956,
+          "psnr_from_mean_mse": 28.39645207325868,
+          "psnr_mean_of_images": 28.470844768563257,
+          "psnr_median": 28.40928179683133,
+          "global_ssim_mean": 0.9945253258844825
+        },
+        "vs_float_original": {
+          "mse": 0.0014462842676069099,
+          "psnr_from_mean_mse": 28.397463379407775,
+          "psnr_mean_of_images": 28.471809759050554,
+          "psnr_median": 28.4049617129256,
+          "global_ssim_mean": 0.9945278734918042
+        }
+      },
+      {
+        "quality": 90,
+        "file_bytes": 18155,
+        "bytes_per_image": 50.43055555555556,
+        "bits_per_image": 403.44444444444446,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 0.00016864774232132942,
+          "psnr_from_mean_mse": 37.73019468313804,
+          "psnr_mean_of_images": 37.81051529230985,
+          "psnr_median": 37.80096765796071,
+          "global_ssim_mean": 0.9993700679666109
+        },
+        "vs_float_original": {
+          "mse": 0.00016883580694541228,
+          "psnr_from_mean_mse": 37.72535442131715,
+          "psnr_mean_of_images": 37.804908077621334,
+          "psnr_median": 37.78179627493682,
+          "global_ssim_mean": 0.9993693444394435
+        }
+      },
+      {
+        "quality": 95,
+        "file_bytes": 23029,
+        "bytes_per_image": 63.96944444444444,
+        "bits_per_image": 511.75555555555553,
+        "canvas_shape": [
+          152,
+          152
+        ],
+        "vs_uint8_quantized": {
+          "mse": 4.311309218676572e-05,
+          "psnr_from_mean_mse": 43.65390827262342,
+          "psnr_mean_of_images": 43.73820259080047,
+          "psnr_median": 43.71287068489992,
+          "global_ssim_mean": 0.999839515396311
+        },
+        "vs_float_original": {
+          "mse": 4.3631808883769274e-05,
+          "psnr_from_mean_mse": 43.60196781696775,
+          "psnr_mean_of_images": 43.684359541563886,
+          "psnr_median": 43.683926386008736,
+          "global_ssim_mean": 0.9998374623338981
+        }
+      }
+    ],
+    "mosaic_cols": 19
+  },
+  "best_under_bit_budget": [
+    {
+      "budget_bits": 128,
+      "random_layer": {
+        "bits": 96,
+        "psnr_from_mean_mse": 8.645642610807728,
+        "global_ssim_mean": 0.24059631824036015,
+        "mse": 0.13659529453143476,
+        "rank": 1,
+        "n_layers": 2
+      },
+      "pca_bipolar_layer": {
+        "bits": 96,
+        "psnr_from_mean_mse": 10.843626048838253,
+        "global_ssim_mean": 0.6126561749154972,
+        "mse": 0.0823450305706097,
+        "rank": 1,
+        "n_layers": 2
+      },
+      "pca_real_layer": {
+        "bits": 96,
+        "psnr_from_mean_mse": 10.682661104278354,
+        "global_ssim_mean": 0.606013673188273,
+        "mse": 0.08545429381645388,
+        "rank": 1,
+        "n_layers": 2
+      },
+      "pca_real_component": {
+        "bits": 96,
+        "psnr_from_mean_mse": 10.682661104278354,
+        "global_ssim_mean": 0.606013673188273,
+        "mse": 0.08545429381645388,
+        "rank": 1,
+        "n_layers": 2
+      },
+      "truncated_svd": null,
+      "jpeg_mosaic": {
+        "bits": 94.55555555555556,
+        "psnr_vs_float": 16.379942574611608,
+        "quality": 10
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 192,
+      "random_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 8.935109385929959,
+        "global_ssim_mean": 0.3071795281398674,
+        "mse": 0.12778770232197556,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_bipolar_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.297570142395019,
+        "global_ssim_mean": 0.6550678373109666,
+        "mse": 0.0741725117013137,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_real_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.28411127269458,
+        "global_ssim_mean": 0.665018418011137,
+        "mse": 0.07440273028634894,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_real_component": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.427601794583119,
+        "global_ssim_mean": 0.6776312304343636,
+        "mse": 0.07198463726244568,
+        "rank": 2,
+        "n_layers": 2
+      },
+      "truncated_svd": null,
+      "jpeg_mosaic": {
+        "bits": 166.22222222222223,
+        "psnr_vs_float": 21.201292554876552,
+        "quality": 30
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 256,
+      "random_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 8.935109385929959,
+        "global_ssim_mean": 0.3071795281398674,
+        "mse": 0.12778770232197556,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_bipolar_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.297570142395019,
+        "global_ssim_mean": 0.6550678373109666,
+        "mse": 0.0741725117013137,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_real_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.28411127269458,
+        "global_ssim_mean": 0.665018418011137,
+        "mse": 0.07440273028634894,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_real_component": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.427601794583119,
+        "global_ssim_mean": 0.6776312304343636,
+        "mse": 0.07198463726244568,
+        "rank": 2,
+        "n_layers": 2
+      },
+      "truncated_svd": null,
+      "jpeg_mosaic": {
+        "bits": 213.44444444444446,
+        "psnr_vs_float": 24.383996238129853,
+        "quality": 50
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 320,
+      "random_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 8.935109385929959,
+        "global_ssim_mean": 0.3071795281398674,
+        "mse": 0.12778770232197556,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_bipolar_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.297570142395019,
+        "global_ssim_mean": 0.6550678373109666,
+        "mse": 0.0741725117013137,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_real_layer": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.28411127269458,
+        "global_ssim_mean": 0.665018418011137,
+        "mse": 0.07440273028634894,
+        "rank": 1,
+        "n_layers": 4
+      },
+      "pca_real_component": {
+        "bits": 192,
+        "psnr_from_mean_mse": 11.427601794583119,
+        "global_ssim_mean": 0.6776312304343636,
+        "mse": 0.07198463726244568,
+        "rank": 2,
+        "n_layers": 2
+      },
+      "truncated_svd": null,
+      "jpeg_mosaic": {
+        "bits": 267.5777777777778,
+        "psnr_vs_float": 28.397463379407775,
+        "quality": 70
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 384,
+      "random_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 8.977738365414213,
+        "global_ssim_mean": 0.3147435309726605,
+        "mse": 0.12653951438635205,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_bipolar_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.37589937263052,
+        "global_ssim_mean": 0.6623739433049336,
+        "mse": 0.07284673019086073,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.391008186685887,
+        "global_ssim_mean": 0.6744718017657492,
+        "mse": 0.072593741617444,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_component": {
+        "bits": 384,
+        "psnr_from_mean_mse": 12.369898387318202,
+        "global_ssim_mean": 0.7505417051122447,
+        "mse": 0.05794422535856742,
+        "rank": 2,
+        "n_layers": 4
+      },
+      "truncated_svd": null,
+      "jpeg_mosaic": {
+        "bits": 267.5777777777778,
+        "psnr_vs_float": 28.397463379407775,
+        "quality": 70
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 512,
+      "random_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 8.977738365414213,
+        "global_ssim_mean": 0.3147435309726605,
+        "mse": 0.12653951438635205,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_bipolar_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.37589937263052,
+        "global_ssim_mean": 0.6623739433049336,
+        "mse": 0.07284673019086073,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.391008186685887,
+        "global_ssim_mean": 0.6744718017657492,
+        "mse": 0.072593741617444,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_component": {
+        "bits": 384,
+        "psnr_from_mean_mse": 12.369898387318202,
+        "global_ssim_mean": 0.7505417051122447,
+        "mse": 0.05794422535856742,
+        "rank": 2,
+        "n_layers": 4
+      },
+      "truncated_svd": null,
+      "jpeg_mosaic": {
+        "bits": 511.75555555555553,
+        "psnr_vs_float": 43.60196781696775,
+        "quality": 95
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 640,
+      "random_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 8.977738365414213,
+        "global_ssim_mean": 0.3147435309726605,
+        "mse": 0.12653951438635205,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_bipolar_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.37589937263052,
+        "global_ssim_mean": 0.6623739433049336,
+        "mse": 0.07284673019086073,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.391008186685887,
+        "global_ssim_mean": 0.6744718017657492,
+        "mse": 0.072593741617444,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_component": {
+        "bits": 384,
+        "psnr_from_mean_mse": 12.369898387318202,
+        "global_ssim_mean": 0.7505417051122447,
+        "mse": 0.05794422535856742,
+        "rank": 2,
+        "n_layers": 4
+      },
+      "truncated_svd": {
+        "bits": 544,
+        "psnr_from_mean_mse": 13.260782662901196,
+        "global_ssim_mean": 0.7881699651182988,
+        "mse": 0.04719779761855902,
+        "rank": 1,
+        "n_layers": null
+      },
+      "jpeg_mosaic": {
+        "bits": 511.75555555555553,
+        "psnr_vs_float": 43.60196781696775,
+        "quality": 95
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 768,
+      "random_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 8.977738365414213,
+        "global_ssim_mean": 0.3147435309726605,
+        "mse": 0.12653951438635205,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_bipolar_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.37589937263052,
+        "global_ssim_mean": 0.6623739433049336,
+        "mse": 0.07284673019086073,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.391008186685887,
+        "global_ssim_mean": 0.6744718017657492,
+        "mse": 0.072593741617444,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_component": {
+        "bits": 768,
+        "psnr_from_mean_mse": 13.884122324884922,
+        "global_ssim_mean": 0.831861419534947,
+        "mse": 0.040887237366490366,
+        "rank": 4,
+        "n_layers": 4
+      },
+      "truncated_svd": {
+        "bits": 544,
+        "psnr_from_mean_mse": 13.260782662901196,
+        "global_ssim_mean": 0.7881699651182988,
+        "mse": 0.04719779761855902,
+        "rank": 1,
+        "n_layers": null
+      },
+      "jpeg_mosaic": {
+        "bits": 511.75555555555553,
+        "psnr_vs_float": 43.60196781696775,
+        "quality": 95
+      },
+      "jpeg_per_image": null
+    },
+    {
+      "budget_bits": 1280,
+      "random_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 8.977738365414213,
+        "global_ssim_mean": 0.3147435309726605,
+        "mse": 0.12653951438635205,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_bipolar_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.37589937263052,
+        "global_ssim_mean": 0.6623739433049336,
+        "mse": 0.07284673019086073,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_layer": {
+        "bits": 384,
+        "psnr_from_mean_mse": 11.391008186685887,
+        "global_ssim_mean": 0.6744718017657492,
+        "mse": 0.072593741617444,
+        "rank": 1,
+        "n_layers": 8
+      },
+      "pca_real_component": {
+        "bits": 768,
+        "psnr_from_mean_mse": 13.884122324884922,
+        "global_ssim_mean": 0.831861419534947,
+        "mse": 0.040887237366490366,
+        "rank": 4,
+        "n_layers": 4
+      },
+      "truncated_svd": {
+        "bits": 1088,
+        "psnr_from_mean_mse": 17.642658568304043,
+        "global_ssim_mean": 0.9318014453354458,
+        "mse": 0.017208148419651285,
+        "rank": 2,
+        "n_layers": null
+      },
+      "jpeg_mosaic": {
+        "bits": 511.75555555555553,
+        "psnr_vs_float": 43.60196781696775,
+        "quality": 95
+      },
+      "jpeg_per_image": null
+    }
+  ],
+  "prior": {
+    "label": "toy class-conditional PCA prior over residual codes",
+    "config": {
+      "rank": 4,
+      "n_layers": 4,
+      "scale_mode": "layer",
+      "basis": "pca_bipolar"
+    },
+    "n_components": 16,
+    "code_dim": 260,
+    "n_train_codes": 1437,
+    "explained_variance_ratio": 0.570623912501556,
+    "samples_per_class": 8,
+    "same_class_nearest_train_rate": 0.05,
+    "median_nearest_train_mse": 0.12356808291462,
+    "min_nearest_train_mse": 0.04987425136116602,
+    "exact_train_copies": 0,
+    "mean_sample_psnr_vs_class_mean_image": 7.400566760086193,
+    "mean_prototype_psnr_vs_class_mean_image": 8.028691867451744,
+    "test_reconstruction": {
+      "mse": 0.18494794330177555,
+      "psnr_from_mean_mse": 7.329504938574071,
+      "psnr_mean_of_images": 7.487916427420825,
+      "psnr_median": 7.261150189191076,
+      "global_ssim_mean": 0.15601887895280037
+    },
+    "class_counts": {
+      "0": 142,
+      "1": 146,
+      "2": 141,
+      "3": 147,
+      "4": 145,
+      "5": 146,
+      "6": 145,
+      "7": 143,
+      "8": 138,
+      "9": 144
+    }
+  },
+  "prior_component_after_sweep": {
+    "label": "toy class-conditional PCA prior over residual codes",
+    "config": {
+      "rank": 4,
+      "n_layers": 4,
+      "scale_mode": "component",
+      "basis": "pca_real"
+    },
+    "n_components": 16,
+    "code_dim": 272,
+    "n_train_codes": 1437,
+    "explained_variance_ratio": 0.44425642499351803,
+    "samples_per_class": 8,
+    "same_class_nearest_train_rate": 0.4125,
+    "median_nearest_train_mse": 0.05819545894815681,
+    "min_nearest_train_mse": 0.02634014254163773,
+    "exact_train_copies": 0,
+    "mean_sample_psnr_vs_class_mean_image": 12.240010095123054,
+    "mean_prototype_psnr_vs_class_mean_image": 14.479553698361858,
+    "test_reconstruction": {
+      "mse": 0.040887237366490366,
+      "psnr_from_mean_mse": 13.884122324884922,
+      "psnr_mean_of_images": 14.257455407497536,
+      "psnr_median": 14.061707388146843,
+      "global_ssim_mean": 0.831861419534947
+    },
+    "class_counts": {
+      "0": 142,
+      "1": 146,
+      "2": 141,
+      "3": 147,
+      "4": 145,
+      "5": 146,
+      "6": 145,
+      "7": 143,
+      "8": 138,
+      "9": 144
+    }
+  }
+}
