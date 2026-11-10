@@ -13,12 +13,11 @@ import hashlib
 from typing import Any
 
 import numpy as np
+from studio.codec import decode, pack_packet, unpack_packet
 
 from resileos.harness.tools import residual_consistency
-from resileos.kin.demigods.checks import hephaestus_check, themis_check
+from resileos.kin.demigods.checks import atlas_check, hephaestus_check, themis_check
 from resileos.studio.codecs import packet_summary
-
-from studio.codec import decode, pack_packet, unpack_packet
 
 
 def _finite_decode(packet: dict[str, Any]) -> tuple[bool, str]:
@@ -86,7 +85,9 @@ def gate_studio_packet(packet: dict[str, Any]) -> dict[str, Any]:
     }
     consistency = residual_consistency(control)
     residual = {"packet_hash": digest} if digest else None
-    hephaestus = hephaestus_check(control, n_facts=0, residual_packet=residual)
+    hephaestus = hephaestus_check(control, residual_packet=residual)
+    # Capacity moved to Atlas. n_facts stays a declared load, not a Hephaestus argument.
+    atlas_check(control, n_facts=0, residual_packet=residual)
     if ok:
         lesson = (
             "studio-codec/1 per-component packet decoded to a finite image. "
