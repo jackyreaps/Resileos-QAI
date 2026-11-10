@@ -1,214 +1,252 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Resileos Studio</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-body { background: #f4f4f0; color: #111; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-.header { background: #1a4d8f; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.header h1 { font-size: 1.15rem; font-weight: 600; }
-.status { font-size: 0.75rem; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 12px; }
-#chat-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 0.95rem; line-height: 1.45; word-wrap: break-word; }
-.msg.user { background: #1a4d8f; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-.msg.bot { background: white; color: #111; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #e5e5e0; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-.msg.bot strong { color: #1a4d8f; }
-.meta { font-size: 0.7rem; color: #666; margin-top: 6px; font-family: ui-monospace, monospace; }
-.suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; justify-content: center; }
-.suggestion-btn, .tool-btn { background: white; border: 1px solid #1a4d8f; color: #1a4d8f; padding: 6px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer; font-weight: 500; }
-.suggestion-btn:hover, .tool-btn:hover { background: #1a4d8f; color: white; }
-.input-area { background: white; padding: 12px; border-top: 1px solid #e5e5e0; display: flex; gap: 8px; }
-input[type="text"] { flex: 1; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem; outline: none; }
-input:focus { border-color: #1a4d8f; }
-button.send-btn { background: #1a4d8f; color: white; border: none; padding: 0 18px; border-radius: 8px; font-weight: 600; cursor: pointer; }
-button.send-btn:disabled { background: #999; }
-.tools-panel { background: #fafaf8; border-bottom: 1px solid #e5e5e0; padding: 8px 16px; font-size: 0.8rem; display: none; }
-.tools-panel.open { display: block; }
-.kin-badge { display: inline-block; background: #e8f0fe; color: #1a4d8f; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-right: 4px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Resileos Studio</title>
+    <style>
+        :root {
+            --bg: #fcfcfc; --panel: #ffffff; --text: #1a1a1a; --muted: #666;
+            --accent: #1a4d8f; --accent-hover: #143c70; --border: #e5e5e5;
+            --user-bg: #1a4d8f; --user-text: #fff; --bot-bg: #ffffff;
+            --danger: #d93838; --success: #0d9463;
+        }
+        [data-theme="dark"] {
+            --bg: #121212; --panel: #1e1e1e; --text: #ededed; --muted: #a0a0a0;
+            --accent: #3b82f6; --accent-hover: #2563eb; --border: #333;
+            --user-bg: #2563eb; --user-text: #fff; --bot-bg: #1e1e1e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.3s; }
+
+        .header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel); z-index: 10; }
+        .header-title { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; transition: background 0.3s; }
+        .dot.online { background: var(--success); }
+        .dot.offline { background: var(--danger); }
+        .btn-icon { background: none; border: none; color: var(--text); font-size: 1.2rem; cursor: pointer; padding: 4px; }
+
+        #chat { flex: 1; overflow-y: auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; }
+        .msg-row { display: flex; gap: 12px; max-width: 800px; margin: 0 auto; width: 100%; }
+        .msg-row.user { justify-content: flex-end; }
+        .avatar { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; flex-shrink: 0; }
+        .avatar.bot { background: var(--accent); color: #fff; }
+        .avatar.user { background: #e5e5e0; color: #333; }
+        [data-theme="dark"] .avatar.user { background: #333; color: #fff; }
+        .bubble { padding: 12px 16px; border-radius: 12px; font-size: 0.95rem; line-height: 1.5; max-width: 85%; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .bubble.user { background: var(--user-bg); color: var(--user-text); border-bottom-right-radius: 2px; }
+        .bubble.bot { background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+        .bubble strong { color: var(--accent); }
+        .meta { font-size: 0.72rem; color: var(--muted); margin-top: 6px; font-family: ui-monospace, monospace; }
+
+        .tools-panel { background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 16px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px; }
+        .tools-panel.open { display: flex; }
+        .tool-chip { background: var(--bg); border: 1px solid var(--border); padding: 6px 12px; border-radius: 16px; cursor: pointer; color: var(--text); transition: all 0.2s; }
+        .tool-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+        .input-wrap { padding: 16px; background: var(--bg); display: flex; justify-content: center; }
+        .input-box { width: 100%; max-width: 768px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: flex-end; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .input-box:focus-within { border-color: var(--accent); }
+        input[type="text"] { flex: 1; border: none; background: transparent; padding: 10px; font-size: 1rem; color: var(--text); outline: none; }
+        button.send { background: var(--accent); color: white; border: none; border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin: 4px; }
+        button.send:disabled { background: #999; }
+
+        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; max-width: 600px; margin-left: auto; margin-right: auto;}
+        .suggestion { background: var(--panel); border: 1px solid var(--border); padding: 8px 14px; border-radius: 16px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+        .suggestion:hover { border-color: var(--accent); color: var(--accent); }
+
+        .typing { display: flex; gap: 4px; align-items: center; height: 20px; }
+        .typing span { width: 5px; height: 5px; background: var(--muted); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing span:nth-child(1) { animation-delay: -0.32s; }
+        .typing span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+    </style>
 </head>
 <body>
-<div class="header">
-  <h1>Resileos Studio</h1>
-  <div class="status" id="status-indicator">Connecting…</div>
-</div>
 
-<div id="tools-panel" class="tools-panel"></div>
+    <div class="header">
+        <div class="header-title">
+            <div class="dot" id="status"></div>
+            Resileos Studio
+        </div>
+        <div>
+            <button class="btn-icon" onclick="toggleTools()" title="Show Tools">🛠️</button>
+            <button class="btn-icon" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+        </div>
+    </div>
 
-<div id="chat-container">
-  <div class="msg bot">Exact residual memory engine. Facts stored as residual packets. Unknowns abstained. Kin + harness available.</div>
-  <div class="suggestions" id="suggestions">
-    <button class="suggestion-btn" onclick="quickAsk('remember alice works_at acme')">Teach fact</button>
-    <button class="suggestion-btn" onclick="quickAsk('alice works_at')">Query fact</button>
-    <button class="suggestion-btn" onclick="quickAsk('who is zeus')">Test abstention</button>
-    <button class="suggestion-btn" onclick="runKinCycle()">Kin cycle</button>
-    <button class="suggestion-btn" onclick="loadTools()">List tools</button>
-    <button class="suggestion-btn" onclick="quickAsk('/tool residual_consistency')">Residual check</button>
-  </div>
-</div>
+    <div id="tools-panel" class="tools-panel"></div>
 
-<div class="input-area">
-  <input type="text" id="user-input" placeholder="remember s r o  |  s r  |  free question  |  /tool name" onkeypress="handleEnter(event)">
-  <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
-</div>
+    <div id="chat">
+        <div class="msg-row bot">
+            <div class="avatar bot">R</div>
+            <div class="bubble bot">
+                Exact residual memory engine. Facts as residual packets. Unknowns abstained. Kin + harness available.
+            </div>
+        </div>
+        <div class="suggestions">
+            <div class="suggestion" onclick="quickAsk('remember alice works_at acme')">Teach fact</div>
+            <div class="suggestion" onclick="quickAsk('alice works_at')">Query fact</div>
+            <div class="suggestion" onclick="quickAsk('who is zeus')">Test abstention</div>
+            <div class="suggestion" onclick="runKinCycle()">Run Kin cycle</div>
+            <div class="suggestion" onclick="quickAsk('/tool residual_consistency')">Residual check</div>
+        </div>
+    </div>
 
-<script>
-const API_KEY = "No4dymPJ4tfRn0BZFuNL07kTnMyCeu5xHw2mpsWmjwk";
-const API_URL = "https://api.resileosai.fun/api/v1";
-const chatContainer = document.getElementById('chat-container');
-const userInput = document.getElementById('user-input');
-const sendBtn = document.getElementById('send-btn');
-const statusIndicator = document.getElementById('status-indicator');
-const toolsPanel = document.getElementById('tools-panel');
-let availableTools = [];
+    <div class="input-wrap">
+        <div class="input-box">
+            <input type="text" id="input" placeholder="remember s r o  |  s r  |  question  |  /tool name" onkeypress="handleEnter(event)">
+            <button class="send" id="send" onclick="sendMsg()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+            </button>
+        </div>
+    </div>
 
-async function checkStatus() {
-  try {
-    const r = await fetch(`${API_URL}/ready`);
-    if (r.ok) {
-      const d = await r.json();
-      statusIndicator.innerText = `Online · ${d.fact_count ?? "?"} facts`;
-      statusIndicator.style.background = "#0a7";
-    } else throw new Error();
-  } catch {
-    statusIndicator.innerText = "API Offline";
-    statusIndicator.style.background = "#c00";
-  }
-}
-checkStatus();
+    <script>
+        const API_KEY = "No4dymPJ4tfRn0BZFuNL07kTnMyCeu5xHw2mpsWmjwk"; 
+        const API_URL = "https://api.resileosai.fun/api/v1";
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('send');
+        const statusDot = document.getElementById('status');
+        const toolsPanel = document.getElementById('tools-panel');
 
-function quickAsk(text) { userInput.value = text; sendMessage(); }
-function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+        function toggleTheme() {
+            const t = document.documentElement.getAttribute('data-theme');
+            document.documentElement.setAttribute('data-theme', t === 'dark' ? 'light' : 'dark');
+        }
 
-function addMessage(text, sender, meta = "") {
-  const div = document.createElement('div');
-  div.className = `msg ${sender}`;
-  div.innerHTML = text + (meta ? `<div class="meta">${meta}</div>` : "");
-  chatContainer.appendChild(div);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}
+        fetch(`${API_URL}/ready`).then(r => {
+            if (r.ok) statusDot.classList.add('online');
+            else throw new Error();
+        }).catch(() => statusDot.classList.add('offline'));
 
-async function loadTools() {
-  addMessage("Loading tool catalogue…", 'user');
-  try {
-    const r = await fetch(`${API_URL}/tools`, { headers: { 'X-API-Key': API_KEY } });
-    const d = await r.json();
-    availableTools = d.tools || d || [];
-    const names = availableTools.map(t => t.name || t).join(', ') || "none";
-    toolsPanel.innerHTML = `<strong>Tools:</strong> ${names}`;
-    toolsPanel.classList.add('open');
-    addMessage(`Tools available: <strong>${names}</strong>`, 'bot', "from /tools");
-  } catch (e) {
-    addMessage("Could not load tools.", 'bot');
-  }
-}
+        async function loadTools() {
+            try {
+                const r = await fetch(`${API_URL}/tools`, { headers: { 'X-API-Key': API_KEY } });
+                const d = await r.json();
+                const tools = d.tools || d || [];
+                toolsPanel.innerHTML = '<strong>Tools (legions):</strong> ' + tools.map(t => 
+                    `<span class="tool-chip" onclick="runTool('${t.name || t}')">${t.name || t}</span>`
+                ).join('');
+            } catch (e) {
+                toolsPanel.innerHTML = 'Could not load tools.';
+            }
+        }
+        function toggleTools() {
+            toolsPanel.classList.toggle('open');
+            if (toolsPanel.classList.contains('open') && toolsPanel.innerHTML === '') loadTools();
+        }
 
-async function runKinCycle() {
-  addMessage("Running Kin cycle…", 'user');
-  sendBtn.disabled = true;
-  try {
-    const r = await fetch(`${API_URL}/kin/cycle`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-      body: JSON.stringify({ apply_policy: true })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || "failed");
-    const h = d.harness || d;
-    const verified = h.verified ?? d.verified;
-    const lesson = h.lesson || d.lesson || "—";
-    const checkpoint = h.checkpoint || d.checkpoint;
-    const residual = d.residual_hash || h.residual_hash;
-    addMessage(
-      `<span class="kin-badge">Kin</span> Cycle complete. Verified: <strong>${verified}</strong><br>Lesson: ${lesson}`,
-      'bot',
-      checkpoint ? `hades: ${checkpoint}` : (residual ? `residual: ${residual.slice(0,12)}…` : "")
-    );
-  } catch (e) {
-    addMessage(`Kin cycle error: ${e.message}`, 'bot');
-  } finally {
-    sendBtn.disabled = false;
-  }
-}
+        function quickAsk(text) { input.value = text; sendMsg(); }
+        function handleEnter(e) { if (e.key === 'Enter') sendMsg(); }
 
-async function callTool(name, args = {}) {
-  addMessage(`Calling tool ${name}…`, 'user');
-  try {
-    const r = await fetch(`${API_URL}/tools/${name}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-      body: JSON.stringify(args)
-    });
-    const d = await r.json();
-    addMessage(`<pre>${JSON.stringify(d, null, 2)}</pre>`, 'bot', `tool: ${name}`);
-  } catch (e) {
-    addMessage(`Tool error: ${e.message}`, 'bot');
-  }
-}
+        function addMsg(text, sender, meta = "") {
+            const row = document.createElement('div');
+            row.className = `msg-row ${sender}`;
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${sender}`;
+            avatar.innerText = sender === 'user' ? 'U' : 'R';
+            const bubble = document.createElement('div');
+            bubble.className = `bubble ${sender}`;
+            bubble.innerHTML = text + (meta ? `<div class="meta">${meta}</div>` : "");
 
-async function sendMessage() {
-  const text = userInput.value.trim();
-  if (!text) return;
-  addMessage(text, 'user');
-  userInput.value = '';
-  sendBtn.disabled = true;
-  sendBtn.innerText = '…';
+            if (sender === 'user') { row.appendChild(bubble); row.appendChild(avatar); }
+            else { row.appendChild(avatar); row.appendChild(bubble); }
+            chat.appendChild(row);
+            chat.scrollTop = chat.scrollHeight;
+            return bubble;
+        }
 
-  if (text.startsWith('/tool ')) {
-    const parts = text.slice(6).split(' ');
-    const name = parts[0];
-    const args = {};
-    await callTool(name, args);
-    sendBtn.disabled = false;
-    sendBtn.innerText = 'Send';
-    return;
-  }
+        async function runKinCycle() {
+            addMsg("Running Kin cycle…", 'user');
+            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            try {
+                const r = await fetch(`${API_URL}/kin/cycle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    body: JSON.stringify({ apply_policy: true })
+                });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || "failed");
+                const h = d.harness || d;
+                const verified = h.verified ?? d.verified ?? "n/a";
+                const lesson = h.lesson || d.lesson || "—";
+                const checkpoint = h.checkpoint || d.checkpoint;
+                const residual = d.residual_hash || h.residual_hash;
+                bubble.innerHTML = `Kin cycle complete.<br>Verified: <strong>${verified}</strong><br>Lesson: ${lesson}`;
+                if (checkpoint || residual) {
+                    bubble.innerHTML += `<div class="meta">${checkpoint ? "hades: " + checkpoint : "residual: " + (residual || "").slice(0,12) + "…"}</div>`;
+                }
+            } catch (e) { bubble.innerHTML = `Kin cycle error: ${e.message}`; }
+        }
 
-  let endpoint = '/query';
-  let body = {};
+        async function runTool(name) {
+            addMsg(`Calling tool ${name}…`, 'user');
+            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            try {
+                const r = await fetch(`${API_URL}/tools/${name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    body: JSON.stringify({})
+                });
+                const d = await r.json();
+                bubble.innerHTML = `<pre>${JSON.stringify(d, null, 2)}</pre>`;
+            } catch (e) { bubble.innerHTML = `Tool ${name} failed.`; }
+        }
 
-  if (text.toLowerCase().startsWith('remember ')) {
-    const parts = text.substring(9).trim().split(/\s+/);
-    if (parts.length >= 3) {
-      endpoint = '/learn';
-      body = { subject: parts[0], relation: parts[1], obj: parts.slice(2).join(' ') };
-    }
-  } else {
-    const parts = text.split(/\s+/);
-    if (parts.length === 2) {
-      body = { subject: parts[0], relation: parts[1] };
-    } else {
-      body = { question: text };
-      endpoint = '/answer';
-    }
-  }
+        async function sendMsg() {
+            const text = input.value.trim();
+            if (!text) return;
+            addMsg(text, 'user');
+            input.value = '';
+            sendBtn.disabled = true;
 
-  try {
-    const r = await fetch(`${API_URL}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-      body: JSON.stringify(body)
-    });
-    const d = await r.json();
+            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            
+            if (text.startsWith('/tool ')) {
+                const toolName = text.slice(6).trim();
+                return runTool(toolName);
+            }
 
-    if (!r.ok) {
-      addMessage(`Error: ${d.detail || r.status}`, 'bot');
-    } else if (endpoint === '/learn') {
-      addMessage(`Learned <strong>${body.subject} ${body.relation} ${body.obj}</strong>`, 'bot', "residual write");
-    } else if (d.status === 'ACCEPTED' || d.status === 'ANSWERED' || d.value || d.answer_text) {
-      addMessage(`<strong>${d.value || d.answer_text}</strong>`, 'bot', d.status || "residual hit");
-    } else {
-      addMessage("Abstained. No matching residual fact.", 'bot', d.status || "ABSTAINED");
-    }
-  } catch (e) {
-    addMessage("Network error reaching API.", 'bot');
-  } finally {
-    sendBtn.disabled = false;
-    sendBtn.innerText = 'Send';
-  }
-}
-</script>
+            let endpoint = '/answer';
+            let body = { question: text };
+
+            if (text.toLowerCase().startsWith('remember ')) {
+                const parts = text.substring(9).trim().split(/\s+/);
+                if (parts.length >= 3) {
+                    endpoint = '/learn';
+                    body = { subject: parts[0], relation: parts[1], obj: parts.slice(2).join(' ') };
+                }
+            } else {
+                const parts = text.split(/\s+/);
+                if (parts.length === 2) {
+                    endpoint = '/query';
+                    body = { subject: parts[0], relation: parts[1] };
+                }
+            }
+
+            try {
+                const r = await fetch(`${API_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    body: JSON.stringify(body)
+                });
+                const d = await r.json();
+
+                if (!r.ok) bubble.innerHTML = `⚠️ ${d.detail || 'Error'}`;
+                else if (endpoint === '/learn') bubble.innerHTML = `Learned <strong>${body.subject} ${body.relation} ${body.obj}</strong>`;
+                else if (d.status === 'ACCEPTED' || d.status === 'ANSWERED' || d.value || d.answer_text) {
+                    bubble.innerHTML = `<strong>${d.value || d.answer_text}</strong>`;
+                } else bubble.innerHTML = "Abstained. No matching residual fact.";
+            } catch (e) {
+                bubble.innerHTML = '⚠️ Network error. Check CORS.';
+            } finally {
+                sendBtn.disabled = false;
+                input.focus();
+            }
+        }
+    </script>
 </body>
 </html>
