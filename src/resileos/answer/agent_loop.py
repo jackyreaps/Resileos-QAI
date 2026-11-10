@@ -1,6 +1,6 @@
 """Autonomous agent loop for open chat."""
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 from titanos import Titanos
 from resileos.harness.legions.search import web_search
 
@@ -44,16 +44,12 @@ async def run_agent_chat(
     while steps < max_steps:
         steps += 1
         
-        # Decide on a tool. For now, we only have search.
-        # Later, you can add risk_classify() here to route to different legions.
         tool_calls.append({"tool": "web_search", "args": {"query": message}})
-        
         search_result = await web_search(message)
         
         if search_result["status"] == "SUCCESS" and search_result["results"]:
             evidence.append(search_result)
             
-            # Construct a synthesized answer from the snippets
             answer_text = (
                 f"Based on a web search: {search_result['evidence_summary'][:300]}... "
                 f"(Source: {search_result['results'][0]['url']})"
@@ -68,8 +64,6 @@ async def run_agent_chat(
                 "verified": False # Web search is never auto-verified
             }
             
-        # If we loop again, we might try a different query next time
-        
     # ── Step 3: Abstain ──
     return {
         "status": "ABSTAINED",
