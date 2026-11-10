@@ -17,17 +17,19 @@ PYTHONPATH=src python scripts/ops/bench_vs_llm.py --out artifacts/report_memory_
 # export BENCH_LLM_KEY=...
 ```
 
-## Results table (fill after run)
+## Results table
+
+Run on 2026-11-10 with `PYTHONPATH=src python scripts/ops/bench_vs_llm.py`. The report field `backend` was `titanos` (not the dict stub). `BENCH_LLM_URL` was unset, so no model was called.
 
 | Metric | Resileos | LLM baseline |
 |--------|----------|--------------|
-| Exact-match rate on known facts | _run_ | _run_ |
-| Invent rate on unknown facts | **0.00 target** | _run_ |
-| p50 latency (known batch) | _ms_ | _ms_ |
-| Cost per 1,000 queries | CPU / VPS | tokens / API |
-| Infrastructure | ~$5 VPS class | GPU or API |
+| Exact-match rate on 3 known facts | 1.0 | not run |
+| Invent rate on 12 unknown pairs | 0.0 | not run |
+| p50 latency of the 3 known queries (ms) | 43.270759 | not run |
+| Mean latency of those 3 queries (ms) | 46.241553 | not run |
+| Cost per 1,000 queries | not measured | not measured |
 
-Paste numbers from `artifacts/report_memory_vs_llm.json` here before marketing the cost claim.
+The p50 is the median of the three per-query times. It is not the batch time divided by 3.
 
 ## Interpretation
 
