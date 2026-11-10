@@ -1,10 +1,10 @@
-"""Web search legion for the agent loop."""
+"""Web search legion for the autonomous agent loop."""
 import httpx
+import re
 
 async def web_search(query: str, max_results: int = 3) -> dict:
     """
     Executes a web search and returns structured evidence.
-    Uses DuckDuckGo HTML endpoint (no API key required).
     """
     url = "https://html.duckduckgo.com/html/"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -15,10 +15,8 @@ async def web_search(query: str, max_results: int = 3) -> dict:
             resp = await client.post(url, data=data, headers=headers, timeout=10.0)
             resp.raise_for_status()
             
-            # Basic parsing for DuckDuckGo HTML (can be upgraded to Tavily/Serper later)
-            import re
             results = []
-            # Extract titles and snippets
+            # Extract titles/URLs and snippets from DDG HTML
             titles = re.findall(r'<a rel="nofollow" class="result__a" href="(.*?)">(.*?)</a>', resp.text)
             snippets = re.findall(r'<a class="result__snippet" href=".*?">(.*?)</a>', resp.text)
             
