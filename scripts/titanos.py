@@ -65,7 +65,7 @@ import math
 import re
 import sys
 from dataclasses import dataclass, field, asdict
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -259,22 +259,69 @@ class Titanos:
             return fact[0], fact[1], fact[2], fact[3], fact[4]
         return fact[0], fact[1], fact[2], None, None
 
+    @staticmethod
+    def _parse_temporal(value) -> Optional[datetime]:
+        """Parse a date or datetime to UTC. None if the value is empty.
+
+        Year-only values such as ``476`` and ``999`` are 1 January of
+        that year. A naive value is UTC. An offset is converted to UTC.
+        An unparseable value returns None so callers can fail closed.
+        """
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        if isinstance(value, date):
+            return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+        text = str(value).strip()
+        if not text:
+            return None
+        year_only = re.fullmatch(r"-?\d{1,6}", text)
+        if year_only:
+            return datetime(int(text), 1, 1, tzinfo=timezone.utc)
+        iso = text.replace("Z", "+00:00")
+        short = re.fullmatch(r"(-?)(\d{1,3})(-\d{2}-\d{2}.*)", iso)
+        if short:
+            sign, year, rest = short.groups()
+            iso = f"{sign}{int(year):04d}{rest}"
+        try:
+            dt = datetime.fromisoformat(iso)
+        except ValueError:
+            try:
+                day = date.fromisoformat(iso[:10])
+            except ValueError:
+                return None
+            return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
     @classmethod
     def _fact_valid_at(cls, fact: tuple, as_of: Optional[str] = None) -> bool:
         """True if the fact's validity interval covers `as_of`.
 
-        as_of=None means "now" (today's date in ISO 8601).
-        None valid_from means "since forever"; None valid_to means
-        "still true".
-
-        Interval is half-open: [valid_from, valid_to).
+        as_of=None means now. None valid_from means "since forever".
+        None valid_to means "still true". Interval is half-open:
+        [valid_from, valid_to). Comparisons use real datetimes in UTC.
+        An unparseable bound does not cover the query.
         """
         _s, _r, _o, valid_from, valid_to = cls._fact_fields(fact)
-        as_of_str = str(as_of) if as_of is not None else date.today().isoformat()
-        if valid_from is not None and str(valid_from) > as_of_str:
+        moment = (
+            cls._parse_temporal(as_of)
+            if as_of is not None
+            else datetime.now(timezone.utc)
+        )
+        if moment is None:
             return False
-        if valid_to is not None and as_of_str >= str(valid_to):
-            return False
+        if valid_from is not None:
+            start = cls._parse_temporal(valid_from)
+            if start is None or moment < start:
+                return False
+        if valid_to is not None:
+            end = cls._parse_temporal(valid_to)
+            if end is None or moment >= end:
+                return False
         return True
 
     # ── accumulators ─────────────────────────────────────────────────
@@ -706,6 +753,72 @@ class Titanos:
             self._csi.update(v, e_int)
             prev = (h["scar_energy"], h["delta"])
 
+    def _value_consistent_with_store(
+        self, anchor: str, relation: str, inverse: bool, proposed,
+        as_of: Optional[str] = None,
+    ):
+        """A value ask_list would return for this query, or None.
+
+        ``as_of`` is forwarded so a historical query is not answered
+        from today's rows. ``temporal_filter_current=False`` is honored
+        inside ``ask_list`` when ``as_of`` is omitted.
+
+        Empty fact list -> abstain. One stored object -> that object,
+        even when cleanup proposed a neighbor. Several stored objects
+        with no explicit validity bounds -> the proposal only when it
+        is one of them. Several explicitly bounded objects -> None,
+        and the caller reports CONFLICT.
+        """
+        stored = self.ask_list(anchor, relation, inverse=inverse, as_of=as_of)
+        if self._explicit_temporal_conflict(anchor, relation, inverse, as_of):
+            return None
+        if proposed in stored:
+            return proposed
+        if len(stored) == 1:
+            return stored[0]
+        return None
+
+    def _explicit_temporal_conflict(
+        self, anchor: str, relation: str, inverse: bool,
+        as_of: Optional[str] = None,
+    ) -> bool:
+        """True when two explicitly bounded facts disagree at ``as_of``.
+
+        Unbounded multi-valued relations such as ``parent_of`` are not
+        conflicts. Two capital facts whose windows both cover the
+        query are.
+        """
+        rows = self.ask_list(anchor, relation, inverse=inverse, as_of=as_of)
+        if len(rows) < 2:
+            return False
+        objects: set[str] = set()
+        for fact in self.facts:
+            subject, rel, obj, valid_from, valid_to = self._fact_fields(fact)
+            if rel != relation:
+                continue
+            if valid_from is None and valid_to is None:
+                continue
+            if inverse:
+                if obj != anchor or subject not in rows:
+                    continue
+                if not self._row_visible(fact, as_of):
+                    continue
+                objects.add(subject)
+            else:
+                if subject != anchor or obj not in rows:
+                    continue
+                if not self._row_visible(fact, as_of):
+                    continue
+                objects.add(obj)
+        return len(objects) >= 2
+
+    def _row_visible(self, fact: tuple, as_of: Optional[str]) -> bool:
+        if as_of == "":
+            return True
+        if as_of is None and not self.cfg.temporal_filter_current:
+            return True
+        return self._fact_valid_at(fact, as_of)
+
     # ── single query ─────────────────────────────────────────────────
     def _ask(self, subject: str, relation: str, inverse: bool,
              conf_mode_override: str | None = None,
@@ -750,10 +863,22 @@ class Titanos:
                 and fast_conf_gated >= classical_thresh
                 and fast_conf_blend >= self.cfg.csi_fast_threshold
                 and current_csi >= self.cfg.csi_health_threshold):
-            self._fast_path_count += 1
-            path = ([(fast_best, relation, subject)] if inverse
-                    else [(subject, relation, fast_best)])
-            return Answer(fast_best, fast_conf_gated, "ACCEPTED", "FAST",
+            aligned = self._value_consistent_with_store(
+                subject, relation, inverse, fast_best, as_of=as_of)
+            if self._explicit_temporal_conflict(
+                subject, relation, inverse, as_of,
+            ):
+                return Answer(
+                    None, fast_conf_gated, "CONFLICT", "ABSTAIN", 0,
+                    reason="temporal conflict: overlapping validity",
+                    emergent=self.cfg.emergent, csi=current_csi,
+                    order_parameter=R,
+                )
+            if aligned is not None:
+                self._fast_path_count += 1
+                path = ([(aligned, relation, subject)] if inverse
+                        else [(subject, relation, aligned)])
+                return Answer(aligned, fast_conf_gated, "ACCEPTED", "FAST",
                           0, path=path,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -863,9 +988,43 @@ class Titanos:
                           reason=f"post-quantum gated conf {conf:.4f} "
                                  f"< {abstain_thresh:.4f}")
 
-        path = ([(best, relation, subject)] if inverse
-                else [(subject, relation, best)])
-        return Answer(best, conf, "ACCEPTED", mode, len(history),
+        aligned = self._value_consistent_with_store(
+            subject, relation, inverse, best, as_of=as_of)
+        if self._explicit_temporal_conflict(subject, relation, inverse, as_of):
+            return Answer(None, conf, "CONFLICT", "ABSTAIN", len(history),
+                          loop_history=history, gate_state=gate_state,
+                          noise_sigma=sigma_eff,
+                          noise_sigma_base=sigma_base,
+                          anisotropy=anisotropy,
+                          band_count=self._counts.get(relation, 0),
+                          emergent=self.cfg.emergent,
+                          csi=updated_csi,
+                          fast_confidence=fast_conf_blend,
+                          fast_path_used=False, escalated=True,
+                          order_parameter=R,
+                          raw_confidence=raw_conf,
+                          order_parameter_scale=scale,
+                          recovery_loss=rec_loss,
+                          reason="temporal conflict: overlapping validity")
+        if aligned is None:
+            return Answer(None, conf, "ABSTAINED", "ABSTAIN", len(history),
+                          loop_history=history, gate_state=gate_state,
+                          noise_sigma=sigma_eff,
+                          noise_sigma_base=sigma_base,
+                          anisotropy=anisotropy,
+                          band_count=self._counts.get(relation, 0),
+                          emergent=self.cfg.emergent,
+                          csi=updated_csi,
+                          fast_confidence=fast_conf_blend,
+                          fast_path_used=False, escalated=True,
+                          order_parameter=R,
+                          raw_confidence=raw_conf,
+                          order_parameter_scale=scale,
+                          recovery_loss=rec_loss,
+                          reason="not a stored fact")
+        path = ([(aligned, relation, subject)] if inverse
+                else [(subject, relation, aligned)])
+        return Answer(aligned, conf, "ACCEPTED", mode, len(history),
                       path=path, loop_history=history, gate_state=gate_state,
                       noise_sigma=sigma_eff, noise_sigma_base=sigma_base,
                       anisotropy=anisotropy,
@@ -908,6 +1067,8 @@ class Titanos:
         use_filter = True
         as_of_arg = as_of
         if as_of == "":
+            use_filter = False
+        elif as_of is None and not self.cfg.temporal_filter_current:
             use_filter = False
 
         def _match(f: tuple) -> bool:
@@ -971,23 +1132,25 @@ class Titanos:
         return self.agency.evaluate_and_prune()
 
     # ── chain / analogy ──────────────────────────────────────────────
-    def chain(self, start: str, relations: list[str]) -> Answer:
+    def chain(self, start: str, relations: list[str],
+              as_of: Optional[str] = None) -> Answer:
         current, path, conf = start, [], 1.0
         total_loops = 0
         modes: list[str] = []
         hist_acc: list = []
         for rel in relations:
-            a = self.ask(current, rel)
+            a = self.ask(current, rel, as_of=as_of)
             total_loops += a.loops
             modes.append(a.mode)
             hist_acc.extend(a.loop_history)
-            if a.status == "ABSTAINED":
-                return Answer(None, conf, "ABSTAINED", "ABSTAIN", total_loops,
+            if a.status != "ACCEPTED":
+                status = "CONFLICT" if a.status == "CONFLICT" else "ABSTAINED"
+                return Answer(None, conf, status, "ABSTAIN", total_loops,
                               path=path, loop_history=hist_acc,
                               emergent=self.cfg.emergent,
                               csi=self._csi.value(),
                               order_parameter=self._order_parameter(),
-                              reason=(f"chain broke at '{current} --{rel}--> ?'"))
+                              reason=(a.reason or f"chain broke at '{current} --{rel}--> ?'"))
             path.extend(a.path)
             conf *= a.confidence
             current = a.value

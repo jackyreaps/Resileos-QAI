@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from resileos.kin.eat import EatDecision, eat_and_learn, eat_filter
-from resileos.kin.hades import Hades
+from resileos.kin.hades import Hades, make_hades
 from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
@@ -114,20 +114,27 @@ class KinBundle:
         })
 
         # Hades checkpoint on verified cycles only. The lesson is the
-        # only thing that crosses attempts; history and evidence stay
-        # inside this attempt. Non-blocking: a failed save does not
+        # only thing that crosses attempts. A failed save does not
         # abort the cycle.
+        checkpoint_id = None
+        lesson = None
+        checkpoint_error = None
         if v["verified"]:
+            rank = getattr(self.last_policy, "depth", None)
+            if rank is None:
+                rank = getattr(self.last_policy, "rank", "?")
+            lesson = (
+                f"kin_cycle turn={self.control.turn} "
+                f"verified=True rank={rank}"
+            )
             try:
-                Hades().save(
-                    self.control,
-                    lesson=(
-                        f"kin_cycle turn={self.control.turn} "
-                        f"verified=True rank={self.last_policy.depth if self.last_policy else '?'}"
-                    ),
-                )
-            except Exception:
-                pass
+                if getattr(self, "_hades", None) is None:
+                    self._hades = make_hades()
+                ckpt = self._hades.save(self.control, lesson=lesson)
+                checkpoint_id = ckpt.id
+                lesson = ckpt.lesson
+            except Exception as exc:
+                checkpoint_error = str(exc)
 
         harness_summary = {
             "verified": v["verified"],
@@ -138,6 +145,11 @@ class KinBundle:
             "budget": self.control.budget_remaining,
             "guides": self.control.guides_loaded,
         }
+        if checkpoint_id is not None:
+            harness_summary["checkpoint"] = checkpoint_id
+            harness_summary["lesson"] = lesson
+        if checkpoint_error is not None:
+            harness_summary["checkpoint_error"] = checkpoint_error
         return report, policy, harness_summary
 
 

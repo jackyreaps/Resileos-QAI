@@ -77,6 +77,13 @@ overlapping validity — the kairos layer must choose explicitly:
 `council.py` for hub conflicts and `verifiers.py` for constraint
 violations.
 
+Implemented on `ask()`: when two or more facts with an explicit
+`valid_from` or `valid_to` are both valid at `as_of` and name
+different objects, the status is `CONFLICT` and the value is null.
+`ask_list()` still returns every value. Unbounded multi-valued
+relations such as `parent_of` are not treated as conflicts, because
+returning `CONFLICT` for every parent would reject ordinary chains.
+
 ## 4. What each layer guarantees
 
 | Layer | What it protects | What it does not |

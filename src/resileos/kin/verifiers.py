@@ -218,9 +218,9 @@ def check_temporal(claim: Claim, ctx: dict[str, Any]) -> CheckResult:
             return CheckResult(False, "invalid_valid_until", "temporal")
 
     if from_dt is not None and to_dt is not None:
-        if from_dt > to_dt:
+        if from_dt >= to_dt:
             return CheckResult(
-                False, "valid_from_after_valid_to", "temporal"
+                False, "valid_from_not_before_valid_until", "temporal"
             )
 
     # Legacy: reject expired facts if requested (pre-RES-332 behaviour)

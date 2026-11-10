@@ -429,6 +429,8 @@ class QueryRequest(BaseModel):
     inverse: bool = False
     render: bool = False
     as_of: Optional[str] = None
+    member: str | None = None
+    used_free: int = 0
 
 
 class SparqlRequest(BaseModel):
@@ -770,9 +772,10 @@ def titanos_query(payload: QueryRequest):
     """Route through Zeus with parent fallthrough. Temporal-aware (RES-332)."""
     try:
         from resileos.ui.use_gate import allow_use
-        member = getattr(payload, "member", None) or "anon"
-        used = int(getattr(payload, "used_free", 0) or 0)
-        decision = allow_use(member, units=1, used_free=used, what="query")
+        member = payload.member or "anon"
+        decision = allow_use(
+            member, units=1, used_free=payload.used_free, what="query",
+        )
         if not decision.get("ok"):
             raise HTTPException(status_code=402, detail="credit required")
 
@@ -999,7 +1002,7 @@ class SubstrateContainer:
         self.geo_head = LowRankMetricHead(hidden_dim=HIDDEN_DIM)
         self.fep_head = VerifiableFEPReductionHead(
             hidden_dim=HIDDEN_DIM,
-            L_kernel=kernel,
+            L_H_kernel=kernel,
             rank=1,
         )
         trainable = (

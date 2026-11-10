@@ -68,15 +68,17 @@ def test_propose_no_claims_for_art():
 def test_review_approve():
     sc = SeparatedCycle()
     p = sc.propose("apollo", _writer_ok, action_type="apollo")
-    v = sc.review(p, "athena", lambda _: (True, "ok", [{"matched": 2}]))
+    v = sc.review_verifiers(p)
+    assert v.reviewer == "verifiers"
     assert v.approved is True
-    assert v.reviewer == "athena"
+    assert v.evidence
 
 
 def test_review_reject():
     sc = SeparatedCycle()
     p = sc.propose("apollo", _writer_ok, action_type="apollo")
-    v = sc.review(p, "athena", lambda _: (False, "bad frame", []))
+    v = sc.review_athena(p)
+    assert v.reviewer == "athena"
     assert v.approved is False
 
 

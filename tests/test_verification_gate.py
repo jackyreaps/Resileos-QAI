@@ -87,16 +87,13 @@ def test_default_apollo_ok_passes():
 
 
 def test_default_apollo_fail_preserves_compat_bug():
-    """Documents the preserved fail-open on default path.
+    """A failed apollo with no scars is fail-closed.
 
-    A failed apollo with no scars returns verified=True in the default
-    path (this is the pre-2026-11-09 behaviour). The strict path
-    (require_evidence=True) fixes it. This test asserts the current
-    default so a future fix that changes it must update the test.
+    verified is False. The historical fail-open default is not kept.
     """
     out = verify_on_stop(_packet(), {"success": False})
-    assert out["verified"] is True
-    assert "not verified" not in out["reason"].lower()
+    assert out["verified"] is False
+    assert "not verified" in out["reason"].lower()
 
 
 def test_default_scars_fail():

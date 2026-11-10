@@ -15,7 +15,8 @@ from resileos.kin.frames import (
     hub_category,
 )
 from resileos.kin.hades import Checkpoint, Hades
-from resileos.kin.harness_wrap import harness_wrap
+from resileos.harness.harness_wrap import harness_wrap
+from resileos.kin.wire_perception import wire_perception
 from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.iris import IrisReport, make_iris_observer
 from resileos.kin.metis import MetisPolicy, make_metis_organizer
@@ -68,6 +69,7 @@ __all__ = [
     "run_separated",
     "perception_cycle",
     "harness_wrap",
+    "wire_perception",
     "Hades",
     "Checkpoint",
 ]

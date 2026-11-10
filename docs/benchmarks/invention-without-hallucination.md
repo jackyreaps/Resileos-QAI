@@ -44,6 +44,19 @@ candidate status exists, interpret the output as:
 That table is honest. It is the abstention claim, not the invention
 claim.
 
+## Results
+
+Run on 2026-11-10 against `http://127.0.0.1:8000/api/v1` with `RESILEOS_AUTH_BYPASS=1`. No LLM key was set.
+
+| Metric | Value |
+|--------|-------|
+| derivation_rate | 0.0 |
+| derivation_grounding_rate | 0.0 |
+| invention_assertion_rate | 0.0 |
+| p50_ms | 3.4 |
+
+The two derivation probes are SPARQL compositions. Both returned no rows (`got: []`), so the derivation rate is 0. The two invention probes (`carol likely_commutes_to`, `alice sibling_of`) returned `ABSTAINED` and null, so nothing invented was asserted. Latencies were 2.7, 2.0, 3.4, and 44.7 ms. The script's `p50_ms` is 3.4. No LLM key was set.
+
 ## What would make the candidate tier real
 
 A response field or status (`CANDIDATE` / `PROVISIONAL`) on a route that

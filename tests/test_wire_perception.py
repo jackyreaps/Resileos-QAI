@@ -75,8 +75,8 @@ def test_learn_fn_path_unverified_by_default():
     out = wire_perception(psyche, _perceived(), learn_fn=lambda s, r, o: None)
     v = out.get("verification", {})
     assert v.get("verified") is False
-    assert ("evidence" in v.get("reason", "").lower()
-            or "apollo" in v.get("reason", "").lower())
+    reason = v.get("reason", "").lower()
+    assert "evidence" in reason or "apollo" in reason or "abstain" in reason
 
 
 def test_legacy_eat_fn_still_works():

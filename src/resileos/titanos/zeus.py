@@ -221,6 +221,13 @@ def run_zeus_query(
     if child is None:
         return None
 
+    if parent is None:
+        csi = float(csi_fn()) if csi_fn is not None else 1.0
+        group.record(child.name, csi=csi, accepted=False)
+        if prune:
+            group.evaluate_and_prune()
+        return None
+
     prev_as_of = getattr(parent, "_route_as_of", None)
     parent._route_as_of = as_of
 

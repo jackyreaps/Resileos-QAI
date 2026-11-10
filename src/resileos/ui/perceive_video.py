@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from resileos.ui.diagnostics import diagnose_image
+from resileos.ui.frame_codec import encode_clip
 from resileos.ui.scale_address import scale_address
 
 
@@ -41,6 +42,14 @@ def perceive_video(
     else:
         motion = 0.0
     addr = scale_address(f[0], subject=subject)
+    clip = encode_clip(f)
+    embed = dict(addr["embed"])
+    embed["residual_bin"] = clip["residual_bin"]
+    embed["reconstruction_mse"] = round(clip["mse"], 6)
+    embed["note"] = (
+        "residual_bin is the mean ResidualCore relative error "
+        "across up to four frames."
+    )
     return {
         "subject": subject,
         "frames": int(t),
@@ -49,9 +58,16 @@ def perceive_video(
         "mean_luma": round(mean_luma, 4),
         "mean_edge": round(mean_edge, 4),
         "motion": round(motion, 4),
-        "address": addr["embed"],
+        "address": embed,
         "gate": addr["gate"],
         "sample_diagnostics": diags[:2],
+        "codec": {
+            "engine": clip["engine"],
+            "mse": clip["mse"],
+            "relative_mse": clip["relative_mse"],
+            "residual_bin": clip["residual_bin"],
+            "frames_encoded": clip["frames_encoded"],
+        },
     }
 
 def into_kin(perceived: dict, psyche=None):

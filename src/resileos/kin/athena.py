@@ -37,7 +37,7 @@ def judge(
             parts.append("drives:" + ",".join(hot))
     reading = " | ".join(parts) if parts else "empty"
     triple = {"subject": subject, "relation": "judgment", "obj": reading[:180]}
-    accepted = True
+    accepted = False
     if eat_fn is not None:
         d = eat_fn(f"{triple['subject']} {triple['relation']} {triple['obj']}")
         accepted = bool(getattr(d, "accepted", False))

@@ -29,16 +29,40 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 
+# Relations that may hold several objects at once. A temporal conflict
+# is two different objects on a single-valued relation whose windows
+# both cover the same as_of.
+_MULTI_VALUED = {"parent_of", "sibling_of", "spouse_of", "symbol_of"}
+
+
+def _windows_overlap(facts_for_pair) -> bool:
+    """True when two explicit or unbounded windows cover a shared moment.
+
+    The caller already filtered to rows valid at one as_of, so any two
+    of those rows overlap at that moment.
+    """
+    return len(facts_for_pair) > 1
+
+
 def _reference_corpus_m9(titan, facts, as_of_list):
-    """M9 on the reference corpus: for each as_of, count (s, r) pairs
-    with > 1 chronos-valid object. Expect 0 for the reference set."""
+    """M9 counts single-valued relations with more than one object.
+
+    parent_of and the other multi-valued relations are not conflicts.
+    """
     conflicts = 0
     checks = 0
+    seen = set()
     for as_of in as_of_list:
         for s, r, _o in facts:
+            if r in _MULTI_VALUED:
+                continue
+            key = (as_of, s, r)
+            if key in seen:
+                continue
+            seen.add(key)
             rows = titan.ask_list(s, r, as_of=as_of)
             checks += 1
-            if len(rows) > 1:
+            if len(rows) > 1 and _windows_overlap(rows):
                 conflicts += 1
     return {
         "checks": checks,
@@ -68,13 +92,14 @@ def _synthetic_overlap_m9(titan, as_of_list):
         if len(rows) > 1:
             conflicts += 1
 
-    # Non-overlap as-of: only one valid
-    non_overlap = ["1750-01-01", "1950-01-01"]
+    # Before B starts only A is valid. After A ends only B is valid.
+    # 1750 is before both windows, so it is not a single-valued moment.
+    non_overlap = ["1820-01-01", "1950-01-01"]
     for as_of in non_overlap:
         rows = titan.ask_list(s, r, as_of=as_of)
         checks += 1
-        if len(rows) == 1:
-            conflicts += 1  # expect single row here, count as "correct"
+        if len(rows) != 1:
+            conflicts += 1
 
     return {
         "checks": checks,

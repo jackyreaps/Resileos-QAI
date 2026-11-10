@@ -36,15 +36,14 @@ import sys
 import time
 from pathlib import Path
 
-import requests
+sys.path.insert(0, "src")
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "src"))
+import requests
 
 try:
     from resileos.ui.attach_scale import attach_scale
-except Exception:
-    def attach_scale(x):  # noqa: D401
+except ImportError:
+    def attach_scale(x):
         return x
 
 OUT = Path("artifacts/report_invention.json")

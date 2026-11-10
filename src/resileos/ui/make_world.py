@@ -34,15 +34,26 @@ def make_still(
 ) -> dict[str, Any]:
     arr = np.zeros((16, 16, 3), dtype=np.uint8)
     out = generate_local(arr, belt=belt, frame=frame, subject=world_id, persona=persona)
-    rows = scene_rows(world_id, prompt, out["embed"])
+    from resileos.ui.frame_codec import codec_summary, encode_frame
+    compression = codec_summary(encode_frame(out["pattern"]))
+    address = dict(out["embed"])
+    address["residual_bin"] = compression["residual_bin"]
+    address["reconstruction_mse"] = round(compression["mse"], 6)
+    rows = scene_rows(world_id, prompt, address)
     return {
         "kind": "still",
         "prompt": prompt,
         "world_id": world_id,
-        "address": out["embed"],
+        "address": address,
         "pattern_shape": out["pattern_shape"],
         "rows": rows,
         "backend": out["backend"],
+        "compression": compression,
+        "compression_note": (
+            "ResidualCore compressed the already generated pattern. "
+            "It did not generate the pixels. The control packet cannot "
+            "rebuild the matrix, and there is no prompt decoder."
+        ),
     }
 
 

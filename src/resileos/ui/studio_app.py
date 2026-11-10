@@ -531,7 +531,7 @@ def _run_surface(mode: str) -> None:
             st.json(out)
 
         st.subheader("Language")
-        st.caption("Native is stored. Translate is a surface. Multilingual is the default path.")
+        st.caption("Native text is kept. Detection is a script guess, not a language name. Translation runs only when a provider is set.")
         txt = st.text_area("Text", key="lang_text", height=100)
         target = st.text_input("Target language code", value="en", key="lang_target")
         c1, c2, c3 = st.columns(3)

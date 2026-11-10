@@ -52,6 +52,16 @@ def perceive_with_scale(
 
     base = perceive_image(arr, subject=subject)
     addr = scale_address(arr, belt=belt, frame=frame, persona=persona, subject=subject)
+    triple = addr.get("triple") or {
+        "subject": subject,
+        "relation": "residual_address",
+        "obj": str(addr["embed"].get("residual_bin", "")),
+    }
+    base["candidates"] = [{
+        "triple": triple,
+        "accepted": False,
+        "note": "Not a fact until eat accepts and learn is called.",
+    }]
     base["scale"] = {
         "address": addr["embed"],
         "gate": addr["gate"],

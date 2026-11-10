@@ -42,7 +42,6 @@ import sys
 import time
 from pathlib import Path
 
-# sys.path.insert so attach_scale imports cleanly when run from repo root.
 sys.path.insert(0, "src")
 
 import requests

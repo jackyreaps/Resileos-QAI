@@ -10,7 +10,9 @@ Temporal extension (RES-332):
     Validity intervals live in a parallel append-only sidecar,
     `titanos_validity.bin`, with fixed-width 16-byte records
     (2 x int64: valid_from_days, valid_to_days since 1970-01-01).
-    -1 is the sentinel for None ("since forever" / "still true").
+    A sentinel far below any real day count means None
+    ("since forever" / "still true"). Negative day counts are real
+    pre-1970 dates, including 1969-12-31.
 
     The sidecar is created lazily on the first append that carries a
     non-None validity. On creation, sentinels are backfilled for
@@ -43,6 +45,7 @@ from __future__ import annotations
 import json
 import mmap
 import os
+import re
 import struct
 import threading
 from datetime import date, timedelta
@@ -59,9 +62,9 @@ VALIDITY_RECORD = struct.Struct("<2q")
 VALIDITY_RECORD_SIZE = VALIDITY_RECORD.size
 NAME_MAX = 128
 
-# Sentinel for None validity in the sidecar (-1 = "since forever" /
-# "still true"). Chosen so it's distinct from any real day count.
-_SENTINEL = -1
+# Sentinel for None validity. Far below any civil day count, so it
+# does not collide with 1969-12-31 (day -1) or earlier dates.
+_SENTINEL = -(2**62)
 _EPOCH = date(1970, 1, 1)
 
 
@@ -72,24 +75,31 @@ def _safe_name(name: str) -> str:
 
 
 def _iso_to_days(s: Optional[str]) -> int:
-    """Convert ISO 8601 date string to days since 1970-01-01.
-    None/empty -> _SENTINEL. Tolerates a datetime prefix (uses first 10 chars).
+    """Convert an ISO date to days since 1970-01-01.
+
+    None or empty is the unbounded sentinel. A datetime prefix uses
+    the calendar date. An unparseable value is rejected.
     """
     if s is None:
         return _SENTINEL
-    s = str(s).strip()
-    if not s:
+    text = str(s).strip()
+    if not text:
         return _SENTINEL
+    day_text = text[:10]
+    short = re.fullmatch(r"(-?)(\d{1,3})(-\d{2}-\d{2})", day_text)
+    if short:
+        sign, year, rest = short.groups()
+        day_text = f"{sign}{int(year):04d}{rest}"
     try:
-        d = date.fromisoformat(s[:10])
-    except ValueError:
-        return _SENTINEL
-    return (d - _EPOCH).days
+        parsed = date.fromisoformat(day_text)
+    except ValueError as exc:
+        raise ValueError(f"unparseable date {s!r}") from exc
+    return (parsed - _EPOCH).days
 
 
 def _days_to_iso(d: int) -> Optional[str]:
-    """Inverse of _iso_to_days. _SENTINEL -> None."""
-    if int(d) < 0:
+    """Inverse of _iso_to_days. The sentinel is None. Negative days are dates."""
+    if int(d) == _SENTINEL:
         return None
     return (_EPOCH + timedelta(days=int(d))).isoformat()
 

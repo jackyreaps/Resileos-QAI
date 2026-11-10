@@ -27,12 +27,16 @@ python scripts/ops/bench_compositional.py
 
 ## Results
 
+Run on 2026-11-10 against `http://127.0.0.1:8000/api/v1` with `RESILEOS_AUTH_BYPASS=1`. `LLM_API_KEY` was unset, so `llm` in the report is null.
+
 | Metric | Resileos | Notes |
 |--------|----------|-------|
-| Composition rate (novel queries) | _run_ | Algebraic / chain |
-| Latency p50 (composed queries) | _ms_ | |
+| Composition rate | 1.0 (3/3) | Chain and inverse hops, all `ACCEPTED` |
+| alice's grandchild | carol in 85.4 ms | forward 2-hop |
+| carol's grandparent | alice in 91.8 ms | inverse 2-hop |
+| carol's parent's workplace | globex in 45.7 ms | inverse then forward |
 
-*(Populate from `artifacts/report_compositional.json` after a host run.)*
+These are the rows from the 2026-11-10 rerun after merging `cc81021`. The script walks `/chain`, not a stored `grandparent_of` relation.
 
 ## Reading the table
 
@@ -42,4 +46,4 @@ A non-zero composition rate on novel combinations means the substrate can comput
 
 - Current compositions are simple (2-hop parent_of, works_at of parent).
 - Full VSA bind/unbind composition requires the substrate operators to be exposed on the query path.
-- LLM baseline is not yet wired in this script; add it once the Resileos number exists.
+- The script calls an LLM when `LLM_API_KEY` and `LLM_MODEL` are set. This run did not set them.

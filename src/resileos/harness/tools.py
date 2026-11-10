@@ -115,9 +115,9 @@ def verify_on_stop(
 ) -> Dict[str, Any]:
     """Outer verification loop. Must pass before closing turn.
 
-    Default require_evidence=False preserves prior behaviour (including
-    the fail-open on apollo=False + no scars). Pass require_evidence=True
-    to enforce the zero-match rule and fail-closed apollo check.
+    Fail closed. Apollo success False and an unverified packet return
+    verified=False on the default path and on require_evidence=True.
+    Scars also fail closed.
     """
     packet_verified = bool(packet.get("verified", False))
     apollo_ok = bool(apollo_result and apollo_result.get("success", False))

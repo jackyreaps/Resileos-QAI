@@ -333,13 +333,29 @@ def zeus_head(
     sc = cycle or SeparatedCycle()
     verdicts: list[Verdict] = []
     for name, fn in reviewers:
-        v = fn(proposal)
+        raw = fn(proposal)
+        if isinstance(raw, tuple):
+            approved = bool(raw[0]) if raw else False
+            reason = str(raw[1]) if len(raw) > 1 else ""
+            evidence = list(raw[2]) if len(raw) > 2 and raw[2] else []
+            v = Verdict(proposal.id, name, approved, reason, evidence)
+        elif isinstance(raw, Verdict):
+            v = raw
+        else:
+            v = Verdict(
+                proposal.id,
+                name,
+                bool(getattr(raw, "approved", False)),
+                str(getattr(raw, "reason", "")),
+                list(getattr(raw, "evidence", []) or []),
+            )
         verdicts.append(v)
         if not v.approved:
             return {
                 "applied": False,
                 "reason": f"reviewer {name} rejected: {v.reason}",
                 "verdicts": [x.__dict__ for x in verdicts],
+                "verification": {"verified": False, "reason": v.reason},
             }
     result = sc.apply(proposal, verdicts[-1], learn_fn)
     result["verdicts"] = [x.__dict__ for x in verdicts]

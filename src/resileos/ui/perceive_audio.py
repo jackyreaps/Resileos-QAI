@@ -25,7 +25,10 @@ def perceive_audio(
     if w.size == 0:
         w = np.zeros(1, dtype=np.float32)
     energy = float(np.mean(w ** 2))
-    zcr = float(np.mean(np.diff(np.signbit(w)).astype(np.float32)))
+    if w.size < 2:
+        zcr = 0.0
+    else:
+        zcr = float(np.mean(np.diff(np.signbit(w)).astype(np.float32)))
     # crude spectral centroid via FFT magnitude
     spec = np.abs(np.fft.rfft(w))
     freqs = np.fft.rfftfreq(w.size, d=1.0 / max(1, sample_rate))

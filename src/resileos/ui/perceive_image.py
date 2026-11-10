@@ -12,23 +12,31 @@ from typing import Any
 import numpy as np
 
 from resileos.ui.diagnostics import diagnose_image
+from resileos.ui.frame_codec import codec_summary, encode_frame
 from resileos.ui.scale_address import scale_address
 
 
 def perceive_image(arr: np.ndarray, *, subject: str = "image") -> dict[str, Any]:
-    """Perceive an image: diagnostics plus scale address."""
-    diag = diagnose_image(np.asarray(arr))
-    addr = scale_address(
-        np.asarray(arr),
-        subject=subject,
+    """Perceive an image: diagnostics, core residual, and scale address."""
+    image = np.asarray(arr)
+    diag = diagnose_image(image)
+    coded = encode_frame(image)
+    addr = scale_address(image, subject=subject)
+    embed = dict(addr["embed"])
+    embed["residual_bin"] = coded["residual_bin"]
+    embed["reconstruction_mse"] = round(coded["mse"], 6)
+    embed["note"] = (
+        "residual_bin is ResidualCore relative reconstruction error "
+        "on a grayscale projection, not the luma/edge scaffold."
     )
     return {
         "subject": subject,
         "diagnostics": diag,
-        "address": addr["embed"],
+        "address": embed,
         "gate": addr["gate"],
         "mean_luma": diag.get("mean_luma"),
         "edge_density": diag.get("edge_density"),
+        "codec": codec_summary(coded),
     }
 
 def into_kin(perceived: dict, psyche=None):
