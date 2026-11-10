@@ -9,7 +9,7 @@
             --bg: #fcfcfc; --panel: #ffffff; --text: #1a1a1a; --muted: #666;
             --accent: #1a4d8f; --accent-hover: #143c70; --border: #e5e5e5;
             --user-bg: #1a4d8f; --user-text: #fff; --bot-bg: #ffffff;
-            --danger: #d93838; --success: #0d9463;
+            --danger: #d93838; --success: #0d9463; --warning: #d97706;
         }
         [data-theme="dark"] {
             --bg: #121212; --panel: #1e1e1e; --text: #ededed; --muted: #a0a0a0;
@@ -37,12 +37,17 @@
         .bubble.user { background: var(--user-bg); color: var(--user-text); border-bottom-right-radius: 2px; }
         .bubble.bot { background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
         .bubble strong { color: var(--accent); }
-        .meta { font-size: 0.72rem; color: var(--muted); margin-top: 6px; font-family: ui-monospace, monospace; }
+        .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; font-family: ui-monospace, monospace; background: rgba(0,0,0,0.03); padding: 6px; border-radius: 4px; }
+        [data-theme="dark"] .meta { background: rgba(255,255,255,0.05); }
 
-        .tools-panel { background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 16px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px; }
-        .tools-panel.open { display: flex; }
-        .tool-chip { background: var(--bg); border: 1px solid var(--border); padding: 6px 12px; border-radius: 16px; cursor: pointer; color: var(--text); transition: all 0.2s; }
+        /* Panels */
+        .panel { background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 16px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px; }
+        .panel.open { display: flex; }
+        .tool-chip { background: var(--bg); border: 1px solid var(--border); padding: 6px 12px; border-radius: 16px; cursor: pointer; color: var(--text); transition: all 0.2s; font-size: 0.8rem;}
         .tool-chip:hover { border-color: var(--accent); color: var(--accent); }
+        .tool-chip.legion { border-color: var(--accent); font-weight: 500; background: rgba(26, 77, 143, 0.05); }
+        [data-theme="dark"] .tool-chip.legion { background: rgba(59, 130, 246, 0.1); }
+        .group-row { width: 100%; margin-bottom: 6px; }
 
         .input-wrap { padding: 16px; background: var(--bg); display: flex; justify-content: center; }
         .input-box { width: 100%; max-width: 768px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: flex-end; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
@@ -60,6 +65,9 @@
         .typing span:nth-child(1) { animation-delay: -0.32s; }
         .typing span:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        
+        pre { background: #f4f4f0; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; }
+        [data-theme="dark"] pre { background: #111; }
     </style>
 </head>
 <body>
@@ -71,11 +79,21 @@
         </div>
         <div>
             <button class="btn-icon" onclick="toggleTools()" title="Show Tools">🛠️</button>
+            <button class="btn-icon" onclick="toggleKin()" title="Show Kin">🕸️</button>
             <button class="btn-icon" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
         </div>
     </div>
 
-    <div id="tools-panel" class="tools-panel"></div>
+    <!-- Tools Panel -->
+    <div id="tools-panel" class="panel"></div>
+
+    <!-- Kin Panel -->
+    <div id="kin-panel" class="panel">
+        <strong>Kin:</strong>
+        <span class="tool-chip" onclick="runKinCycle()">Iris → Metis → Hermes</span>
+        <span class="tool-chip" onclick="listCheckpoints()">Hades checkpoints</span>
+        <span class="tool-chip" onclick="runResidualCheck()">Residual consistency</span>
+    </div>
 
     <div id="chat">
         <div class="msg-row bot">
@@ -90,6 +108,7 @@
             <div class="suggestion" onclick="quickAsk('who is zeus')">Test abstention</div>
             <div class="suggestion" onclick="runKinCycle()">Run Kin cycle</div>
             <div class="suggestion" onclick="quickAsk('/tool residual_consistency')">Residual check</div>
+            <div class="suggestion" onclick="runVideoLegion(prompt('Video prompt:'))">Video legion</div>
         </div>
     </div>
 
@@ -110,8 +129,10 @@
         const sendBtn = document.getElementById('send');
         const statusDot = document.getElementById('status');
         const toolsPanel = document.getElementById('tools-panel');
+        const kinPanel = document.getElementById('kin-panel');
 
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+        
         function toggleTheme() {
             const t = document.documentElement.getAttribute('data-theme');
             document.documentElement.setAttribute('data-theme', t === 'dark' ? 'light' : 'dark');
@@ -122,23 +143,63 @@
             else throw new Error();
         }).catch(() => statusDot.classList.add('offline'));
 
+        // ── Tools & Kin Panels ──
         async function loadTools() {
             try {
                 const r = await fetch(`${API_URL}/tools`, { headers: { 'X-API-Key': API_KEY } });
                 const d = await r.json();
                 const tools = d.tools || d || [];
-                toolsPanel.innerHTML = '<strong>Tools (legions):</strong> ' + tools.map(t => 
-                    `<span class="tool-chip" onclick="runTool('${t.name || t}')">${t.name || t}</span>`
-                ).join('');
+
+                const groups = { Iris: [], Metis: [], Hermes: [], Hades: [], Apollo: [], Other: [] };
+                tools.forEach(t => {
+                    const name = typeof t === 'string' ? t : t.name;
+                    const kin = typeof t === 'object' && t.kin ? t.kin : inferKin(name);
+                    const isLegion = typeof t === 'object' && t.legion;
+                    
+                    if (groups[kin]) groups[kin].push({ name, legion: isLegion });
+                    else groups.Other.push({ name, legion: false });
+                });
+
+                toolsPanel.innerHTML = Object.entries(groups)
+                    .filter(([_, arr]) => arr.length)
+                    .map(([kin, arr]) => `
+                        <div class="group-row">
+                            <strong>${kin}:</strong>
+                            ${arr.map(t => `
+                                <span class="tool-chip ${t.legion ? 'legion' : ''}" 
+                                      onclick="runTool('${t.name}')" 
+                                      title="${t.legion ? 'Legion under ' + kin : 'Tool'}">
+                                    ${t.name}${t.legion ? ' ✦' : ''}
+                                </span>
+                            `).join('')}
+                        </div>
+                    `).join('');
             } catch (e) {
                 toolsPanel.innerHTML = 'Could not load tools.';
             }
         }
+
+        function inferKin(name) {
+            if (name.match(/observe|flag|iris/i)) return 'Iris';
+            if (name.match(/policy|risk|guide|metis/i)) return 'Metis';
+            if (name.match(/cycle|navigate|review|hermes|separated/i)) return 'Hermes';
+            if (name.match(/hades|checkpoint|save|restore/i)) return 'Hades';
+            if (name.match(/apollo|verify|residual|success/i)) return 'Apollo';
+            return 'Other';
+        }
+
         function toggleTools() {
             toolsPanel.classList.toggle('open');
+            kinPanel.classList.remove('open');
             if (toolsPanel.classList.contains('open') && toolsPanel.innerHTML === '') loadTools();
         }
 
+        function toggleKin() {
+            kinPanel.classList.toggle('open');
+            toolsPanel.classList.remove('open');
+        }
+
+        // ── Actions ──
         function quickAsk(text) { input.value = text; sendMsg(); }
         function handleEnter(e) { if (e.key === 'Enter') sendMsg(); }
 
@@ -170,16 +231,95 @@
                 });
                 const d = await r.json();
                 if (!r.ok) throw new Error(d.detail || "failed");
-                const h = d.harness || d;
+                
+                const h = d.harness || {};
                 const verified = h.verified ?? d.verified ?? "n/a";
                 const lesson = h.lesson || d.lesson || "—";
                 const checkpoint = h.checkpoint || d.checkpoint;
                 const residual = d.residual_hash || h.residual_hash;
+                
                 bubble.innerHTML = `Kin cycle complete.<br>Verified: <strong>${verified}</strong><br>Lesson: ${lesson}`;
-                if (checkpoint || residual) {
+                
+                if (h.risk_class || h.confidence || h.budget_remaining) {
+                    bubble.innerHTML += `<div class="meta">risk: ${h.risk_class || "—"} · confidence: ${h.confidence ?? "—"} · budget: ${h.budget_remaining ?? "—"}</div>`;
+                } else if (checkpoint || residual) {
                     bubble.innerHTML += `<div class="meta">${checkpoint ? "hades: " + checkpoint : "residual: " + (residual || "").slice(0,12) + "…"}</div>`;
                 }
-            } catch (e) { bubble.innerHTML = `Kin cycle error: ${e.message}`; }
+            } catch (e) { 
+                bubble.innerHTML = `Kin cycle error: ${e.message}`; 
+            }
+        }
+
+        async function listCheckpoints() {
+            addMsg("Listing Hades checkpoints…", 'user');
+            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            try {
+                const r = await fetch(`${API_URL}/kin/hades/list`, { headers: { 'X-API-Key': API_KEY } });
+                const d = await r.json();
+                const cps = d.checkpoints || d || [];
+                if (!cps.length) {
+                    bubble.innerHTML = "No checkpoints.";
+                    return;
+                }
+                bubble.innerHTML = cps.map(cp => 
+                    `<div style="margin:6px 0">
+                        <code>${cp.id || cp.name || 'unnamed'}</code>
+                        <button class="tool-chip" style="margin-left:8px" 
+                                onclick="restoreCheckpoint('${cp.id || cp.name}')">Restore fresh</button>
+                    </div>`
+                ).join('');
+            } catch (e) {
+                bubble.innerHTML = "No checkpoints endpoint or empty.";
+            }
+        }
+
+        async function restoreCheckpoint(id) {
+            addMsg(`Restoring from Hades checkpoint ${id} (fresh context)…`, 'user');
+            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            try {
+                const r = await fetch(`${API_URL}/kin/hades/restore`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    body: JSON.stringify({ checkpoint_id: id, fresh: true })
+                });
+                const d = await r.json();
+                bubble.innerHTML = r.ok 
+                    ? `Restored. Lesson: ${d.lesson || '—'}<br>Residual: ${(d.residual_hash || '').slice(0,12)}…`
+                    : `Restore failed: ${d.detail || 'unknown'}`;
+            } catch (e) {
+                bubble.innerHTML = "Restore failed.";
+            }
+        }
+
+        async function runResidualCheck() {
+            return runTool("residual_consistency");
+        }
+
+        async function runVideoLegion(promptText, draft = true) {
+            if (!promptText) return;
+            const safePrompt = promptText.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            addMsg(`Video legion (${draft ? 'draft' : 'final'}): ${promptText}`, 'user');
+            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            try {
+                const r = await fetch(`${API_URL}/tools/video_generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    body: JSON.stringify({
+                        prompt: promptText,
+                        draft,
+                        model: "seedance-2.5",
+                        resolution: draft ? "480p" : "1080p",
+                        duration: 5
+                    })
+                });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || "failed");
+                bubble.innerHTML = `Video ${draft ? 'draft' : 'final'} ready.<br>
+                    <pre>${JSON.stringify(d, null, 2)}</pre>
+                    ${draft ? `<button class="tool-chip" onclick="runVideoLegion('${safePrompt}', false)">Upscale to 1080p</button>` : ''}`;
+            } catch (e) {
+                bubble.innerHTML = `Video legion failed: ${e.message}`;
+            }
         }
 
         async function runTool(name) {
@@ -193,7 +333,9 @@
                 });
                 const d = await r.json();
                 bubble.innerHTML = `<pre>${JSON.stringify(d, null, 2)}</pre>`;
-            } catch (e) { bubble.innerHTML = `Tool ${name} failed.`; }
+            } catch (e) { 
+                bubble.innerHTML = `Tool ${name} failed.`; 
+            }
         }
 
         async function sendMsg() {
@@ -205,29 +347,30 @@
 
             const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
             
-            if (text.startsWith('/tool ')) {
-                const toolName = text.slice(6).trim();
-                return runTool(toolName);
-            }
-
-            let endpoint = '/answer';
-            let body = { question: text };
-
-            if (text.toLowerCase().startsWith('remember ')) {
-                const parts = text.substring(9).trim().split(/\s+/);
-                if (parts.length >= 3) {
-                    endpoint = '/learn';
-                    body = { subject: parts[0], relation: parts[1], obj: parts.slice(2).join(' ') };
-                }
-            } else {
-                const parts = text.split(/\s+/);
-                if (parts.length === 2) {
-                    endpoint = '/query';
-                    body = { subject: parts[0], relation: parts[1] };
-                }
-            }
-
             try {
+                if (text.startsWith('/tool ')) {
+                    const toolName = text.slice(6).trim();
+                    await runTool(toolName);
+                    return;
+                }
+
+                let endpoint = '/answer';
+                let body = { question: text };
+
+                if (text.toLowerCase().startsWith('remember ')) {
+                    const parts = text.substring(9).trim().split(/\s+/);
+                    if (parts.length >= 3) {
+                        endpoint = '/learn';
+                        body = { subject: parts[0], relation: parts[1], obj: parts.slice(2).join(' ') };
+                    }
+                } else {
+                    const parts = text.split(/\s+/);
+                    if (parts.length === 2) {
+                        endpoint = '/query';
+                        body = { subject: parts[0], relation: parts[1] };
+                    }
+                }
+
                 const r = await fetch(`${API_URL}${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
