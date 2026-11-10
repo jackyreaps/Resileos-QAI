@@ -1,6 +1,8 @@
 """Residual codec mode: round trip, candidates, external sampler, demi-gods."""
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
@@ -108,6 +110,79 @@ def test_unknown_external_sampler_is_not_loaded():
     assert "not loaded" in sampler.reason
     with pytest.raises(SamplerOff):
         sampler.propose()
+
+
+def _png_b64() -> str:
+    import base64
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (16, 16), (180, 40, 40)).save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def test_minimax_api_stays_off_without_opt_in_even_if_a_key_is_set():
+    calls = []
+
+    def post(url, headers, payload):
+        calls.append(url)
+        raise AssertionError("http was called")
+
+    sampler = resolve_external_sampler(
+        {"MINIMAX_API_KEY": "secret", "MINIMAX_API_BASE": "https://example.invalid"},
+        post=post,
+    )
+    assert sampler.enabled is False
+    with pytest.raises(SamplerOff):
+        sampler.propose(condition={"prompt": "a red square"})
+    assert calls == []
+
+
+def test_minimax_api_without_a_key_stays_off():
+    sampler = resolve_external_sampler({"RESILEOS_EXTERNAL_SAMPLER": "minimax_api"})
+    assert sampler.enabled is False
+    assert "MINIMAX_API_KEY" in sampler.reason
+    with pytest.raises(SamplerOff):
+        sampler.propose(condition={"prompt": "a red square"})
+
+
+def test_minimax_api_reencodes_a_mocked_image_as_a_candidate(monkeypatch):
+    def explode(*_args, **_kwargs):
+        raise AssertionError("real http")
+
+    monkeypatch.setattr("urllib.request.urlopen", explode)
+    monkeypatch.setattr(ResidualCore, "step", explode)
+    calls = []
+
+    def post(url, headers, payload):
+        calls.append({"url": url, "payload": payload, "auth": headers.get("Authorization")})
+        return {"data": [{"b64_json": _png_b64()}]}
+
+    out = propose_external(
+        env={
+            "RESILEOS_EXTERNAL_SAMPLER": "minimax_api",
+            "MINIMAX_API_KEY": "test-key",
+            "MINIMAX_API_BASE": "https://example.invalid",
+        },
+        condition={"prompt": "a red square"},
+        post=post,
+    )
+    assert calls and calls[0]["url"] == "https://example.invalid/v1/images/generations"
+    assert calls[0]["payload"]["model"] == "MiniMax-H3-Image"
+    assert calls[0]["payload"]["response_format"] == "b64_json"
+    assert calls[0]["auth"] == "Bearer test-key"
+    assert out["enabled"] is True
+    assert out["learned"] is False
+    assert out["scar_matrix_updated"] is False
+    assert out["packet"]["scale_mode"] == "component"
+    assert out["packet"]["basis"] == "minimax_api-reencoded"
+    assert out["gate"]["hephaestus"]["verified"] is True
+    assert out["gate"]["themis"]["verified"] is True
+    assert out["candidate"]["status"] == "candidate"
+    assert out["candidate"]["learned"] is False
+    assert "test-key" not in json.dumps(out["sampler"])
 
 
 def test_fake_external_sampler_proposes_a_gated_candidate():

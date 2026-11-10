@@ -166,7 +166,8 @@ def render_residual_codec(st: Any, *, on_candidate: Callable[[dict[str, Any], np
     else:
         st.info(
             f"External sampler is off. {status['reason']}. "
-            "Set RESILEOS_EXTERNAL_SAMPLER=fake to use the in-repo stand-in. "
+            "Set RESILEOS_EXTERNAL_SAMPLER=fake for the in-repo stand-in. "
+            "minimax_api stays off unless that name and MINIMAX_API_KEY are both set. "
             "No weights are loaded. See docs/studio/external-samplers.md."
         )
 

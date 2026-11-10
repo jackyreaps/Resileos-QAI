@@ -183,9 +183,10 @@ def propose_external(
     condition: dict[str, Any] | None = None,
     env: dict[str, str] | None = None,
     register: bool = True,
+    post: Any = None,
 ) -> dict[str, Any]:
     """Ask the configured external sampler for a packet. Off by default."""
-    sampler = resolve_external_sampler(env)
+    sampler = resolve_external_sampler(env, post=post)
     status = sampler.status()
     if not sampler.enabled:
         return {

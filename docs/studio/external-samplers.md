@@ -1,85 +1,209 @@
 ---
 doc: STUDIO-002
 title: External samplers
-status: draft — lookup on 2026-11-10, no weights downloaded
+status: corrected — MiniMax-H3-Image card checked 2026-11-10
 depends_on: [STUDIO-001, RES-201]
 ---
 
 # External samplers
 
-An external sampler proposes a `studio-codec/1` packet. It does not decode,
-it does not call `learn`, and it does not touch the scar matrix. The Studio
-mode reads `RESILEOS_EXTERNAL_SAMPLER`. Unset, `off`, `none`, and `disabled`
-leave the sampler off. The only implementation in this repository is `fake`,
-which builds a deterministic ±1 packet with per-component scales and does
-not open a network connection. Any other name, including `p-h3-image`, stays
-off and is not loaded.
+An external sampler proposes a `studio-codec/1` packet. It does not call
+`learn`, and it does not touch the scar matrix. The Studio mode reads
+`RESILEOS_EXTERNAL_SAMPLER`. Unset, `off`, `none`, and `disabled` leave the
+sampler off.
 
-No weights and no third-party sampler code are vendored here.
+Two names are implemented, and neither downloads weights:
 
-## What was checked
+- `fake` builds a deterministic ±1 packet in process. No network.
+- `minimax_api` is a stub for the hosted MiniMax-H3-Image API. It stays off
+  unless that name is set **and** `MINIMAX_API_KEY` is set. A key alone does
+  nothing. The stub asks for `b64_json`, re-encodes the pixels with the
+  residual codec, and returns only the packet. Studio then treats that
+  packet as a candidate.
 
-Looked up on 2026-11-10 from public pages. Nothing was downloaded.
+Any other name, including `p-h3-image`, stays off.
 
-There is no separate MiniMax release found under the name "H3-Image".
-MiniMax publishes **MiniMax-H3**, a video and audio model that also accepts
-images as conditions. **P-H3-Image** is Pruna's image model based on that
-system. The notes below keep those two names apart.
+## Correction
 
-### MiniMax-H3
+An earlier draft of this note said there was no separate MiniMax release
+named H3-Image. That was wrong. **MiniMax-H3-Image** is its own model:
+[huggingface.co/MiniMaxAI/MiniMax-H3-Image](https://huggingface.co/MiniMaxAI/MiniMax-H3-Image).
+MiniMax-H3 is the video model. P-H3-Image is Pruna's separate distillation.
+They are three different things.
 
-- Code and architecture write-up: [github.com/MiniMax-AI/MiniMax-H3](https://github.com/MiniMax-AI/MiniMax-H3).
-- Weights and the license FAQ: [huggingface.co/MiniMaxAI/MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3).
-- License text used by the image distillation as well: [PrunaAI/P-H3-Image LICENSE](https://huggingface.co/PrunaAI/P-H3-Image/blob/main/LICENSE), which is the MiniMax H3 Community License. The GitHub README says MiniMax H3 is released under that agreement.
+Nothing below was downloaded. The figures are from the model card, the
+community license, and the platform image-generation guides, read on
+2026-11-10.
 
-What the README states, in its own words:
+## MiniMax-H3-Image
 
-- H3 generates video with stereo audio, up to 15 seconds, 24 fps. The shorter side defaults to 768 pixels. A 2K regenerate stage exists and is **not** in the open-source drop ("this module is not yet open-sourced").
-- Two open checkpoints: `MiniMax-H3 Base FL2VA` and `MiniMax-H3 Base Ref2VA`, both BF16, described as CFG-distilled. Each repo holds a processor, tokenizer, text encoder, transformer, visual VAE, and audio VAE.
-- The visual path is a VAE (spatial compression 16×, temporal 4×, 24 latent channels) plus a later patch of `1×2×2`. The README also says a ViT decoder is trained after the encoder.
-- The generator is the H3-Omni-Transformer: a 33B dense single-stream transformer. About 13B of that is AdaLN. The README says those AdaLN outputs can be cached and need not be loaded for inference-only use, and that the full weights are released anyway.
-- Attention and the FFN are shared across modalities. Modality-specific parameters sit in the input and output layers and in AdaLN.
-- Positions are 3D multimodal RoPE over `(t, h, w)`. The public diffusers class describes the same three-axis rotary embedding: [transformer_minimax_h3.py](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/transformers/transformer_minimax_h3.py).
-- Tokens from text, vision, and audio are one packed sequence. RoPE is applied before that sequence enters the transformer.
-- The text encoder starts from Qwen3-VL-32B and passes layer-50 hidden states.
-- H3-Context-IR, the hosted prompt preprocessor, is **not** in the open-source release.
+Card: [MiniMaxAI/MiniMax-H3-Image](https://huggingface.co/MiniMaxAI/MiniMax-H3-Image).
+License file: [LICENSE](https://huggingface.co/MiniMaxAI/MiniMax-H3-Image/blob/main/LICENSE).
 
-The community license, as quoted on the P-H3-Image card and in the license file linked above, grants rights only outside the European Union, the United Kingdom, the Republic of Korea, and the United States, unless MiniMax grants a separate license. Products built on the works must show "Powered by MiniMax H3". This repository does not use the weights, so that obligation is not triggered here. Read the license before anyone does.
+It is one checkpoint for text-to-image and for editing with reference
+images. The card says it is distilled to 6 sampling steps (6 NFEs) with no
+classifier-free guidance, and that it generates images of about 16
+megapixels directly, without an upscaler. The sizes it lists around that
+point run from 4096×4096 (1:1) to 6272×2688 (21:9). It also says the
+effective working range is about 4 MP to 20 MP, with the best results
+around 16 MP.
 
-A revenue threshold is sometimes mentioned in secondary write-ups. It was not copied into this note, because the pages read for this lookup did not put a dollar figure in the excerpt that was checked. The license file is the source.
+Architecture, as the card states it:
 
-### P-H3-Image
+- Diffusion transformer: 33.1B parameters, dense, single-stream, 50 layers,
+  hidden size 5376, 56 attention heads, FFN size 14336, 3D multimodal RoPE.
+  Same block family as the H3-Omni-Transformer, without the audio layers.
+  Weights are BF16. The embedding, timestep, and output layers are FP32.
+- Image VAE: a CNN encoder and a 2D ViT decoder (24 layers), 16× spatial
+  downsampling, 24 latent channels. The DiT patchifies that latent with a
+  2×2 patch, so each transformer token covers 32×32 pixels.
+- Text encoder: the Qwen3-VL text encoder from MiniMax-H3, unchanged. The
+  DiT reads hidden states from its 50th layer. It is not in the H3-Image
+  repository. `model_index.json` loads it from `MiniMaxAI/MiniMax-H3`,
+  folder `text_encoder/`.
+- Optional prompt expander: [MiniMax-H3-Image-PE](https://huggingface.co/MiniMaxAI/MiniMax-H3-Image-PE).
+  The card lists it as NVFP4, 17.9 GB. The hosted API can expand prompts
+  through H3-Image-Context-IR instead. That expander is a separate call.
 
-- Model card: [huggingface.co/PrunaAI/P-H3-Image](https://huggingface.co/PrunaAI/P-H3-Image).
-- Pruna's write-up: [pruna.ai/blog/oss-p-h3-image-launch](https://www.pruna.ai/blog/oss-p-h3-image-launch).
-- Diffusers integration: [huggingface/diffusers pull 15171](https://github.com/huggingface/diffusers/pull/15171).
+The text prompt and any reference images are encoded into one packed
+sequence for that single-stream transformer. The transformer predicts the
+target latent. The VAE decodes it.
 
-The model card (fetched 2026-11-10) says P-H3-Image is an image model based on MiniMax-H3: text-to-image and editing with 1 to 8 images, 8 sampling steps, no classifier-free guidance, best at about 8 megapixels. It lists a 33.1B-parameter transformer, a 4B text encoder, a VAE, and a prompt upsampler, about 100 GB in bf16, and about 83 GB of GPU memory at 8 MP without the upsampler (about 101 GB with it). A ComfyUI package, [PrunaAI/P-H3-Image-Comfy](https://huggingface.co/PrunaAI/P-H3-Image-Comfy), is where the card points for int8 and 4-bit files that run in less memory. The card's own lower-memory note for the bf16 pipeline is auto offload onto an 80 GB GPU.
+### Weights
 
-Pruna's blog describes a different size: the timestep block (about 40% of H3's transformer) replaced by a smaller one, backbone from 33B to 20B parameters, smallest download 20 GB rather than 143 GB, and a new single-frame decoder because H3's video decoder is blurry on one frame. The diffusers pull says the transformer class is the existing `MiniMaxH3Transformer3DModel`, unchanged, and that the VAE is MiniMax-H3's encoder with a single-frame image decoder. Those three sources do not agree on whether the shipped transformer is 33.1B or 20B. This note does not pick a winner. The card is what the Hub page showed; the blog is what Pruna wrote about the distillation; the pull is what diffusers reviewed.
+From the model card's own tables, not from a download:
 
-License, from the model card: the MiniMax H3 Community License, with the same territory exclusion and the "Powered by MiniMax H3" line. The card says the text encoder's Qwen3-VL-4B parts and the Qwen3.5-9B prompt upsampler are Apache 2.0. See the card's NOTICE, which was not vendored here.
+| Piece | Where | Size on the card |
+|---|---|---|
+| MiniMax-H3-Image checkpoint | `MiniMaxAI/MiniMax-H3-Image` | 68.65 GB |
+| of which the DiT (`transformer/`) | same repo | 66.28 GB |
+| of which the VAE | same repo | 2.34 GB |
+| Text encoder | `MiniMaxAI/MiniMax-H3`, `text_encoder/` | 66.7 GB |
+| Optional PE | `MiniMaxAI/MiniMax-H3-Image-PE` | 17.9 GB |
 
-P-H3-Image does not generate video. The card says so.
+About 69 GB for the image checkpoint, plus about 67 GB for the text
+encoder. This repository does not vendor either.
 
-## How one would plug in
+The card says to serve it with SGLang, vLLM-Omni, diffusers, or ComfyUI.
+Local servers it documents expose `POST /v1/images/generations` and
+`POST /v1/images/edits`. The response shape it shows puts the PNG in
+`data[0].b64_json`. The Studio stub asks for that field and does not
+follow a returned URL.
 
-Not built. The contract is already the one `ExternalSampler.propose` uses:
+### Community license
 
-1. The sampler, running in its own process if the weights are large, turns a prompt or a condition dict into a `studio-codec/1` packet with per-component scales, or into latents that an adapter folds into that packet.
-2. Studio calls `decode` on the packet with whatever decoder is registered. Today that is the linear sum. A learned decoder would be the `learned_conv` slot, still outside `ResidualCore`.
-3. The packet is gated (Hephaestus, residual consistency, Themis) and, if it passes, registered as a candidate. `learn` is not called.
+The card releases the checkpoint under the **MiniMax-H3-Image Community
+License Agreement** (license date November 10, 2026). The same agreement
+covers MiniMax-H3-Image-PE.
 
-A P-H3-style model does not natively emit bipolar residual factors. An adapter would have to encode its decoded image, or its VAE latent, with the studio codec. That adapter is the boundary. The DiT stays on the far side of it. Turning `RESILEOS_EXTERNAL_SAMPLER` to a Hub id must not be enough to download 100 GB; a future loader would be a separate, explicit step, and it would have to record the license territory before the first forward pass.
+"Excluded Territories" in that license are the European Union, the United
+Kingdom, the Republic of Korea, and the United States of America.
+"Applicable Territory" is the world outside that list. The grant of rights
+is only inside the Applicable Territory. Section V.4 says you may not use,
+reproduce, modify, distribute, or display the works **or any of their
+outputs or results** outside the Applicable Territory, and that such use
+is not authorized by the agreement.
+
+A separate license for the excluded territories is requested through the
+application form linked from the card and from Section IV of the license:
+[platform.minimax.io/license](https://platform.minimax.io/license).
+Without that separate license, use of the weights or of their outputs in
+those territories is not authorized by the community agreement.
+
+Section IV also says a separate written authorization is required if
+annualized revenue of you and your affiliates exceeds 1 million USD, or if
+you provide a hosted service to third parties. That is a term of the
+license, not a terms-of-service ruling about the public API.
+
+### Hosted API, separately
+
+The card points at a hosted API:
+
+- Global: [platform.minimax.io](https://platform.minimax.io)
+- China: [platform.minimax.cn](https://platform.minimax.cn)
+- Image guide (English): [platform.minimax.io/docs/guides/image-generation](https://platform.minimax.io/docs/guides/image-generation)
+- Image guide (Chinese): [platform.minimax.cn/docs/guides/image-generation](https://platform.minimax.cn/docs/guides/image-generation)
+
+Those guides describe `POST /v1/images/generations` and
+`POST /v1/images/edits` on `api.minimax.io` and `api.minimax.cn`, for the
+model id `MiniMax-H3-Image`. They are product documentation. They are not
+the community license, and this note does not treat them as permission to
+use the weights.
+
+The hosted API is a different route, governed by the platform's own terms.
+The owner has to read those terms before anyone sends a prompt or stores
+an image. This note does not say the platform terms allow use in the
+United States, or in any other excluded territory, or anywhere else.
+
+The community license's own definition of "Hosted Service" includes APIs.
+That does not settle what the platform contract says. Both documents have
+to be read. This repository's stub does not send a request unless the
+operator sets the opt-in and a key, and even then the tests never call
+the network.
+
+## What the stub does
+
+`RESILEOS_EXTERNAL_SAMPLER=minimax_api` is the opt-in. `MINIMAX_API_KEY`
+is required as well. Either one alone leaves the sampler off, and
+`propose` raises before any socket. `MINIMAX_API_BASE` is the host
+(`https://api.minimax.io` or `https://api.minimax.cn` are the ones the
+guides show). If the base is unset and no test double was injected, no
+request is sent.
+
+The call, when it happens, is one JSON POST to
+`{MINIMAX_API_BASE}/v1/images/generations` with `response_format` of
+`b64_json`. The PNG or JPEG bytes are decoded in process and passed
+through the PCA per-component codec. The packet from that encode is the
+only value returned. Studio decodes the packet, gates it with Hephaestus,
+residual consistency, and Themis, and registers it as a candidate.
+`learn` is not called. The scar matrix is not updated. A URL in the
+response is not fetched.
+
+This is not a 16-megapixel client. It does not download the 69 GB
+checkpoint or the text encoder. It does not start SGLang, vLLM, diffusers,
+or ComfyUI.
+
+## MiniMax-H3 and P-H3-Image
+
+Kept so the names stay distinct. Neither is MiniMax-H3-Image.
+
+**MiniMax-H3** ([GitHub](https://github.com/MiniMax-AI/MiniMax-H3),
+[weights](https://huggingface.co/MiniMaxAI/MiniMax-H3)) generates video
+with stereo audio. Its README describes a visual VAE, a 33B single-stream
+transformer, 3D RoPE, AdaLN, and a packed text/vision/audio sequence. Its
+license is the MiniMax H3 Community License, a different document from the
+H3-Image community license.
+
+**P-H3-Image** ([card](https://huggingface.co/PrunaAI/P-H3-Image),
+[Pruna's blog](https://www.pruna.ai/blog/oss-p-h3-image-launch)) is Pruna's
+image model based on MiniMax-H3. The card describes 8 steps and no
+classifier-free guidance, and lists a 33.1B transformer. The blog describes
+a smaller backbone. Those two pages disagree. The card says the license is
+the MiniMax H3 Community License. Setting `RESILEOS_EXTERNAL_SAMPLER` to
+`p-h3-image` does not load it.
 
 ## Design notes, not a port
 
 Three ideas are worth borrowing. None of them belong inside the scar update.
 
-**Per-component scales.** The digits study already measured this. One scale for a whole rank-r product is a weak codec; one scale per rank-1 term is the stronger variant, and it is what the Studio mode stores. H3's own latent is a different object (24 channels, 16× spatial). The borrow is the idea that each component carries its own gain, which this codec now does. It is not a claim that bipolar scales match a VAE latent.
+**Per-component scales.** The digits study measured this. One scale for a
+whole rank-r product is a weak codec. One scale per rank-1 term is what
+the Studio mode stores. H3-Image's latent is a different object: 24
+channels, 16× spatial, then a 2×2 patch. The borrow is the gain per
+component, not a claim that bipolar scales match that VAE.
 
-**RoPE-style positions, outside the core.** H3 puts 3D rotary positions on the packed token sequence before the transformer. If a future prior predicts residual codes on a grid, the positions belong in that prior, not in `ResidualCore`. The core codes one matrix. It does not need a rotary embedding to do that.
+**RoPE, outside the core.** H3-Image uses 3D multimodal RoPE on the packed
+sequence, the same position scheme as H3. If a future prior predicts
+residual codes on a grid, the positions belong in that prior. The core
+codes one matrix.
 
-**AdaLN conditioning, outside the core.** H3 keeps modality and timestep conditioning in AdaLN branches, and says the shared attention block stays modality-agnostic. That split matches the rule already in force here: a prompt, a class id, or a timestep may condition the sampler, and the packet that comes back is still just factors and scales. The core does not learn a text embedding.
+**AdaLN and prompts, outside the core.** H3 keeps timestep and modality
+conditioning in AdaLN and leaves the shared block modality-agnostic.
+H3-Image keeps the prompt in the text encoder and the packed sequence.
+A prompt may condition the sampler. The packet that comes back is factors
+and scales. The core does not learn a text embedding.
 
-Packed sequences are how H3 mixes text, frames, and audio in one self-attention stream. A studio prior could pack a caption's tokens beside residual codes the same way. That packing is a property of the sampler's sequence, not of the control packet and not of Λ.
+Packed sequences are how those models mix text and image tokens in one
+self-attention stream. A studio prior could pack a caption beside residual
+codes the same way. That packing is a property of the sampler, not of the
+control packet and not of Λ.
