@@ -16,6 +16,16 @@ Titanos console (application layer):
     GET  /api/v1/answer/backends     (backend availability report)
     POST /api/v1/save
 
+Chat and hub ledger (persona UI):
+    POST   /api/v1/chat
+    GET    /api/v1/hub/{hub_id}/ledger
+    PUT    /api/v1/hub/{hub_id}/ledger
+    DELETE /api/v1/hub/{hub_id}/ledger
+
+Studio and UI surfaces are mounted from resileos.studio.routes and
+resileos.ui.routes under /api/v1/studio/* and /api/v1/{perceive,generate,
+language,agent,mouth,explain,remember}.
+
 Substrate (QD-TER two-head system, RES-600/601/602):
     GET  /api/v1/substrate_stats
     POST /api/v1/train_substrate
@@ -155,6 +165,20 @@ _KEYS_PATH = Path(
     os.getenv("API_KEYS_PATH", str(ROOT / "configs" / "api_keys.json"))
 )
 _AUTH_BYPASS = os.getenv("RESILEOS_AUTH_BYPASS", "0") == "1"
+
+# Static site (Cloudflare Pages). RESILEOS_CORS_ORIGINS replaces this list.
+DEFAULT_CORS_ORIGINS = (
+    "https://resileosai.fun",
+    "https://www.resileosai.fun",
+)
+
+
+def configured_cors_origins() -> list[str]:
+    """Origins for browser calls. Empty env keeps the two production sites."""
+    raw = os.getenv("RESILEOS_CORS_ORIGINS", "").strip()
+    if not raw:
+        return list(DEFAULT_CORS_ORIGINS)
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
 
 def _hash_key(value: str) -> str:
@@ -1328,3 +1352,178 @@ def lecore_route(payload: LeCoreRouteRequest):
             for c in caps
         ],
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Chat, hub ledger, studio, and UI surfaces
+# ═══════════════════════════════════════════════════════════════════════════
+from resileos.chat.ledger import (  # noqa: E402
+    delete_user_triple,
+    edit_user_triple,
+    list_user_ledger,
+)
+from resileos.chat.router import Turn, dispatch, present  # noqa: E402
+from resileos.studio.routes import register_studio_routes  # noqa: E402
+from resileos.ui.routes import register_ui_routes  # noqa: E402
+
+
+class ChatRequest(BaseModel):
+    text: str
+    hub_id: str = "anon"
+    force_class: str | None = None
+    last_tool_empty: bool = False
+    persona: str = "honest"
+
+
+class LedgerEditRequest(BaseModel):
+    relation: str
+    obj: str
+    new_relation: str | None = None
+    new_obj: str | None = None
+
+
+def _save_titanos() -> None:
+    titanos_singleton.save(STATE_FILE)
+
+
+def _chat_response(
+    reply: str,
+    status: str,
+    action: dict,
+    *,
+    hub_id: str,
+    persona: str,
+) -> dict:
+    flags = present(status, action)
+    return {
+        "reply_text": reply,
+        "status": status,
+        "action_taken": action,
+        "router_class": action.get("class"),
+        "hub_id": hub_id,
+        "subject": action.get("subject"),
+        "rows": list(action.get("rows") or []),
+        "chip": flags["chip"],
+        "memory_chip": flags["memory_chip"],
+        "teach_affordance": flags["teach_affordance"],
+        "persona": persona,
+        "allow_mouth": mouth_allowed_now(),
+    }
+
+
+def mouth_allowed_now() -> bool:
+    from resileos.kin.wiring import mouth_allowed_from_last_cycle
+
+    return mouth_allowed_from_last_cycle(default=False)
+
+
+@app.post("/api/v1/chat", dependencies=[Depends(verify_api_key)])
+def chat_turn(payload: ChatRequest):
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(400, "text is required")
+    from resileos.answer.user_profile import PERSONA_PACKS
+
+    persona = payload.persona if payload.persona in PERSONA_PACKS else "honest"
+    try:
+        reply, status, action = dispatch(
+            Turn(
+                text=text,
+                last_tool_empty=payload.last_tool_empty,
+                force_class=payload.force_class,
+                allow_mouth=None,
+                persona=persona,
+            ),
+            titanos_singleton,
+            payload.hub_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(500, str(exc)) from exc
+    if action.get("wrote"):
+        try:
+            _save_titanos()
+        except Exception as exc:
+            log.warning("chat learned but state save failed: %s", exc)
+    try:
+        from resileos.chat.ledger import normalize_hub_id
+
+        hub_id = normalize_hub_id(payload.hub_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return _chat_response(
+        reply, status, action, hub_id=hub_id, persona=persona
+    )
+
+
+@app.get(
+    "/api/v1/hub/{hub_id}/ledger",
+    dependencies=[Depends(verify_api_key)],
+)
+def hub_ledger_list(hub_id: str):
+    try:
+        return list_user_ledger(titanos_singleton, hub_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.put(
+    "/api/v1/hub/{hub_id}/ledger",
+    dependencies=[Depends(verify_api_key)],
+)
+def hub_ledger_edit(hub_id: str, payload: LedgerEditRequest):
+    try:
+        ledger = edit_user_triple(
+            titanos_singleton,
+            hub_id,
+            payload.relation,
+            payload.obj,
+            new_relation=payload.new_relation,
+            new_obj=payload.new_obj,
+        )
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if ledger.get("wrote"):
+        try:
+            _save_titanos()
+        except Exception as exc:
+            log.warning("ledger edit saved in memory but not on disk: %s", exc)
+    return ledger
+
+
+@app.delete(
+    "/api/v1/hub/{hub_id}/ledger",
+    dependencies=[Depends(verify_api_key)],
+)
+def hub_ledger_delete(
+    hub_id: str,
+    relation: str = Query(...),
+    obj: str = Query(...),
+):
+    try:
+        ledger = delete_user_triple(titanos_singleton, hub_id, relation, obj)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    try:
+        _save_titanos()
+    except Exception as exc:
+        log.warning("ledger delete saved in memory but not on disk: %s", exc)
+    return ledger
+
+
+def _mount_surfaces() -> None:
+    register_studio_routes(app, verify_api_key)
+    register_ui_routes(
+        app,
+        verify_api_key,
+        get_titanos=lambda: titanos_singleton,
+        save=_save_titanos,
+    )
+
+
+_mount_surfaces()
