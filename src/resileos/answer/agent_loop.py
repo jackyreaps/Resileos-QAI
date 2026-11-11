@@ -2,7 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 from titanos import Titanos
-from resileos.kin.bundle import KinBundle
+from resileos.kin.bundle import build_kin_bundle
 from resileos.harness.legions.search import web_search, scrape_url
 from resileos.answer import AnswerContext, select_backend, StructuredBackend
 
@@ -14,7 +14,7 @@ async def run_agent_chat(
     history: List[dict],
     file_data: Optional[dict] = None,
 ) -> Dict[str, Any]:
-    bundle = KinBundle(titanos=titanos)
+    bundle = build_kin_bundle()
 
     # ── Step 1: Residual Check ──
     parts = message.split()
@@ -35,7 +35,7 @@ async def run_agent_chat(
         report, policy, harness_meta = bundle.cycle(apply_policy=True)
         allow_mouth = policy.allow_mouth
         verified = harness_meta.get("harness", {}).get("verified", False)
-        budget = bundle.control.to_dict().get("budget_remaining", 0) if bundle.control else 0
+        budget = bundle.control.budget_remaining if bundle.control else 0
     except Exception as e:
         log.warning(f"Kin cycle failed: {e}")
         allow_mouth = False
