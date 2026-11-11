@@ -157,6 +157,20 @@ def fact_cue(text: str, titanos: Any) -> bool:
     return False
 
 
+def parse_preference(text: str) -> tuple[bool, str] | None:
+    """``I like X`` / ``I don't like X``. None when the line is not a preference."""
+    raw = text.strip()
+    dislike = re.match(r"^i\s+(?:don't|do not)\s+like\s+(.+)$", raw, re.I)
+    if dislike:
+        topic = _obj(dislike.group(1), lower=True)
+        return (False, topic) if topic else None
+    like = re.match(r"^i\s+like\s+(.+)$", raw, re.I)
+    if like:
+        topic = _obj(like.group(1), lower=True)
+        return (True, topic) if topic else None
+    return None
+
+
 def classify(text: str, titanos: Any, *, last_tool_empty: bool = False) -> str:
     """First match wins. See the module docstring for the order."""
     if teach_cue(text):
@@ -399,6 +413,36 @@ def dispatch(
     force = (item.force_class or "").strip() or None
     if force is not None and force not in CLASSES:
         raise ValueError(f"unknown class {force}")
+    if force is None:
+        preference = parse_preference(text)
+        if preference is not None:
+            like, topic = preference
+            fragment = None
+            try:
+                from resileos.kin.aphrodite import record_preference
+
+                _state, fragment = record_preference(hub_id, topic, like=like)
+            except ValueError:
+                fragment = None
+            reply = f"Recorded {'like' if like else 'dislike'}: {topic}."
+            try:
+                subject = user_subject(hub_id)
+            except ValueError:
+                subject = ""
+            action = _action(
+                "SOFT_CHAT",
+                "preference",
+                tool=None,
+                subject=subject,
+                relation=None,
+                relations=[],
+                obj=topic,
+                rows=[],
+                wrote=False,
+            )
+            if fragment:
+                action["tutorial_fragment"] = fragment
+            return reply, "ACCEPTED", action
     klass = force or classify(text, titanos, last_tool_empty=item.last_tool_empty)
     allow = mouth_open(item)
     persona = _persona(item.persona)

@@ -269,6 +269,43 @@ try:
 except Exception as e:
     log.warning("Kin wiring failed; kin routes unavailable: %s", e)
 
+def _register_runtime_legions() -> None:
+    """Hermes web_search is the host's default legion. Examples stay off."""
+    import asyncio
+
+    from resileos.harness.legions.search import web_search
+    from resileos.kin.aphrodite import register_aphrodite_legions
+    from resileos.kin.legions import LegionError, register_legion
+
+    def web_search_legion(seen, **kwargs):
+        del seen
+        query = str(kwargs.get("query") or kwargs.get("q") or "")
+        max_results = int(kwargs.get("max_results") or 3)
+        return asyncio.run(web_search(query, max_results=max_results))
+
+    try:
+        register_legion(
+            "hermes",
+            web_search_legion,
+            name="web_search",
+            constraints={
+                "action": "search",
+                "writes_residual": False,
+                "executes": True,
+            },
+        )
+    except LegionError as exc:
+        log.warning("web_search legion not registered: %s", exc)
+    try:
+        register_aphrodite_legions()
+    except LegionError as exc:
+        log.warning("aphrodite legions not registered: %s", exc)
+
+try:
+    _register_runtime_legions()
+except Exception as e:
+    log.warning("Runtime legion registration failed: %s", e)
+
 _answer_backend_singleton: AnswerBackend | None = None
 
 def _answer_backend() -> AnswerBackend:
@@ -422,15 +459,34 @@ def video_generate(payload: dict | None = None):
 
 @app.post("/api/v1/tools/{name}", dependencies=[Depends(verify_api_key)])
 async def run_named_tool(name: str, payload: dict | None = None):
-    """Run a harness tool or the web_search legion."""
+    """Run an Oracle tool, a harness tool, or the web_search legion."""
     from resileos.answer.agent_loop import _call_named_tool, _maybe_search
+    from resileos.answer.tool_execute import execute_tool
 
+    args = dict(payload or {})
     if name == "web_search":
-        query = str((payload or {}).get("query") or (payload or {}).get("q") or "")
+        query = str(args.get("query") or args.get("q") or "")
         body = await _maybe_search(query)
         return {"name": name, "result": body.get("search") or {"query": query, "results": []}}
+    if name == "resileos_sparql":
+        return {"name": name, "result": titanos_sparql(SparqlRequest(query=str(args.get("query") or "")))}
+    if name == "resileos_answer":
+        return {
+            "name": name,
+            "result": titanos_answer(
+                AnswerRequest(
+                    question=args.get("question"),
+                    subject=args.get("subject"),
+                    relation=args.get("relation"),
+                    inverse=bool(args.get("inverse") or False),
+                    as_of=args.get("as_of"),
+                )
+            ),
+        }
+    if name in {"resileos_ask", "resileos_chain", "resileos_abstain"}:
+        return {"name": name, "result": execute_tool(name, args, titanos=titanos_singleton)}
     try:
-        result = _call_named_tool(name, payload or {})
+        result = _call_named_tool(name, args)
     except KeyError:
         raise HTTPException(404, f"unknown tool: {name}")
     except Exception as e:

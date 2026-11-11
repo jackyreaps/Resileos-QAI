@@ -299,6 +299,13 @@ async def run_agent_chat(
         raise
 
     body = present_chat(reply, status, action, hub_id=hub_id, persona=persona)
+    fragment = action.get("tutorial_fragment")
+    if not fragment:
+        from resileos.kin.aphrodite import note_router_step
+
+        fragment = note_router_step(hub_id, status, action)
+    if fragment and (status == "ACCEPTED" or status == "ABSTAINED"):
+        body["tutorial_fragment"] = fragment
     if file_data:
         body["file"] = {key: value for key, value in file_data.items() if key != "bytes"}
         body["value"] = f"{_upload_note(file_data)}\n\n{reply}".strip()

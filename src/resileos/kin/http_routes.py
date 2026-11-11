@@ -24,7 +24,7 @@ def register_kin_routes(
 ) -> None:
     """Register POST /api/v1/eat and POST /api/v1/kin/cycle."""
     try:
-        from fastapi import Depends
+        from fastapi import Depends, HTTPException
         from pydantic import BaseModel, Field
     except ImportError as e:
         raise ImportError("fastapi required to register kin routes") from e
@@ -40,6 +40,7 @@ def register_kin_routes(
         user_id: str = ""
         apply_policy: bool = True
         residual_packet_hash: Optional[str] = None
+        topics: list[str] = []
 
     class SeparatedCycleRequest(BaseModel):
         writer: str = "apollo"
@@ -94,22 +95,47 @@ def register_kin_routes(
         agency = get_agency() if get_agency else None
 
         residual_packet = None
-        if body.residual_packet_hash:
+        if body.residual_packet_hash or body.topics:
             residual_packet = type(
-                "Stub", (), {"packet_hash": body.residual_packet_hash}
+                "Stub",
+                (),
+                {
+                    "packet_hash": body.residual_packet_hash,
+                    "topics": list(body.topics),
+                },
             )()
+
+        aphrodite_state = None
+        hub = body.user_id or "anon"
+        store = None
+        try:
+            from resileos.kin.aphrodite import get_store
+
+            store = get_store()
+            aphrodite_state = store.get(hub)
+        except ValueError:
+            aphrodite_state = None
 
         report, policy, harness = _bundle().cycle(
             metrics=metrics,
             agency_group=agency,
             apply_policy=body.apply_policy,
             residual_packet=residual_packet,
+            aphrodite_state=aphrodite_state,
         )
-        return {
+        if store is not None and aphrodite_state is not None and harness.get("verified"):
+            try:
+                store.save(hub)
+            except ValueError:
+                pass
+        payload = {
             "report": report.to_dict(),
             "policy": policy.to_dict(),
             "harness": harness,
         }
+        if harness.get("verified") and harness.get("tutorial_fragment"):
+            payload["tutorial_fragment"] = harness["tutorial_fragment"]
+        return payload
 
     @app.post("/api/v1/kin/separated_cycle", dependencies=deps)
     def api_separated_cycle(body: SeparatedCycleRequest) -> dict:
@@ -154,3 +180,72 @@ def register_kin_routes(
             body.subject, body.relation, _ask_fn(titan),
             profile=body.profile,
         ).to_dict()
+
+    from resileos.kin.legions import LegionError, invoke_legion, list_legions
+
+    @app.get("/api/v1/kin/legions", dependencies=deps)
+    def api_list_legions() -> dict:
+        catalog = list_legions()
+        return {"kins": list(catalog), "legions": catalog}
+
+    @app.post("/api/v1/kin/legions/{kin}/{name}", dependencies=deps)
+    def api_invoke_legion(kin: str, name: str, payload: dict | None = None) -> dict:
+        raw = dict(payload or {})
+        packet = raw.pop("packet", {}) or {}
+        extra = raw.pop("kwargs", None)
+        kwargs = dict(extra) if isinstance(extra, dict) else raw
+        try:
+            return invoke_legion(kin, name, packet, **kwargs)
+        except LegionError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    from resileos.chat.ledger import normalize_hub_id
+    from resileos.kin.aphrodite import get_store, record_preference
+
+    class AphroditeStateBody(BaseModel):
+        human_signals: Optional[dict] = None
+        step: Optional[str] = None
+        verified: bool = False
+
+    class AphroditePreference(BaseModel):
+        topic: str
+        like: bool = True
+        care: int = 1
+
+    def _hub(hub: str) -> str:
+        try:
+            return normalize_hub_id(hub)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/api/v1/aphrodite/{hub}/state", dependencies=deps)
+    def api_aphrodite_state(hub: str) -> dict:
+        return get_store().get(_hub(hub)).to_dict()
+
+    @app.post("/api/v1/aphrodite/{hub}/state", dependencies=deps)
+    def api_aphrodite_state_post(hub: str, body: AphroditeStateBody) -> dict:
+        hub_id = _hub(hub)
+        state = get_store().get(hub_id)
+        state.fold_signals(body.human_signals)
+        fragment = state.advance(body.step, verified=bool(body.verified)) if body.step else None
+        get_store().save(hub_id)
+        out = state.to_dict()
+        out["tutorial_fragment"] = fragment if body.verified else None
+        return out
+
+    @app.post("/api/v1/aphrodite/{hub}/preference", dependencies=deps)
+    def api_aphrodite_preference(hub: str, body: AphroditePreference) -> dict:
+        hub_id = _hub(hub)
+        try:
+            state, fragment = record_preference(
+                hub_id, body.topic, like=body.like, care=body.care
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        out = state.to_dict()
+        out["tutorial_fragment"] = fragment
+        return out
+
+    @app.post("/api/v1/aphrodite/{hub}/reset", dependencies=deps)
+    def api_aphrodite_reset(hub: str) -> dict:
+        return get_store().reset(_hub(hub)).to_dict()
