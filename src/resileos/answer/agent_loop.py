@@ -18,7 +18,7 @@ async def run_agent_chat(
 ) -> Dict[str, Any]:
     bundle = KinBundle(titanos=titanos)
 
-    # ── Step 1: Residual Check (exact match wins) ──
+    # ── Step 1: Exact Residual Check ──
     parts = message.split()
     if len(parts) == 2:
         try:
@@ -52,7 +52,7 @@ async def run_agent_chat(
     final_answer = None
 
     # ── Step 3: Native Cascade Routing ──
-    # Use the CascadeRouter to decide if we should search or answer directly
+    # Use the real CascadeRouter from the harness
     router = CascadeRouter()
     
     # The router expects options like ["residual", "search", "escalate"]
@@ -97,7 +97,7 @@ async def run_agent_chat(
                     context_text += f"\n\nDetailed context: {scrape.get('content')[:2000]}"
 
             # We have the web content; now we need to synthesize an answer
-            final_answer = context_text  # This will be rendered by the backend
+            final_answer = context_text
 
     # ── Step 5: Synthesize with Native Backend ──
     if final_answer:
