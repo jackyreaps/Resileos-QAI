@@ -1,5 +1,9 @@
-"""Optional FastAPI routes for eat + kin cycle."""
-from __future__ import annotations
+"""Optional FastAPI routes for eat + kin cycle.
+
+No ``from __future__ import annotations`` here: the request models are
+defined inside ``register_kin_routes``, and postponed annotations make
+FastAPI read them as query parameters instead of JSON bodies.
+"""
 
 from typing import Any, Callable, Optional
 

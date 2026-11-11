@@ -109,6 +109,20 @@ _KEYS_PATH = Path(
 )
 _AUTH_BYPASS = os.getenv("RESILEOS_AUTH_BYPASS", "0") == "1"
 
+# Static site (Cloudflare Pages). RESILEOS_CORS_ORIGINS replaces this list.
+DEFAULT_CORS_ORIGINS = (
+    "https://resileosai.fun",
+    "https://www.resileosai.fun",
+)
+
+
+def configured_cors_origins() -> list[str]:
+    """Origins for browser calls. Empty env keeps the two production sites."""
+    raw = os.getenv("RESILEOS_CORS_ORIGINS", "").strip()
+    if not raw:
+        return list(DEFAULT_CORS_ORIGINS)
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
 
 def _hash_key(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
@@ -322,8 +336,16 @@ class AnswerRequest(BaseModel):
     as_of: Optional[str] = None
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str | None = None
+    text: str | None = None
     history: list = []
+    hub_id: str = "anon"
+    force_class: str | None = None
+    last_tool_empty: bool = False
+    persona: str = "honest"
+
+    def content(self) -> str:
+        return (self.message or self.text or "").strip()
 
 
 def _resolve_answer_input(payload: AnswerRequest) -> tuple[Optional[str], Optional[str], bool, str]:
@@ -387,6 +409,35 @@ def list_tools(q: Optional[str] = Query(default=None)):
         payload["search"] = search_tool_surface(q)
     return payload
 
+@app.post("/api/v1/tools/video_generate", dependencies=[Depends(verify_api_key)])
+def video_generate(payload: dict | None = None):
+    """Honest stub: no video generator is wired on this host."""
+    del payload
+    return {
+        "status": "UNAVAILABLE",
+        "detail": "No video generator is configured on this host.",
+        "draft": False,
+    }
+
+
+@app.post("/api/v1/tools/{name}", dependencies=[Depends(verify_api_key)])
+async def run_named_tool(name: str, payload: dict | None = None):
+    """Run a harness tool or the web_search legion."""
+    from resileos.answer.agent_loop import _call_named_tool, _maybe_search
+
+    if name == "web_search":
+        query = str((payload or {}).get("query") or (payload or {}).get("q") or "")
+        body = await _maybe_search(query)
+        return {"name": name, "result": body.get("search") or {"query": query, "results": []}}
+    try:
+        result = _call_named_tool(name, payload or {})
+    except KeyError:
+        raise HTTPException(404, f"unknown tool: {name}")
+    except Exception as e:
+        raise HTTPException(400, str(e)) from e
+    return {"name": name, "result": result}
+
+
 @app.get("/api/v1/ready")
 def titanos_ready():
     try:
@@ -413,13 +464,33 @@ def titanos_answer_backends():
 
 @app.post("/api/v1/chat", dependencies=[Depends(verify_api_key)])
 async def titanos_chat(payload: ChatRequest):
-    """Autonomous agent loop."""
+    """Studio chat. Accepts `message` (page) or `text` (persona surface)."""
+    text = payload.content()
+    if not text:
+        raise HTTPException(400, "text is required")
+    from resileos.answer.user_profile import PERSONA_PACKS
+
+    persona = payload.persona if payload.persona in PERSONA_PACKS else "honest"
     try:
-        # Pass the history to the agent loop!
-        result = await run_agent_chat(titanos_singleton, payload.message, payload.history)
-        return result
+        result = await run_agent_chat(
+            titanos_singleton,
+            text,
+            payload.history,
+            hub_id=payload.hub_id,
+            force_class=payload.force_class,
+            last_tool_empty=payload.last_tool_empty,
+            persona=persona,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
+    if (result.get("action_taken") or {}).get("wrote"):
+        try:
+            titanos_singleton.save(STATE_FILE)
+        except Exception as exc:
+            log.warning("chat learned but state save failed: %s", exc)
+    return result
 
 @app.post("/api/v1/upload", dependencies=[Depends(verify_api_key)])
 async def upload_file(
@@ -446,10 +517,14 @@ async def upload_file(
         except Exception:
             pass
 
-    # Call the agent loop with the file_data
     result = await run_agent_chat(
         titanos_singleton, message, history=[], file_data=file_data
     )
+    if (result.get("action_taken") or {}).get("wrote"):
+        try:
+            titanos_singleton.save(STATE_FILE)
+        except Exception as exc:
+            log.warning("upload learned but state save failed: %s", exc)
     return result
 
 @app.post("/api/v1/answer", dependencies=[Depends(verify_api_key)])
@@ -665,20 +740,57 @@ def titanos_save():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Hades & Agent Tool Stubs (for Studio UI)
+# Hades checkpoints and optional tools
 # ═══════════════════════════════════════════════════════════════════════════
+
+def _hades_store():
+    from resileos.kin.hades import make_hades
+    from resileos.kin.wiring import get_kin_bundle
+
+    bundle = get_kin_bundle()
+    store = getattr(bundle, "_hades", None)
+    if store is None:
+        store = make_hades()
+        bundle._hades = store
+    return bundle, store
+
 
 @app.get("/api/v1/kin/hades/list", dependencies=[Depends(verify_api_key)])
 def hades_list():
-    return {"checkpoints": [{"id": "cp_001", "name": "Initial verified state"}]}
+    _, store = _hades_store()
+    checkpoints = []
+    for cid in store.list_ids():
+        ckpt = store.load(cid)
+        if ckpt is None:
+            checkpoints.append({"id": cid, "name": cid})
+            continue
+        checkpoints.append({
+            "id": ckpt.id,
+            "name": ckpt.lesson or ckpt.id,
+            "created_at": ckpt.created_at,
+            "verified": ckpt.verified,
+        })
+    return {"checkpoints": checkpoints}
+
 
 @app.post("/api/v1/kin/hades/restore", dependencies=[Depends(verify_api_key)])
 def hades_restore(payload: dict):
-    return {"status": "RESTORED", "lesson": "Restored from checkpoint", "residual_hash": "abcdef123456"}
-
-@app.post("/api/v1/tools/video_generate", dependencies=[Depends(verify_api_key)])
-def video_generate(payload: dict):
-    return {"status": "SUCCESS", "video_url": "https://example.com/draft.mp4", "draft": True}
+    checkpoint_id = str((payload or {}).get("checkpoint_id") or (payload or {}).get("id") or "").strip()
+    if not checkpoint_id:
+        raise HTTPException(400, "checkpoint_id is required")
+    bundle, store = _hades_store()
+    ckpt = store.load(checkpoint_id)
+    if ckpt is None:
+        raise HTTPException(404, f"unknown checkpoint: {checkpoint_id}")
+    packet = store.restore_fresh(checkpoint_id)
+    bundle.control = packet
+    return {
+        "status": "RESTORED",
+        "checkpoint_id": checkpoint_id,
+        "lesson": ckpt.lesson,
+        "residual_hash": ckpt.residual_packet_hash,
+        "verified_previous": ckpt.verified,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -872,3 +984,98 @@ def lecore_route(payload: LeCoreRouteRequest):
     except (LeCoreUnreachable, LeCoreError) as e:
         return {"available": False, "error": str(e)}
     return {"available": True, "query": query, "capabilities": [{"name": c.name, "description": c.description, "score": c.score} for c in caps]}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Hub ledger, studio, and UI surfaces
+# ═══════════════════════════════════════════════════════════════════════════
+from resileos.chat.ledger import (  # noqa: E402
+    delete_user_triple,
+    edit_user_triple,
+    list_user_ledger,
+)
+from resileos.studio.routes import register_studio_routes  # noqa: E402
+from resileos.ui.routes import register_ui_routes  # noqa: E402
+
+
+class LedgerEditRequest(BaseModel):
+    relation: str
+    obj: str
+    new_relation: str | None = None
+    new_obj: str | None = None
+
+
+def _save_titanos() -> None:
+    titanos_singleton.save(STATE_FILE)
+
+
+@app.get(
+    "/api/v1/hub/{hub_id}/ledger",
+    dependencies=[Depends(verify_api_key)],
+)
+def hub_ledger_list(hub_id: str):
+    try:
+        return list_user_ledger(titanos_singleton, hub_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.put(
+    "/api/v1/hub/{hub_id}/ledger",
+    dependencies=[Depends(verify_api_key)],
+)
+def hub_ledger_edit(hub_id: str, payload: LedgerEditRequest):
+    try:
+        ledger = edit_user_triple(
+            titanos_singleton,
+            hub_id,
+            payload.relation,
+            payload.obj,
+            new_relation=payload.new_relation,
+            new_obj=payload.new_obj,
+        )
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if ledger.get("wrote"):
+        try:
+            _save_titanos()
+        except Exception as exc:
+            log.warning("ledger edit saved in memory but not on disk: %s", exc)
+    return ledger
+
+
+@app.delete(
+    "/api/v1/hub/{hub_id}/ledger",
+    dependencies=[Depends(verify_api_key)],
+)
+def hub_ledger_delete(
+    hub_id: str,
+    relation: str = Query(...),
+    obj: str = Query(...),
+):
+    try:
+        ledger = delete_user_triple(titanos_singleton, hub_id, relation, obj)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    try:
+        _save_titanos()
+    except Exception as exc:
+        log.warning("ledger delete saved in memory but not on disk: %s", exc)
+    return ledger
+
+
+def _mount_surfaces() -> None:
+    register_studio_routes(app, verify_api_key)
+    register_ui_routes(
+        app,
+        verify_api_key,
+        get_titanos=lambda: titanos_singleton,
+        save=_save_titanos,
+    )
+
+
+_mount_surfaces()

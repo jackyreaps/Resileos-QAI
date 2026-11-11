@@ -20,11 +20,10 @@ services:
       - ./titanos_live_state.json:/app/titanos_live_state.json
       - resileos_substrate:/app/data
       - ./configs:/app/configs:ro
-      # --- ADD THESE THREE LINES ---
+      # Live-reload the API after git pull without rebuilding the image.
       - ./app.py:/app/app.py
       - ./asgi.py:/app/asgi.py
       - ./src:/app/src
-      # ------------------------------
 
 volumes:
   resileos_substrate:

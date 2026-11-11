@@ -2,79 +2,193 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resileos Studio</title>
+    <link rel="stylesheet" href="/assets/fonts/fonts.css" />
     <style>
         :root {
-            --bg: #fcfcfc; --panel: #ffffff; --text: #1a1a1a; --muted: #666;
-            --accent: #1a4d8f; --accent-hover: #143c70; --border: #e5e5e5;
-            --user-bg: #1a4d8f; --user-text: #fff; --bot-bg: #ffffff;
-            --danger: #d93838; --success: #0d9463;
+            --bg: #f6f4ef;
+            --panel: #fffcf7;
+            --text: #1a1a1a;
+            --muted: #5c6570;
+            --accent: #1a4d8f;
+            --accent-hover: #143c70;
+            --border: #e4dfd4;
+            --user-bg: #1a4d8f;
+            --user-text: #fff;
+            --bot-bg: #fffcf7;
+            --danger: #d93838;
+            --success: #0d9463;
+            --warn: #b58112;
+            --chip-bg: #eef3fa;
+            --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            --display: "Instrument Serif", "Iowan Old Style", Palatino, Georgia, serif;
+            --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
         [data-theme="dark"] {
-            --bg: #121212; --panel: #1e1e1e; --text: #ededed; --muted: #a0a0a0;
-            --accent: #3b82f6; --accent-hover: #2563eb; --border: #333;
-            --user-bg: #2563eb; --user-text: #fff; --bot-bg: #1e1e1e;
+            --bg: #06080e;
+            --panel: #101623;
+            --text: #eef2fb;
+            --muted: #8b97b0;
+            --accent: #5b8cff;
+            --accent-hover: #7aa3ff;
+            --border: #243049;
+            --user-bg: #2563eb;
+            --user-text: #fff;
+            --bot-bg: #141c2c;
+            --danger: #ff6b7a;
+            --success: #3dd68c;
+            --warn: #f0b429;
+            --chip-bg: #182235;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-        .header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel); }
-        .header-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+        .header {
+            padding: 14px 22px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--panel);
+            gap: 16px;
+        }
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .brand {
+            font-family: var(--display);
+            font-size: 1.35rem;
+            letter-spacing: 0.01em;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .brand:hover { color: var(--accent); }
+        .brand span { font-size: 0.95rem; color: var(--muted); font-family: var(--font); margin-left: 6px; }
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
         .dot.online { background: var(--success); }
-        .dot.offline { background: var(--danger); }
-        .header-actions { display: flex; gap: 8px; }
-        .btn-icon { background: none; border: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+        .dot.offline, .dot.error { background: var(--danger); }
+        .dot.connecting { background: var(--warn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 20%, transparent); }
+        .dot.needs-key { background: var(--warn); }
+        .header-actions { display: flex; gap: 6px; }
+        .btn-icon {
+            background: none; border: none; color: var(--muted); cursor: pointer;
+            padding: 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+        }
         .btn-icon:hover { background: var(--bg); color: var(--text); }
-        #chat { flex: 1; overflow-y: auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; }
-        .msg-row { display: flex; gap: 16px; max-width: 768px; margin: 0 auto; width: 100%; }
+        .btn-icon[aria-pressed="true"] { color: var(--accent); background: var(--chip-bg); }
+        #chat { flex: 1; overflow-y: auto; padding: 28px 16px 16px; display: flex; flex-direction: column; gap: 20px; }
+        .msg-row { display: flex; gap: 14px; max-width: 768px; margin: 0 auto; width: 100%; }
         .msg-row.user { justify-content: flex-end; }
-        .avatar { width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .avatar {
+            width: 28px; height: 28px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
         .avatar.bot { background: var(--accent); color: #fff; }
         .avatar.user { background: #e5e5e0; color: #333; }
         [data-theme="dark"] .avatar.user { background: #333; color: #fff; }
-        .bubble { padding: 12px 16px; border-radius: 12px; font-size: 0.95rem; line-height: 1.5; max-width: 85%; }
-        .bubble.user { background: var(--user-bg); color: var(--user-text); border-bottom-right-radius: 2px; }
-        .bubble.bot { background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
-        .bubble strong { font-weight: 600; color: var(--accent); }
-        .meta { font-size: 0.75rem; color: var(--muted); margin-top: 8px; font-family: ui-monospace, monospace; }
-        .panel { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 20px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px; }
+        .bubble {
+            padding: 12px 16px; border-radius: 14px; font-size: 0.95rem; line-height: 1.55; max-width: 85%;
+            white-space: pre-wrap; word-break: break-word;
+        }
+        .bubble.user { background: var(--user-bg); color: var(--user-text); border-bottom-right-radius: 4px; }
+        .bubble.bot { background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+        .reply { font-size: 0.98rem; }
+        .meta { font-size: 0.75rem; color: var(--muted); margin-top: 8px; font-family: var(--mono); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .chip {
+            display: inline-flex; align-items: center;
+            font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase;
+            padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border);
+            background: var(--chip-bg); color: var(--muted);
+        }
+        .chip.accepted { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, var(--border)); }
+        .chip.abstained, .chip.no_rows { color: var(--warn); }
+        .chip.conflict, .chip.error { color: var(--danger); }
+        .chip.memory { color: var(--accent); }
+        .panel {
+            background: var(--panel); border-bottom: 1px solid var(--border);
+            padding: 12px 22px; font-size: 0.85rem; display: none; flex-wrap: wrap; gap: 8px;
+        }
         .panel.open { display: flex; }
-        .tool-chip { background: var(--bg); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.8rem; }
+        .tool-chip {
+            background: var(--bg); border: 1px solid var(--border); padding: 6px 12px;
+            border-radius: 8px; cursor: pointer; color: var(--text); font-size: 0.8rem;
+        }
         .tool-chip:hover { border-color: var(--accent); }
-        .tool-chip.legion { border-color: var(--accent); background: rgba(26, 77, 143, 0.05); }
-        [data-theme="dark"] .tool-chip.legion { background: rgba(59, 130, 246, 0.1); }
+        .tool-chip.legion { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
         .group-row { width: 100%; margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .group-label { font-weight: 600; color: var(--muted); width: 60px; }
+        .group-label { font-weight: 600; color: var(--muted); width: 72px; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; }
+        .settings-grid { display: grid; gap: 10px; width: 100%; max-width: 768px; margin: 0 auto; }
+        .settings-grid label { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
+        .settings-grid input {
+            border: 1px solid var(--border); background: var(--bg); color: var(--text);
+            border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; font-family: var(--font);
+        }
+        .settings-grid input:focus { outline: none; border-color: var(--accent); }
+        .settings-hint { font-size: 0.8rem; color: var(--muted); }
         .input-wrap { padding: 16px; background: var(--bg); display: flex; justify-content: center; }
-        .input-box { width: 100%; max-width: 768px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: flex-end; padding: 6px; }
-        .input-box:focus-within { border-color: var(--accent); }
-        input[type="text"] { flex: 1; border: none; background: transparent; padding: 10px; font-size: 1rem; color: var(--text); outline: none; }
-        button.send { background: var(--accent); color: white; border: none; border-radius: 8px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin: 4px; }
-        button.send:disabled { background: #999; }
-        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; max-width: 600px; margin-left: auto; margin-right: auto; }
-        .suggestion { background: var(--panel); border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; color: var(--text); }
+        .input-box {
+            width: 100%; max-width: 768px; background: var(--panel);
+            border: 1px solid var(--border); border-radius: 14px; display: flex; align-items: flex-end; padding: 6px;
+        }
+        .input-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+        input[type="text"] { flex: 1; border: none; background: transparent; padding: 10px; font-size: 1rem; color: var(--text); outline: none; font-family: var(--font); }
+        button.send {
+            background: var(--accent); color: white; border: none; border-radius: 10px;
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; margin: 4px;
+        }
+        button.send:disabled { background: #999; cursor: not-allowed; }
+        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; max-width: 640px; margin-left: auto; margin-right: auto; }
+        .suggestion {
+            background: var(--panel); border: 1px solid var(--border); padding: 10px 16px;
+            border-radius: 10px; font-size: 0.88rem; cursor: pointer; color: var(--text);
+        }
         .suggestion:hover { border-color: var(--accent); color: var(--accent); }
         .typing { display: flex; gap: 4px; align-items: center; height: 20px; }
         .typing span { width: 5px; height: 5px; background: var(--muted); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
         .typing span:nth-child(1) { animation-delay: -0.32s; }
         .typing span:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
-        pre { background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; border: 1px solid var(--border); }
+        pre { background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; border: 1px solid var(--border); font-family: var(--mono); white-space: pre-wrap; }
+        .file-chip { font-size: 0.8rem; color: var(--muted); padding: 0 8px 8px; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-title">
-            <div class="dot" id="status"></div>
-            Resileos Studio
+            <a class="brand" href="/">Resileos<span>Studio</span></a>
+            <div class="status"><div class="dot connecting" id="status"></div><span id="status-label">Connecting</span></div>
         </div>
         <div class="header-actions">
-            <button class="btn-icon" onclick="toggleTools()" title="Tools">
+            <button class="btn-icon" id="btn-tools" onclick="toggleTools()" title="Tools" aria-pressed="false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
             </button>
-            <button class="btn-icon" onclick="toggleKin()" title="Kin">
+            <button class="btn-icon" id="btn-kin" onclick="toggleKin()" title="Kin" aria-pressed="false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            </button>
+            <button class="btn-icon" id="btn-settings" onclick="toggleSettings()" title="Connection" aria-pressed="false">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
             <button class="btn-icon" onclick="toggleTheme()" title="Theme">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -85,10 +199,24 @@
     <div id="tools-panel" class="panel"></div>
     <div id="kin-panel" class="panel">
         <div class="group-row">
-            <span class="group-label">Kin:</span>
+            <span class="group-label">Kin</span>
             <span class="tool-chip" onclick="runKinCycle()">Iris → Metis → Hermes</span>
-            <span class="tool-chip" onclick="listCheckpoints()">Hades Checkpoints</span>
-            <span class="tool-chip" onclick="runResidualCheck()">Residual Check</span>
+            <span class="tool-chip" onclick="listCheckpoints()">Hades checkpoints</span>
+            <span class="tool-chip" onclick="runResidualCheck()">Residual check</span>
+        </div>
+    </div>
+    <div id="settings-panel" class="panel">
+        <div class="settings-grid">
+            <label>API URL
+                <input id="settings-url" type="text" autocomplete="off" spellcheck="false" />
+            </label>
+            <label>API key
+                <input id="settings-key" type="password" autocomplete="off" spellcheck="false" />
+            </label>
+            <label>Hub id
+                <input id="settings-hub" type="text" autocomplete="off" spellcheck="false" />
+            </label>
+            <p class="settings-hint">The key stays in this browser only. It is sent as <code>X-API-Key</code> to the API host, never stored in the page source.</p>
         </div>
     </div>
 
@@ -97,14 +225,15 @@
             <div class="avatar bot">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
             </div>
-            <div class="bubble bot">Exact residual memory engine. Facts as residual packets. Unknowns abstained. Kin + harness available.</div>
+            <div class="bubble bot">Exact residual memory. Facts are stored as residual packets. Unknowns are abstained. Kin and the harness are available from the header.</div>
         </div>
-        <div class="suggestions">
-            <div class="suggestion" onclick="quickAsk('remember alice works_at acme')">Teach fact</div>
-            <div class="suggestion" onclick="quickAsk('alice works_at')">Query fact</div>
-            <div class="suggestion" onclick="quickAsk('Who won the Super Bowl in 2024?')">Test web search</div>
-            <div class="suggestion" onclick="runKinCycle()">Run Kin cycle</div>
-            <div class="suggestion" onclick="quickAsk('/tool residual_consistency')">Residual check</div>
+        <div class="suggestions" id="suggestions">
+            <div class="suggestion" data-ask="remember alice works_at acme">Teach a fact</div>
+            <div class="suggestion" data-ask="alice works_at">Ask a stored fact</div>
+            <div class="suggestion" data-ask="what is the domain of Zeus">Query Zeus domain</div>
+            <div class="suggestion" data-ask="/search Who won the Super Bowl in 2024?">Unverified web search</div>
+            <div class="suggestion" data-action="kin">Run Kin cycle</div>
+            <div class="suggestion" data-action="residual">Residual check</div>
         </div>
     </div>
 
@@ -114,60 +243,84 @@
             <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="Upload file">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
             </button>
-            <input type="text" id="input" placeholder="Ask anything or attach a file..." onkeypress="handleEnter(event)">
-            <button class="send" id="send" onclick="sendMsg()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+            <input type="text" id="input" placeholder="Ask a stored fact, or teach one with remember…" onkeydown="handleEnter(event)" autocomplete="off">
+            <button class="send" id="send" onclick="sendMsg()" title="Send">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </button>
         </div>
     </div>
+    <div id="file-chip" class="file-chip" hidden></div>
 
     <script>
-        const API_KEY = "No4dymPJ4tfRn0BZFuNL07kTnMyCeu5xHw2mpsWmjwk";
-        const API_URL = "https://api.resileosai.fun/api/v1";
+        const DEFAULT_API_URL = "https://api.resileosai.fun/api/v1";
         const chat = document.getElementById('chat');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('send');
         const statusDot = document.getElementById('status');
+        const statusLabel = document.getElementById('status-label');
         const toolsPanel = document.getElementById('tools-panel');
         const kinPanel = document.getElementById('kin-panel');
+        const settingsPanel = document.getElementById('settings-panel');
         let chatHistory = [];
         let selectedFile = null;
+        let lastToolEmpty = false;
+        let toolsLoaded = false;
 
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
-
-        function toggleTheme() {
-            const t = document.documentElement.getAttribute('data-theme');
-            document.documentElement.setAttribute('data-theme', t === 'dark' ? 'light' : 'dark');
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.setAttribute('data-theme', 'dark');
         }
 
-        fetch(`${API_URL}/ready`).then(r => {
-            statusDot.classList.add(r.ok ? 'online' : 'offline');
-        }).catch(() => statusDot.classList.add('offline'));
-
-        async function loadTools() {
-            try {
-                const r = await fetch(`${API_URL}/tools`, { headers: { 'X-API-Key': API_KEY } });
-                const d = await r.json();
-                const tools = d.tools || d || [];
-                const groups = { Iris: [], Metis: [], Hermes: [], Hades: [], Apollo: [], Other: [] };
-                tools.forEach(t => {
-                    const name = typeof t === 'string' ? t : t.name;
-                    const kin = (typeof t === 'object' && t.kin) || inferKin(name);
-                    const isLegion = typeof t === 'object' && t.legion;
-                    (groups[kin] || groups.Other).push({ name, legion: isLegion });
-                });
-                toolsPanel.innerHTML = Object.entries(groups)
-                    .filter(([_, arr]) => arr.length)
-                    .map(([kin, arr]) => `
-                        <div class="group-row">
-                            <span class="group-label">${kin}:</span>
-                            ${arr.map(t => `<span class="tool-chip ${t.legion ? 'legion' : ''}" onclick="runTool('${t.name}')">${t.name}</span>`).join('')}
-                        </div>
-                    `).join('');
-            } catch (e) {
-                toolsPanel.innerHTML = 'Could not load tools.';
-            }
+        function apiUrl() {
+            return (localStorage.getItem('resileos_api_url') || DEFAULT_API_URL).replace(/\/$/, '');
         }
+        function apiKey() { return localStorage.getItem('resileos_api_key') || ''; }
+        function hubId() { return localStorage.getItem('resileos_hub_id') || 'anon'; }
+
+        function fillSettings() {
+            document.getElementById('settings-url').value = apiUrl();
+            document.getElementById('settings-key').value = apiKey();
+            document.getElementById('settings-hub').value = hubId();
+        }
+        function saveSettings() {
+            const url = document.getElementById('settings-url').value.trim() || DEFAULT_API_URL;
+            const key = document.getElementById('settings-key').value.trim();
+            const hub = document.getElementById('settings-hub').value.trim() || 'anon';
+            localStorage.setItem('resileos_api_url', url);
+            if (key) localStorage.setItem('resileos_api_key', key);
+            else localStorage.removeItem('resileos_api_key');
+            localStorage.setItem('resileos_hub_id', hub);
+            checkReady();
+        }
+        ['settings-url', 'settings-key', 'settings-hub'].forEach(id => {
+            document.getElementById(id).addEventListener('change', saveSettings);
+        });
+        fillSettings();
+
+        function setStatus(kind, label) {
+            statusDot.className = 'dot ' + kind;
+            statusLabel.textContent = label;
+        }
+
+        function authHeaders(json) {
+            const headers = {};
+            if (json) headers['Content-Type'] = 'application/json';
+            const key = apiKey();
+            if (key) headers['X-API-Key'] = key;
+            return headers;
+        }
+
+        function checkReady() {
+            setStatus('connecting', 'Connecting');
+            fetch(`${apiUrl()}/ready`).then(r => {
+                if (r.ok) {
+                    setStatus('online', apiKey() ? 'Online' : 'Online · add a key to chat');
+                    if (!apiKey()) setStatus('needs-key', 'Enter an API key');
+                } else {
+                    setStatus('offline', 'API not ready');
+                }
+            }).catch(() => setStatus('offline', 'Unreachable'));
+        }
+        checkReady();
 
         function inferKin(name) {
             if (/observe|flag|iris/i.test(name)) return 'Iris';
@@ -178,41 +331,112 @@
             return 'Other';
         }
 
-        function toggleTools() {
-            toolsPanel.classList.toggle('open');
-            kinPanel.classList.remove('open');
-            if (toolsPanel.classList.contains('open') && !toolsPanel.innerHTML) loadTools();
+        async function loadTools() {
+            try {
+                const r = await fetch(`${apiUrl()}/tools`, { headers: authHeaders() });
+                if (r.status === 401 || r.status === 403) {
+                    toolsPanel.replaceChildren(document.createTextNode('Add an API key in Connection to list tools.'));
+                    return;
+                }
+                const d = await r.json();
+                const raw = [].concat(d.tools || [], d.harness || []);
+                const seen = new Set();
+                const groups = { Iris: [], Metis: [], Hermes: [], Hades: [], Apollo: [], Other: [] };
+                raw.forEach(t => {
+                    const name = typeof t === 'string' ? t : t.name;
+                    if (!name || seen.has(name)) return;
+                    seen.add(name);
+                    const kin = (typeof t === 'object' && t.kin) || inferKin(name);
+                    const isLegion = typeof t === 'object' && t.legion;
+                    (groups[kin] || groups.Other).push({ name, legion: isLegion });
+                });
+                if (!seen.has('web_search')) groups.Other.push({ name: 'web_search', legion: true });
+                toolsPanel.replaceChildren();
+                Object.entries(groups).filter(([, arr]) => arr.length).forEach(([kin, arr]) => {
+                    const row = document.createElement('div');
+                    row.className = 'group-row';
+                    const label = document.createElement('span');
+                    label.className = 'group-label';
+                    label.textContent = kin;
+                    row.appendChild(label);
+                    arr.forEach(t => {
+                        const chip = document.createElement('span');
+                        chip.className = 'tool-chip' + (t.legion ? ' legion' : '');
+                        chip.textContent = t.name;
+                        chip.addEventListener('click', () => runTool(t.name));
+                        row.appendChild(chip);
+                    });
+                    toolsPanel.appendChild(row);
+                });
+                toolsLoaded = true;
+            } catch (e) {
+                toolsPanel.replaceChildren(document.createTextNode('Could not load tools.'));
+            }
         }
 
-        function toggleKin() {
-            kinPanel.classList.toggle('open');
+        function closePanels() {
             toolsPanel.classList.remove('open');
+            kinPanel.classList.remove('open');
+            settingsPanel.classList.remove('open');
+            document.getElementById('btn-tools').setAttribute('aria-pressed', 'false');
+            document.getElementById('btn-kin').setAttribute('aria-pressed', 'false');
+            document.getElementById('btn-settings').setAttribute('aria-pressed', 'false');
         }
+        function togglePanel(panel, btn) {
+            const open = !panel.classList.contains('open');
+            closePanels();
+            if (open) {
+                panel.classList.add('open');
+                btn.setAttribute('aria-pressed', 'true');
+            }
+        }
+        function toggleTools() {
+            const willOpen = !toolsPanel.classList.contains('open');
+            togglePanel(toolsPanel, document.getElementById('btn-tools'));
+            if (willOpen && !toolsLoaded) loadTools();
+        }
+        function toggleKin() { togglePanel(kinPanel, document.getElementById('btn-kin')); }
+        function toggleSettings() { togglePanel(settingsPanel, document.getElementById('btn-settings')); }
+        function toggleTheme() {
+            const t = document.documentElement.getAttribute('data-theme');
+            document.documentElement.setAttribute('data-theme', t === 'dark' ? 'light' : 'dark');
+        }
+
+        function hideSuggestions() {
+            const el = document.getElementById('suggestions');
+            if (el) el.remove();
+        }
+        document.getElementById('suggestions').addEventListener('click', (ev) => {
+            const item = ev.target.closest('.suggestion');
+            if (!item) return;
+            if (item.dataset.action === 'kin') runKinCycle();
+            else if (item.dataset.action === 'residual') runResidualCheck();
+            else if (item.dataset.ask) quickAsk(item.dataset.ask);
+        });
 
         function quickAsk(text) { input.value = text; sendMsg(); }
         function handleEnter(e) { if (e.key === 'Enter') sendMsg(); }
 
         function handleFileUpload() {
             const fileInput = document.getElementById('file-input');
+            const chip = document.getElementById('file-chip');
             if (fileInput.files.length > 0) {
                 selectedFile = fileInput.files[0];
-                addMsg(`[Attached: ${selectedFile.name}]`, 'user');
+                chip.hidden = false;
+                chip.textContent = 'Attached: ' + selectedFile.name;
             }
         }
 
-        function addMsg(text, sender) {
+        function addMsg(sender) {
             const row = document.createElement('div');
             row.className = `msg-row ${sender}`;
             const avatar = document.createElement('div');
             avatar.className = `avatar ${sender}`;
-            if (sender === 'user') {
-                avatar.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
-            } else {
-                avatar.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>`;
-            }
+            avatar.innerHTML = sender === 'user'
+                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`
+                : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>`;
             const bubble = document.createElement('div');
             bubble.className = `bubble ${sender}`;
-            bubble.innerHTML = text;
             if (sender === 'user') { row.appendChild(bubble); row.appendChild(avatar); }
             else { row.appendChild(avatar); row.appendChild(bubble); }
             chat.appendChild(row);
@@ -220,115 +444,211 @@
             return bubble;
         }
 
+        function setTyping(bubble) {
+            bubble.replaceChildren();
+            const wrap = document.createElement('div');
+            wrap.className = 'typing';
+            wrap.append(document.createElement('span'), document.createElement('span'), document.createElement('span'));
+            bubble.appendChild(wrap);
+        }
+
+        function chipEl(text, kind) {
+            const el = document.createElement('span');
+            el.className = 'chip ' + (kind || '');
+            el.textContent = text;
+            return el;
+        }
+
+        function renderReply(bubble, d) {
+            bubble.replaceChildren();
+            const text = (d && (d.reply_text || d.value)) || '';
+            const reply = document.createElement('div');
+            reply.className = 'reply';
+            reply.textContent = text || 'No matching residual fact.';
+            bubble.appendChild(reply);
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            const status = (d && d.status) || '';
+            const chip = d && d.chip;
+            if (status === 'ACCEPTED' || status === 'ANSWERED') meta.appendChild(chipEl(status === 'ANSWERED' ? 'answered' : 'accepted', 'accepted'));
+            if (chip) meta.appendChild(chipEl(chip, chip));
+            else if (status === 'ABSTAINED') meta.appendChild(chipEl('abstained', 'abstained'));
+            else if (status === 'NO_ROWS') meta.appendChild(chipEl('no rows', 'no_rows'));
+            else if (status === 'CONFLICT') meta.appendChild(chipEl('conflict', 'conflict'));
+            else if (status === 'MOUTH_CLOSED') meta.appendChild(chipEl('mouth closed', 'abstained'));
+            else if (status === 'ERROR') meta.appendChild(chipEl('error', 'error'));
+            if (d && d.memory_chip) meta.appendChild(chipEl('remembered', 'memory'));
+            if (d && d.source) meta.appendChild(document.createTextNode('source: ' + d.source));
+            if (d && typeof d.verified === 'boolean') meta.appendChild(document.createTextNode('verified: ' + d.verified));
+            if (d && d.router_class) meta.appendChild(document.createTextNode(d.router_class));
+            if (d && d.tool_calls && d.tool_calls.length) {
+                meta.appendChild(document.createTextNode('tools: ' + d.tool_calls.map(t => t.tool || t.name).join(', ')));
+            }
+            if (meta.childNodes.length) bubble.appendChild(meta);
+        }
+
         async function runKinCycle() {
-            addMsg("Running Kin cycle...", 'user');
-            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            hideSuggestions();
+            addMsg('user').textContent = 'Running Kin cycle…';
+            const bubble = addMsg('bot');
+            setTyping(bubble);
             try {
-                const r = await fetch(`${API_URL}/kin/cycle`, {
+                const r = await fetch(`${apiUrl()}/kin/cycle`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    headers: authHeaders(true),
                     body: JSON.stringify({ apply_policy: true })
                 });
                 const d = await r.json();
-                bubble.innerHTML = r.ok ? `Kin cycle complete. Lesson: ${d.lesson || '—'}` : `Error: ${JSON.stringify(d.detail) || 'failed'}`;
-            } catch (e) { bubble.innerHTML = `Kin cycle error: ${e.message}`; }
+                if (!r.ok) {
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+                    return;
+                }
+                const lesson = (d.harness && d.harness.lesson) || (d.report && d.report.lesson) || d.lesson || '—';
+                renderReply(bubble, { status: 'ACCEPTED', value: 'Kin cycle complete. Lesson: ' + lesson, source: 'kin', verified: !!(d.harness && d.harness.verified) });
+            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Kin cycle error: ' + e.message }); }
         }
 
         async function listCheckpoints() {
-            addMsg("Listing Hades checkpoints...", 'user');
-            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            hideSuggestions();
+            addMsg('user').textContent = 'Listing Hades checkpoints…';
+            const bubble = addMsg('bot');
+            setTyping(bubble);
             try {
-                const r = await fetch(`${API_URL}/kin/hades/list`, { headers: { 'X-API-Key': API_KEY } });
+                const r = await fetch(`${apiUrl()}/kin/hades/list`, { headers: authHeaders() });
                 const d = await r.json();
-                const cps = d.checkpoints || d || [];
-                bubble.innerHTML = cps.length
-                    ? cps.map(cp => `<div style="margin:6px 0"><code>${cp.id || cp.name}</code> <button class="tool-chip" style="margin-left:8px" onclick="restoreCheckpoint('${cp.id || cp.name}')">Restore</button></div>`).join('')
-                    : "No checkpoints.";
-            } catch (e) { bubble.innerHTML = "No checkpoints endpoint."; }
+                if (!r.ok) {
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+                    return;
+                }
+                const cps = d.checkpoints || [];
+                if (!cps.length) {
+                    renderReply(bubble, { status: 'NO_ROWS', value: 'No checkpoints yet. A verified Kin cycle writes one.' });
+                    return;
+                }
+                bubble.replaceChildren();
+                cps.forEach(cp => {
+                    const row = document.createElement('div');
+                    row.style.margin = '6px 0';
+                    const code = document.createElement('code');
+                    code.textContent = cp.id || cp.name;
+                    const btn = document.createElement('button');
+                    btn.className = 'tool-chip';
+                    btn.style.marginLeft = '8px';
+                    btn.textContent = 'Restore';
+                    btn.addEventListener('click', () => restoreCheckpoint(cp.id || cp.name));
+                    row.append(code, btn);
+                    if (cp.name && cp.name !== cp.id) {
+                        const note = document.createElement('div');
+                        note.className = 'meta';
+                        note.textContent = cp.name;
+                        row.appendChild(note);
+                    }
+                    bubble.appendChild(row);
+                });
+            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'No checkpoints endpoint.' }); }
         }
 
         async function restoreCheckpoint(id) {
-            addMsg(`Restoring checkpoint ${id}...`, 'user');
-            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            addMsg('user').textContent = 'Restoring checkpoint ' + id + '…';
+            const bubble = addMsg('bot');
+            setTyping(bubble);
             try {
-                const r = await fetch(`${API_URL}/kin/hades/restore`, {
+                const r = await fetch(`${apiUrl()}/kin/hades/restore`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+                    headers: authHeaders(true),
                     body: JSON.stringify({ checkpoint_id: id, fresh: true })
                 });
-                bubble.innerHTML = r.ok ? "Restored." : "Restore failed.";
-            } catch (e) { bubble.innerHTML = "Restore failed."; }
+                const d = await r.json().catch(() => ({}));
+                if (r.ok) renderReply(bubble, { status: 'ACCEPTED', value: d.lesson ? ('Restored. Lesson: ' + d.lesson) : 'Restored.', source: 'hades', verified: false });
+                else renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Restore failed.' }); }
         }
 
-        async function runResidualCheck() { return runTool("residual_consistency"); }
+        async function runResidualCheck() { return runTool('residual_consistency'); }
 
         async function runTool(name) {
-            addMsg(`Calling tool ${name}...`, 'user');
-            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
+            hideSuggestions();
+            addMsg('user').textContent = 'Calling tool ' + name + '…';
+            const bubble = addMsg('bot');
+            setTyping(bubble);
             try {
-                const r = await fetch(`${API_URL}/tools/${name}`, {
+                const payload = name === 'web_search' ? { query: input.value.trim() || 'resileos' } : {};
+                const r = await fetch(`${apiUrl()}/tools/${encodeURIComponent(name)}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-                    body: JSON.stringify({})
+                    headers: authHeaders(true),
+                    body: JSON.stringify(payload)
                 });
                 const d = await r.json();
-                bubble.innerHTML = `<pre>${JSON.stringify(d, null, 2)}</pre>`;
-            } catch (e) { bubble.innerHTML = `Tool ${name} failed.`; }
+                if (!r.ok) {
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+                    return;
+                }
+                bubble.replaceChildren();
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(d, null, 2);
+                bubble.appendChild(pre);
+            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Tool ' + name + ' failed.' }); }
+        }
+
+        function formatError(r, d) {
+            if (r.status === 401 || r.status === 403) {
+                setStatus('needs-key', 'API key required');
+                return 'This host needs a valid API key. Open Connection and paste the key you were issued.';
+            }
+            if (d && d.detail) {
+                return typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+            }
+            return 'Request failed (' + r.status + ')';
         }
 
         async function sendMsg() {
             const text = input.value.trim();
             if (!text && !selectedFile) return;
-            addMsg(text || `[File: ${selectedFile.name}]`, 'user');
+            hideSuggestions();
+            addMsg('user').textContent = text || ('[File: ' + selectedFile.name + ']');
             input.value = '';
             sendBtn.disabled = true;
-
-            const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
-
+            const bubble = addMsg('bot');
+            setTyping(bubble);
             try {
                 const endpoint = selectedFile ? '/upload' : '/chat';
-                const fetchOptions = selectedFile 
-                    ? { 
-                        method: 'POST', 
-                        headers: { 'X-API-Key': API_KEY }, 
-                        body: (() => { const fd = new FormData(); fd.append("message", text); fd.append("file", selectedFile); return fd; })()
+                const fetchOptions = selectedFile
+                    ? {
+                        method: 'POST',
+                        headers: authHeaders(false),
+                        body: (() => { const fd = new FormData(); fd.append('message', text); fd.append('file', selectedFile); return fd; })()
                       }
-                    : { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY }, 
-                        body: JSON.stringify({ message: text, history: chatHistory }) 
+                    : {
+                        method: 'POST',
+                        headers: authHeaders(true),
+                        body: JSON.stringify({
+                            message: text,
+                            text: text,
+                            history: chatHistory,
+                            hub_id: hubId(),
+                            last_tool_empty: lastToolEmpty,
+                            persona: 'honest'
+                        })
                       };
-
-                const r = await fetch(`${API_URL}${endpoint}`, fetchOptions);
+                const r = await fetch(`${apiUrl()}${endpoint}`, fetchOptions);
                 const d = await r.json();
-                
                 selectedFile = null;
-
+                document.getElementById('file-chip').hidden = true;
+                document.getElementById('file-input').value = '';
                 if (!r.ok) {
-                    bubble.innerHTML = `Error: ${JSON.stringify(d.detail) || 'Check connection'}`;
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
                     return;
                 }
-
-                if (d.status === 'ANSWERED') {
-                    let html = `<strong>${d.value || '—'}</strong>`;
-                    html += `<div class="meta">source: ${d.source || '—'} · verified: ${d.verified}</div>`;
-                    if (d.tool_calls && d.tool_calls.length) {
-                        html += `<div class="meta">tools: ${d.tool_calls.map(t => t.tool || t.name).join(', ')}</div>`;
-                    }
-                    if (d.eat_decision) {
-                        html += `<div class="meta">eat: ${d.eat_decision.action}</div>`;
-                    }
-                    bubble.innerHTML = html;
-                    
-                    chatHistory.push({ role: "user", content: text });
-                    chatHistory.push({ role: "assistant", content: d.value });
+                renderReply(bubble, d);
+                lastToolEmpty = ['NO_ROWS', 'ABSTAINED'].includes(d.status) || d.chip === 'no_rows' || d.chip === 'abstained';
+                if (text) {
+                    chatHistory.push({ role: 'user', content: text });
+                    chatHistory.push({ role: 'assistant', content: d.reply_text || d.value || '' });
                     if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
-                    
-                } else {
-                    bubble.innerHTML = d.value || "Abstained. No matching residual fact or search result.";
                 }
             } catch (e) {
-                bubble.innerHTML = 'Network error.';
+                renderReply(bubble, { status: 'ERROR', value: 'Network error.' });
+                setStatus('offline', 'Network error');
             } finally {
                 sendBtn.disabled = false;
                 input.focus();
