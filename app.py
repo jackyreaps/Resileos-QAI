@@ -18,7 +18,10 @@ from typing import Optional
 
 import numpy as np
 import torch
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, UploadFile, File, Form
+from PIL import Image
+import io
+
 from resileos.ui.shared_state import init_shared
 from resileos.ui.query_scale import with_scale
 from fastapi.security.api_key import APIKeyHeader
@@ -67,7 +70,7 @@ from resileos.titanos.zeus import (  # noqa: E402
     run_zeus_query,
 )
 from resileos.kin.wiring import wire_kin  # noqa: E402
-from resileos.answer.agent_loop import run_agent_chat  # <--- NEW IMPORT
+from resileos.answer.agent_loop import run_agent_chat  # <--- IMPORTED
 
 # ── Harness tool surface ───────────────────────────────────────────────
 from resileos.harness.surface import (  # noqa: E402
@@ -412,10 +415,42 @@ def titanos_answer_backends():
 async def titanos_chat(payload: ChatRequest):
     """Autonomous agent loop."""
     try:
-        result = await run_agent_chat(titanos_singleton, payload.message)
+        # Pass the history to the agent loop!
+        result = await run_agent_chat(titanos_singleton, payload.message, payload.history)
         return result
     except Exception as e:
         raise HTTPException(500, str(e))
+
+@app.post("/api/v1/upload", dependencies=[Depends(verify_api_key)])
+async def upload_file(
+    file: UploadFile = File(...),
+    message: str = Form(""),
+):
+    """Handles file uploads and passes them to the agent loop for perception."""
+    content = await file.read()
+    file_type = file.content_type or "application/octet-stream"
+    
+    file_data = {
+        "type": file_type,
+        "size": len(content),
+        "name": file.filename,
+        "subject": f"file:{file.filename}"
+    }
+
+    if file_type.startswith("image/"):
+        try:
+            img = Image.open(io.BytesIO(content))
+            file_data.update({
+                "width": img.width, "height": img.height, "format": img.format
+            })
+        except Exception:
+            pass
+
+    # Call the agent loop with the file_data
+    result = await run_agent_chat(
+        titanos_singleton, message, history=[], file_data=file_data
+    )
+    return result
 
 @app.post("/api/v1/answer", dependencies=[Depends(verify_api_key)])
 def titanos_answer(payload: AnswerRequest):
