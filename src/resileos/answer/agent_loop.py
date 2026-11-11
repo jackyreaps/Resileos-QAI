@@ -3,7 +3,6 @@ import logging
 from typing import Any, Dict, List, Optional
 from titanos import Titanos
 
-# Import your actual infrastructure
 from resileos.kin.bundle import build_kin_bundle
 from resileos.harness.cascade import CascadeRouter
 from resileos.harness.legions.search import web_search, scrape_url
@@ -18,10 +17,10 @@ async def run_agent_chat(
     history: List[dict],
     file_data: Optional[dict] = None,
 ) -> Dict[str, Any]:
-    # 1. Initialize your Kin bundle
+    
     bundle = build_kin_bundle()
 
-    # 2. Exact Residual Check
+    # 1. Exact Residual Check
     parts = message.split()
     if len(parts) == 2:
         subject, relation = parts[0], parts[1]
@@ -35,13 +34,12 @@ async def run_agent_chat(
         except Exception:
             pass
 
-    # 3. Run your Kin Cycle
+    # 2. Run Kin Cycle & Safely Get Budget
     try:
         report, policy, harness_meta = bundle.cycle(apply_policy=True)
         allow_mouth = policy.allow_mouth
         verified = harness_meta.get("harness", {}).get("verified", False)
         
-        # Safely extract budget
         raw_budget = bundle.control.budget_remaining if bundle.control else 0
         budget = int(raw_budget.get("remaining", raw_budget.get("budget", 0))) if isinstance(raw_budget, dict) else int(raw_budget)
     except Exception as e:
@@ -55,13 +53,13 @@ async def run_agent_chat(
     scraped_content = None
     final_answer = None
 
-    # 4. Handle File Context
+    # 3. Handle File Upload Context
     file_context = ""
     if file_data:
         tool_calls.append({"tool": "perception", "args": {"name": file_data.get("name")}})
         file_context = f" [User uploaded file: {file_data.get('name')} ({file_data.get('type')})]"
 
-    # 5. Native Cascade Routing (No hardcoded text)
+    # 4. Native Cascade Routing
     route = "escalate"
     try:
         router = CascadeRouter()
@@ -74,7 +72,7 @@ async def run_agent_chat(
     except Exception as e:
         log.warning(f"Cascade routing failed: {e}")
 
-    # 6. Execute Route
+    # 5. Execute Route
     if route == "search" and budget > 0:
         current_query = message + file_context
         if history and len(history) > 0 and len(message.split()) < 5:
@@ -97,8 +95,7 @@ async def run_agent_chat(
             if not scraped_content:
                 scraped_content = search_result["evidence_summary"]
 
-    # 7. Synthesize with Native Backend (The "Mouth")
-    # If it escalated or searched, we pass the context to your backend to generate the answer.
+    # 6. Synthesize with Native Backend
     if scraped_content or route == "escalate":
         # Run web scraped content through your Eat Filter
         if scraped_content:
@@ -111,10 +108,12 @@ async def run_agent_chat(
                 }
 
         # Build the context for your native AnswerBackend
+        # FIXED: Added inverse=False to prevent the TypeError crash
         ctx = AnswerContext(
             question=message + file_context,
             subject="web_search" if scraped_content else "conversational",
             relation="evidence" if scraped_content else "answer",
+            inverse=False,
             rows=(scraped_content,) if scraped_content else tuple(h.get('content', '') for h in history),
             confidence=1.0 if (scraped_content or route == "escalate") else 0.0,
         )
@@ -122,7 +121,7 @@ async def run_agent_chat(
         backend = select_backend()
         if allow_mouth:
             try:
-                # This is where your actual model (local or structured) generates the response
+                # This is where your actual backend generates the response
                 answer_text = backend.render(ctx)
             except Exception as e:
                 log.warning(f"Backend render failed: {e}")
