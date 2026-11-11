@@ -73,6 +73,13 @@ _KIN: dict[str, dict[str, bool]] = {
         "sees_history": False,
         "gated_write": True,
     },
+    "aphrodite": {
+        "writes_residual": False,
+        "executes": True,
+        "may_set_verified": False,
+        "sees_history": False,
+        "gated_write": False,
+    },
 }
 
 _ALIASES = {"perception": "eat"}
@@ -96,6 +103,11 @@ def _canon(kin_name: str) -> str:
 def reset_legions() -> None:
     """Drop registered legions. Tests use this. It does not list them."""
     _surfaces.clear()
+
+
+def list_legions() -> dict[str, list[dict[str, str]]]:
+    """Every Kin catalogue, including empty ones."""
+    return {kin: kin_catalogue(kin) for kin in _KIN}
 
 
 def kin_catalogue(kin_name: str) -> list[dict[str, str]]:

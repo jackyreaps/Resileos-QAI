@@ -56,6 +56,7 @@ class Checkpoint:
     evidence_gist: list[dict]           # bounded, not full history
     control_state: dict                 # minimal ControlPacket fields
     scars: list[str] = field(default_factory=list)
+    extra: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -68,6 +69,7 @@ class Checkpoint:
             "evidence_gist": self.evidence_gist[-5:],  # keep tiny
             "control_state": self.control_state,
             "scars": self.scars,
+            "extra": self.extra,
         }
 
 
@@ -91,6 +93,7 @@ class Hades:
         control: ControlPacket,
         residual_packet_hash: Optional[str] = None,
         lesson: Optional[str] = None,
+        extra: Optional[dict] = None,
     ) -> Checkpoint:
         """Create a checkpoint. Lesson is the only thing that should cross attempts.
 
@@ -139,6 +142,7 @@ class Hades:
             evidence_gist=list(getattr(control, "evidence", []) or [])[-5:],
             control_state=control_state,
             scars=list(getattr(control, "scars", []) or [])[:],
+            extra=dict(extra or {}),
         )
         self._cache[ckpt.id] = ckpt
         self._path(ckpt.id).write_text(json.dumps(ckpt.to_dict(), indent=2))

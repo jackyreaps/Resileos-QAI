@@ -17,7 +17,9 @@ flowchart TD
   kin --> hermes["Hermes: context under a budget"]
   kin --> apollo["Apollo: success criteria"]
   kin --> hades["Hades: checkpoint and lesson"]
+  kin --> aphrodite["Aphrodite: preferences, no residual writes"]
   kin --> eat["Eat: accept, reject, or abstain before learn"]
+  hermes --> moirai["Clotho, Lachesis, Atropos, Harmonia"]
   iris --> legIris["Legion on Iris"]
   metis --> legMetis["Legion on Metis"]
   hermes --> legHermes["Legion on Hermes"]
@@ -75,9 +77,10 @@ Mouth policy (`src/resileos/kin/mouth_policy.py`): `should_render_prose` returns
 |---|---|
 | Iris | Observes metrics and flags. Does not answer user facts. |
 | Metis | Turns an Iris report into policy: mouth flag, Hermes depth, child enable and disable lists. Does not learn world triples. |
-| Hermes | Ranks and truncates context the caller already supplied, under `max_depth` and `max_items`. Does not invent context. |
+| Hermes | Ranks and truncates context the caller already supplied, under `max_depth` and `max_items`. Does not invent context. Clotho, Lachesis, Atropos, and Harmonia sit under Hermes. |
 | Apollo | Golden-ladder hops, success criteria, and `verify_on_stop`. Art paths are not required to be pure truth. |
-| Hades | Checkpoints. The lesson crosses attempts. Full history, full evidence, and scars stay inside the attempt. `save()` does not itself require `verified`. |
+| Hades | Checkpoints and lessons. The lesson crosses attempts. Full history, full evidence, and scars stay inside the attempt. `save()` does not itself require `verified`. |
+| Aphrodite | Preferences, care weights, and a persona that grows on verified tutorial steps. Does not write residual facts. Legions: Calliope, Ligeia, Echo. |
 | Eat | External text becomes accept, reject, or abstain. Only an accepted triple may be learned. |
 
 `KinBundle.cycle` runs Iris then Metis. Routes live at `/api/v1/kin/*` and `/api/v1/eat/*` via `wire_kin` in `app.py`. `/api/v1/world/*` and `/api/v1/guild/*` exist in `src/resileos/answer/api_routes.py` and are not registered on `app.py`.

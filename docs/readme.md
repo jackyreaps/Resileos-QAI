@@ -87,6 +87,8 @@ Harness and current product surface (code on main; some numbered docs above stil
 - [Demi-god skill layer](320-titanos/demigods.md) — RES-343, implemented
 - [Legions under Kin](320-titanos/legions.md) — RES-345, registration implemented; examples off unless enabled
 - [Kin operators and eat](320-titanos/kin-eat-build.md) — RES-338, implemented
+- [Aphrodite](320-titanos/aphrodite.md) — preferences and tutorial steps; no residual writes
+- [Hermes coordination](320-titanos/hermes-coordination.md) — Clotho, Lachesis, Atropos, Harmonia
 - [Verifier swarm](320-titanos/verifier-swarm.md) — RES-340, implemented
 - [Equal-budget measurement](benchmarks/equal_budget.md) — RES-344, measured 2026-11-10
 - [Studio residual codec study](studio/research.md) — STUDIO-001
