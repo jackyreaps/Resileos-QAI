@@ -110,7 +110,11 @@
 
     <div class="input-wrap">
         <div class="input-box">
-            <input type="text" id="input" placeholder="Ask anything..." onkeypress="handleEnter(event)">
+            <input type="file" id="file-input" style="display:none" onchange="handleFileUpload()">
+            <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="Upload file">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            </button>
+            <input type="text" id="input" placeholder="Ask anything or attach a file..." onkeypress="handleEnter(event)">
             <button class="send" id="send" onclick="sendMsg()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
             </button>
@@ -126,6 +130,8 @@
         const statusDot = document.getElementById('status');
         const toolsPanel = document.getElementById('tools-panel');
         const kinPanel = document.getElementById('kin-panel');
+        let chatHistory = [];
+        let selectedFile = null;
 
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
 
@@ -186,6 +192,14 @@
         function quickAsk(text) { input.value = text; sendMsg(); }
         function handleEnter(e) { if (e.key === 'Enter') sendMsg(); }
 
+        function handleFileUpload() {
+            const fileInput = document.getElementById('file-input');
+            if (fileInput.files.length > 0) {
+                selectedFile = fileInput.files[0];
+                addMsg(`[Attached: ${selectedFile.name}]`, 'user');
+            }
+        }
+
         function addMsg(text, sender) {
             const row = document.createElement('div');
             row.className = `msg-row ${sender}`;
@@ -216,7 +230,7 @@
                     body: JSON.stringify({ apply_policy: true })
                 });
                 const d = await r.json();
-                bubble.innerHTML = r.ok ? `Kin cycle complete. Lesson: ${d.lesson || '—'}` : `Error: ${d.detail || 'failed'}`;
+                bubble.innerHTML = r.ok ? `Kin cycle complete. Lesson: ${d.lesson || '—'}` : `Error: ${JSON.stringify(d.detail) || 'failed'}`;
             } catch (e) { bubble.innerHTML = `Kin cycle error: ${e.message}`; }
         }
 
@@ -264,28 +278,34 @@
 
         async function sendMsg() {
             const text = input.value.trim();
-            if (!text) return;
-            addMsg(text, 'user');
+            if (!text && !selectedFile) return;
+            addMsg(text || `[File: ${selectedFile.name}]`, 'user');
             input.value = '';
             sendBtn.disabled = true;
 
             const bubble = addMsg('<div class="typing"><span></span><span></span><span></span></div>', 'bot');
 
             try {
-                if (text.startsWith('/tool ')) {
-                    await runTool(text.slice(6).trim());
-                    return;
-                }
+                const endpoint = selectedFile ? '/upload' : '/chat';
+                const fetchOptions = selectedFile 
+                    ? { 
+                        method: 'POST', 
+                        headers: { 'X-API-Key': API_KEY }, 
+                        body: (() => { const fd = new FormData(); fd.append("message", text); fd.append("file", selectedFile); return fd; })()
+                      }
+                    : { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY }, 
+                        body: JSON.stringify({ message: text, history: chatHistory }) 
+                      };
 
-                const r = await fetch(`${API_URL}/chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
-                    body: JSON.stringify({ message: text, history: [] })
-                });
+                const r = await fetch(`${API_URL}${endpoint}`, fetchOptions);
                 const d = await r.json();
+                
+                selectedFile = null;
 
                 if (!r.ok) {
-                    bubble.innerHTML = `Error: ${d.detail || 'Check connection'}`;
+                    bubble.innerHTML = `Error: ${JSON.stringify(d.detail) || 'Check connection'}`;
                     return;
                 }
 
@@ -295,7 +315,15 @@
                     if (d.tool_calls && d.tool_calls.length) {
                         html += `<div class="meta">tools: ${d.tool_calls.map(t => t.tool || t.name).join(', ')}</div>`;
                     }
+                    if (d.eat_decision) {
+                        html += `<div class="meta">eat: ${d.eat_decision.action}</div>`;
+                    }
                     bubble.innerHTML = html;
+                    
+                    chatHistory.push({ role: "user", content: text });
+                    chatHistory.push({ role: "assistant", content: d.value });
+                    if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
+                    
                 } else {
                     bubble.innerHTML = d.value || "Abstained. No matching residual fact or search result.";
                 }
