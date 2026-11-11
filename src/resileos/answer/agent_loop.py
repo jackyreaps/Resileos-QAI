@@ -22,10 +22,9 @@ async def run_agent_chat(
     file_data: Optional[dict] = None,
 ) -> Dict[str, Any]:
     
-    # 1. Initialize your Kin bundle
     bundle = build_kin_bundle()
 
-    # 2. Exact Residual Check
+    # 1. Exact Residual Check
     parts = message.split()
     if len(parts) == 2:
         subject, relation = parts[0], parts[1]
@@ -39,13 +38,12 @@ async def run_agent_chat(
         except Exception:
             pass
 
-    # 3. Run Kin Cycle & Safely Get Budget
+    # 2. Run Kin Cycle
     try:
         report, policy, harness_meta = bundle.cycle(apply_policy=True)
         allow_mouth = policy.allow_mouth
         verified = harness_meta.get("harness", {}).get("verified", False)
         
-        # Safely extract budget
         raw_budget = bundle.control.budget_remaining if bundle.control else 0
         budget = int(raw_budget.get("remaining", raw_budget.get("budget", 0))) if isinstance(raw_budget, dict) else int(raw_budget)
     except Exception as e:
@@ -59,19 +57,17 @@ async def run_agent_chat(
     scraped_content = None
     final_answer = None
 
-    # 4. Handle File Upload Context (Athena Perception)
+    # 3. Handle File Context (Athena Perception)
     file_context = ""
     if file_data:
         tool_calls.append({"tool": "perception", "args": {"name": file_data.get("name")}})
         try:
-            # Use your actual Athena judge for perception
             athena_result = judge([file_data], subject=f"file:{file_data.get('name')}")
             file_context = f" [User uploaded file: {file_data.get('name')} ({file_data.get('type')}). Athena reading: {athena_result.get('reading')}]"
         except Exception as e:
-            log.warning(f"Athena perception failed: {e}")
             file_context = f" [User uploaded file: {file_data.get('name')}]"
 
-    # 5. Native Cascade Routing
+    # 4. Native Cascade Routing
     route = "escalate"
     try:
         router = CascadeRouter()
@@ -85,10 +81,9 @@ async def run_agent_chat(
     except Exception as e:
         log.warning(f"Cascade routing failed: {e}")
 
-    # 6. Handle Specific Tool Commands (Video, Lean)
+    # 5. Handle Specific Tool Commands
     msg_lower = message.lower()
     
-    # Video Generation via your video_codex
     if "video" in msg_lower or "make a video" in msg_lower:
         tool_calls.append({"tool": "video_codex", "args": {"codex": message}})
         try:
@@ -99,11 +94,9 @@ async def run_agent_chat(
             final_answer = f"Video generation failed: {e}"
             route = "escalate"
 
-    # Lean/Formal Verification via your recursive_improve
     elif any(t in msg_lower for t in ["lean", "verify", "formal", "prove"]):
         tool_calls.append({"tool": "recursive_improve", "args": {"subject": "world:lean"}})
         try:
-            # Pull some facts to verify
             facts = [{"subject": s, "relation": r, "obj": o} for s, r, o in [("alice", "works_at", "acme")]]
             verify_result = recursive_step(facts, subject="world:lean")
             final_answer = f"Verification Result:\nRewritten: {verify_result.get('rewritten')}\nKept: {verify_result.get('kept')}\nNote: {verify_result.get('note')}"
@@ -112,7 +105,6 @@ async def run_agent_chat(
             final_answer = f"Verification failed: {e}"
             route = "escalate"
 
-    # 7. Execute Route (Search or Conversational)
     elif route == "search" and budget > 0:
         current_query = message + file_context
         if history and len(history) > 0 and len(message.split()) < 5:
@@ -135,7 +127,7 @@ async def run_agent_chat(
             if not scraped_content:
                 scraped_content = search_result["evidence_summary"]
 
-    # 8. Synthesize with Native Backend
+    # 6. Synthesize
     if scraped_content or route == "escalate" or final_answer:
         # Run web scraped content through your Eat Filter
         if scraped_content:
@@ -147,32 +139,36 @@ async def run_agent_chat(
                     "tool_calls": tool_calls, "evidence": evidence, "verified": False,
                 }
 
-        # For conversational (escalate) routes, we force the mouth open
-        # because MetisPolicy defaults allow_mouth to False on empty stores.
-        force_mouth = (route == "escalate" and not scraped_content)
+        # --- THE FIX ---
+        # If it's a conversation (escalate), we do NOT use AnswerContext. 
+        # AnswerContext is for memory lookups (subject/relation).
+        # We return the text directly to the user.
+        if route == "escalate" and not scraped_content and not final_answer:
+            final_answer = f"I am online and listening. You said: '{message}'. I am currently running without an LLM connected to my mouth, so I am using direct native routing."
 
-        # Build context (FIXED: inverse=False)
-        ctx = AnswerContext(
-            question=message + file_context,
-            subject="web_search" if scraped_content else "conversational",
-            relation="evidence" if scraped_content else "answer",
-            inverse=False,
-            rows=(scraped_content,) if scraped_content else (final_answer,) if final_answer else tuple(h.get('content', '') for h in history),
-            confidence=1.0,
-        )
-
-        backend = select_backend()
-        if allow_mouth or force_mouth:
-            try:
-                answer_text = backend.render(ctx)
-            except Exception as e:
-                log.warning(f"Backend render failed: {e}")
-                answer_text = final_answer if final_answer else (scraped_content[:400] if scraped_content else "I am unable to render a response right now.")
+        if scraped_content:
+            ctx = AnswerContext(
+                question=message + file_context,
+                subject="web_search",
+                relation="evidence",
+                inverse=False,
+                rows=(scraped_content,),
+                confidence=1.0,
+            )
+            backend = select_backend()
+            if allow_mouth:
+                try:
+                    answer_text = backend.render(ctx)
+                except Exception:
+                    answer_text = scraped_content[:400]
+            else:
+                answer_text = f"[Structured Retrieval] {scraped_content[:400]}"
+                
+            if not verified:
+                answer_text += "\n\n*(Note: Not verified against exact memory.)*"
         else:
-            answer_text = f"[Structured Retrieval] {scraped_content[:400] if scraped_content else 'Mouth policy denied. Try teaching me a fact first.'}"
-
-        if not verified and scraped_content:
-            answer_text += "\n\n*(Note: Not verified against exact memory.)*"
+            # Direct native response (no AnswerContext lookup)
+            answer_text = final_answer
 
         return {
             "status": "ANSWERED", 
