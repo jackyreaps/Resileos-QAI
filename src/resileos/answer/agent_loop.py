@@ -1,19 +1,10 @@
-"""Autonomous agent loop driven by KinBundle and CascadeRouter."""
+"""Autonomous agent loop driven by the KinBundle."""
 import logging
 from typing import Any, Dict, List, Optional
 from titanos import Titanos
 from resileos.kin.bundle import KinBundle
 from resileos.harness.legions.search import web_search, scrape_url
-from resileos.kin.eat import eat_filter
-from resileos.answer import AnswerContext, select_backend
-
-# Safely import the real CascadeRouter from your harness
-try:
-    from resileos.harness.cascade import CascadeRouter
-    HAS_CASCADE = True
-except ImportError:
-    log.warning("CascadeRouter not found. Using fallback routing.")
-    HAS_CASCADE = False
+from resileos.answer import AnswerContext, select_backend, StructuredBackend
 
 log = logging.getLogger(__name__)
 
@@ -23,17 +14,14 @@ async def run_agent_chat(
     history: List[dict],
     file_data: Optional[dict] = None,
 ) -> Dict[str, Any]:
-    
     bundle = KinBundle(titanos=titanos)
-    tool_calls = []
-    evidence = []
-    final_answer = None
 
-    # ── Step 1: Exact Residual Check ──
+    # ── Step 1: Residual Check ──
     parts = message.split()
     if len(parts) == 2:
+        subject, relation = parts[0], parts[1]
         try:
-            rows = titanos.ask_list(parts[0], parts[1])
+            rows = titanos.ask_list(subject, relation)
             if rows:
                 return {
                     "status": "ANSWERED", "source": "residual", "value": rows[0],
@@ -42,120 +30,95 @@ async def run_agent_chat(
         except Exception:
             pass
 
-    # ── Step 2: Run Kin Cycle (Iris → Metis → Hermes) ──
+    # ── Step 2: Run the Kin Cycle ──
     try:
         report, policy, harness_meta = bundle.cycle(apply_policy=True)
-        allow_mouth = getattr(policy, "allow_mouth", False)
+        allow_mouth = policy.allow_mouth
         verified = harness_meta.get("harness", {}).get("verified", False)
-        budget = getattr(bundle.control, "budget_remaining", 0) if bundle.control else 0
+        budget = bundle.control.to_dict().get("budget_remaining", 0) if bundle.control else 0
     except Exception as e:
         log.warning(f"Kin cycle failed: {e}")
         allow_mouth = False
         verified = False
         budget = 0
 
-    # ── Step 3: Native Cascade Routing ──
-    route = "escalate"  # Default
-    
-    if HAS_CASCADE:
-        try:
-            router = CascadeRouter()
-            route_result = router.route(
-                question=message,
-                options=["residual", "search", "escalate"],
-                packet=bundle.control.to_dict() if bundle.control else {},
-            )
-            # Map the router's response to our execution paths
-            raw_route = route_result.get("route", "escalate")
-            if raw_route == "residual":
-                route = "residual"
-            elif raw_route in ("cascade", "search"):
-                route = "search"
-            else:
-                route = "escalate"
-        except Exception as e:
-            log.warning(f"Cascade routing failed: {e}")
-            route = "escalate"
-    else:
-        # Fallback routing if Cascade is missing
-        msg_lower = message.lower()
-        if any(t in msg_lower for t in ["can you", "who are you", "hello", "hi", "ready"]):
-            route = "escalate"
-        elif len(parts) == 2:
-            route = "residual"
-        else:
-            route = "search"
+    tool_calls = []
+    evidence = []
+    scraped_content = None
 
-    # ── Step 4: Execute Route ──
-    if file_data:
-        final_answer = f"I have received and analyzed the file: {file_data.get('name')} ({file_data.get('type')})."
-        tool_calls.append({"tool": "perception", "args": {"name": file_data.get('name')}})
-    
-    elif route == "escalate":
-        # Native conversational fallback
-        final_answer = "I am the Resileos exact memory engine. I can learn facts, answer queries using my residual memory, and search the web when needed. I am fully ready."
-    
-    elif route == "search" and budget > 0:
-        # Web search fallback
-        query = message
-        if history and len(message.split()) < 5:
-            query = f"{history[-1].get('content', '')} {message}".strip()
+    # ── Step 3: Perception (File Upload) ──
+    if file_data and budget > 0:
+        tool_calls.append({"tool": "perception", "args": {"name": file_data.get("name")}})
+        return {
+            "status": "ANSWERED",
+            "source": "perception",
+            "value": f"I have received and analyzed the file: {file_data.get('name')} ({file_data.get('type')}).",
+            "tool_calls": tool_calls,
+            "evidence": [],
+            "verified": False,
+        }
 
-        tool_calls.append({"tool": "web_search", "args": {"query": query}})
-        search_result = await web_search(query)
-        
-        if search_result.get("status") == "SUCCESS" and search_result.get("results"):
+    # ── Step 4: Web Search ──
+    if budget > 0 and not scraped_content:
+        current_query = message
+        if history and len(history) > 0 and len(message.split()) < 5:
+            current_query = f"{history[-1].get('content', '')} {message}"
+
+        tool_calls.append({"tool": "web_search", "args": {"query": current_query}})
+        search_result = await web_search(current_query)
+
+        if search_result["status"] == "SUCCESS" and search_result["results"]:
             evidence.append(search_result)
-            top = search_result["results"][0]
-            final_answer = search_result.get("evidence_summary", "")
-            
-            if "duckduckgo.com" not in top.get("url", ""):
-                tool_calls.append({"tool": "scrape_url", "args": {"url": top["url"]}})
-                scrape = await scrape_url(top["url"])
-                if scrape.get("status") == "SUCCESS":
-                    evidence.append(scrape)
-                    final_answer = scrape.get("content")
-        else:
-            final_answer = "I searched the web but couldn't find a good answer."
+            top_url = search_result["results"][0]["url"]
+
+            if "duckduckgo.com" not in top_url:
+                tool_calls.append({"tool": "scrape_url", "args": {"url": top_url}})
+                scrape_result = await scrape_url(top_url)
+                if scrape_result["status"] == "SUCCESS":
+                    evidence.append(scrape_result)
+                    scraped_content = scrape_result["content"]
+
+            if not scraped_content:
+                scraped_content = search_result["evidence_summary"]
 
     # ── Step 5: Synthesize & Return ──
-    if final_answer:
-        # Run the final answer through the Eat filter
-        try:
-            decision = eat_filter(final_answer)
-            if getattr(decision, "action", "") == "reject":
-                return {
-                    "status": "ABSTAINED", "source": "eat_rejection",
-                    "value": f"Eat filter rejected the answer: {decision.reason}",
-                    "tool_calls": tool_calls, "evidence": evidence, "verified": False
-                }
-        except Exception:
-            pass
-
+    if scraped_content:
         ctx = AnswerContext(
-            question=message, subject="swarm", relation="evidence",
-            rows=(final_answer,), confidence=1.0 if evidence else 0.0,
+            question=message,
+            subject="web_search",
+            relation="evidence",
+            rows=(scraped_content,),
+            confidence=1.0 if evidence else 0.0,
         )
-        
+
         backend = select_backend()
         if allow_mouth:
             try:
                 answer_text = backend.render(ctx)
-            except Exception:
-                answer_text = final_answer[:400]
+            except Exception as e:
+                log.warning(f"Backend render failed: {e}")
+                answer_text = f"Based on a web search: {scraped_content[:400]}..."
         else:
-            answer_text = f"[Structured Retrieval] {final_answer[:400]}..."
+            answer_text = f"[Structured Retrieval] {scraped_content[:400]}..."
 
-        if not verified and evidence:
-            answer_text += "\n\n*(Note: Not verified by Apollo against residual memory.)*"
+        final_status = "ANSWERED"
+        if not verified:
+            answer_text += "\n\n*(Note: This information came from the web and has not been verified against your exact memory.)*"
 
         return {
-            "status": "ANSWERED", "source": route, "value": answer_text,
-            "tool_calls": tool_calls, "evidence": evidence, "verified": verified,
+            "status": final_status,
+            "source": "web_search",
+            "value": answer_text,
+            "tool_calls": tool_calls,
+            "evidence": evidence,
+            "verified": verified,
         }
 
     return {
-        "status": "ABSTAINED", "source": "none",
-        "value": "Swarm could not answer within budget.",
-        "tool_calls": tool_calls, "evidence": evidence, "verified": False
+        "status": "ABSTAINED",
+        "source": "none",
+        "value": "I couldn't find this in my memory or the web.",
+        "tool_calls": tool_calls,
+        "evidence": evidence,
+        "verified": False,
     }
