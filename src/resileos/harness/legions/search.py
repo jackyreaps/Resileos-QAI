@@ -1,4 +1,4 @@
-"""Web search legion for the autonomous agent loop."""
+"""Web search and scrape legions for the autonomous agent loop."""
 import httpx
 import re
 
@@ -40,4 +40,29 @@ async def web_search(query: str, max_results: int = 3) -> dict:
             "error": str(e),
             "results": [],
             "evidence_summary": ""
+        }
+
+async def scrape_url(url: str) -> dict:
+    """
+    Fetches the text content of a specific URL.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=10.0, follow_redirects=True)
+            resp.raise_for_status()
+            
+            # Basic HTML stripping to get plain text
+            text = re.sub(r'<[^>]+>', ' ', resp.text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            
+            return {
+                "status": "SUCCESS",
+                "url": url,
+                "content": text[:4000]  # Limit to 4000 chars
+            }
+    except Exception as e:
+        return {
+            "status": "ERROR",
+            "url": url,
+            "error": str(e)
         }
