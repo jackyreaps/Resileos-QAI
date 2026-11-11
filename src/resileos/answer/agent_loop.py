@@ -30,12 +30,20 @@ async def run_agent_chat(
         except Exception:
             pass
 
-    # ── Step 2: Run the Kin Cycle ──
+    # ── Step 2: Run the Kin Cycle & Safely Get Budget ──
     try:
         report, policy, harness_meta = bundle.cycle(apply_policy=True)
         allow_mouth = policy.allow_mouth
         verified = harness_meta.get("harness", {}).get("verified", False)
-        budget = bundle.control.budget_remaining if bundle.control else 0
+        
+        # Safely extract budget as an integer to prevent 'dict > int' errors
+        budget = 1
+        if bundle.control:
+            raw_budget = getattr(bundle.control, "budget_remaining", 1)
+            if isinstance(raw_budget, dict):
+                budget = int(raw_budget.get("remaining", raw_budget.get("budget", 1)))
+            elif isinstance(raw_budget, (int, float)):
+                budget = int(raw_budget)
     except Exception as e:
         log.warning(f"Kin cycle failed: {e}")
         allow_mouth = False
@@ -58,7 +66,19 @@ async def run_agent_chat(
             "verified": False,
         }
 
-    # ── Step 4: Web Search ──
+    # ── Step 4: Conversational Check (Prevents dumb web searches) ──
+    msg_lower = message.lower()
+    if any(t in msg_lower for t in ["can you", "who are you", "what are you", "hello", "hi", "ready"]):
+        return {
+            "status": "ANSWERED",
+            "source": "conversational",
+            "value": "I am the Resileos exact memory engine. I can learn facts, answer queries using my residual memory, and search the web when needed. I am fully ready.",
+            "tool_calls": [],
+            "evidence": [],
+            "verified": True,
+        }
+
+    # ── Step 5: Web Search ──
     if budget > 0 and not scraped_content:
         current_query = message
         if history and len(history) > 0 and len(message.split()) < 5:
@@ -81,7 +101,7 @@ async def run_agent_chat(
             if not scraped_content:
                 scraped_content = search_result["evidence_summary"]
 
-    # ── Step 5: Synthesize & Return ──
+    # ── Step 6: Synthesize & Return ──
     if scraped_content:
         ctx = AnswerContext(
             question=message,
