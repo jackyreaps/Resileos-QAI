@@ -77,6 +77,10 @@ class ForgeBody(BaseModel):
     stage: str = "draft"
     matrix: list[Any] | None = None
     frames: list[Any] | None = None
+    previous: list[Any] | None = None
+    keyframe: list[Any] | None = None
+    draft: list[Any] | None = None
+    prediction: str = "previous"
 
 
 class GraphifyBody(BaseModel):
@@ -249,6 +253,10 @@ def register_studio_routes(
                     stage=stage,
                     matrix=body.matrix,
                     frames=body.frames,
+                    previous=body.previous,
+                    keyframe=body.keyframe,
+                    draft=body.draft,
+                    prediction=body.prediction,
                 )
             )
         except LegionError as exc:
