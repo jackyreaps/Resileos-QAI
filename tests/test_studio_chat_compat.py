@@ -17,6 +17,41 @@ def test_chat_html_has_no_hardcoded_api_key():
     assert "fonts.css" in html
 
 
+def test_chat_page_signs_in_and_posts_studio_tools():
+    html = (ROOT / "landing" / "public" / "chat.html").read_text(encoding="utf-8")
+    assert 'id="portal"' in html
+    assert 'id="portal-username"' in html
+    assert "resileos_username" in html
+    assert "resileos_theme" in html
+    assert 'id="history-panel"' in html
+    assert 'id="history-username"' in html
+    assert 'id="input"' in html
+    assert "<textarea" in html
+    assert "shiftKey" in html
+    assert "Remembers exactly" in html
+    assert "Stores · Derives · Abstains" in html
+    assert "/studio/forge/video" in html
+    assert "/studio/graphify" in html
+    assert "/studio/plan-test-debug" in html
+    assert "/studio/stop" in html
+    assert 'id="stop-run"' in html
+    assert "eat_filter" in html
+    assert "verify_on_stop" in html
+    assert "UNAVAILABLE" in html
+    assert "schedulePersist" in html
+    assert "async function persistThread" in html
+    assert "fonts.googleapis.com" not in html
+    assert "superintelligence" not in html.lower()
+    assert "RES-309" not in html
+    assert 'href="/chat.html"' not in html
+    sign_out = html.split("async function signOut()", 1)[1].split("['settings-url'", 1)[0]
+    assert "resileos_username" in sign_out
+    assert "resileos_api_key" not in sign_out
+    assert "localStorage.clear" not in sign_out
+    optional = html.split("function applyOptionalKey", 1)[1].split("function showApp", 1)[0]
+    assert "if (!key) return;" in optional
+
+
 def test_chat_accepts_message_alias(client, monkeypatch):
     import app as app_module
 
