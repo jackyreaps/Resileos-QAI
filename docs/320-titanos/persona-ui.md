@@ -218,8 +218,13 @@ Perception responses always include `candidates` (each `{triple, accepted, eat}`
 | `POST /api/v1/perceive/image` | `{"image": [[0, 1], [1, 0]], "subject": "image", "commit": false}` | perception fields from `perceive_image` plus candidates |
 | `POST /api/v1/perceive/art` | `{"title": "hymn", "description": "short", "world_id": "world:art", "commit": false}` | `encode_art` under `art`, plus candidates |
 | `POST /api/v1/perceive/frame` | `{"image": [[0, 1], [1, 0]], "subject": "frame", "commit": false}` | `codec_summary` under `codec`, plus candidates |
+| `POST /api/v1/perceive/audio` | `{"wave": [0.0, 0.2], "subject": "audio", "commit": false}` | `perceive_audio` under `perception`, plus candidates |
+| `POST /api/v1/perceive/video` | `{"frames": [[[0, 1], [1, 0]]], "subject": "video", "commit": false}` | `perceive_video` under `perception`, plus candidates |
+| `POST /api/v1/perceive/language` | `{"text": "hello", "subject": "text", "commit": false}` | `perceive_language` under `perception`, plus candidates |
 | `POST /api/v1/generate/fluid` | `{"image": null, "belt": 0, "frame": 0, "persona": "", "subject": "frame"}` | `generate_still`: `embed`, `triple`, `prompt`, `still_url`, `backend` |
 | `POST /api/v1/generate/local` | same shape | `generate_local`: `embed`, `field`, `triple`, `gate`, `pattern_shape`, `pattern`, `backend`, `note` |
+| `POST /api/v1/generate/video` | `{"prompt": "a hill"}` | `generate_video_hook`. Unconfigured hosts return `status: UNAVAILABLE`, `url: null`, `draft: false` |
+| `POST /api/v1/task/lookup` | `{"goal": "domain", "steps": [{"subject": "Zeus", "relation": "domain"}]}` | `task_with_scale`: `goal`, `trace`, `answer`, `scale`. Store lookups only |
 | `POST /api/v1/language/detect` | `{"text": "hello"}` | `detect_language`: `guess`, `latin_share`, `other_share`, `address`, `note` |
 | `POST /api/v1/language/translate` | `{"text": "hello", "target": "en", "source": null}` | `translate`: `text`, `translated`, `target`, `source`, `provider`, `address`, `note` |
 | `POST /api/v1/agent/task` | `{"goal": "status", "steps": [{"tool": "git_status", "args": {}}]}` | `{"result": {...}, "harness": {...}}`. Mutating tools (`write_file`, `apply_diff`, `git_commit`) set `result.ran` false and `result.verification.requires_verification` true. They are not called. |
@@ -227,13 +232,12 @@ Perception responses always include `candidates` (each `{triple, accepted, eat}`
 | `POST /api/v1/explain` | `{"query": "domain", "hub_rows": ["sky"]}` | `explain`: `text`, `source`, `query` |
 | `POST /api/v1/remember` | `{"subject": "ada", "relation": "likes", "obj": "geometry"}` | `remember`: `subject` (`user:ada` if no hub prefix), `relation`, `obj`, `scale`. Does not `learn`. |
 
-## 6. Not mounted
+## 6. Not an HTTP call
 
-| Function | Why |
-|----------|-----|
-| `fluid_gen.generate_video_hook` | External video provider. Fluid route calls `generate_still`. |
-| `task_loop.run_task`, `task_api.task_from_steps` | Store lookup loop, not the mutating worker. Agent route wraps `agent_loop.run_task`. |
-| `studio.panel.render_residual_codec` | Streamlit renderer. The gear drawer calls it. `GET /api/v1/studio/panel` returns the panel's data and does not invoke it. |
+| Function | Where it runs |
+|----------|----------------|
+| `studio.panel.render_residual_codec` | Streamlit gear drawer in `ui.py`. `GET /api/v1/studio/panel` returns the panel data and does not invoke the renderer. |
+| `agent_loop` mutating tools | `POST /api/v1/agent/task` refuses `write_file`, `apply_diff`, and `git_commit`. |
 
 ## 7. CORS
 

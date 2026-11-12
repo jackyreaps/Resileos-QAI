@@ -43,7 +43,8 @@ inspection and for RES-313's depth accounting.
 When the hierarchy encoder emits a packet `p` with hypervector `hv_p`, level
 `L_p`, and span `[s_p, e_p)`:
 
-    stream_hv = normalize(stream_hv + decay**L_p * hv_p)
+    raw = raw + decay**L_p * hv_p
+    stream_hv = normalize(raw)
     stream_span = (min(stream_span.start, s_p), max(stream_span.end, e_p))
     stream_packet_count += 1
     last_packet_level = L_p
@@ -51,9 +52,8 @@ When the hierarchy encoder emits a packet `p` with hypervector `hv_p`, level
 `decay` is a scalar in `(0, 1]`. It controls the effective window of the
 running state. `decay = 1` means every packet ever emitted contributes equally —
 the state is a corpus-wide bundle, and its recall capacity is the flat-bundle
-capacity `C(dim)` from RES-310 §1. `decay < 1` means recent packets dominate —
-the state is a decaying memory with an effective horizon of `1 / (1 - decay)`
-packets.
+capacity `C(dim)` from RES-310 §1. `decay < 1` multiplies each packet by `decay` to the power of its level
+before that packet joins the sum.
 
 The default is `decay = 1`. Rationale: a decaying state is a lossy state, and
 RES-313's capacity law assumes the non-decaying form. `decay < 1` is an
@@ -76,9 +76,9 @@ Two optional readouts are defined for inspection:
 
     entropy() -> float
 
-Returns the effective number of packets contributing to `stream_hv`, estimated
-from the norm: if `stream_hv` is a sum of `N` unit-norm random phasors, its norm
-is `sqrt(N)` in expectation. `entropy()` returns `||stream_hv||**2`.
+Returns `||raw||**2`. `readout()` is the normalized `stream_hv`, whose squared
+norm is 1 after the first packet. The sum of `N` unit-norm random phasors has
+squared norm `N` in expectation, so `entropy()` reads the sum before normalize.
 
     snapshot() -> dict
 

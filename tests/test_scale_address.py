@@ -17,5 +17,7 @@ def test_scale_address_gates():
     assert out["embed"]["belt"] == 2
     assert out["triple"]["subject"] == "world"
     assert out["gate"]["frame"] in {"exact", "reconstructed", "abstained"}
-    assert out["field"]["backend"] in {"kuramoto", "fallback"}
+    assert out["field"]["backend"] == "kuramoto"
+    assert len(out["field"]["theta"]) == 3
+    assert all(np.isfinite(out["field"]["theta"]))
     assert out["scale"] == "belt/frame/residual"

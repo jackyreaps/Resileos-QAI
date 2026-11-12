@@ -13,31 +13,30 @@ from typing import Any
 
 import numpy as np
 
-from resileos.ui.residual_embed import address_triple, embed_frame
 from resileos.ui.scale_address import scale_address
 
-try:
-    from resileos.substrate.oscillator import KuramotoField
-    _HAS_KURAMOTO = True
-except ImportError:
-    KuramotoField = None
-    _HAS_KURAMOTO = False
+
+def _kuramoto_field():
+    try:
+        from resileos.substrate.oscillator import KuramotoField
+    except ImportError:
+        return None
+    return KuramotoField
 
 
 def field_from_embed(embed: dict[str, Any]) -> dict[str, Any]:
     """Drive a small Kuramoto field from the residual address, or a fallback."""
-    if _HAS_KURAMOTO and KuramotoField is not None:
+    KuramotoField = _kuramoto_field()
+    if KuramotoField is not None:
         # three oscillators, one per mask bit family
-        field = KuramotoField(n=3)
+        field = KuramotoField(3)
         theta0 = np.array([
             embed["mean_luma"] * np.pi,
             embed["edge_density"] * np.pi,
             (embed["belt"] % 3) * 0.5,
         ])
         field.theta = theta0
-        # one step if the method exists
-        if hasattr(field, "step"):
-            field.step()
+        field.step(epsilon=1.0)
         return {
             "backend": "kuramoto",
             "theta": [round(float(x), 4) for x in field.theta],
