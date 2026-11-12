@@ -386,6 +386,7 @@ class ChatRequest(BaseModel):
     force_class: str | None = None
     last_tool_empty: bool = False
     persona: str = "honest"
+    prose: bool = True
 
     def content(self) -> str:
         return (self.message or self.text or "").strip()
@@ -554,6 +555,7 @@ async def titanos_chat(payload: ChatRequest):
             force_class=payload.force_class,
             last_tool_empty=payload.last_tool_empty,
             persona=persona,
+            prose=bool(payload.prose),
         )
     except ValueError as e:
         raise HTTPException(400, str(e)) from e

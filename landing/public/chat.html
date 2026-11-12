@@ -160,7 +160,7 @@
             font-size: 0.8rem;
             color: var(--muted);
         }
-        .portal-card input, .settings-grid input, .history-user input, .action-card input, .action-card textarea, .action-card select {
+        .portal-card input, .settings-grid input, .settings-grid select, .history-user input, .action-card input, .action-card textarea, .action-card select {
             width: 100%;
             border: 1px solid var(--border);
             background: color-mix(in srgb, var(--bg) 86%, transparent);
@@ -443,8 +443,15 @@
         .chip.conflict, .chip.error, .chip.refused { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
         .chip.memory { color: var(--accent); }
         .bubble a { color: inherit; }
-        .raw-fold { margin-top: 8px; }
-        .raw-fold summary { cursor: pointer; color: var(--faint); font-size: 0.75rem; font-family: var(--mono); }
+        .raw-fold, .trace-fold { margin-top: 8px; }
+        .raw-fold summary, .trace-fold summary { cursor: pointer; color: var(--faint); font-size: 0.75rem; font-family: var(--mono); }
+        .trace-fold pre {
+            margin-top: 6px;
+            color: var(--faint);
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            white-space: pre-wrap;
+        }
         .panel {
             background: color-mix(in srgb, var(--panel) 94%, transparent);
             border-bottom: 1px solid var(--border);
@@ -790,6 +797,15 @@
             <label>Username
                 <input id="settings-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="Required to save chats" />
             </label>
+            <label>Persona
+                <select id="settings-persona">
+                    <option value="honest">Honest</option>
+                    <option value="guide">Guide</option>
+                    <option value="builder">Builder</option>
+                    <option value="mythic">Mythic</option>
+                </select>
+            </label>
+            <label class="check"><input id="settings-debug" type="checkbox" /> Show source, tools, and timing on the reply</label>
             <p class="settings-hint" id="key-mode"></p>
             <p class="settings-hint"><strong>Shared demo key, rate-limited</strong>. About 100 usernames. Leave the field as-is to use it, or paste your own key. An override stays in this browser only and is sent as <code>X-API-Key</code>. Choose a username before a conversation is saved. Clearing a paid key here is explicit. Switch user does not remove it.</p>
         </div>
@@ -863,6 +879,11 @@
         function apiKey() { return localStorage.getItem('resileos_api_key') || DEMO_API_KEY; }
         function usingDemoKey() { return apiKey() === DEMO_API_KEY; }
         function hubId() { return localStorage.getItem('resileos_hub_id') || 'anon'; }
+        function currentPersona() {
+            const saved = localStorage.getItem('resileos_persona') || 'honest';
+            return ['honest', 'guide', 'builder', 'mythic'].indexOf(saved) === -1 ? 'honest' : saved;
+        }
+        function debugReplies() { return localStorage.getItem('resileos_debug') === '1'; }
         function currentUsername() { return (localStorage.getItem('resileos_username') || '').trim(); }
         function validUsername(name) { return USERNAME_RE.test(name || ''); }
         function onlineLabel() {
@@ -895,6 +916,10 @@
             document.getElementById('settings-url').value = apiUrl();
             document.getElementById('settings-key').value = apiKey();
             document.getElementById('settings-hub').value = hubId();
+            const personaField = document.getElementById('settings-persona');
+            if (personaField) personaField.value = currentPersona();
+            const debugField = document.getElementById('settings-debug');
+            if (debugField) debugField.checked = debugReplies();
             syncUsernameFields();
             updateDemoLabel();
         }
@@ -978,6 +1003,12 @@
             if (hub !== prevHub) currentConversationId = null;
             const settingsName = document.getElementById('settings-username');
             if (settingsName) storeUsername(settingsName.value);
+            const personaField = document.getElementById('settings-persona');
+            if (personaField && ['honest', 'guide', 'builder', 'mythic'].indexOf(personaField.value) !== -1) {
+                localStorage.setItem('resileos_persona', personaField.value);
+            }
+            const debugField = document.getElementById('settings-debug');
+            if (debugField) localStorage.setItem('resileos_debug', debugField.checked ? '1' : '0');
             updateDemoLabel();
             fillPortal();
             checkReady();
@@ -1024,7 +1055,7 @@
             setHistoryNote('Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.');
             if (statusDot.classList.contains('online')) setStatus('online', onlineLabel());
         }
-        ['settings-url', 'settings-key', 'settings-hub', 'settings-username'].forEach(id => {
+        ['settings-url', 'settings-key', 'settings-hub', 'settings-username', 'settings-persona', 'settings-debug'].forEach(id => {
             const node = document.getElementById(id);
             if (node) node.addEventListener('change', saveSettings);
         });
@@ -1764,9 +1795,10 @@
             meta.className = 'meta';
             const status = (d && d.status) || '';
             const chip = d && d.chip;
+            const accepted = String(status).toLowerCase() === 'accepted';
             const kind = d && d.message_kind;
-            if (kind) meta.appendChild(chipEl(kindLabel(kind), kindClass(kind)));
-            if (status) meta.appendChild(chipEl(badgeLabel(status), statusKind(status)));
+            if (kind && !accepted) meta.appendChild(chipEl(kindLabel(kind), kindClass(kind)));
+            if (status && !accepted) meta.appendChild(chipEl(badgeLabel(status), statusKind(status)));
             if (chip && String(chip).toLowerCase() !== String(status).toLowerCase()) meta.appendChild(chipEl(chip, chip));
             if (d && d.memory_chip) meta.appendChild(chipEl('remembered', 'memory'));
             const notes = [];
@@ -1778,8 +1810,19 @@
                 notes.push('tools: ' + d.tool_calls.map(t => t.tool || t.name).join(', '));
             }
             if (typeof options.ms === 'number') notes.push(Math.round(options.ms) + ' ms');
-            if (notes.length) meta.appendChild(document.createTextNode(notes.join(' · ')));
+            if (debugReplies() && notes.length) meta.appendChild(document.createTextNode(notes.join(' · ')));
             if (meta.childNodes.length) bubble.appendChild(meta);
+            if (notes.length) {
+                const fold = document.createElement('details');
+                fold.className = 'trace-fold';
+                if (debugReplies()) fold.open = true;
+                const summary = document.createElement('summary');
+                summary.textContent = 'Details';
+                const pre = document.createElement('pre');
+                pre.textContent = notes.join('\n');
+                fold.append(summary, pre);
+                bubble.appendChild(fold);
+            }
             if (text && companion) extraLine(bubble, companion, 'companion');
             if (tutorial) {
                 extraLine(bubble, tutorial, 'tutorial');
@@ -2376,7 +2419,8 @@
                             history: chatHistory,
                             hub_id: hubId(),
                             last_tool_empty: lastToolEmpty,
-                            persona: 'honest'
+                            persona: currentPersona(),
+                            prose: true
                         })
                       };
                 const r = await fetch(`${apiUrl()}${endpoint}`, fetchOptions);

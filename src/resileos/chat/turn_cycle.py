@@ -34,12 +34,15 @@ UNVERIFIED_WRITE = (
 
 ORIENTATION = {
     "honest": (
-        'I will not invent a fact for this. Teach one with "remember that…", '
-        "attach a document, or ask a stored subject and relation."
+        "Checking the record… I will not invent a fact for this. "
+        'Teach one with "remember that…", attach a document, or ask a stored subject and relation.'
     ),
-    "guide": "We can teach a fact, recall one, or abstain. I will not fill a gap with a guess.",
-    "builder": "Teach a row, ask one, or run a tool. This turn adds no fact.",
-    "mythic": "I hear you. Nothing unstored will be stated as a fact.",
+    "guide": (
+        "Checking the record… We can teach a fact, recall one, or abstain. "
+        "I will not fill a gap with a guess."
+    ),
+    "builder": "Checking the record… Teach a row, ask one, or run a tool. This turn adds no fact.",
+    "mythic": "Checking the record… I hear you. Nothing unstored will be stated as a fact.",
 }
 
 _FOLLOW = re.compile(r"(?i)^(?:and|also|what about|how about)\s+(.+?)\s*\??$")

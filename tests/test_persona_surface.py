@@ -86,7 +86,8 @@ def test_chat_five_outcomes_and_ledger(client, open_api):
     assert soft_body["mouth_open"] is True
     assert soft_body["message_kind"] == "mouth"
     assert soft_body["status"] == "ACCEPTED"
-    assert "won't assert" in soft_body["reply_text"].lower()
+    assert "with you" in soft_body["reply_text"].lower()
+    assert soft_body["factual_mouth"] is False
     assert "sky" not in soft_body["reply_text"]
     assert "exact_answers" not in soft_body["reply_text"]
 
