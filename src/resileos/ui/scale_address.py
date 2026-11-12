@@ -11,20 +11,22 @@ placeholder until the suite residual is coded. The shape is stable.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
+from resileos.ui.core_bridge import core_step_from_address, search_from_field
 from resileos.ui.framework_gate import gate_candidate
 from resileos.ui.residual_embed import address_triple, embed_frame
-from resileos.ui.core_bridge import core_step_from_address, search_from_field
 
-try:
-    from resileos.substrate.oscillator import KuramotoField
-    _HAS_KURAMOTO = True
-except ImportError:
-    KuramotoField = None
-    _HAS_KURAMOTO = False
+
+def _kuramoto_field():
+    """Import after package init. A module-level import is circular."""
+    try:
+        from resileos.substrate.oscillator import KuramotoField
+    except ImportError:
+        return None
+    return KuramotoField
 
 
 def persona_phase(persona: str) -> float:
@@ -35,13 +37,13 @@ def persona_phase(persona: str) -> float:
 
 
 def scale_address(
-    arr: Optional[np.ndarray] = None,
+    arr: np.ndarray | None = None,
     *,
     belt: int = 0,
     frame: int = 0,
     persona: str = "",
     subject: str = "state",
-    stored: Optional[list[dict[str, str]]] = None,
+    stored: list[dict[str, str]] | None = None,
     eat_accepted: bool = False,
 ) -> dict[str, Any]:
     """One address for a frame, a fact, or a world state.
@@ -58,11 +60,11 @@ def scale_address(
         (belt % 3) * 0.5,
     ]
     backend = "fallback"
-    if _HAS_KURAMOTO and KuramotoField is not None:
-        field = KuramotoField(n=3)
-        field.theta = np.array(theta)
-        if hasattr(field, "step"):
-            field.step()
+    KuramotoField = _kuramoto_field()
+    if KuramotoField is not None:
+        field = KuramotoField(3)
+        field.theta = np.asarray(theta, dtype=float)
+        field.step(epsilon=1.0)
         theta = [float(x) for x in field.theta]
         backend = "kuramoto"
     triple = address_triple(embed, subject=subject)

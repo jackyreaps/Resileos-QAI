@@ -33,12 +33,11 @@ behavior (Titanos converges when confident, explores when uncertain).
 """
 from __future__ import annotations
 
-from typing import Optional
+import math
 
 import numpy as np
 
 from ..state_dtype import state_dtype
-
 
 PHI = (1.0 + np.sqrt(5.0)) / 2.0
 
@@ -172,9 +171,9 @@ class KuramotoField:
         gain = self.kappa / (self.alpha + float(epsilon))
         return self.omega + gain * coupling
 
-    def velocity(self, theta: Optional[np.ndarray] = None,
+    def velocity(self, theta: np.ndarray | None = None,
                  epsilon: float = 0.0,
-                 W: Optional[np.ndarray] = None) -> np.ndarray:
+                 W: np.ndarray | None = None) -> np.ndarray:
         """
         Public wrapper for the phase velocity dtheta/dt.
 
@@ -200,8 +199,8 @@ class KuramotoField:
                 f"W shape {W.shape} != ({self.r}, {self.r})")
         return self._dtheta(theta, epsilon, W)
 
-    def step(self, epsilon: float, W: Optional[np.ndarray] = None,
-             dt: Optional[float] = None) -> np.ndarray:
+    def step(self, epsilon: float, W: np.ndarray | None = None,
+             dt: float | None = None) -> np.ndarray:
         """
         Advance the field by one RK4 step. Returns the new theta.
 
@@ -210,22 +209,46 @@ class KuramotoField:
         no coupling (each oscillator rotates at its own omega_i).
         """
         dt = self.dt if dt is None else float(dt)
+        if dt <= 0.0:
+            raise ValueError("dt must be > 0")
         if W is None:
             W = empty_coupling(self.r)
-        W = np.asarray(W, dtype=state_dtype())
+        W = np.asarray(W)
         if W.shape != (self.r, self.r):
             raise ValueError(
                 f"W shape {W.shape} != ({self.r}, {self.r})")
 
-        theta = self.theta
-        k1 = self._dtheta(theta, epsilon, W)
-        k2 = self._dtheta(theta + 0.5 * dt * k1, epsilon, W)
-        k3 = self._dtheta(theta + 0.5 * dt * k2, epsilon, W)
-        k4 = self._dtheta(theta + dt * k3, epsilon, W)
-        new_theta = theta + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        # One RK4 step of the documented ODE is exact when W is zero.
+        # Under strong coupling the same dt moves phases by many radians
+        # and the field does not lock. Subdivide only that case.
+        gain = abs(self.kappa / (self.alpha + float(epsilon)))
+        row = float(np.max(np.sum(np.abs(W), axis=1))) if self.r else 0.0
+        max_phase = 0.2
+        nsub = 1
+        if gain * row * dt > max_phase:
+            nsub = int(math.ceil((gain * row * dt) / max_phase))
+            nsub = max(1, min(nsub, 20000))
 
-        # Wrap to [-pi, pi] to keep exp(i*theta) numerically clean.
-        self.theta = ((new_theta + np.pi) % (2.0 * np.pi)) - np.pi
+        def _rk4(theta: np.ndarray, h: float, coupling: np.ndarray) -> np.ndarray:
+            k1 = self._dtheta(theta, epsilon, coupling)
+            k2 = self._dtheta(theta + 0.5 * h * k1, epsilon, coupling)
+            k3 = self._dtheta(theta + 0.5 * h * k2, epsilon, coupling)
+            k4 = self._dtheta(theta + h * k3, epsilon, coupling)
+            return theta + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+        def _wrap(theta: np.ndarray) -> np.ndarray:
+            return ((theta + np.pi) % (2.0 * np.pi)) - np.pi
+
+        if nsub == 1:
+            theta = _wrap(_rk4(self.theta, dt, np.asarray(W, dtype=state_dtype())))
+            self.theta = np.asarray(theta, dtype=state_dtype())
+        else:
+            theta = np.asarray(self.theta, dtype=np.float64)
+            coupling = np.asarray(W, dtype=np.float64)
+            h = dt / nsub
+            for _ in range(nsub):
+                theta = _wrap(_rk4(theta, h, coupling))
+            self.theta = np.asarray(theta, dtype=state_dtype())
         self._last_epsilon = float(epsilon)
         return self.theta.copy()
 

@@ -25,7 +25,7 @@ def init_shared() -> dict[str, Any]:
         _SHARED["core"] = None
     try:
         from resileos.substrate.oscillator import KuramotoField
-        _SHARED["field"] = KuramotoField(n=3)
+        _SHARED["field"] = KuramotoField(3)
     except Exception:
         _SHARED["field"] = None
     try:

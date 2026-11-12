@@ -149,6 +149,35 @@ def test_update_many_matches_sequential():
 
 
 # ── decay ───────────────────────────────────────────────────────────────
+def test_entropy_is_squared_norm_of_the_sum():
+    dim = 8
+    first = np.zeros(dim, dtype=np.complex128)
+    second = np.zeros(dim, dtype=np.complex128)
+    first[0] = 1.0
+    second[1] = 1.0
+    st = StreamState(StreamStateConfig(dim=dim, decay=1.0))
+    st.update(_packet(hv=first, level=1, dim=dim))
+    assert st.entropy() == pytest.approx(1.0)
+    assert abs(float(np.linalg.norm(st.readout())) - 1.0) < 1e-9
+    st.update(_packet(hv=second, level=1, dim=dim))
+    assert st.entropy() == pytest.approx(2.0)
+    expected = (first + second) / np.sqrt(2.0)
+    assert np.allclose(st.readout(), expected)
+
+
+def test_entropy_survives_save(tmp_path):
+    st = StreamState(StreamStateConfig(dim=8, decay=1.0))
+    hv = np.zeros(8, dtype=np.complex128)
+    hv[0] = 1.0
+    st.update(_packet(hv=hv, dim=8))
+    st.update(_packet(hv=hv, dim=8))
+    path = tmp_path / "state.npz"
+    st.save(path)
+    loaded = StreamState.load(path)
+    assert loaded.entropy() == pytest.approx(st.entropy())
+    assert loaded.entropy() == pytest.approx(4.0)
+
+
 def test_decay_1_entropy_grows_with_packets():
     st = StreamState(StreamStateConfig(dim=256, decay=1.0))
     rng = np.random.default_rng(0)
