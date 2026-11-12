@@ -1062,6 +1062,7 @@ from resileos.chat.ledger import (  # noqa: E402
     edit_user_triple,
     list_user_ledger,
 )
+from resileos.chat.conversations import register_conversation_routes  # noqa: E402
 from resileos.studio.routes import register_studio_routes  # noqa: E402
 from resileos.ui.routes import register_ui_routes  # noqa: E402
 
@@ -1136,6 +1137,18 @@ def hub_ledger_delete(
     return ledger
 
 
+async def conversation_key_id(
+    api_key: str | None = Depends(_api_key_header),
+) -> str:
+    """Auth for conversation routes. Returns the key hash, never the key."""
+    await verify_api_key(api_key)
+    if api_key and api_key.strip():
+        return _hash_key(api_key.strip())
+    if _AUTH_BYPASS:
+        return "auth-bypass"
+    raise HTTPException(status_code=401, detail="missing X-API-Key header")
+
+
 def _mount_surfaces() -> None:
     register_studio_routes(app, verify_api_key)
     register_ui_routes(
@@ -1144,6 +1157,7 @@ def _mount_surfaces() -> None:
         get_titanos=lambda: titanos_singleton,
         save=_save_titanos,
     )
+    register_conversation_routes(app, conversation_key_id)
 
 
 _mount_surfaces()

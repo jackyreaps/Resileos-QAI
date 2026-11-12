@@ -210,10 +210,14 @@ def create_checkout(body: CheckoutRequest) -> dict:
             503,
             detail=f"Missing {price_env}. Create the Stripe Price and set the env var.",
         )
-    success = os.getenv(
-        "STRIPE_SUCCESS_URL",
-        os.getenv("RESILEOS_SITE_URL", "http://127.0.0.1:8787") + "/?checkout=success",
-    )
+    success = os.getenv("STRIPE_SUCCESS_URL", "").strip()
+    site = os.getenv("RESILEOS_SITE_URL", "http://127.0.0.1:8787").rstrip("/")
+    if not success:
+        success = site + "/chat?checkout=success"
+    elif "resileosai.fun" in success and "/chat" not in success.split("?", 1)[0]:
+        origin = site if "resileosai.fun" in site else "https://resileosai.fun"
+        success = origin.rstrip("/") + "/chat?checkout=success"
+    joiner = "&" if "?" in success else "?"
     cancel = os.getenv(
         "STRIPE_CANCEL_URL",
         os.getenv("RESILEOS_SITE_URL", "http://127.0.0.1:8787") + "/#pricing",
@@ -222,7 +226,7 @@ def create_checkout(body: CheckoutRequest) -> dict:
         session = stripe.checkout.Session.create(
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success + "&session_id={CHECKOUT_SESSION_ID}",
+            success_url=success + joiner + "session_id={CHECKOUT_SESSION_ID}",
             cancel_url=cancel,
             customer_email=str(body.email) if body.email else None,
             metadata={"plan": body.plan},

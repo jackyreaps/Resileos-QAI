@@ -75,7 +75,7 @@ test-mode key when you are working locally.
 export API_KEYS_PATH=./data/api_keys.json
 export RESILEOS_API_BASE_URL=http://127.0.0.1:8000/api/v1
 export RESILEOS_SITE_URL=http://127.0.0.1:8787
-export STRIPE_SUCCESS_URL=http://127.0.0.1:8787/?checkout=success
+export STRIPE_SUCCESS_URL=http://127.0.0.1:8787/chat?checkout=success
 export STRIPE_CANCEL_URL=http://127.0.0.1:8787/#pricing
 # also export STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, and STRIPE_PRICE_*
 uvicorn api.server:app --app-dir . --host 127.0.0.1 --port 8787 --reload

@@ -89,21 +89,38 @@
       msg.textContent = "Key issued. Copy it now — shown once.";
       msg.className = "msg ok";
       reveal.classList.add("show");
-      reveal.innerHTML =
-        "<div><strong>X-API-Key</strong></div>" +
-        "<div>" +
-        data.api_key +
-        "</div>" +
-        "<div style='margin-top:8px'><strong>Base URL</strong></div>" +
-        "<div>" +
-        data.base_url +
-        "</div>" +
-        "<div style='margin-top:8px;color:#8b97b0'>" +
-        (data.note || "") +
-        "</div>" +
-        "<div style='margin-top:8px;color:#f0b429'>demo_namespace: " +
-        (data.demo_namespace || "coming_soon") +
-        "</div>";
+      reveal.replaceChildren();
+      const keyLabel = document.createElement("div");
+      const keyStrong = document.createElement("strong");
+      keyStrong.textContent = "X-API-Key";
+      keyLabel.appendChild(keyStrong);
+      const keyLine = document.createElement("div");
+      keyLine.textContent = data.api_key || "";
+      const baseLabel = document.createElement("div");
+      baseLabel.style.marginTop = "8px";
+      const baseStrong = document.createElement("strong");
+      baseStrong.textContent = "Base URL";
+      baseLabel.appendChild(baseStrong);
+      const baseLine = document.createElement("div");
+      baseLine.textContent = data.base_url || "";
+      const note = document.createElement("div");
+      note.style.marginTop = "8px";
+      note.style.color = "#8b97b0";
+      note.textContent = data.note || "";
+      const demo = document.createElement("div");
+      demo.style.marginTop = "8px";
+      demo.style.color = "#f0b429";
+      demo.textContent = "demo_namespace: " + (data.demo_namespace || "coming_soon");
+      const open = document.createElement("a");
+      open.href = "/chat";
+      open.className = "btn btn-primary";
+      open.style.marginTop = "12px";
+      open.textContent = "Open chat";
+      reveal.append(keyLabel, keyLine, baseLabel, baseLine, note, demo, open);
+      try {
+        if (data.api_key) localStorage.setItem("resileos_api_key", data.api_key);
+        if (data.base_url) localStorage.setItem("resileos_api_url", data.base_url);
+      } catch (err) { /* the key is still on the page once */ }
       // Prefer server-provided curls if present
       if (data.quickstart) {
         if (data.quickstart.learn)
@@ -177,15 +194,23 @@
             box.className = "msg err";
             return;
           }
-          box.className = "msg ok";
-          box.innerHTML =
-            "Paid key ready. Copy now:<br><code>" +
-            data.api_key +
-            "</code><br>Base: " +
-            data.base_url;
-          reveal.classList.add("show");
-          reveal.textContent = data.api_key;
-          document.getElementById("start")?.scrollIntoView({ behavior: "smooth" });
+          try {
+            if (data.api_key) localStorage.setItem("resileos_api_key", data.api_key);
+            if (data.base_url) localStorage.setItem("resileos_api_url", data.base_url);
+          } catch (err) {
+            box.className = "msg err";
+            box.replaceChildren();
+            const line = document.createElement("div");
+            line.textContent = "This browser could not store the paid key. Copy it, then open chat.";
+            const code = document.createElement("code");
+            code.textContent = data.api_key || "";
+            const open = document.createElement("a");
+            open.href = "/chat";
+            open.textContent = "Open chat";
+            box.append(line, document.createElement("br"), code, document.createElement("br"), open);
+            return;
+          }
+          window.location.assign("/chat");
         })
         .catch(() => {
           box.textContent = "Claim failed — webhook may still be processing.";

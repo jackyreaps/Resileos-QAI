@@ -934,3 +934,75 @@ html.lenis, html.lenis body { height: auto; }
   .nav-links a:not(.nav-cta)::after { transition: none; }
   .card::after, .pantheon-card::after, .price-card::after { transition: none; }
 }
+
+/* Sculpture blend: soften hard crops into the page ground */
+.hero-figure,
+.titanos-figure,
+.patron-photo,
+.pantheon-card .frame,
+.demi-card .frame {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(90% 70% at 50% 38%, rgba(91, 140, 255, .16), transparent 62%),
+    radial-gradient(70% 50% at 72% 78%, rgba(139, 108, 255, .12), transparent 64%),
+    #06080e;
+  border-color: transparent;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, .32),
+    inset 0 0 0 1px rgba(238, 242, 251, .05);
+}
+.hero-figure img,
+.titanos-figure img,
+.patron-photo img,
+.pantheon-card .frame img,
+.demi-card .frame img {
+  position: relative;
+  z-index: 1;
+  -webkit-mask-image: radial-gradient(ellipse 84% 78% at 50% 42%, #000 58%, transparent 100%);
+  mask-image: radial-gradient(ellipse 84% 78% at 50% 42%, #000 58%, transparent 100%);
+  filter: saturate(.94) contrast(1.04) brightness(1.02);
+}
+.hero-figure::before,
+.titanos-figure::before,
+.patron-photo::before,
+.pantheon-card .frame::before,
+.demi-card .frame::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 14% 16% 18%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(91, 140, 255, .34), rgba(139, 108, 255, .1) 58%, transparent 76%);
+  filter: blur(14px);
+}
+.titanos-figure img {
+  -webkit-mask-image: radial-gradient(ellipse 92% 80% at 50% 46%, #000 56%, transparent 100%);
+  mask-image: radial-gradient(ellipse 92% 80% at 50% 46%, #000 56%, transparent 100%);
+}
+.hero-figure::after,
+.titanos-figure::after,
+.patron-photo::after,
+.pantheon-card .frame::after,
+.demi-card .frame::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(238, 242, 251, .06), transparent 22%, rgba(6, 8, 14, .2) 100%),
+    radial-gradient(120% 80% at 50% 100%, rgba(6, 8, 14, .5), transparent 58%);
+}
+.img-hover:hover img {
+  filter: saturate(1) contrast(1.05) brightness(1.06);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-figure img,
+  .titanos-figure img,
+  .patron-photo img,
+  .pantheon-card .frame img,
+  .demi-card .frame img {
+    filter: none;
+  }
+}
