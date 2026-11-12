@@ -12,7 +12,7 @@ Read of Kin, demi-gods, Hermes paths, legions, swarms, and the studio / chat / m
 
 This is a code reading. It does not claim a production video path, a photograph metric, or a comparison with another model. Digit-study PSNR in the studio research note is an 8×8 digits figure. It is not photo quality and it is not video quality.
 
-Base for the reading: `main` at `531595ca` (squash-merged PR #25 at `b1220370`, PR #26 at `531595ca`). Open PR #27 (inter-frame residual phase step) was read as context and is not in this change. `src/resileos/ui/residual_frame.py` is not on this branch.
+Base for the reading: `main` now includes squash-merged PR #25 at `b1220370`, PR #26 at `531595ca`, and PR #27 at `a640101`. `src/resileos/ui/residual_frame.py` is on this tree. The shell findings below are otherwise unchanged.
 
 ## What this change wired
 
@@ -36,8 +36,8 @@ Samples stay candidates. No visual path calls `learn`.
 | Rheology coordinates and the canonical metric-bridge head | `NotImplementedError` by design until the coordinate system in RES-601 is derived. Not a studio shell. |
 | External samplers and video providers | Slots stay off. Unconfigured calls return unavailable and do not invent a URL. Higgsfield, Seedance, ComfyUI, OpenAI, Kapwing, vidful.ai, aifreevideo.com, and Stable Video Diffusion are not wired. Official SVD weights are research-licensed and are not a path for this product. |
 | A residual-gated video page | Documented under "Video surface" below. Not built. |
-| Clip-level temporal residual tracking | The next change after this inventory. See the last section. |
-| PR #27 | Open. Its files are not copied here. |
+| Clip-level temporal residual tracking | The next change after this inventory. See the last section. This pull request does not start it. |
+| PR #27 | Squash-merged to `main` at `a640101`. `src/resileos/ui/residual_frame.py` is on this tree. |
 
 ## Residual core and packets
 
@@ -155,12 +155,12 @@ This inventory does not build that page, and it does not copy another product's 
 
 ## Open work and the next change
 
-PR #27 is open. It treats inter-frame motion as a phase step on the residual cascade. This branch does not contain that work.
+PR #27 is on `main` at `a640101`. It treats inter-frame motion as a residual phase step (`src/resileos/ui/residual_frame.py`). This branch includes that commit.
 
-The change after this inventory is clip-level temporal residual tracking, not another pass over the shells above:
+The change after this inventory is still clip-level temporal residual tracking, not another pass over the shells above:
 
 - Frame 0 is a base packet.
 - Each later frame is the residual of that frame against the previous reconstruction.
 - Iris and Hades gain a JSONL record of that residual path.
 
-That work should merge `main` with a merge commit if it needs to catch up. It should not copy PR #27's files in ahead of review, and it should not force-push.
+That work is a later pull request. This one does not add it.
