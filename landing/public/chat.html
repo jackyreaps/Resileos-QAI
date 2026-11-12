@@ -97,7 +97,68 @@
         }
         .btn-icon:hover { background: var(--bg); color: var(--text); }
         .btn-icon[aria-pressed="true"] { color: var(--accent); background: var(--chip-bg); }
-        #chat { flex: 1; overflow-y: auto; padding: 28px 16px 16px; display: flex; flex-direction: column; gap: 20px; }
+        .header { flex-shrink: 0; }
+        .workspace {
+            flex: 1; min-height: 0; display: flex; position: relative; overflow: hidden;
+        }
+        .chat-column {
+            flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+        }
+        #chat {
+            flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+            padding: 28px 16px 16px; display: flex; flex-direction: column; gap: 20px;
+        }
+        .input-wrap { flex-shrink: 0; }
+        .history {
+            position: absolute; top: 0; bottom: 0; left: 0; z-index: 6;
+            width: min(320px, 88vw);
+            transform: translateX(-105%);
+            transition: transform .32s cubic-bezier(.2, .7, .2, 1);
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            box-shadow: 16px 0 40px rgba(0, 0, 0, .18);
+            display: flex; flex-direction: column; min-height: 0;
+        }
+        .history.open { transform: translateX(0); }
+        .history-scrim {
+            position: absolute; inset: 0; z-index: 5; border: 0; padding: 0;
+            background: rgba(6, 8, 14, .38); cursor: pointer;
+        }
+        .history-scrim[hidden] { display: none; }
+        .history-head {
+            flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; padding: 14px 14px 8px;
+        }
+        .history-head h2 { font-family: var(--display); font-size: 1.25rem; font-weight: 400; }
+        .history-new, .history-save {
+            background: var(--accent); color: #fff; border: none; border-radius: 8px;
+            padding: 6px 10px; cursor: pointer; font-size: 0.8rem; font-family: var(--font);
+        }
+        .history-new:hover, .history-save:hover { background: var(--accent-hover); }
+        .history-user { flex-shrink: 0; display: grid; gap: 8px; padding: 0 14px 8px; }
+        .history-user label { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
+        .history-user input {
+            border: 1px solid var(--border); background: var(--bg); color: var(--text);
+            border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; font-family: var(--font);
+        }
+        .history-user input:focus { outline: none; border-color: var(--accent); }
+        .history-list {
+            flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+            padding: 4px 10px 16px; display: flex; flex-direction: column; gap: 6px;
+        }
+        .history-item {
+            text-align: left; width: 100%; border: 1px solid var(--border); background: var(--bg);
+            color: var(--text); border-radius: 10px; padding: 8px 10px; cursor: pointer;
+            font-family: var(--font); display: grid; gap: 2px;
+        }
+        .history-item:hover, .history-item.active { border-color: var(--accent); }
+        .history-title { font-size: 0.88rem; }
+        .history-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); }
+        .history-empty { color: var(--muted); font-size: 0.82rem; padding: 8px 4px; }
+        #history-note { padding: 0 14px 8px; flex-shrink: 0; }
+        @media (prefers-reduced-motion: reduce) {
+            .history { transition: none; }
+        }
         .msg-row { display: flex; gap: 14px; max-width: 768px; margin: 0 auto; width: 100%; }
         .msg-row.user { justify-content: flex-end; }
         .avatar {
@@ -181,6 +242,7 @@
         }
         button.send:disabled { background: #999; cursor: not-allowed; }
         .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; max-width: 640px; margin-left: auto; margin-right: auto; }
+        .suggestions[hidden] { display: none; }
         .suggestion {
             background: var(--panel); border: 1px solid var(--border); padding: 10px 16px;
             border-radius: 10px; font-size: 0.88rem; cursor: pointer; color: var(--text);
@@ -193,6 +255,13 @@
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
         pre { background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; border: 1px solid var(--border); font-family: var(--mono); white-space: pre-wrap; }
         .file-chip { font-size: 0.8rem; color: var(--muted); padding: 0 8px 8px; }
+        .history-user input[type="text"],
+        .settings-grid input[type="text"],
+        .settings-grid input[type="password"] {
+            flex: none; width: 100%;
+            border: 1px solid var(--border); background: var(--bg); color: var(--text);
+            border-radius: 8px; padding: 8px 10px; font-size: 0.95rem;
+        }
     </style>
 </head>
 <body>
@@ -202,6 +271,9 @@
             <div class="status"><div class="dot connecting" id="status"></div><span id="status-label">Connecting</span></div>
         </div>
         <div class="header-actions">
+            <button class="btn-icon" id="btn-history" type="button" onclick="toggleHistory()" title="Conversations" aria-pressed="false" aria-expanded="false" aria-controls="history-panel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="15" y2="18"></line></svg>
+            </button>
             <button class="btn-icon" id="btn-tools" onclick="toggleTools()" title="Tools" aria-pressed="false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
             </button>
@@ -229,6 +301,23 @@
         </div>
     </div>
 
+    <div class="workspace">
+    <aside id="history-panel" class="history" aria-hidden="true" aria-label="Conversation history">
+        <div class="history-head">
+            <h2>Conversations</h2>
+            <button type="button" class="history-new" id="history-new">New</button>
+        </div>
+        <form id="history-user-form" class="history-user">
+            <label>Username
+                <input id="history-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="ada" />
+            </label>
+            <button type="submit" class="history-save">Use this name</button>
+        </form>
+        <p class="settings-hint" id="history-note">Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.</p>
+        <div id="history-list" class="history-list"></div>
+    </aside>
+    <button type="button" class="history-scrim" id="history-scrim" hidden aria-label="Close conversations"></button>
+    <div class="chat-column">
     <div id="tools-panel" class="panel">
         <p class="panel-intro">Every tool from GET /tools, including harness tools. Edit the JSON and run it against POST /tools/{name}.</p>
         <div id="tools-list" class="panel-grid"></div>
@@ -274,13 +363,16 @@
             <label>Hub id
                 <input id="settings-hub" type="text" autocomplete="off" spellcheck="false" />
             </label>
+            <label>Username
+                <input id="settings-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="Choose a name to save chats" />
+            </label>
             <p class="settings-hint" id="key-mode"></p>
-            <p class="settings-hint"><strong>Shared demo key, rate-limited</strong>. Leave the field as-is to use it, or paste your own key. An override stays in this browser only and is sent as <code>X-API-Key</code>.</p>
+            <p class="settings-hint"><strong>Shared demo key, rate-limited</strong>. About 100 usernames. Leave the field as-is to use it, or paste your own key. An override stays in this browser only and is sent as <code>X-API-Key</code>. Choose a username before a conversation is saved.</p>
         </div>
     </div>
 
     <div id="chat">
-        <div class="msg-row bot">
+        <div class="msg-row bot" data-welcome="1">
             <div class="avatar bot">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
             </div>
@@ -309,6 +401,8 @@
         </div>
     </div>
     <div id="file-chip" class="file-chip" hidden></div>
+    </div>
+    </div>
 
     <script>
         const DEFAULT_API_URL = "https://api.resileosai.fun/api/v1";
@@ -342,30 +436,76 @@
         function apiKey() { return localStorage.getItem('resileos_api_key') || DEMO_API_KEY; }
         function usingDemoKey() { return apiKey() === DEMO_API_KEY; }
         function hubId() { return localStorage.getItem('resileos_hub_id') || 'anon'; }
+        function currentUsername() { return (localStorage.getItem('resileos_username') || '').trim(); }
+        function validUsername(name) { return /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/.test(name || ''); }
+        function onlineLabel() {
+            const base = usingDemoKey() ? 'Online · demo key' : 'Online';
+            const name = currentUsername();
+            return name ? base + ' · ' + name : base;
+        }
 
         function updateDemoLabel() {
             const el = document.getElementById('key-mode');
-            if (el) el.textContent = usingDemoKey() ? 'Shared demo key, rate-limited' : 'Using your own key stored in this browser.';
+            if (el) el.textContent = usingDemoKey()
+                ? 'Shared demo key, rate-limited. About 100 usernames.'
+                : 'Using your own key stored in this browser.';
+        }
+        function syncUsernameFields(name) {
+            const value = name === undefined ? currentUsername() : name;
+            const historyName = document.getElementById('history-username');
+            const settingsName = document.getElementById('settings-username');
+            if (historyName && document.activeElement !== historyName) historyName.value = value;
+            if (settingsName && document.activeElement !== settingsName) settingsName.value = value;
         }
         function fillSettings() {
             document.getElementById('settings-url').value = apiUrl();
             document.getElementById('settings-key').value = apiKey();
             document.getElementById('settings-hub').value = hubId();
+            syncUsernameFields();
             updateDemoLabel();
+        }
+        function storeUsername(raw) {
+            const name = (raw || '').trim();
+            if (!name) {
+                localStorage.removeItem('resileos_username');
+                syncUsernameFields('');
+                setHistoryNote('Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.');
+                refreshHistory();
+                return false;
+            }
+            if (!validUsername(name)) {
+                setHistoryNote('Use 2–32 letters, digits, underscores, or hyphens.');
+                return false;
+            }
+            const changed = name !== currentUsername();
+            localStorage.setItem('resileos_username', name);
+            syncUsernameFields(name);
+            setHistoryNote('Saving conversations for ' + name + ' on hub ' + hubId() + '.');
+            if (changed) currentConversationId = null;
+            if (snapshotThread().length) schedulePersist();
+            refreshHistory();
+            if (statusDot.classList.contains('online')) setStatus('online', onlineLabel());
+            return true;
         }
         function saveSettings() {
             const url = document.getElementById('settings-url').value.trim() || DEFAULT_API_URL;
             const key = document.getElementById('settings-key').value.trim();
             const hub = document.getElementById('settings-hub').value.trim() || 'anon';
+            const prevHub = hubId();
             localStorage.setItem('resileos_api_url', url);
             if (!key || key === DEMO_API_KEY) localStorage.removeItem('resileos_api_key');
             else localStorage.setItem('resileos_api_key', key);
             localStorage.setItem('resileos_hub_id', hub);
+            if (hub !== prevHub) currentConversationId = null;
+            const settingsName = document.getElementById('settings-username');
+            if (settingsName) storeUsername(settingsName.value);
             updateDemoLabel();
             checkReady();
+            refreshHistory();
         }
-        ['settings-url', 'settings-key', 'settings-hub'].forEach(id => {
-            document.getElementById(id).addEventListener('change', saveSettings);
+        ['settings-url', 'settings-key', 'settings-hub', 'settings-username'].forEach(id => {
+            const node = document.getElementById(id);
+            if (node) node.addEventListener('change', saveSettings);
         });
         fillSettings();
 
@@ -386,7 +526,7 @@
             setStatus('connecting', 'Connecting');
             fetch(`${apiUrl()}/ready`).then(r => {
                 if (r.ok) {
-                    setStatus('online', usingDemoKey() ? 'Online · demo key' : 'Online');
+                    setStatus('online', onlineLabel());
                 } else {
                     setStatus('offline', 'API not ready');
                 }
@@ -772,7 +912,13 @@
 
         function hideSuggestions() {
             const el = document.getElementById('suggestions');
-            if (el) el.remove();
+            if (el) el.hidden = true;
+        }
+        function showSuggestions() {
+            const el = document.getElementById('suggestions');
+            if (!el) return;
+            el.hidden = false;
+            chat.appendChild(el);
         }
         document.getElementById('suggestions').addEventListener('click', (ev) => {
             const item = ev.target.closest('.suggestion');
@@ -862,6 +1008,7 @@
                 if (slot) slot.textContent = d.tutorial_fragment;
                 refreshCompanion();
             }
+            schedulePersist();
         }
 
         async function runEndpoint(label, method, path, body) {
@@ -892,6 +1039,7 @@
                         bubble.appendChild(note);
                     }
                 }
+                schedulePersist();
                 if (d && d.persona && d.steps) applyCompanion(d);
                 const step = tutorialStepFor(method, path, d);
                 if (step) postTutorialStep(step);
@@ -960,6 +1108,7 @@
                     }
                     bubble.appendChild(row);
                 });
+                schedulePersist();
             } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'No checkpoints endpoint.' }); }
         }
 
@@ -1002,6 +1151,7 @@
                 const pre = document.createElement('pre');
                 pre.textContent = JSON.stringify(d, null, 2);
                 bubble.appendChild(pre);
+                schedulePersist();
             } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Tool ' + name + ' failed.' }); }
         }
 
@@ -1014,6 +1164,318 @@
                 return typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
             }
             return 'Request failed (' + r.status + ')';
+        }
+
+        const historyPanel = document.getElementById('history-panel');
+        const historyList = document.getElementById('history-list');
+        const historyScrim = document.getElementById('history-scrim');
+        const historyButton = document.getElementById('btn-history');
+        let currentConversationId = null;
+        let persistTimer = null;
+        let suppressPersist = false;
+        let historyOpen = false;
+
+        function setHistoryNote(text) {
+            const note = document.getElementById('history-note');
+            if (note) note.textContent = text;
+        }
+        function cacheStorageKey() {
+            const name = currentUsername();
+            if (!validUsername(name)) return '';
+            return 'resileos_chat_cache:' + name + ':' + hubId();
+        }
+        function readCache() {
+            const key = cacheStorageKey();
+            if (!key) return { conversations: {} };
+            try {
+                const parsed = JSON.parse(localStorage.getItem(key) || '');
+                if (parsed && parsed.conversations) return parsed;
+            } catch (err) { /* cache is optional */ }
+            return { conversations: {} };
+        }
+        function writeCache(data) {
+            const key = cacheStorageKey();
+            if (!key) return;
+            try { localStorage.setItem(key, JSON.stringify(data)); } catch (err) { /* cache is optional */ }
+        }
+        function rememberCache(record) {
+            if (!record || !record.id) return;
+            const cache = readCache();
+            cache.conversations[record.id] = {
+                id: record.id,
+                title: record.title || 'Conversation',
+                updated_at: record.updated_at || '',
+                message_count: record.message_count || (record.messages || []).length,
+                messages: record.messages || []
+            };
+            writeCache(cache);
+        }
+        function snapshotThread() {
+            const messages = [];
+            chat.querySelectorAll('.msg-row').forEach(row => {
+                if (row.hasAttribute('data-welcome')) return;
+                const bubble = row.querySelector('.bubble');
+                if (!bubble || bubble.querySelector('.typing')) return;
+                const reply = bubble.querySelector('.reply');
+                const text = (reply ? reply.textContent : bubble.textContent).trim();
+                if (!text) return;
+                messages.push({
+                    role: row.classList.contains('user') ? 'user' : 'assistant',
+                    text: text.slice(0, 8000)
+                });
+            });
+            return messages;
+        }
+        function titleFrom(messages) {
+            const first = messages.find(m => m.role === 'user' && m.text);
+            return first ? first.text.slice(0, 80) : 'Conversation';
+        }
+        function schedulePersist() {
+            if (suppressPersist) return;
+            clearTimeout(persistTimer);
+            persistTimer = setTimeout(() => { persistThread(); }, 350);
+        }
+        async function persistThread() {
+            const username = currentUsername();
+            if (!validUsername(username)) return;
+            const messages = snapshotThread();
+            if (!messages.length) return;
+            const body = {
+                username: username,
+                hub_id: hubId(),
+                title: titleFrom(messages),
+                messages: messages
+            };
+            rememberCache({
+                id: currentConversationId || 'draft',
+                title: body.title,
+                updated_at: new Date().toISOString(),
+                messages: messages
+            });
+            try {
+                const path = currentConversationId
+                    ? '/conversations/' + encodeURIComponent(currentConversationId)
+                    : '/conversations';
+                const method = currentConversationId ? 'PUT' : 'POST';
+                let response = await fetch(apiUrl() + path, {
+                    method: method,
+                    headers: authHeaders(true),
+                    body: JSON.stringify(body)
+                });
+                if (response.status === 404 && currentConversationId) {
+                    currentConversationId = null;
+                    response = await fetch(apiUrl() + '/conversations', {
+                        method: 'POST',
+                        headers: authHeaders(true),
+                        body: JSON.stringify(body)
+                    });
+                }
+                const data = await response.json().catch(() => ({}));
+                if (response.status === 429) {
+                    setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Could not save this conversation.');
+                    return;
+                }
+                if (!response.ok) {
+                    setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Saved in this browser. The server did not store it yet.');
+                    return;
+                }
+                currentConversationId = data.id;
+                rememberCache(data);
+                const cache = readCache();
+                if (cache.conversations.draft) {
+                    delete cache.conversations.draft;
+                    writeCache(cache);
+                }
+                setHistoryNote('Saved for ' + username + ' on hub ' + hubId() + '.');
+                refreshHistory();
+            } catch (err) {
+                setHistoryNote('Saved in this browser. The server was unreachable.');
+            }
+        }
+        function renderHistoryItems(items) {
+            historyList.replaceChildren();
+            if (!validUsername(currentUsername())) {
+                const empty = document.createElement('p');
+                empty.className = 'history-empty';
+                empty.textContent = 'Enter a username to list saved conversations. This tab keeps the current thread until you leave.';
+                historyList.appendChild(empty);
+                return;
+            }
+            if (!items.length) {
+                const empty = document.createElement('p');
+                empty.className = 'history-empty';
+                empty.textContent = 'No saved conversations for this username yet.';
+                historyList.appendChild(empty);
+                return;
+            }
+            items.forEach(item => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'history-item' + (item.id === currentConversationId ? ' active' : '');
+                const title = document.createElement('span');
+                title.className = 'history-title';
+                title.textContent = item.title || 'Conversation';
+                const meta = document.createElement('span');
+                meta.className = 'history-meta';
+                const when = item.updated_at ? item.updated_at.replace('T', ' ').replace('+00:00', ' UTC') : '';
+                meta.textContent = [when, (item.message_count || 0) + ' messages'].filter(Boolean).join(' · ');
+                btn.append(title, meta);
+                btn.addEventListener('click', () => openConversation(item.id));
+                historyList.appendChild(btn);
+            });
+        }
+        async function refreshHistory() {
+            const username = currentUsername();
+            if (!validUsername(username)) {
+                renderHistoryItems([]);
+                return;
+            }
+            const cache = readCache();
+            const cachedItems = Object.values(cache.conversations)
+                .filter(item => item && item.id && item.id !== 'draft')
+                .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+            renderHistoryItems(cachedItems);
+            try {
+                const response = await fetch(
+                    apiUrl() + '/conversations?username=' + encodeURIComponent(username) + '&hub_id=' + encodeURIComponent(hubId()),
+                    { headers: authHeaders() }
+                );
+                if (!response.ok) return;
+                const data = await response.json();
+                const rows = data.conversations || [];
+                const next = { conversations: {} };
+                rows.forEach(row => {
+                    const previous = cache.conversations[row.id] || {};
+                    next.conversations[row.id] = {
+                        id: row.id,
+                        title: row.title || previous.title || 'Conversation',
+                        updated_at: row.updated_at || previous.updated_at || '',
+                        message_count: row.message_count || previous.message_count || 0,
+                        messages: previous.messages || []
+                    };
+                });
+                writeCache(next);
+                renderHistoryItems(rows.map(row => next.conversations[row.id]));
+            } catch (err) { /* the cache list stays */ }
+        }
+        function renderThread(messages) {
+            suppressPersist = true;
+            clearTimeout(persistTimer);
+            hideSuggestions();
+            chat.querySelectorAll('.msg-row').forEach(row => row.remove());
+            if (!messages.length) {
+                const bubble = addMsg('bot');
+                bubble.textContent = 'Exact residual memory. Facts are stored as residual packets. Unknowns are abstained. Tools, Kin, Studio, and the ledger are in the header.';
+                const row = bubble.parentElement;
+                if (row) row.setAttribute('data-welcome', '1');
+                showSuggestions();
+            } else {
+                hideSuggestions();
+                messages.forEach(message => {
+                    const role = message.role === 'user' ? 'user' : 'bot';
+                    const bubble = addMsg(role);
+                    if (role === 'user') bubble.textContent = message.text || '';
+                    else renderReply(bubble, { value: message.text || '', status: message.status || '' });
+                });
+            }
+            chatHistory = messages.slice(-10).map(message => ({
+                role: message.role === 'assistant' ? 'assistant' : 'user',
+                content: message.text || ''
+            }));
+            suppressPersist = false;
+            requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
+        }
+        async function openConversation(id) {
+            const username = currentUsername();
+            if (!validUsername(username) || !id) return;
+            currentConversationId = id;
+            const cached = readCache().conversations[id];
+            if (cached && cached.messages && cached.messages.length) renderThread(cached.messages);
+            try {
+                const response = await fetch(
+                    apiUrl() + '/conversations/' + encodeURIComponent(id)
+                        + '?username=' + encodeURIComponent(username)
+                        + '&hub_id=' + encodeURIComponent(hubId()),
+                    { headers: authHeaders() }
+                );
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Could not open that conversation.');
+                    return;
+                }
+                rememberCache(data);
+                renderThread(data.messages || []);
+                refreshHistory();
+            } catch (err) {
+                setHistoryNote('Showing the copy saved in this browser.');
+            }
+        }
+        function startNewConversation() {
+            currentConversationId = null;
+            renderThread([]);
+            refreshHistory();
+            input.focus();
+        }
+        function openHistory() {
+            historyOpen = true;
+            historyPanel.classList.add('open');
+            historyPanel.setAttribute('aria-hidden', 'false');
+            historyScrim.hidden = false;
+            historyButton.setAttribute('aria-pressed', 'true');
+            historyButton.setAttribute('aria-expanded', 'true');
+            refreshHistory();
+        }
+        function closeHistory() {
+            historyOpen = false;
+            historyPanel.classList.remove('open');
+            historyPanel.setAttribute('aria-hidden', 'true');
+            historyScrim.hidden = true;
+            historyButton.setAttribute('aria-pressed', 'false');
+            historyButton.setAttribute('aria-expanded', 'false');
+        }
+        function toggleHistory() {
+            if (historyOpen) closeHistory();
+            else openHistory();
+        }
+        document.getElementById('history-new').addEventListener('click', startNewConversation);
+        document.getElementById('history-scrim').addEventListener('click', closeHistory);
+        document.getElementById('history-user-form').addEventListener('submit', (event) => {
+            event.preventDefault();
+            storeUsername(document.getElementById('history-username').value);
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            if (historyOpen) { closeHistory(); return; }
+            closePanels();
+        });
+
+        async function claimPaidKey() {
+            const params = new URLSearchParams(location.search);
+            if (params.get('checkout') !== 'success') return;
+            const sessionId = params.get('session_id') || '';
+            if (!/^(cs_test_|cs_live_)[A-Za-z0-9]+$/.test(sessionId)) return;
+            setStatus('connecting', 'Retrieving paid key');
+            try {
+                const response = await fetch('/api/claim/' + encodeURIComponent(sessionId));
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.api_key) {
+                    setStatus('needs-key', 'Key not ready');
+                    setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Paid key is not ready yet. Refresh in a few seconds.');
+                    return;
+                }
+                localStorage.setItem('resileos_api_key', data.api_key);
+                if (data.base_url) localStorage.setItem('resileos_api_url', String(data.base_url).replace(/\/$/, ''));
+                fillSettings();
+                const url = new URL(location.href);
+                url.searchParams.delete('checkout');
+                url.searchParams.delete('session_id');
+                history.replaceState({}, '', url.pathname + url.search + url.hash);
+                setHistoryNote('Paid key saved in this browser. Choose a username before conversations are saved.');
+                openHistory();
+                checkReady();
+            } catch (err) {
+                setStatus('offline', 'Could not claim key');
+            }
         }
 
         async function sendMsg() {
@@ -1067,8 +1529,14 @@
             } finally {
                 sendBtn.disabled = false;
                 input.focus();
+                schedulePersist();
             }
         }
+        claimPaidKey();
+        if (validUsername(currentUsername())) {
+            setHistoryNote('Conversations for ' + currentUsername() + ' on hub ' + hubId() + '. The shared demo key is rate-limited, about 100 users.');
+        }
+        refreshHistory();
     </script>
 </body>
 </html>

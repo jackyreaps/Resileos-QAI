@@ -1,5 +1,47 @@
 import { detail, json, priceEnvName, siteUrl } from "../_lib.js";
 
+function requestOrigin(request, env) {
+  const fallback = siteUrl(env).replace(/\/$/, "") || "https://resileosai.fun";
+  try {
+    const url = new URL(request.url);
+    const host = url.host;
+    if (
+      host === "resileosai.fun" ||
+      host === "www.resileosai.fun" ||
+      host.endsWith(".pages.dev") ||
+      host.startsWith("localhost") ||
+      host.startsWith("127.0.0.1")
+    ) {
+      return url.origin;
+    }
+  } catch {
+    /* use the configured site */
+  }
+  return fallback;
+}
+
+function successTarget(request, env) {
+  const origin = requestOrigin(request, env);
+  const configured = (env.STRIPE_SUCCESS_URL || "").trim();
+  if (!configured) return `${origin}/chat?checkout=success`;
+  try {
+    const url = new URL(configured, origin);
+    const host = url.host;
+    if (
+      host === "resileosai.fun" ||
+      host === "www.resileosai.fun" ||
+      host.endsWith(".pages.dev") ||
+      host.startsWith("localhost") ||
+      host.startsWith("127.0.0.1")
+    ) {
+      return `${origin}/chat?checkout=success`;
+    }
+  } catch {
+    /* keep a custom success URL */
+  }
+  return configured;
+}
+
 export async function onRequestPost({ request, env }) {
   if (!env.STRIPE_SECRET_KEY) {
     return detail(
@@ -19,10 +61,8 @@ export async function onRequestPost({ request, env }) {
   const priceId = env[priceKey];
   if (!priceId) return detail(`Missing ${priceKey}. Create the Stripe Price and set the env var.`, 503);
 
-  const root = siteUrl(env).replace(/\/$/, "");
-  const success =
-    env.STRIPE_SUCCESS_URL || `${root}/?checkout=success`;
-  const cancel = env.STRIPE_CANCEL_URL || `${root}/#pricing`;
+  const success = successTarget(request, env);
+  const cancel = env.STRIPE_CANCEL_URL || `${requestOrigin(request, env)}/#pricing`;
   const params = new URLSearchParams();
   params.set("mode", "subscription");
   params.set("line_items[0][price]", priceId);

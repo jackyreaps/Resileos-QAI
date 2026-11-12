@@ -1,5 +1,10 @@
 # Image credits
 
+The landing page feathers each portrait with a CSS mask and a shared
+edge vignette so the crops blend into the page ground (`#06080e`). The
+files in this folder are the November 2026 generations; the mask is
+presentation, not a new source.
+
 ## Site portraits (AI-generated)
 
 Every portrait the landing page serves as a `*.webp` file in this folder was
