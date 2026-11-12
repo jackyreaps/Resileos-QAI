@@ -50,20 +50,36 @@ First match wins.
 
 ## 3. Mouth
 
-Prose needs `MetisPolicy.allow_mouth` from the last kin cycle. The HTTP
-route does not let the client turn the mouth on.
+The chat page sends `prose: true`. That asks the route to render when
+the gate allows. It does not open the factual mouth. The route ignores
+a client `allow_mouth` flag. `should_render_prose(..., require_verified=True)`
+stays the factual gate: an unverified cycle does not authorize an
+assertive fact. Metis `allow_mouth` may open a non-factual persona line.
 
-On `TOOL_FACT` and `HUB_RECALL`, a open mouth may say only
-`{subject} {relation} {rows}`. A closed mouth returns the row strings and
-does not add a sentence. An empty result uses the fixed unavailable line.
-It does not invent a value.
+On a verified `TOOL_FACT`, `HUB_RECALL`, or `HUB_LEARN`, `render_persona_mouth`
+expands only the structured rows, the persona pack, Aphrodite care
+weights, and recent verified Hades lessons (lesson text only, under a
+Hermes budget). The sentence is natural language. It does not add a
+value that is not in those rows or lessons. The structured status and
+rows are always returned beside the sentence.
 
-`SOFT_CHAT` with the mouth closed returns `reply_text: ""` and
-`status: MOUTH_CLOSED`. With the mouth open, the reply is one persona
-line (`honest`, `guide`, `builder`, `mythic`) and no store fact.
+`prose: false` leaves the mouth closed. The reply is the row strings,
+or the bare triple after a learn, and does not add a sentence. An empty
+result abstains in plain language and offers `remember that…`. It does
+not invent a value. A conflict names every stored value and does not
+pick one.
 
-`HUB_LEARN` confirms the triple. The sentence form needs the mouth; the
-bare triple does not.
+An unverified cycle uses a holding line (`Checking the record…`) and
+does not state a stored value in the sentence.
+
+`SOFT_CHAT` with prose off returns `reply_text: ""` and
+`status: MOUTH_CLOSED`. With prose on and a verified cycle, the reply
+is one persona line (`honest`, `guide`, `builder`, `mythic`) and no
+store fact.
+
+`HUB_LEARN` confirms the triple. The sentence form needs a verified
+cycle and prose. The bare triple does not. Aphrodite may raise a care
+weight on that object. She does not write a residual fact.
 
 ## 4. Memory strip
 
@@ -99,13 +115,15 @@ Request:
   "hub_id": "alice",
   "force_class": null,
   "last_tool_empty": false,
-  "persona": "honest"
+  "persona": "honest",
+  "prose": true
 }
 ```
 
 `force_class` is `null` or one of the five class names. `persona` is
 `honest`, `guide`, `builder`, or `mythic` (anything else is treated as
-`honest`).
+`honest`). `prose` defaults to true. False keeps the closed mouth.
+Sending `allow_mouth` does not force a fact.
 
 Response:
 

@@ -11,11 +11,10 @@ Decision order matches docs/320-titanos/chat-router.md:
 Learn and recall call Titanos ``learn`` / ``ask_list`` (and ``resileos_ask``,
 which is ask_list). They do not reimplement binding.
 
-Persona prose requires Metis ``allow_mouth``. On TOOL_FACT the mouth may
-paraphrase only the returned rows and the declared subject/relation. A
-closed mouth still returns those rows as data, and still states that the
-store returned nothing — that fixed line is the abstain contract, not a
-persona.
+``dispatch`` returns the structured rows. The HTTP path may then call
+``render_persona_mouth`` when the client asked for prose and the cycle
+verified. That sentence may use only those rows, the persona pack, and
+verified learn-lessons. A closed mouth still returns the row strings.
 """
 from __future__ import annotations
 

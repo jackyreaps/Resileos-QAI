@@ -189,12 +189,125 @@ def _finish(
     *,
     assertive: bool,
 ) -> dict[str, Any]:
+    action = body.get("action_taken") or {}
+    body.setdefault("factual_mouth", False)
+    body.setdefault(
+        "structured",
+        {
+            "status": body.get("status"),
+            "subject": action.get("subject"),
+            "relation": action.get("relation"),
+            "rows": list(body.get("rows") or []),
+            "obj": action.get("obj"),
+            "value": body.get("reply_text") or "",
+        },
+    )
     return turn_cycle.attach_turn_fields(
         body,
         window=window,
         cycle=cycle,
         assertive=assertive,
     )
+
+
+def _row_groups(action: dict[str, Any], titanos: Any) -> list[tuple[str, list[str]]] | None:
+    relations = [str(item) for item in (action.get("relations") or []) if item]
+    subject = str(action.get("subject") or "")
+    if len(relations) <= 1 or not subject:
+        return None
+    ask = getattr(titanos, "ask_list", None)
+    if not callable(ask):
+        return None
+    groups: list[tuple[str, list[str]]] = []
+    for relation in relations:
+        got = [str(row) for row in ask(subject, relation) or []]
+        if got:
+            groups.append((relation, got))
+    return groups or None
+
+
+def _persona_reply(
+    reply: str,
+    status: str,
+    action: dict[str, Any],
+    *,
+    persona: str,
+    hub_id: str,
+    verified: bool,
+    allow_mouth: bool,
+    prose: bool,
+    titanos: Any,
+) -> dict[str, Any]:
+    """Persona sentence over the structured turn. Failures keep ``reply``."""
+    from resileos.chat.persona_mouth import (
+        budgeted_lessons,
+        remember_verified_learn,
+        render_persona_mouth,
+    )
+
+    if (
+        verified
+        and action.get("wrote")
+        and status == "ACCEPTED"
+        and action.get("subject")
+        and action.get("relation")
+        and action.get("obj")
+    ):
+        try:
+            remember_verified_learn(
+                hub_id,
+                str(action["subject"]),
+                str(action["relation"]),
+                str(action["obj"]),
+            )
+        except Exception:
+            log.exception("verified learn lesson was not recorded")
+    lessons: list[str] = []
+    if prose and verified:
+        try:
+            lessons = budgeted_lessons(hub_id)
+        except Exception:
+            log.exception("hades lessons were not loaded")
+            lessons = []
+    try:
+        groups = _row_groups(action, titanos)
+    except Exception:
+        groups = None
+    try:
+        return render_persona_mouth(
+            status=status,
+            persona=persona,
+            subject=str(action.get("subject") or ""),
+            relation=action.get("relation"),
+            rows=list(action.get("rows") or []),
+            obj=action.get("obj"),
+            wrote=bool(action.get("wrote")),
+            router_class=str(action.get("class") or ""),
+            action_name=str(action.get("action") or ""),
+            verified=verified,
+            allow_mouth=allow_mouth,
+            prose=prose,
+            lessons=lessons,
+            hub_id=hub_id,
+            prior_reply=reply,
+            groups=groups,
+        )
+    except Exception:
+        log.exception("persona mouth failed")
+        return {
+            "apply": False,
+            "factual": False,
+            "structured": {
+                "status": status,
+                "subject": action.get("subject"),
+                "relation": action.get("relation"),
+                "rows": list(action.get("rows") or []),
+                "obj": action.get("obj"),
+                "value": reply,
+            },
+            "audit": {"rendered": False, "writes_residual": False},
+            "lessons": lessons,
+        }
 
 
 async def run_agent_chat(
@@ -207,8 +320,13 @@ async def run_agent_chat(
     force_class: str | None = None,
     last_tool_empty: bool = False,
     persona: str = "honest",
+    prose: bool = True,
 ) -> dict[str, Any]:
-    """Route one studio turn through retrieval, and a Kin cycle when it is chat."""
+    """Route one studio turn through retrieval, and a Kin cycle when it is chat.
+
+    ``prose`` asks for a persona sentence when the gate allows it. It does
+    not open the factual mouth on an unverified cycle.
+    """
     window = turn_cycle.budget_history(history)
     text = (message or "").strip()
 
@@ -321,7 +439,8 @@ async def run_agent_chat(
         }
     spoken = turn_cycle.continuation_text(text, window, titanos)
     empty_follow = turn_cycle.infer_last_tool_empty(window, last_tool_empty)
-    assertive = bool(cycle.get("verified") or cycle.get("allow_mouth"))
+    # The client request is necessary. Verification or Metis still decides.
+    assertive = bool(prose and (cycle.get("verified") or cycle.get("allow_mouth")))
     triple = None
     try:
         triple = turn_cycle.writable_triple(spoken, hub_id, force_class)
@@ -396,9 +515,35 @@ async def run_agent_chat(
         log.exception("chat dispatch failed")
         raise
 
-    if not reply and status == "MOUTH_CLOSED":
+    if not reply and status == "MOUTH_CLOSED" and prose:
         reply = turn_cycle.orientation_text(persona)
+    prior_reply = reply
+    rendered = _persona_reply(
+        reply,
+        status,
+        action,
+        persona=persona,
+        hub_id=hub_id,
+        verified=bool(cycle.get("verified")),
+        allow_mouth=bool(cycle.get("allow_mouth")),
+        prose=prose,
+        titanos=store,
+    )
+    if rendered.get("apply"):
+        reply = str(rendered.get("text") or reply)
     body = present_chat(reply, status, action, hub_id=hub_id, persona=persona)
+    body["structured"] = rendered.get("structured") or {
+        "status": status,
+        "subject": action.get("subject"),
+        "relation": action.get("relation"),
+        "rows": list(action.get("rows") or []),
+        "obj": action.get("obj"),
+        "value": prior_reply,
+    }
+    body["factual_mouth"] = bool(rendered.get("factual"))
+    body["mouth"] = rendered.get("audit") or {"rendered": False, "writes_residual": False}
+    if rendered.get("lessons"):
+        body["lessons"] = list(rendered["lessons"])
     if cycle.get("allow_mouth") is not None:
         body["allow_mouth"] = bool(cycle.get("allow_mouth"))
     fragment = action.get("tutorial_fragment")

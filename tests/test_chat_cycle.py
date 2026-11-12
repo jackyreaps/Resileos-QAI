@@ -84,6 +84,9 @@ def test_chat_page_renders_companion_and_message_kinds():
     assert "Stores · Derives · Abstains" in html
     assert "Sign in with a username" in html
     assert "shiftKey" in html
+    assert "prose: true" in html
+    assert "trace-fold" in html
+    assert 'id="settings-persona"' in html
     assert 'href="/chat.html"' not in html
     redirects = ROOT / "landing" / "public" / "_redirects"
     if redirects.exists():
@@ -154,7 +157,8 @@ def test_verified_turn_speaks_and_unverified_turn_does_not_write(client, monkeyp
     assert hello["cycle_verified"] is True
     assert hello["mouth_open"] is True
     assert hello["message_kind"] == "mouth"
-    assert "won't assert" in hello["reply_text"].lower()
+    assert "with you" in hello["reply_text"].lower()
+    assert hello["factual_mouth"] is False
     assert hello.get("companion_prompt")
     assert "Stores · Derives · Abstains" in hello["companion_prompt"]
     assert "username" in hello["companion_prompt"].lower()
