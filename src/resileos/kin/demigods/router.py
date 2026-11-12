@@ -17,6 +17,7 @@ from typing import Any
 import resileos.harness.tools as harness_tools
 
 from .hierarchy import DemigodError, DemigodHierarchyError, active_demigod
+from .swarm import commit_swarm, drop_swarm, prepare_swarm
 
 # Bare roster name. Slashes, dots, and parent segments never match.
 _NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -110,11 +111,26 @@ def demigod_search(query: str, limit: int = 5) -> dict[str, Any]:
     return {"query": query, "results": hits[:cap]}
 
 
-def demigod_summon(name: str, packet: Any = None) -> dict[str, Any]:
+def _drop_guide(packet: Any, token: str) -> None:
+    loaded, stored = harness_tools._guide_containers(packet)
+    loaded[:] = [item for item in loaded if item != token]
+    stored.pop(token, None)
+
+
+def demigod_summon(
+    name: str,
+    packet: Any = None,
+    swarm: list[str] | None = None,
+) -> dict[str, Any]:
     """Load one Demi-god guide into the caller's packet.
 
     The persona text is capped and stored on ``guide_bodies`` under the
     exact id ``demigod:<name>``. ``guides_loaded`` records that same id.
+
+    ``swarm`` mounts legion names from the parent Kin, or a check-local
+    helper, onto this attempt only. The names are not registered on the
+    Kin catalogue. An empty swarm leaves the packet unchanged aside from
+    the guide.
     """
     current = active_demigod()
     if current is not None:
@@ -127,6 +143,12 @@ def demigod_summon(name: str, packet: Any = None) -> dict[str, Any]:
     roster = _require_roster()
     if safe not in roster:
         raise DemigodError(f"unknown demigod: {safe}")
+    prepared = prepare_swarm(
+        safe,
+        packet,
+        swarm,
+        guide_names=set(_iter_guide_names()),
+    )
     body = _read_guide(safe)
     token = guide_token(safe)
     # Cap is read at call time so tests and callers share one limit.
@@ -136,6 +158,11 @@ def demigod_summon(name: str, packet: Any = None) -> dict[str, Any]:
         bodies={token: body},
         body_cap=harness_tools.GUIDE_BODY_CAP,
     )
+    try:
+        mounted = commit_swarm(safe, packet, prepared)
+    except Exception:
+        _drop_guide(packet, token)
+        raise
     stored = loaded["bodies"].get(token, "")
     return {
         "summoned": True,
@@ -144,6 +171,8 @@ def demigod_summon(name: str, packet: Any = None) -> dict[str, Any]:
         "preview": stored[:400],
         "body_chars": len(stored),
         "hierarchy": "serves under Iris/Metis/Hermes/Apollo/Hades",
+        "swarm": list(mounted.get("names") or []),
+        "attempt_id": mounted.get("attempt_id"),
     }
 
 
@@ -167,4 +196,13 @@ def demigod_dismiss(name: str, packet: Any = None) -> dict[str, Any]:
     # In-place so a dict from ControlPacket.to_dict() updates the packet.
     loaded[:] = [item for item in loaded if item != token]
     stored.pop(token, None)
-    return {"dismissed": True, "demigod": safe, "remaining": list(loaded)}
+    stopped = drop_swarm(packet, demigod=safe)
+    result: dict[str, Any] = {
+        "dismissed": True,
+        "demigod": safe,
+        "remaining": list(loaded),
+        "swarm_dropped": stopped is not None,
+    }
+    if stopped is not None:
+        result["process"] = stopped
+    return result

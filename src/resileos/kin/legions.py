@@ -273,6 +273,7 @@ def _wrap(kin: str, name: str, tool_fn: ToolFn, constraints: dict[str, Any]) -> 
 
     wrapped.__name__ = name
     wrapped.__doc__ = tool_fn.__doc__ or name
+    wrapped.spawns_processes = bool(constraints.get("spawns_processes"))  # type: ignore[attr-defined]
     return wrapped
 
 
@@ -286,6 +287,20 @@ def register_legion(
     """Register one tool on one Kin. The constraints cannot exceed the role."""
     if not isinstance(constraints, dict):
         raise LegionError("constraints must be a dict")
+    from resileos.kin.demigods.hierarchy import DemigodHierarchyError, active_demigod
+
+    if active_demigod() is not None:
+        raise DemigodHierarchyError(
+            "a demigod cannot promote a temporary legion to permanent status"
+        )
+    try:
+        from resileos.kin.demigods.swarm import swarm_mounted
+    except ImportError:
+        swarm_mounted = None
+    if swarm_mounted is not None and swarm_mounted():
+        raise DemigodHierarchyError(
+            "a demigod cannot promote a temporary legion to permanent status"
+        )
     kin = _canon(kin_name)
     role = _KIN[kin]
     if constraints.get("writes_residual") and not role["writes_residual"]:
@@ -298,6 +313,13 @@ def register_legion(
     surface = _surfaces.setdefault(kin, {})
     surface[tool_name] = _wrap(kin, tool_name, tool_fn, constraints)
     return tool_name
+
+
+def legion_spawns(kin_name: str, tool_name: str) -> bool:
+    """True when this Kin's legion declared that it can spawn processes."""
+    kin = _canon(kin_name)
+    fn = _surfaces.get(kin, {}).get(tool_name)
+    return bool(getattr(fn, "spawns_processes", False))
 
 
 def invoke_legion(kin_name: str, tool_name: str, packet: Any, **kwargs: Any) -> dict[str, Any]:

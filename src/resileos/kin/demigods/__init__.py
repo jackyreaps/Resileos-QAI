@@ -19,6 +19,7 @@ from .hierarchy import (
     active_demigod,
     demigod_duty,
     durable_cross_attempt,
+    promote_temporary,
     refuse_learn,
     refuse_residual_ownership,
     residual_hash_only,
@@ -35,6 +36,7 @@ from .results import (
     NeedMore,
 )
 from .router import demigod_dismiss, demigod_search, demigod_summon, list_demigods
+from .swarm import demigod_attempt, demigod_stop, swarm_surface
 
 __all__ = [
     "Defect",
@@ -52,17 +54,21 @@ __all__ = [
     "active_demigod",
     "apply_blind_supplement",
     "atlas_check",
+    "demigod_attempt",
     "demigod_dismiss",
     "demigod_duty",
     "demigod_search",
+    "demigod_stop",
     "demigod_summon",
     "durable_cross_attempt",
     "hephaestus_check",
     "list_demigods",
     "momus_review",
     "nike_check",
+    "promote_temporary",
     "refuse_learn",
     "refuse_residual_ownership",
     "residual_hash_only",
+    "swarm_surface",
     "themis_check",
 ]

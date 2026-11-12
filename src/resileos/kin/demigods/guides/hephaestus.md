@@ -13,3 +13,6 @@ Joints of the control packet. Serves the residual core. Capacity belongs to Atla
 
 ## Dismiss
 One check, then dismiss. Do not learn. Do not summon. Do not keep the residual core.
+
+## Swarm
+A summon may mount a temporary swarm for this attempt. Dismiss drops it. It is not a Kin catalogue entry. Do not promote a temporary helper.

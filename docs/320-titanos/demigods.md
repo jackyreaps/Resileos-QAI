@@ -46,6 +46,16 @@ Guide files are read with `importlib.resources` from `resileos.kin.demigods.guid
 
 `guide_load` is the single place a body is truncated. Summon passes the file text and `GUIDE_BODY_CAP`.
 
+## Temporary swarm
+
+`demigod_summon(..., swarm=[...])` mounts names for this attempt only. A name must already be a legion on the parent Kin that Demi-god serves, or a check-local helper for that Demi-god. Themis and Nike serve Apollo. Momus and Hephaestus serve Hermes. Atlas serves Iris. Hephaestus is not a Kin; the Forge video legion is registered on Hermes and mounted into a Hephaestus swarm.
+
+The check calls the mounted surface. Each call still runs the parent Kin's `risk_classify`, `evidence_attach`, and budget gate. The names are not added to the Kin catalogue.
+
+`demigod_dismiss`, and `demigod_attempt` when the check returns, drop the surface and the `demigod_swarm` packet key. A Demi-god still cannot summon another Demi-god, call `learn`, or promote a temporary helper onto a Kin.
+
+If a mounted legion can spawn processes, Clotho registers that group on the attempt id. Atropos cuts it on stop or dismiss. `stop_requested` is not `fully_stopped`. Hades still refuses the checkpoint until the group is fully stopped and residual consistency holds.
+
 ## Maker and blind verifier
 
 `maker_blind_verifier_cycle` lives in `resileos.harness.separated`.

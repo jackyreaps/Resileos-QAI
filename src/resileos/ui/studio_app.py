@@ -505,7 +505,9 @@ def _run_surface(mode: str) -> None:
                 st.success(f"{reg.get('asset_id')}") if reg.get("ok") else st.error(reg)
                 if reg.get("ok"):
                     st.session_state.assets_local.insert(0, {"id": reg.get("asset_id"), "kind": kind, "path": path.strip(), "title": title})
-            st.info("Video generation is not bundled. Register MP4/WebM URLs to preview and store.")
+            st.info(
+                "Forge video is on the Tools tab. Without a provider it returns UNAVAILABLE and does not invent a URL."
+            )
         with b:
             st.markdown("#### Library")
             st.caption(f"{len(st.session_state.assets_local)} item(s) in this session")
@@ -685,6 +687,54 @@ def _run_surface(mode: str) -> None:
 
 
         st.divider()
+        st.markdown("**Forge, graphify, and plan / test / debug**")
+        st.caption(
+            "Hephaestus is the Studio patron. Hermes dispatches Forge and the loop. "
+            "Graphify goes through Eat. Hades keeps lessons and checkpoints."
+        )
+        tool_l, tool_m, tool_r = st.columns(3)
+        with tool_l:
+            st.markdown("**Forge video**")
+            forge_prompt = st.text_input("Video prompt", key="forge_prompt")
+            if st.button("Run forge", key="forge_go"):
+                sc, sb = api_post(
+                    "/studio/forge/video",
+                    key,
+                    {"prompt": forge_prompt, "stage": "draft"},
+                )
+                st.write(f"HTTP **{sc}**")
+                st.json(sb)
+        with tool_m:
+            st.markdown("**Graphify**")
+            graph_src = st.text_area("Triples, one per line", key="graph_src", height=90)
+            graph_commit = st.checkbox(
+                "Commit accepted triples", value=False, key="graph_commit"
+            )
+            if st.button("Ingest", key="graph_go") and graph_src.strip():
+                sc, sb = api_post(
+                    "/studio/graphify",
+                    key,
+                    {"source": graph_src, "commit": bool(graph_commit)},
+                )
+                st.write(f"HTTP **{sc}**")
+                st.json(sb)
+        with tool_r:
+            st.markdown("**Plan / test / debug**")
+            loop_goal = st.text_input("Goal", key="loop_goal")
+            if st.button("Run loop", key="loop_go") and loop_goal.strip():
+                sc, sb = api_post(
+                    "/studio/plan-test-debug",
+                    key,
+                    {"goal": loop_goal.strip()},
+                )
+                st.write(f"HTTP **{sc}**")
+                st.json(sb)
+        st.caption(
+            "write_file, apply_diff, and git_commit stay refused until a verified proof. "
+            "This surface does not execute them."
+        )
+
+        st.divider()
         st.markdown("**Worker and offline**")
         code = st.text_input("Numpy or Python expression", key="worker_code", placeholder="np.arange(4).sum()")
         if st.button("Run and record", key="worker_rec") and code:
@@ -745,7 +795,9 @@ def _run_surface(mode: str) -> None:
         | Search | Answer + Triple + SPARQL + Chain (live API) |
         | Images | Pollinations HTTP generate + auto `/learn_batch` register |
         | Residual codec | 8×8 PCA packet, per-component scales. Samples stay candidates |
-        | Video | Register/preview URLs (bring your own encoder) |
+        | Video | Forge legion on Hermes, under Hephaestus. UNAVAILABLE when no provider is set |
+        | Graphify | Ingest through Eat. Learn only on accept when commit is set |
+        | Plan / test / debug | Hermes loop. Mutating steps stay refused until verified |
         | Product | Same API keys as paid hosting |
 
         ### Persona / user memory (PAL-style)

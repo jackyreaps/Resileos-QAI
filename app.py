@@ -300,6 +300,12 @@ def _register_runtime_legions() -> None:
         register_aphrodite_legions()
     except LegionError as exc:
         log.warning("aphrodite legions not registered: %s", exc)
+    try:
+        from resileos.kin.studio_tools import register_studio_legions
+
+        register_studio_legions()
+    except LegionError as exc:
+        log.warning("studio legions not registered: %s", exc)
 
 try:
     _register_runtime_legions()
@@ -1150,7 +1156,7 @@ async def conversation_key_id(
 
 
 def _mount_surfaces() -> None:
-    register_studio_routes(app, verify_api_key)
+    register_studio_routes(app, verify_api_key, get_titanos=lambda: titanos_singleton)
     register_ui_routes(
         app,
         verify_api_key,
