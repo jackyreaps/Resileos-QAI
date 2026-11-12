@@ -47,3 +47,7 @@ A non-zero composition rate on novel combinations means the substrate can comput
 - Current compositions are simple (2-hop parent_of, works_at of parent).
 - Full VSA bind/unbind composition requires the substrate operators to be exposed on the query path.
 - The script calls an LLM when `LLM_API_KEY` and `LLM_MODEL` are set. This run did not set them.
+
+## Rerun, 2026-11-12
+
+No HTTP server was listening, so the `/chain` leg was not called. The same three compositions were scored in-process with `Titanos.ask`, `ask_inverse`, and `chain` (`--in-process`). All three matched: grandchild carol in 240.2 ms, grandparent alice in 222.5 ms, parent's workplace globex in 222.5 ms. Composition rate 1.0 (3/3). No model was called. Artifact: `landing/artifacts/report_compositional_2026-11-12.json`. The 2026-11-10 table above is the HTTP run on another machine.

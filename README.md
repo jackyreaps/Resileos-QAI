@@ -61,7 +61,7 @@ Facts may carry `valid_from` and `valid_to`. The interval is half-open: `[valid_
 
 Tests cover the Athens `capital_of` windows: `as_of="1800-01-01"` is `Ottoman Empire`, `as_of="1900-01-01"` is `Greece`, and `ask` at `1860-01-01` on two overlapping windows returns `CONFLICT` with `value=None` while `ask_list` returns both objects. `chain(..., as_of=...)` forwards `as_of` on every hop. SPARQL accepts `AS OF`.
 
-`scripts/run_temporal_probe.py` on this tree, against `configs/titanos-facts.json`, reports reference M9 `0.0000` (`0/141`) and synthetic overlap `2/2` with non-overlap singular `2/2`. `docs/400-operations/capacity-results.md` still lists M9 as deferred from the 2026-11-03 acceptance run. That sentence in the capacity note is behind the probe.
+`scripts/run_temporal_probe.py` on this tree, against `configs/titanos-facts.json`, reports reference M9 `0.0000` (`0/141`) and synthetic overlap `2/2` with non-overlap singular `2/2`. The 2026-11-12 sample of that probe is in `docs/400-operations/capacity-results.md` and `landing/artifacts/report_temporal_probe_2026-11-12.json`.
 
 ## Harness
 
@@ -119,7 +119,7 @@ MiniMax-H3-Image, MiniMax-H3 (video), and Pruna P-H3-Image are three different m
 
 ## Benches
 
-Numbers below are the runs written into `docs/benchmarks/` on 2026-11-10. No model key was set for those runs. Cost per 1,000 queries was not measured.
+Numbers below are the runs written into `docs/benchmarks/` on 2026-11-10. No model key was set for those runs. Cost per 1,000 queries was not measured. A 2026-11-12 rerun on a cursor cloud agent VM is in [docs/benchmarks/measurement-2026-11-12.md](docs/benchmarks/measurement-2026-11-12.md). That rerun did not call a model. Its latencies are from that VM and are not the 2026-11-10 figures.
 
 | Bench | Result | Reproduce |
 |---|---|---|
@@ -128,7 +128,7 @@ Numbers below are the runs written into `docs/benchmarks/` on 2026-11-10. No mod
 | Invention | `derivation_rate` **0.0**, `invention_assertion_rate` **0.0**, `p50_ms` **3.4**. The two invention probes returned `ABSTAINED`. | `python scripts/ops/bench_invention.py` |
 | Equal budget | 22 tasks, budget 8. Residual/Apollo and Kin+Demi-gods+Hades both **22/22**, correct-abstain **6/6**, false accepts **0**. Mean steps 1.0 vs 6.0. Mean latency 0.361 ms vs 43.230 ms. | `PYTHONPATH=src:scripts python scripts/bench/equal_budget.py` |
 | Temporal probe | Reference M9 **0/141**. Synthetic overlap **2/2**, non-overlap singular **2/2**. | `PYTHONPATH=src:. python scripts/run_temporal_probe.py` |
-| Capacity M1–M4 | 2026-11-03 acceptance on the 120-fact corpus: M1 **1.0**, M2 **0.0**, M3 **1.0**, M4 **1.0**. M5–M8 are still deferred in that note. | [docs/400-operations/capacity-results.md](docs/400-operations/capacity-results.md) |
+| Capacity M1–M4 | 2026-11-03 acceptance on the 120-fact corpus: M1 **1.0**, M2 **0.0**, M3 **1.0**, M4 **1.0**. A 2026-11-12 sample measured M5, M7, and M9; chain p95 on that VM was above 500 ms. M6 and M8 were not measured. | [docs/400-operations/capacity-results.md](docs/400-operations/capacity-results.md) |
 
 ## Install and tests
 

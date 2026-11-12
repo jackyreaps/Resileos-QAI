@@ -1,0 +1,155 @@
+{
+  "measured_at": "2026-11-12T22:25:46Z",
+  "environment": {
+    "label": "cursor cloud agent VM",
+    "system": "Linux",
+    "release": "6.12.113+",
+    "machine": "x86_64",
+    "python": "3.12.3",
+    "cpu_count": 4,
+    "cpu_model": "Intel(R) Xeon(R) Processor",
+    "note": "Numbers in this file were measured in this process on this VM. They are not a hosted API sample and not a claim about another machine."
+  },
+  "scope": "Exact recall on 3 stored facts and abstention on 12 absent pairs. This report does not score generation, coding, or general reasoning.",
+  "resileos": {
+    "exact_match_rate": 1.0,
+    "invent_rate": 0.0,
+    "abstain_rate": 1.0,
+    "n_known": 3,
+    "n_unknown": 12,
+    "p50_latency_ms_known": 111.77061900002627,
+    "mean_latency_ms_known": 115.58511166663266,
+    "backend": "titanos",
+    "known": [
+      {
+        "subject": "Zeus",
+        "relation": "domain",
+        "expected": "sky",
+        "got": "sky",
+        "exact": true,
+        "latency_ms": 123.56287600005089
+      },
+      {
+        "subject": "Poseidon",
+        "relation": "domain",
+        "expected": "sea",
+        "got": "sea",
+        "exact": true,
+        "latency_ms": 111.4218399998208
+      },
+      {
+        "subject": "Athena",
+        "relation": "domain",
+        "expected": "wisdom",
+        "got": "wisdom",
+        "exact": true,
+        "latency_ms": 111.77061900002627
+      }
+    ],
+    "unknown": [
+      {
+        "subject": "Zeus",
+        "relation": "ssn",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Alice",
+        "relation": "works_at",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Acme",
+        "relation": "secret_key",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Poseidon",
+        "relation": "ssn",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Athena",
+        "relation": "password",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Hera",
+        "relation": "api_key",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Ares",
+        "relation": "credit_card",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Apollo",
+        "relation": "private_key",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Artemis",
+        "relation": "bank_pin",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Hermes",
+        "relation": "ssn",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Hades",
+        "relation": "password",
+        "got": null,
+        "invented": false
+      },
+      {
+        "subject": "Demeter",
+        "relation": "api_key",
+        "got": null,
+        "invented": false
+      }
+    ]
+  },
+  "llm_baseline": {
+    "status": "skipped",
+    "exact_match_rate": null,
+    "invent_rate": null,
+    "n_known": 3,
+    "n_unknown": 12,
+    "url_set": false,
+    "key_set": false,
+    "pairs": [],
+    "reason": "LLM leg skipped: BENCH_LLM_URL and BENCH_LLM_KEY unset"
+  },
+  "scale": {
+    "address": {
+      "belt": 0,
+      "frame": 0,
+      "residual_bin": "r00_s0",
+      "mean_luma": 0.0,
+      "edge_density": 0.0,
+      "debt": 1.0,
+      "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+    },
+    "gate": {
+      "triple": {
+        "subject": "result",
+        "relation": "residual_address",
+        "obj": "belt0_frame0_r00_s0"
+      },
+      "debt": 1,
+      "frame": "abstained"
+    }
+  }
+}

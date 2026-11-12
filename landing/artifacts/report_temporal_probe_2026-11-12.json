@@ -1,0 +1,32 @@
+{
+  "probe": "temporal_conflict",
+  "metric": "M9",
+  "measured_at": "2026-11-12T22:25:49Z",
+  "environment": {
+    "label": "cursor cloud agent VM",
+    "system": "Linux",
+    "release": "6.12.113+",
+    "machine": "x86_64",
+    "python": "3.12.3",
+    "cpu_count": 4,
+    "cpu_model": "Intel(R) Xeon(R) Processor",
+    "note": "Numbers in this file were measured in this process on this VM. They are not a hosted API sample and not a claim about another machine."
+  },
+  "corpus": "/agent/repos/Resileos-QAI/configs/titanos-facts.json",
+  "n_facts": 120,
+  "reference": {
+    "checks": 141,
+    "conflicts": 0,
+    "M9": 0.0,
+    "target": 0.0,
+    "pass": true
+  },
+  "synthetic_overlap": {
+    "checks": 4,
+    "conflicts_in_overlap": 2,
+    "conflicts_detected": 2,
+    "non_overlap_singular": 2,
+    "pass": true
+  },
+  "pass": true
+}

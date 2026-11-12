@@ -12,7 +12,8 @@ windows in ``scripts/run_temporal_probe.py`` (obj_A 1800–1900, obj_B from
 1850). Overlap and dates outside every window must abstain.
 
 Usage:
-    PYTHONPATH=src:scripts python scripts/bench/equal_budget.py
+    PYTHONPATH=src:scripts python scripts/bench/equal_budget.py \
+        --out landing/artifacts/report_equal_budget_YYYY-MM-DD.json
 """
 from __future__ import annotations
 
@@ -211,19 +212,33 @@ def hierarchy_call(
         return {"obj": None, "steps": steps, "stopped": "budget"}
     bundle = build_kin_bundle()
     bundle._hades = Hades(store_dir=hades_dir)
-    bundle.cycle(
+    _cycle_report, _policy, harness = bundle.cycle(
         metrics={
             "hits": 1 if len(found) == 1 else 0,
             "misses": 0 if len(found) == 1 else 1,
         }
     )
+    consistency = harness.get("consistency") if isinstance(harness, dict) else None
+    cycle_meta = {
+        "cycle_verified": (
+            bool(harness.get("verified")) if isinstance(harness, dict) else False
+        ),
+        "cycle_consistent": (
+            bool(consistency.get("consistent"))
+            if isinstance(consistency, dict)
+            else False
+        ),
+        "cycle_reason": (
+            str(harness.get("reason") or "") if isinstance(harness, dict) else ""
+        ),
+    }
 
     if not take():
-        return {"obj": None, "steps": steps, "stopped": "budget"}
+        return {"obj": None, "steps": steps, "stopped": "budget", **cycle_meta}
     joints = hephaestus_check(packet)
 
     if not take():
-        return {"obj": None, "steps": steps, "stopped": "budget"}
+        return {"obj": None, "steps": steps, "stopped": "budget", **cycle_meta}
     capacity = atlas_check(packet, n_facts=len(rows))
 
     digest = _hash_for(
@@ -235,7 +250,7 @@ def hierarchy_call(
         ]
     }
     if not take():
-        return {"obj": None, "steps": steps, "stopped": "budget"}
+        return {"obj": None, "steps": steps, "stopped": "budget", **cycle_meta}
     review = momus_review(artefact, spec, digest)
 
     passed = bool(joints.verified and capacity.verified and review.verified)
@@ -247,16 +262,22 @@ def hierarchy_call(
             "hephaestus": joints.verified,
             "atlas": capacity.verified,
             "momus": review.outcome,
+            **cycle_meta,
         }
 
     if not take():
-        return {"obj": None, "steps": steps, "stopped": "budget"}
+        return {"obj": None, "steps": steps, "stopped": "budget", **cycle_meta}
     lesson = (
         f"equal-budget turn={packet.turn} verified=True "
         f"status={artefact['status']}"
     )
     bundle._hades.save(packet, residual_packet_hash=digest, lesson=lesson)
-    return {"obj": artefact["obj"], "steps": steps, "stopped": "answered"}
+    return {
+        "obj": artefact["obj"],
+        "steps": steps,
+        "stopped": "answered",
+        **cycle_meta,
+    }
 
 
 def _summarize(task_rows: list[dict]) -> dict[str, Any]:
@@ -267,7 +288,7 @@ def _summarize(task_rows: list[dict]) -> dict[str, Any]:
     false_accepts = sum(1 for row in task_rows if row["false_accept"])
     steps = [row["steps"] for row in task_rows]
     latency = [row["latency_ms"] for row in task_rows]
-    return {
+    out = {
         "n": n,
         "accuracy": correct / n if n else 0.0,
         "correct": correct,
@@ -283,6 +304,24 @@ def _summarize(task_rows: list[dict]) -> dict[str, Any]:
         "steps_mean": sum(steps) / n if n else 0.0,
         "steps_max": max(steps) if steps else 0,
     }
+    if any("cycle_verified" in row for row in task_rows):
+        out["cycle_verified"] = sum(
+            1 for row in task_rows if row.get("cycle_verified") is True
+        )
+        out["cycle_consistent"] = sum(
+            1 for row in task_rows if row.get("cycle_consistent") is True
+        )
+        out["cycle_observed"] = sum(
+            1 for row in task_rows if "cycle_verified" in row
+        )
+        reasons: dict[str, int] = {}
+        for row in task_rows:
+            reason = str(row.get("cycle_reason") or "")
+            if not reason:
+                continue
+            reasons[reason] = reasons.get(reason, 0) + 1
+        out["cycle_reasons"] = reasons
+    return out
 
 
 def run_equal_budget(
@@ -323,6 +362,15 @@ def run_equal_budget(
                     "steps": result["steps"],
                     "latency_ms": elapsed,
                     **scored,
+                    **(
+                        {
+                            "cycle_verified": result["cycle_verified"],
+                            "cycle_consistent": result["cycle_consistent"],
+                            "cycle_reason": result.get("cycle_reason", ""),
+                        }
+                        if "cycle_verified" in result
+                        else {}
+                    ),
                 }
             )
         return out
@@ -357,8 +405,25 @@ def run_equal_budget(
 
 
 def main() -> None:
+    import argparse
+    import sys
+
+    root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "scripts"))
+    from bench.measure_meta import dated_artifact, environment, utc_now
+
+    parser = argparse.ArgumentParser(description="Equal-budget measurement")
+    parser.add_argument("--out", type=Path, default=None)
+    args = parser.parse_args()
     report = run_equal_budget()
-    print(json.dumps(report, indent=2))
+    report["measured_at"] = utc_now()
+    report["environment"] = environment()
+    text = json.dumps(report, indent=2) + "\n"
+    print(text, end="")
+    out = args.out or dated_artifact("equal_budget")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    print(f"wrote {out}")
 
 
 if __name__ == "__main__":

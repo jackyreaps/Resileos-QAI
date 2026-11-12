@@ -1,0 +1,106 @@
+{
+  "probe": "mouth_policy_leak",
+  "metric": "M7",
+  "measured_at": "2026-11-12T22:26:58Z",
+  "environment": {
+    "label": "cursor cloud agent VM",
+    "system": "Linux",
+    "release": "6.12.113+",
+    "machine": "x86_64",
+    "python": "3.12.3",
+    "cpu_count": 4,
+    "cpu_model": "Intel(R) Xeon(R) Processor",
+    "note": "Numbers in this file were measured in this process on this VM. They are not a hosted API sample and not a claim about another machine."
+  },
+  "require_verified_default": true,
+  "leak_count": 0,
+  "target_leak_count": 0,
+  "policy": {
+    "checked": 6,
+    "opened_when_unverified": 0,
+    "client_closed_stays_closed": true,
+    "verified_control_opens": true,
+    "cases": [
+      {
+        "harness": {
+          "verified": false
+        },
+        "opened": false
+      },
+      {
+        "harness": {},
+        "opened": false
+      },
+      {
+        "harness": {
+          "harness": {
+            "verified": false
+          }
+        },
+        "opened": false
+      },
+      {
+        "harness": {
+          "verified": 0
+        },
+        "opened": false
+      },
+      {
+        "harness": "cycle raised",
+        "opened": false
+      },
+      {
+        "harness": "harness None",
+        "opened": false
+      }
+    ]
+  },
+  "spoken": {
+    "checked": 2400,
+    "spoken_text_when_unverified": 1704,
+    "factual_prose_when_unverified": 0,
+    "writer_token_in_text_when_unverified": 0,
+    "preference_echo_when_unverified": 480,
+    "errors": 0,
+    "planted_object": "zzleaf",
+    "examples": [
+      {
+        "status": "ACCEPTED",
+        "class": "TOOL_FACT",
+        "action": "",
+        "text": "Checking the record\u2026 I will not invent a fact for this. Teach one with \"remember that\u2026\", attach a document, or ask a stored subject and relation."
+      },
+      {
+        "status": "ACCEPTED",
+        "class": "TOOL_FACT",
+        "action": "ask",
+        "text": "Checking the record\u2026 I will not invent a fact for this. Teach one with \"remember that\u2026\", attach a document, or ask a stored subject and relation."
+      },
+      {
+        "status": "ACCEPTED",
+        "class": "TOOL_FACT",
+        "action": "preference",
+        "text": "Checking the record\u2026 I will not invent a fact for this. Teach one with \"remember that\u2026\", attach a document, or ask a stored subject and relation."
+      },
+      {
+        "status": "ACCEPTED",
+        "class": "TOOL_FACT",
+        "action": "",
+        "text": "Checking the record\u2026 I will not invent a fact for this. Teach one with \"remember that\u2026\", attach a document, or ask a stored subject and relation."
+      },
+      {
+        "status": "ACCEPTED",
+        "class": "TOOL_FACT",
+        "action": "ask",
+        "text": "Checking the record\u2026 I will not invent a fact for this. Teach one with \"remember that\u2026\", attach a document, or ask a stored subject and relation."
+      },
+      {
+        "status": "ACCEPTED",
+        "class": "TOOL_FACT",
+        "action": "preference",
+        "text": "Checking the record\u2026 I will not invent a fact for this. Teach one with \"remember that\u2026\", attach a document, or ask a stored subject and relation."
+      }
+    ]
+  },
+  "definition": "leak_count = policy authorizations on an unverified cycle + factual prose while verified is false + spoken text that contains the planted object outside a preference echo. Non-empty orientation, abstain, and soft templates are spoken_text_when_unverified. Preference lines that repeat obj are preference_echo_when_unverified. Neither of those is part of leak_count."
+}

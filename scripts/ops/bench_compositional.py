@@ -42,9 +42,9 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, "src")
-
-import requests
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 try:
     from resileos.ui.attach_scale import attach_scale
@@ -118,6 +118,8 @@ COMPOSITIONS = [
 
 
 def _post(path: str, body: dict, timeout: float = 30.0) -> dict:
+    import requests
+
     r = requests.post(f"{BASE}{path}", json=body, headers=HEADERS, timeout=timeout)
     r.raise_for_status()
     return r.json()
@@ -218,6 +220,86 @@ def run_resileos() -> dict:
     }
 
 
+def run_inprocess() -> dict:
+    """Same three compositions against Titanos.ask / ask_inverse / chain.
+
+    Does not open a socket. Inverse hops call ``ask_inverse``. Forward
+    hops and ``/chain`` call ``ask`` / ``chain``. A step counts only
+    when the answer status is ACCEPTED.
+    """
+    from titanos import Titanos, TitanosConfig
+
+    titan = Titanos(TitanosConfig())
+    for subject, relation, obj in BASE_FACTS:
+        titan.learn(subject, relation, obj)
+
+    def _accepted(answer) -> str | None:
+        if getattr(answer, "status", None) != "ACCEPTED":
+            return None
+        value = getattr(answer, "value", None)
+        return None if value is None else str(value)
+
+    results = []
+    hits = 0
+    active = _active()
+    for spec in active:
+        started = time.perf_counter()
+        error = None
+        got = None
+        try:
+            if spec["kind"] == "chain":
+                got = _accepted(titan.chain(spec["start"], spec["relations"]))
+            elif spec["kind"] == "compose":
+                prev = None
+                for index, step in enumerate(spec["steps"]):
+                    subject = step["subject"]
+                    if subject == "@prev":
+                        if prev is None:
+                            error = "prior step returned no value"
+                            got = None
+                            break
+                        subject = prev
+                    if step.get("inverse"):
+                        answer = titan.ask_inverse(subject, step["relation"])
+                    else:
+                        answer = titan.ask(subject, step["relation"])
+                    got = _accepted(answer)
+                    if got is None:
+                        error = f"step {index} not ACCEPTED"
+                        break
+                    prev = got
+            else:
+                raise ValueError(f"unknown kind: {spec['kind']}")
+        except Exception as exc:
+            got = None
+            error = type(exc).__name__
+        elapsed = (time.perf_counter() - started) * 1000
+        ok = got is not None and str(got) == spec["expected"]
+        if ok:
+            hits += 1
+        results.append(
+            {
+                "kind": spec["kind"],
+                "question": spec["question"],
+                "expected": spec["expected"],
+                "got": got,
+                "ok": ok,
+                "latency_ms": round(elapsed, 1),
+                "note": spec["note"],
+                "error": error,
+            }
+        )
+    return {
+        "transport": "in-process Titanos.ask / ask_inverse / chain",
+        "backend": "titanos",
+        "config": "Titanos(TitanosConfig())",
+        "composition_rate": round(hits / len(active), 4) if active else 0.0,
+        "hits": hits,
+        "total": len(active),
+        "results": results,
+    }
+
+
 def run_llm() -> dict | None:
     if not (LLM_KEY and LLM_MODEL):
         return None
@@ -240,6 +322,8 @@ def run_llm() -> dict | None:
             "temperature": 0,
             "max_tokens": 32,
         }
+        import requests
+
         r = requests.post(
             LLM_URL,
             json=body,
@@ -285,37 +369,57 @@ def run_llm() -> dict | None:
 
 
 def main() -> int:
+    from bench.measure_meta import environment, redact_text, utc_now
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-seed", action="store_true")
+    ap.add_argument(
+        "--in-process",
+        action="store_true",
+        help="score Titanos directly and do not call HTTP",
+    )
     ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args()
 
     report: dict = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "base_facts": BASE_FACTS,
+        "measured_at": utc_now(),
+        "environment": environment(),
+        "base_facts": [list(row) for row in BASE_FACTS],
         "compositions": COMPOSITIONS,
     }
 
-    if not args.skip_seed:
+    if args.in_process:
+        report["http"] = {
+            "status": "skipped",
+            "reason": "--in-process set; no HTTP server was called",
+        }
         try:
-            seed_base()
+            report["resileos"] = run_inprocess()
+        except Exception as exc:
+            report["resileos"] = {"error": type(exc).__name__}
+        report["llm"] = None
+        report["llm_note"] = "LLM leg not called on the in-process path"
+    else:
+        if not args.skip_seed:
+            try:
+                seed_base()
+            except Exception as e:
+                report["seed_error"] = redact_text(str(e))
+
+        try:
+            report["resileos"] = run_resileos()
         except Exception as e:
-            report["seed_error"] = str(e)
+            report["resileos"] = {"error": redact_text(str(e))}
 
-    try:
-        report["resileos"] = run_resileos()
-    except Exception as e:
-        report["resileos"] = {"error": str(e)}
-
-    llm = run_llm()
-    report["llm"] = llm
+        llm = run_llm()
+        report["llm"] = llm
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(
-        json.dumps(attach_scale(report), indent=2), encoding="utf-8"
-    )
-    print(json.dumps(report, indent=2))
-    print(f"\nwrote {args.out}")
+    text = redact_text(json.dumps(attach_scale(report), indent=2)) + "\n"
+    args.out.write_text(text, encoding="utf-8")
+    print(text, end="")
+    print(f"wrote {args.out}")
     return 0
 
 
