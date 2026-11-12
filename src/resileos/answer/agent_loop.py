@@ -1,15 +1,21 @@
-"""Studio chat loop: five-class router plus explicit search, tool, and upload paths."""
+"""Studio chat loop: five-class router, explicit tools, and a bounded Kin cycle.
+
+Ordinary turns keep history under a Hermes budget and run one Kin cycle.
+``/search`` and ``/tool`` stay explicit tool use. Assertive mouth waits on
+a verified cycle or the Metis allow_mouth policy. An unverified cycle does
+not learn.
+"""
 from __future__ import annotations
 
 import inspect
 import logging
 from typing import Any
 
+from resileos.chat import turn_cycle
 from resileos.chat.ledger import normalize_hub_id
 from resileos.chat.router import Turn, dispatch, present
 from resileos.harness.legions.search import web_search
 from resileos.harness.surface import ALWAYS_VISIBLE_TOOLS, DEMIGOD_TOOLS
-from resileos.kin.wiring import mouth_allowed_from_last_cycle
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +74,7 @@ def present_chat(
         "memory_chip": flags["memory_chip"],
         "teach_affordance": flags["teach_affordance"],
         "persona": persona,
-        "allow_mouth": mouth_allowed_from_last_cycle(default=False),
+        "allow_mouth": False,
         "value": reply,
         "source": src,
         "verified": verified,
@@ -176,6 +182,21 @@ def _upload_note(file_data: dict[str, Any]) -> str:
     )
 
 
+def _finish(
+    body: dict[str, Any],
+    window: list[dict[str, Any]],
+    cycle: dict[str, Any] | None,
+    *,
+    assertive: bool,
+) -> dict[str, Any]:
+    return turn_cycle.attach_turn_fields(
+        body,
+        window=window,
+        cycle=cycle,
+        assertive=assertive,
+    )
+
+
 async def run_agent_chat(
     titanos: Any,
     message: str,
@@ -187,8 +208,8 @@ async def run_agent_chat(
     last_tool_empty: bool = False,
     persona: str = "honest",
 ) -> dict[str, Any]:
-    """Route one studio turn. History is accepted and unused by the router."""
-    del history
+    """Route one studio turn through retrieval, and a Kin cycle when it is chat."""
+    window = turn_cycle.budget_history(history)
     text = (message or "").strip()
 
     if file_data and not text:
@@ -214,12 +235,14 @@ async def run_agent_chat(
         )
         body["verified"] = False
         body["file"] = {key: value for key, value in file_data.items() if key != "bytes"}
-        return body
+        return _finish(body, window, None, assertive=False)
 
     if text.lower().startswith("/search "):
-        return await _maybe_search(text[8:].strip())
+        body = await _maybe_search(text[8:].strip())
+        return _finish(body, window, None, assertive=False)
     if text.lower() == "/search":
-        return await _maybe_search("")
+        body = await _maybe_search("")
+        return _finish(body, window, None, assertive=False)
 
     if text.lower().startswith("/tool "):
         name = text[6:].strip().split()[0] if text[6:].strip() else ""
@@ -236,7 +259,7 @@ async def run_agent_chat(
                 "wrote": False,
                 "inverse": False,
             }
-            return present_chat(
+            body = present_chat(
                 "Name a tool after /tool.",
                 "NO_ROWS",
                 action,
@@ -244,6 +267,7 @@ async def run_agent_chat(
                 persona=persona,
                 source="tool",
             )
+            return _finish(body, window, None, assertive=False)
         try:
             raw = _call_named_tool(name, {})
             import json
@@ -275,21 +299,95 @@ async def run_agent_chat(
         )
         body["verified"] = False
         body["tool_result"] = raw
-        return body
+        return _finish(body, window, None, assertive=False)
 
     if not text:
         raise ValueError("turn text is empty")
 
     try:
+        cycle = turn_cycle.run_bounded_cycle(text, window, hub_id, titanos)
+    except Exception:
+        log.exception("bounded kin cycle failed")
+        cycle = {
+            "verified": False,
+            "allow_mouth": False,
+            "tutorial_fragment": None,
+            "checkpoint": None,
+            "reason": "cycle failed",
+            "packet_hash": "",
+            "stage_before": 0,
+            "history_used": len(window),
+            "legions": {},
+        }
+    spoken = turn_cycle.continuation_text(text, window, titanos)
+    empty_follow = turn_cycle.infer_last_tool_empty(window, last_tool_empty)
+    assertive = bool(cycle.get("verified") or cycle.get("allow_mouth"))
+    triple = None
+    try:
+        triple = turn_cycle.writable_triple(spoken, hub_id, force_class)
+    except ValueError:
+        triple = None
+
+    if triple is not None and not cycle.get("verified"):
+        action = {
+            "class": "HUB_LEARN",
+            "action": "learn",
+            "tool": None,
+            "subject": triple[0],
+            "relation": triple[1],
+            "relations": [triple[1]],
+            "obj": triple[2],
+            "rows": [],
+            "wrote": False,
+            "inverse": False,
+        }
+        body = present_chat(
+            turn_cycle.UNVERIFIED_WRITE,
+            "ABSTAINED",
+            action,
+            hub_id=hub_id,
+            persona=persona,
+        )
+        body["verified"] = False
+        return _finish(body, window, cycle, assertive=False)
+
+    store = titanos
+    if triple is not None and cycle.get("verified"):
+        head = turn_cycle.zeus_learn(titanos, triple)
+        if not head.get("applied"):
+            reason = str(head.get("reason") or "not approved")[:180]
+            action = {
+                "class": "HUB_LEARN",
+                "action": "learn",
+                "tool": None,
+                "subject": triple[0],
+                "relation": triple[1],
+                "relations": [triple[1]],
+                "obj": triple[2],
+                "rows": [],
+                "wrote": False,
+                "inverse": False,
+            }
+            reply = (
+                "Nothing was stored. "
+                f"{reason}. "
+                'Teach a clear "remember …" line, attach a document, or ask a fact already in the store.'
+            )
+            body = present_chat(reply, "ABSTAINED", action, hub_id=hub_id, persona=persona)
+            body["verified"] = False
+            return _finish(body, window, cycle, assertive=assertive)
+        store = turn_cycle.LearnProxy(titanos)
+
+    try:
         reply, status, action = dispatch(
             Turn(
-                text=text,
-                last_tool_empty=last_tool_empty,
+                text=spoken,
+                last_tool_empty=empty_follow,
                 force_class=force_class,
-                allow_mouth=None,
+                allow_mouth=assertive,
                 persona=persona,
             ),
-            titanos,
+            store,
             hub_id,
         )
     except ValueError:
@@ -298,16 +396,23 @@ async def run_agent_chat(
         log.exception("chat dispatch failed")
         raise
 
+    if not reply and status == "MOUTH_CLOSED":
+        reply = turn_cycle.orientation_text(persona)
     body = present_chat(reply, status, action, hub_id=hub_id, persona=persona)
+    if cycle.get("allow_mouth") is not None:
+        body["allow_mouth"] = bool(cycle.get("allow_mouth"))
     fragment = action.get("tutorial_fragment")
     if not fragment:
         from resileos.kin.aphrodite import note_router_step
 
         fragment = note_router_step(hub_id, status, action)
+    if not fragment and cycle.get("verified"):
+        fragment = cycle.get("tutorial_fragment")
     if fragment and (status == "ACCEPTED" or status == "ABSTAINED"):
         body["tutorial_fragment"] = fragment
     if file_data:
         body["file"] = {key: value for key, value in file_data.items() if key != "bytes"}
-        body["value"] = f"{_upload_note(file_data)}\n\n{reply}".strip()
+        note = _upload_note(file_data)
+        body["value"] = f"{note}\n\n{reply}".strip()
         body["reply_text"] = body["value"]
-    return body
+    return _finish(body, window, cycle, assertive=assertive and status != "MOUTH_CLOSED")

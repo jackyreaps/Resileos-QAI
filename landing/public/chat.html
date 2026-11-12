@@ -272,7 +272,7 @@
             min-height: 0;
             overflow-y: auto;
             overscroll-behavior: contain;
-            padding: 28px 16px 12px;
+            padding: 28px 16px 24px;
             display: flex;
             flex-direction: column;
             gap: 16px;
@@ -404,6 +404,18 @@
             border-bottom-left-radius: 5px;
         }
         .reply { font-size: 0.98rem; white-space: pre-wrap; }
+        .reply.companion, .reply.tutorial {
+            margin-top: 10px;
+            padding-left: 10px;
+            border-left: 2px solid var(--accent);
+        }
+        .reply.tutorial { border-left-color: var(--success); }
+        .companion-line {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 0.95rem;
+            max-width: 46rem;
+        }
         .meta {
             font-size: 0.75rem;
             color: var(--muted);
@@ -787,7 +799,8 @@
         <div class="empty" id="empty-state">
             <p class="eyebrow">Stores · Derives · Abstains</p>
             <h2>Remembers exactly</h2>
-            <p class="lede">Facts are stored as residual packets. Unknowns are abstained. Tools, Kin, Studio, and the ledger are in the header.</p>
+            <p class="lede">Sign in with a username to keep this thread. Teach a fact, then ask it back. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented. Studio, Kin, and the ledger are in the header.</p>
+            <p class="companion-line" id="returning-companion" hidden></p>
             <div class="suggestions" id="suggestions">
                 <button type="button" class="suggestion" data-ask="remember alice works_at acme">Teach a fact</button>
                 <button type="button" class="suggestion" data-ask="alice works_at">Ask a stored fact</button>
@@ -1362,6 +1375,7 @@
                 const slot = document.getElementById('companion-fragment');
                 if (slot) slot.textContent = state.tutorial_fragment || state.last_fragment || '';
             }
+            paintReturningCompanion();
             const steps = document.getElementById('companion-steps');
             if (!steps) return;
             steps.replaceChildren();
@@ -1429,6 +1443,7 @@
         try {
             const cached = localStorage.getItem('resileos_companion');
             if (cached) applyCompanion(JSON.parse(cached));
+            else paintReturningCompanion();
         } catch (err) { /* ignore a bad local copy */ }
 
         function closePanels() {
@@ -1572,6 +1587,46 @@
             return '';
         }
 
+        function kindLabel(kind) {
+            const labels = {
+                residual: 'stored',
+                search: 'search',
+                tool: 'tool',
+                abstain: 'abstain',
+                mouth: 'mouth',
+                orientation: 'guide',
+                tutorial: 'tutorial',
+                companion: 'companion'
+            };
+            return labels[kind] || kind;
+        }
+
+        function kindClass(kind) {
+            if (kind === 'residual' || kind === 'mouth') return 'accepted';
+            if (kind === 'tutorial' || kind === 'companion') return 'memory';
+            if (kind === 'search' || kind === 'orientation' || kind === 'abstain') return 'abstained';
+            if (kind === 'tool') return '';
+            return '';
+        }
+
+        function paintReturningCompanion() {
+            const slot = document.getElementById('returning-companion');
+            if (!slot) return;
+            let state = null;
+            try { state = JSON.parse(localStorage.getItem('resileos_companion') || 'null'); }
+            catch (err) { state = null; }
+            if (!state) { slot.hidden = true; return; }
+            const persona = state.persona || {};
+            const pending = (state.steps || []).find(step => !step.done);
+            const lines = [];
+            if (persona.name) lines.push(persona.name + ' is with this hub.');
+            if (state.last_fragment) lines.push(state.last_fragment);
+            else if (pending && pending.label) lines.push('Next: ' + pending.label + '.');
+            if (!lines.length) { slot.hidden = true; return; }
+            slot.hidden = false;
+            slot.textContent = lines.join(' ');
+        }
+
         function badgeLabel(status) {
             const s = String(status || '');
             const lower = s.toLowerCase();
@@ -1683,38 +1738,56 @@
             return { text: lines.join('\n'), status: status, href: data.status === 'UNAVAILABLE' ? '' : href };
         }
 
+        function extraLine(bubble, text, kind) {
+            if (!text) return;
+            const note = document.createElement('div');
+            note.className = 'reply ' + kind;
+            note.textContent = text;
+            bubble.appendChild(note);
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            meta.appendChild(chipEl(kindLabel(kind), kindClass(kind)));
+            bubble.appendChild(meta);
+        }
+
         function renderReply(bubble, d, opts) {
             const options = opts || {};
             bubble.replaceChildren();
             const text = replyText(d);
+            const companion = d && typeof d.companion_prompt === 'string' ? d.companion_prompt : '';
+            const tutorial = d && typeof d.tutorial_fragment === 'string' ? d.tutorial_fragment : '';
             const reply = document.createElement('div');
             reply.className = 'reply';
-            reply.textContent = text || 'No matching residual fact.';
+            reply.textContent = text || companion || 'No matching residual fact.';
             bubble.appendChild(reply);
             const meta = document.createElement('div');
             meta.className = 'meta';
             const status = (d && d.status) || '';
             const chip = d && d.chip;
+            const kind = d && d.message_kind;
+            if (kind) meta.appendChild(chipEl(kindLabel(kind), kindClass(kind)));
             if (status) meta.appendChild(chipEl(badgeLabel(status), statusKind(status)));
             if (chip && String(chip).toLowerCase() !== String(status).toLowerCase()) meta.appendChild(chipEl(chip, chip));
             if (d && d.memory_chip) meta.appendChild(chipEl('remembered', 'memory'));
-            if (d && d.source) meta.appendChild(document.createTextNode('source: ' + d.source));
-            if (d && typeof d.verified === 'boolean') meta.appendChild(document.createTextNode('verified: ' + d.verified));
-            if (d && d.router_class) meta.appendChild(document.createTextNode(d.router_class));
+            const notes = [];
+            if (d && d.source) notes.push('source: ' + d.source);
+            if (d && typeof d.verified === 'boolean') notes.push('verified: ' + d.verified);
+            if (d && d.cycle_verified === true) notes.push('cycle verified');
+            if (d && d.router_class) notes.push(d.router_class);
             if (d && d.tool_calls && d.tool_calls.length) {
-                meta.appendChild(document.createTextNode('tools: ' + d.tool_calls.map(t => t.tool || t.name).join(', ')));
+                notes.push('tools: ' + d.tool_calls.map(t => t.tool || t.name).join(', '));
             }
-            if (typeof options.ms === 'number') meta.appendChild(document.createTextNode(Math.round(options.ms) + ' ms'));
+            if (typeof options.ms === 'number') notes.push(Math.round(options.ms) + ' ms');
+            if (notes.length) meta.appendChild(document.createTextNode(notes.join(' · ')));
             if (meta.childNodes.length) bubble.appendChild(meta);
-            if (d && d.tutorial_fragment) {
-                const note = document.createElement('div');
-                note.className = 'reply';
-                note.textContent = d.tutorial_fragment;
-                bubble.appendChild(note);
+            if (text && companion) extraLine(bubble, companion, 'companion');
+            if (tutorial) {
+                extraLine(bubble, tutorial, 'tutorial');
                 const slot = document.getElementById('companion-fragment');
-                if (slot) slot.textContent = d.tutorial_fragment;
+                if (slot) slot.textContent = tutorial;
                 refreshCompanion();
             }
+            if (chat.contains(bubble)) chat.scrollTop = chat.scrollHeight;
             if (options.persist !== false) schedulePersist();
         }
 
@@ -2317,8 +2390,15 @@
                 renderReply(bubble, d, { ms: ms });
                 lastToolEmpty = ['NO_ROWS', 'ABSTAINED'].includes(d.status) || d.chip === 'no_rows' || d.chip === 'abstained';
                 if (text) {
+                    const taken = d.action_taken || {};
                     chatHistory.push({ role: 'user', content: text });
-                    chatHistory.push({ role: 'assistant', content: d.reply_text || d.value || '' });
+                    chatHistory.push({
+                        role: 'assistant',
+                        content: d.reply_text || d.value || '',
+                        subject: d.subject || taken.subject || '',
+                        relation: taken.relation || '',
+                        obj: (Array.isArray(d.rows) && d.rows.length) ? String(d.rows[0]) : ''
+                    });
                     if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
                 }
             } catch (e) {

@@ -69,9 +69,12 @@ _POSSESSIVE = re.compile(r"(?i)\b(?:who|what) is (\w+)'s (\w+)\b")
 
 _ABSTAIN_TEXT = (
     'The Oracle has no channel and no rows for that. '
-    'Say "remember that…" to teach me.'
+    'Say "remember that…" to teach me, attach a document, or try a clearer ask.'
 )
-_EMPTY_TEXT = "I don't have a verified fact for that in the store. No rows were returned."
+_EMPTY_TEXT = (
+    "I don't have a verified fact for that in the store. No rows were returned. "
+    'Teach one with "remember that…", attach a document, or ask more clearly.'
+)
 
 _SOFT_PROSE = {
     "honest": "I'm here. I won't assert a stored fact on this turn.",
