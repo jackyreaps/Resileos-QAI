@@ -7,13 +7,15 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from resileos.substrate.oscillator import (
-    KuramotoField, golden_ladder, golden_weyl, coupling_from_graph,
-    empty_coupling, PHI,
-)
 from resileos.substrate.nonconservative import NonConservativeOperator
+from resileos.substrate.oscillator import (
+    KuramotoField,
+    coupling_from_graph,
+    empty_coupling,
+    golden_ladder,
+    golden_weyl,
+)
 from resileos.substrate.phasor import PhasorGraph
-
 
 R = 8
 
@@ -87,6 +89,17 @@ def test_no_coupling_theta_advances_at_omega():
     # RK4 of a constant derivative is exact
     assert np.allclose(theta1, ((expected + np.pi) % (2 * np.pi)) - np.pi,
                        atol=1e-9)
+
+
+def test_large_dt_under_coupling_stays_finite():
+    """A single coarse step must not leave the circle."""
+    f = KuramotoField(R, kappa=10.0, alpha=1e-3, dt=0.5,
+                      random_start=True, seed=0)
+    W = np.ones((R, R)) - np.eye(R)
+    theta = f.step(epsilon=0.01, W=W, dt=0.5)
+    assert np.all(np.isfinite(theta))
+    assert np.all(theta >= -np.pi - 1e-6)
+    assert np.all(theta <= np.pi + 1e-6)
 
 
 def test_coupling_increases_order_parameter():

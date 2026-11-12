@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -82,11 +81,16 @@ class StreamState:
         last_packet_level   int               level of last packet
                                               (0 = none)
 
-    Update rule (spec §3):
-        stream_hv = normalize(stream_hv + decay**L_p * hv_p)
+    Update rule:
+        raw = raw + decay**L_p * hv_p
+        stream_hv = normalize(raw)
         stream_span = (min(start, s_p), max(end, e_p))
         stream_packet_count += 1
         last_packet_level = L_p
+
+    decay = 1 keeps every packet in the sum at equal weight. Normalizing
+    on every step would shrink older packets, and ||stream_hv||^2 would
+    stay 1, so entropy() reads ||raw||^2 instead.
     """
 
     def __init__(self, cfg: StreamStateConfig) -> None:
@@ -94,8 +98,10 @@ class StreamState:
             raise TypeError("cfg must be a StreamStateConfig")
         self.cfg = cfg
         self._hv: np.ndarray = np.zeros(cfg.dim, dtype=np.complex128)
-        self._span_start: Optional[int] = None
-        self._span_end: Optional[int] = None
+        # Unnormalized bundle. readout() is normalize(raw); entropy is ||raw||^2.
+        self._raw: np.ndarray = np.zeros(cfg.dim, dtype=np.complex128)
+        self._span_start: int | None = None
+        self._span_end: int | None = None
         self._count: int = 0
         self._last_level: int = 0
 
@@ -113,7 +119,7 @@ class StreamState:
         return self._count
 
     @property
-    def span(self) -> tuple[Optional[int], Optional[int]]:
+    def span(self) -> tuple[int | None, int | None]:
         return (self._span_start, self._span_end)
 
     @property
@@ -131,7 +137,8 @@ class StreamState:
                 f"(dim,) = ({self.cfg.dim},)"
             )
         weight = float(self.cfg.decay) ** int(packet.level)
-        self._hv = _normalize(self._hv + weight * packet.hv)
+        self._raw = self._raw + weight * np.asarray(packet.hv, dtype=np.complex128)
+        self._hv = _normalize(self._raw)
 
         if self._span_start is None:
             self._span_start = int(packet.span_start)
@@ -157,12 +164,12 @@ class StreamState:
         return self._hv.copy()
 
     def entropy(self) -> float:
-        """Effective number of packets contributing (spec §4).
+        """Squared norm of the unnormalized bundle.
 
-        For a unit-norm bundle of N random phasors, ||sum||^2 ~ N in
-        expectation. This returns ||stream_hv||^2. Diagnostic only.
+        readout() is unit-norm after the first packet, so ||stream_hv||^2
+        stays 1. A sum of N random unit phasors has ||raw||^2 ~ N.
         """
-        return float(np.sum(np.abs(self._hv) ** 2))
+        return float(np.sum(np.abs(self._raw) ** 2))
 
     def snapshot(self) -> dict:
         """Full state dict (spec §4)."""
@@ -185,6 +192,7 @@ class StreamState:
         np.savez(
             p,
             hv=self._hv,
+            raw=self._raw,
             dim=np.int64(self.cfg.dim),
             decay=np.float64(self.cfg.decay),
             seed=np.int64(self.cfg.seed),
@@ -199,7 +207,7 @@ class StreamState:
         )
 
     @classmethod
-    def load(cls, path: str | Path) -> "StreamState":
+    def load(cls, path: str | Path) -> StreamState:
         """Reconstruct from a .npz written by save() (spec §5)."""
         raw = np.load(Path(path), allow_pickle=False)
         cfg = StreamStateConfig(
@@ -209,6 +217,10 @@ class StreamState:
         )
         state = cls(cfg)
         state._hv = raw["hv"].astype(np.complex128)
+        if "raw" in raw.files:
+            state._raw = raw["raw"].astype(np.complex128)
+        else:
+            state._raw = state._hv.copy()
         s = int(raw["span_start"])
         e = int(raw["span_end"])
         state._span_start = None if s < 0 else s
@@ -220,6 +232,7 @@ class StreamState:
     def reset(self) -> None:
         """Return to initial state: zero vector, empty span, zero count."""
         self._hv = np.zeros(self.cfg.dim, dtype=np.complex128)
+        self._raw = np.zeros(self.cfg.dim, dtype=np.complex128)
         self._span_start = None
         self._span_end = None
         self._count = 0

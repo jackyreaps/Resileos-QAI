@@ -11,7 +11,7 @@ because the address is stable and the provider is a peripheral.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -32,7 +32,7 @@ def fluid_prompt(embed: dict[str, Any], persona: str = "") -> str:
 
 
 def generate_still(
-    arr: Optional[np.ndarray] = None,
+    arr: np.ndarray | None = None,
     *,
     belt: int = 0,
     frame: int = 0,
@@ -54,8 +54,32 @@ def generate_still(
 
 
 def generate_video_hook(prompt: str) -> dict[str, Any]:
-    """Video only if configured. Otherwise status is not_configured."""
-    status = video_status()
-    if not status["configured"]:
-        return {"status": "not_configured", "prompt": prompt}
-    return request_video(prompt)
+    """Video only when a provider returns an asset. Otherwise UNAVAILABLE.
+
+    No placeholder URL is invented.
+    """
+    unavailable = {
+        "status": "UNAVAILABLE",
+        "detail": "No video generator is configured on this host.",
+        "draft": False,
+        "prompt": prompt,
+        "url": None,
+    }
+    if not video_status()["configured"]:
+        return unavailable
+    result = request_video(prompt)
+    url = None
+    payload = result.get("result")
+    if isinstance(payload, dict):
+        url = payload.get("url") or payload.get("video_url")
+    if result.get("status") != "submitted" or not url:
+        unavailable["detail"] = "Video provider returned no asset."
+        return unavailable
+    return {
+        "status": "submitted",
+        "detail": "",
+        "draft": False,
+        "prompt": prompt,
+        "url": url,
+        "result": payload,
+    }

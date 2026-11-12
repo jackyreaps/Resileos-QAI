@@ -5,7 +5,7 @@ is importable. Fallback path keeps the same return shape.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -17,14 +17,13 @@ except ImportError:
     CoreConfig = None
     _HAS_CORE = False
 
-try:
-    from resileos.evolution_oscillator import OscillatorOrientedSearch
-    from resileos.substrate.oscillator import KuramotoField
-    _HAS_SEARCH = True
-except ImportError:
-    OscillatorOrientedSearch = None
-    KuramotoField = None
-    _HAS_SEARCH = False
+def _search_types():
+    try:
+        from resileos.evolution_oscillator import OscillatorOrientedSearch
+        from resileos.substrate.oscillator import KuramotoField
+    except ImportError:
+        return None, None
+    return OscillatorOrientedSearch, KuramotoField
 
 
 def core_step_from_address(embed: dict[str, Any], size: int = 4) -> dict[str, Any]:
@@ -50,8 +49,9 @@ def core_step_from_address(embed: dict[str, Any], size: int = 4) -> dict[str, An
 
 def search_from_field(theta: list[float]) -> dict[str, Any]:
     """Build an oscillator-oriented search biased by the field phases."""
-    if _HAS_SEARCH and OscillatorOrientedSearch is not None and KuramotoField is not None:
-        field = KuramotoField(n=3)
+    OscillatorOrientedSearch, KuramotoField = _search_types()
+    if OscillatorOrientedSearch is not None and KuramotoField is not None:
+        field = KuramotoField(3)
         field.theta = np.array(theta[:3] if len(theta) >= 3 else [0.0, 0.0, 0.0])
         search = OscillatorOrientedSearch(field=field, budget=8, seed=0)
         return {

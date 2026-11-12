@@ -448,12 +448,24 @@ def list_tools(q: Optional[str] = Query(default=None)):
 
 @app.post("/api/v1/tools/video_generate", dependencies=[Depends(verify_api_key)])
 def video_generate(payload: dict | None = None):
-    """Honest stub: no video generator is wired on this host."""
-    del payload
+    """Call the video hook. Unavailable hosts get no URL."""
+    from resileos.ui.fluid_gen import generate_video_hook
+
+    prompt = ""
+    if isinstance(payload, dict):
+        prompt = str(payload.get("prompt") or "")
+    out = generate_video_hook(prompt)
+    if out.get("status") != "submitted" or not out.get("url"):
+        return {
+            "status": "UNAVAILABLE",
+            "detail": out.get("detail") or "No video generator is configured on this host.",
+            "draft": False,
+        }
     return {
-        "status": "UNAVAILABLE",
-        "detail": "No video generator is configured on this host.",
+        "status": "submitted",
+        "detail": "",
         "draft": False,
+        "url": out.get("url"),
     }
 
 

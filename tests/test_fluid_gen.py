@@ -1,7 +1,7 @@
 """Tests for the fluid generator."""
 import numpy as np
 
-from resileos.ui.fluid_gen import fluid_prompt, generate_still, generate_video_hook
+from resileos.ui.fluid_gen import generate_still, generate_video_hook
 
 
 def test_generate_still():
@@ -17,4 +17,15 @@ def test_generate_still():
 def test_video_hook_unconfigured(monkeypatch):
     monkeypatch.delenv("RESILEOS_VIDEO_PROVIDER", raising=False)
     out = generate_video_hook("test")
-    assert out["status"] == "not_configured"
+    assert out["status"] == "UNAVAILABLE"
+    assert out["url"] is None
+    assert out["draft"] is False
+    assert "http" not in str(out).lower()
+
+
+def test_video_hook_provider_without_asset(monkeypatch):
+    monkeypatch.setenv("RESILEOS_VIDEO_PROVIDER", "named")
+    out = generate_video_hook("test")
+    assert out["status"] == "UNAVAILABLE"
+    assert out["url"] is None
+    assert "http" not in str(out).lower()
