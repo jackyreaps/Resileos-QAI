@@ -4,909 +4,174 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Resileos — Remembers exactly. Grows with your hub.</title>
-  <meta name="description" content="Keeps exact facts, refuses to invent, gets more capable as hubs fill. Stores, derives, and abstains. Studio + free key." />
+  <meta name="description" content="Remembers exactly, grows with your hub, and does not make things up. Stores, derives, and abstains." />
   <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
   <link rel="stylesheet" href="/assets/site.css" />
+  <script>
+    (function () {
+      var routes = {
+        titanos: "/how-it-works#titanos",
+        structure: "/kin#structure",
+        bench: "/how-it-works#bench",
+        time: "/how-it-works#time",
+        senses: "/how-it-works#senses",
+        experimental: "/how-it-works#experimental",
+        "demi-gods": "/kin#demi-gods",
+        roadmap: "/how-it-works#roadmap",
+        pricing: "/pricing#pricing",
+        start: "/pricing#start",
+        capable: "/how-it-works#capable",
+        kin: "/kin#kin",
+        studio: "/kin#studio",
+        pantheon: "/kin#pantheon",
+        quickstart: "/how-it-works#quickstart",
+        faq: "/how-it-works#faq"
+      };
+      var id = (location.hash || "").slice(1);
+      if (routes[id]) location.replace(routes[id]);
+    })();
+  </script>
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
   <nav class="nav" aria-label="Primary">
     <div class="nav-inner">
-      <a class="logo" href="#top"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
         <span></span><span></span><span></span>
       </button>
       <div class="nav-links" id="nav-menu">
-        <a href="#titanos"><span class="nav-el">Titanos</span><span class="nav-en">Engine</span></a>
-        <a href="#structure"><span class="nav-el">Order</span><span class="nav-en">Structure</span></a>
-        <a href="#does"><span class="nav-el">Zeus</span><span class="nav-en">Core</span></a>
-        <a href="#bench"><span class="nav-el">Apollo</span><span class="nav-en">Proof</span></a>
-        <a href="#time"><span class="nav-el">Hades</span><span class="nav-en">Lessons</span></a>
-        <a href="#senses"><span class="nav-el">Iris</span><span class="nav-en">Senses</span></a>
-        <a href="#experimental"><span class="nav-el">Athena</span><span class="nav-en">Judgment</span></a>
-        <a href="#demi-gods"><span class="nav-el">Demi-gods</span><span class="nav-en">Checks</span></a>
-        <a href="#roadmap"><span class="nav-el">Metis</span><span class="nav-en">Policy</span></a>
-        <a href="#pricing"><span class="nav-el">Hermes</span><span class="nav-en">Dispatch</span></a>
-        <a href="/chat"><span class="nav-el">Chat</span><span class="nav-en">Talk</span></a>
-        <a class="nav-cta" href="/chat">Open chat</a>
+        <a href="/" aria-current="page">Home</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/kin">Kin</a>
+        <a href="/pricing">Pricing</a>
+        <a class="nav-cta" href="/chat">Chat</a>
       </div>
     </div>
   </nav>
 
   <main id="main">
-  <header class="hero" id="top">
-    <div class="hero-copy">
-      <div class="eyebrow">Stores · derives · abstains</div>
-      <h1>Remembers exactly.<br><span class="line2">Grows with your hub.</span></h1>
-      <p class="lede">
-        A machine that <strong>keeps exact facts</strong>, <strong>refuses to invent</strong>, and gets
-        <strong>more capable as hubs fill</strong>. Learn a fact, ask it back, get that fact.
-        Missing entities and relations returned clear empty answers in the measured probes. Open <a href="/chat">chat</a> or the API. Free key to start.
-      </p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="/chat">Open chat</a>
-        <a class="btn btn-ghost" href="#start">Get a free key</a>
-      </div>
-      <p class="micro">Stored facts, growing hubs, clear abstentions. <a href="#capable">See what it can do</a>.</p>
-    <aside class="panel" aria-label="Live epistemic demo">
-      <div class="tag">ILLUSTRATIVE TRACE · TITANOS</div>
-      <div class="row m"># Learn</div>
-      <div class="row">POST /api/v1/learn</div>
-      <div class="row">{"subject":"Zeus","relation":"domain","obj":"sky"}</div>
-      <div class="row k">→ status: SUCCESS</div>
-      <br />
-      <div class="row m"># Ask it back</div>
-      <div class="row">POST /api/v1/query · Zeus domain</div>
-      <div class="row k">→ ACCEPTED · sky</div>
-      <br />
-      <div class="row m"># Derive</div>
-      <div class="row">POST /api/v1/chain · Zeus → parent_of → domain</div>
-      <div class="row k">→ ACCEPTED · wisdom · path provenance</div>
-      <br />
-      <div class="row m"># As of a date</div>
-      <div class="row">Athens capital_of as of 1800</div>
-      <div class="row k">→ ACCEPTED · Ottoman · today · Greece</div>
-      <br />
-      <div class="row m"># Unknown</div>
-      <div class="row">Zeus ssn</div>
-      <div class="row c">→ ABSTAINED · empty</div>
-    </aside>
-    </div>
-    <figure class="hero-figure img-hover">
-      <img src="/assets/gods/zeus.webp" width="864" height="1152" alt="AI-enhanced marble portrait of Zeus Ammon with circuit traces, based on a Metropolitan Museum sculpture" />
-    </figure>
-  </header>
-
-  <div class="stats">
-    <div class="stats-nums" aria-label="Measured results">
-      <div>
-        <strong class="ok-num">1.0</strong>
-        <span>Exact recall on 3 known facts</span>
-      </div>
-      <div>
-        <strong class="ok-num">0.0</strong>
-        <span>Invent rate on 12 unknown pairs</span>
-      </div>
-      <div>
-        <strong>3/3</strong>
-        <span>Composition via /chain</span>
-      </div>
-      <div>
-        <strong>0/141</strong>
-        <span>False conflicts, temporal probe</span>
-      </div>
-      <div>
-        <strong>~35 ms</strong>
-        <span>Median latency</span>
-      </div>
-    </div>
-    <div class="strip-inner">
-      <div><strong>Remembers exactly</strong> — learned fact in, same fact out</div>
-      <div><strong>Refuses to invent</strong> — unknowns stay empty</div>
-      <div><strong>Grows with hubs</strong> — user: · world: · org:</div>
-      <div><strong>Facts with time</strong> — ask as of a date</div>
-    </div>
-  </div>
-
-  <section id="titanos">
-    <div class="meander" aria-hidden="true"></div>
-    <figure class="titanos-figure img-hover">
-      <img src="/assets/gods/titanos.webp" width="1280" height="720" alt="AI-generated marble figurehead of Titanos with circuit traces and a voxel dissolve" />
-    </figure>
-    <p class="patron-kicker"><strong>Titanos</strong>, Engine</p>
-    <h2>The figurehead</h2>
-    <p class="sub">Titanos is the engine over the deterministic residual core. It exposes <code>ask</code>, <code>ask_list</code>, and <code>chain</code>. Those calls return <strong>ACCEPTED</strong>, <strong>ABSTAINED</strong>, or <strong>CONFLICT</strong>.</p>
-  </section>
-
-  <section class="alt" id="structure">
-    <div class="inner">
-      <div class="meander" aria-hidden="true"></div>
-      <p class="patron-kicker"><strong>Order</strong>, Structure</p>
-      <h2>How the gods are structured</h2>
-      <p class="sub">Not a circle of equals. Titanos sits at the top as the engine. Zeus routing stands over the residual core, which is the deterministic leaf and the source of truth. Kin stand as side-interfaces to that core. Demi-gods are summoned for one check and then dismissed. Legions serve under one Kin.</p>
-      <div class="hierarchy" aria-label="Hierarchy of Titanos, Zeus routing, the residual core, Kin, Demi-gods, and Legions">
-        <div class="h-spine" aria-hidden="true"></div>
-        <div class="h-stack">
-          <div class="h-node h-top">
-            <span class="h-kicker">Engine</span>
-            <strong>Titanos</strong>
-            <span><code>ask</code> · <code>ask_list</code> · <code>chain</code> return ACCEPTED, ABSTAINED, or CONFLICT</span>
-          </div>
-          <div class="h-node">
-            <span class="h-kicker">Routing</span>
-            <strong>Zeus</strong>
-            <span>Writes apply only after reviewers approve</span>
-          </div>
-          <div class="h-node h-core">
-            <span class="h-kicker">Source of truth</span>
-            <strong>Residual core</strong>
-            <span>Deterministic leaf. Exact store, derivation, and abstention consult this core.</span>
-          </div>
-        </div>
-        <p class="h-label">Kin — standing side-interfaces</p>
-        <ul class="h-kin">
-          <li><strong>Iris</strong><span>Senses, sensors, and log readers</span></li>
-          <li><strong>Metis</strong><span>Policy: routers and risk classifiers; output is policy only</span></li>
-          <li><strong>Hermes</strong><span>Paths and dispatch</span></li>
-          <li><strong>Hades</strong><span>Lessons and checkpoints. Not Studio.</span></li>
-          <li><strong>Apollo</strong><span>Proof</span></li>
-          <li><strong>Athena</strong><span>Judgment: fail-closed when Apollo does not succeed</span></li>
-          <li><strong>Eat / perception</strong><span>Ingest gated before residual writes</span></li>
-        </ul>
-        <p class="h-label">Demi-gods — summoned for one check, then dismissed</p>
-        <ul class="h-demi">
-          <li>Themis</li>
-          <li>Momus</li>
-          <li>Hephaestus</li>
-          <li>Nike</li>
-          <li>Atlas</li>
-        </ul>
-        <p class="h-label">Legions <span class="pending">BETA</span></p>
-        <p class="h-note">Bounded tools registered under one Kin via <code>register_legion</code>. They inherit that Kin's constraints. Example legions are optional and off by default.</p>
-        <p class="h-label">Studio legions <span class="pending">BETA</span></p>
-        <ul class="h-plan">
-          <li><strong>Plan / test / debug</strong> <span>Hermes dispatches the loop. Mutating steps stay refused until Apollo proof. Lower-tier output stays out of the verified step.</span></li>
-          <li><strong>Graphify</strong> <span>Ingest through Eat: accept, reject, or abstain. Learn only on accept when commit is set.</span></li>
-          <li><strong>Forge</strong> <span>Hephaestus patronage. A video legion on Hermes. A configured provider can draft. Otherwise the status is UNAVAILABLE and no URL is invented.</span></li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <section id="pantheon">
-    <div class="meander" aria-hidden="true"></div>
-    <p class="patron-kicker"><strong>Pantheon</strong>, Map</p>
-    <h2>Find a section by its patron</h2>
-    <p class="sub">Titanos is the engine above this map. Each part of the site has a patron. Open any card to jump there. <a href="#kin">Legions under Kin</a> are merged on main and in beta.</p>
-    <div class="pantheon-grid">
-      <a class="pantheon-card" href="#does">
-        <span class="frame img-hover"><img src="/assets/gods/zeus.webp" width="864" height="1152" alt="AI-enhanced marble portrait of Zeus Ammon with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Zeus</span><span class="role">Core</span></span>
-      </a>
-      <a class="pantheon-card" href="#bench">
-        <span class="frame img-hover"><img src="/assets/gods/apollo.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Apollo with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Apollo</span><span class="role">Proof</span></span>
-      </a>
-      <a class="pantheon-card" href="#time">
-        <span class="frame img-hover"><img src="/assets/gods/hades.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Serapis as Hades with circuit traces, based on a Vatican Museums sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Hades</span><span class="role">Lessons</span></span>
-      </a>
-      <a class="pantheon-card" href="#senses">
-        <span class="frame img-hover"><img src="/assets/gods/iris.webp" width="825" height="1100" alt="AI-enhanced marble figure of Iris from the Parthenon west pediment, with circuit traces, based on a British Museum sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Iris</span><span class="role">Senses</span></span>
-      </a>
-      <a class="pantheon-card" href="#experimental">
-        <span class="frame img-hover"><img src="/assets/gods/athena.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Athena with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Athena</span><span class="role">Judgment</span></span>
-      </a>
-      <a class="pantheon-card" href="#roadmap">
-        <span class="frame img-hover"><img src="/assets/gods/metis.webp" width="825" height="1100" alt="AI-generated marble portrait of Metis with circuit traces" loading="lazy" /></span>
-        <span class="meta"><span class="name">Metis</span><span class="role">Policy</span></span>
-      </a>
-      <a class="pantheon-card" href="#pricing">
-        <span class="frame img-hover"><img src="/assets/gods/hermes.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Hermes with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Hermes</span><span class="role">Dispatch</span></span>
-      </a>
-      <a class="pantheon-card" href="#demi-gods">
-        <span class="frame img-hover"><img src="/assets/gods/themis.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Themis with circuit traces, based on a National Archaeological Museum of Greece sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Themis</span><span class="role">Law</span></span>
-      </a>
-      <a class="pantheon-card" href="#demi-gods">
-        <span class="frame img-hover"><img src="/assets/gods/momus.webp" width="825" height="1100" alt="AI-generated marble portrait of Momus with circuit traces" loading="lazy" /></span>
-        <span class="meta"><span class="name">Momus</span><span class="role">Critique</span></span>
-      </a>
-      <a class="pantheon-card" href="#studio">
-        <span class="frame img-hover"><img src="/assets/gods/hephaestus.webp" width="825" height="1100" alt="AI-generated marble portrait of Hephaestus with circuit traces" loading="lazy" /></span>
-        <span class="meta"><span class="name">Hephaestus</span><span class="role">Forge</span></span>
-      </a>
-      <a class="pantheon-card" href="#demi-gods">
-        <span class="frame img-hover"><img src="/assets/gods/nike.webp" width="825" height="1100" alt="AI-enhanced terracotta Nike with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Nike</span><span class="role">Victory</span></span>
-      </a>
-      <a class="pantheon-card" href="#demi-gods">
-        <span class="frame img-hover"><img src="/assets/gods/atlas.webp" width="825" height="1100" alt="AI-enhanced marble portrait of the Farnese Atlas with circuit traces, based on a National Archaeological Museum of Naples sculpture" loading="lazy" /></span>
-        <span class="meta"><span class="name">Atlas</span><span class="role">Capacity</span></span>
-      </a>
-    </div>
-  </section>
-
-  <section class="alt" id="kin">
-    <div class="inner">
-    <div class="meander" aria-hidden="true"></div>
-      <p class="patron-kicker"><strong>Architecture</strong></p>
-      <h2>Legions under Kin <span class="pending">BETA</span></h2>
-      <p class="sub">Merged on main at <code>ee9199ad</code>. This layer is in beta. Kin are role classes whose constraints do not move. A legion is one bounded tool registered on that Kin via <code>register_legion</code> in <code>src/resileos/kin/legions.py</code>. It inherits the Kin's <code>risk_classify</code> gate, <code>evidence_attach</code>, and budget check. Callers reach it only through that Kin's catalogue; there is no global registry. A legion cannot take the residual core, bypass Zeus routing, cross the Hades checkpoint boundary, or turn the verified-cycle mouth on. Example legions for Ollama, JSONL trace, and lesson notes are optional and off by default: <code>register_example_legions</code> registers nothing unless <code>enable=True</code>.</p>
-      <div class="grid">
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Iris</h3>
-          <p>Sensors, log readers, and capacity probes, under Iris. They cannot write residual state.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Metis</h3>
-          <p>Decision routers, risk classifiers, and guide loaders, under Metis. Output is policy only; they do not execute.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Hermes</h3>
-          <p>Paths and dispatch. Navigators and separated-cycle reviewers see the artefact and the lesson, not full history.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Hades</h3>
-          <p>Lessons and checkpoints. Save and restore do not carry history or scars into a fresh packet. Hades is not Studio.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Apollo</h3>
-          <p>Proof. Only Apollo can mark verified, and only when <code>verify_on_stop</code> passes.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Eat</h3>
-          <p>Structured ingest and perception helpers (<code>perception</code> is an alias of <code>eat</code>). They cannot write the residual store before the risk and budget gates.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="does">
-    <div class="meander" aria-hidden="true"></div>
-    <div class="patron">
-      <figure class="patron-photo img-hover">
-        <img src="/assets/gods/zeus.webp" width="864" height="1152" alt="AI-enhanced marble portrait of Zeus Ammon with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" />
-      </figure>
-      <div>
-        <p class="patron-kicker"><strong>Zeus</strong>, Core</p>
-        <h2>What it does</h2>
-        <p class="sub">
-          Exact memory for structured work. Capability scales with what you store in your hubs —
-          not with guessing harder.
+    <header class="hero" id="top">
+      <div class="hero-copy">
+        <div class="eyebrow">Stores · Derives · Abstains</div>
+        <h1>Remembers exactly.<br><span class="line2">Grows with your hub.</span></h1>
+        <p class="lede">
+          It keeps the facts you store, derives only from those facts, and abstains when it does not know.
+          <strong>It does not make things up.</strong> Open chat with the shared demo key, or read how a fact moves through the engine.
         </p>
-      </div>
-    </div>
-    <div class="grid">
-      <div class="card">
-        <span class="badge badge-ok">REMEMBERS</span>
-        <h3>Exact store</h3>
-        <p>Learn a triple. Ask it back. Get that object — the same fact you put in.</p>
-      </div>
-      <div class="card">
-        <span class="badge badge-ok">DERIVES</span>
-        <h3>Composition with path</h3>
-        <p>Follow stored relations with a path. Via <code>/chain</code>, a 2026-11-10 run answered 3 of 3: grandchild, grandparent, and parent’s workplace.</p>
-      </div>
-      <div class="card">
-        <span class="badge badge-ok">ABSTAINS</span>
-        <h3>Refuses to invent</h3>
-        <p>Unknown pairs stay empty. On the same run, 12 of 12 unknown probes abstained, and the invention bench derived 0 and invented 0.</p>
-      </div>
-      <div class="card">
-        <span class="badge badge-ok">GROWS</span>
-        <h3>Hubs fill → more you can ask</h3>
-        <p><code>user:</code>, <code>world:</code>, <code>org:</code> basins. More verified facts → more answers and derivations.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="alt" id="capable">
-    <div class="inner">
-    <div class="meander" aria-hidden="true"></div>
-      <h2>What it can do</h2>
-      <p class="sub">
-        Verified results from runs on 2026-11-10 (America/Chicago, UTC-6) against main at <code>04ec684</code>.
-        Verified means the described behavior ran, not that every route is production-ready.
-        Full inventory: <code>CAPABILITIES.md</code>.
-      </p>
-      <div class="grid">
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Learn &amp; exact query</h3>
-          <p><code>learn Zeus domain sky</code> → <code>query</code> returns <strong>ACCEPTED · sky</strong> (mode CLASSICAL).</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="/chat">Open chat</a>
+          <a class="btn btn-ghost" href="/how-it-works">How it works</a>
+          <a class="btn btn-ghost" href="/pricing">Pricing</a>
         </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Abstain</h3>
-          <p>Unknown pairs return <strong>ABSTAINED</strong>, value empty. Memory bench invent rate on 12 unknown pairs: <strong>0.0</strong>.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Chain / derive</h3>
-          <p>Via <code>/chain</code>: <strong>3 of 3</strong> on grandchild, grandparent, and parent’s workplace, with path provenance. No language model was used.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Hubs</h3>
-          <p><code>learn user:alice prefers exact_answers</code> → ask returns that object. Worlds/orgs use the same prefix contract.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Studio</h3>
-          <p>Visitors use <a href="/chat">/chat</a>. The Streamlit surface still has Save fact, Seed demo, Chat (<code>remember S R O</code>), Search, Media, Residual codec, Make, Language, Tools, Diagnostics, and Help, on the same API keys.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Hub search → explain</h3>
-          <p>Search hub first (<code>world:materials status</code> → <code>workspace</code>); if empty, offer lookup URL + remember helper.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>float32 default</h3>
-          <p><code>RESILEOS_STATE_DTYPE</code> unset → float32. Classical core on ordinary CPU.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Free key (CLI)</h3>
-          <p><code>scripts/issue_free_key.py</code> mints a free-tier key + hash for <code>api_keys.json</code> / env. No Stripe.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Kin eat / cycle</h3>
-          <p>Ingest filter and Iris→Metis→Hermes cycle on <code>/api/v1/eat</code> and <code>/kin/cycle</code> (tests green).</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Residual compression</h3>
-          <p>Low-rank residual compression of images and video frames, with measured round-trip error. It rebuilds an approximation of an image you already have. It does not generate pixels from a prompt.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Make world / art path</h3>
-          <p>Studio Make tab + <code>make_world</code> / Apollo art encoders write scene/art facts under <code>world:</code>. Renderer is fallback-local; treat as early beta.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Apollo / improve cycle</h3>
-          <p>Golden-ladder hops with eat verification (<code>/api/v1/apollo</code>). Internals tested; product UX still early.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Optional mouth</h3>
-          <p>Structured renderer ships; hosted/local HF mouths need keys/deps. Off by default — store first.</p>
-        </div>
-      </div>
-
-    <div class="meander" aria-hidden="true"></div>
-      <div class="patron" id="time">
-        <figure class="patron-photo img-hover">
-          <img src="/assets/gods/hades.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Serapis as Hades with circuit traces, based on a Vatican Museums sculpture" loading="lazy" />
-        </figure>
-        <div>
-          <p class="patron-kicker"><strong>Hades</strong>, Lessons</p>
-          <h3 class="subhead">Facts with time <span class="pending">VERIFIED BEHAVIOR</span></h3>
-          <p class="sub">Facts can carry a valid-from and valid-to window (half-open). Ask as of a date, and the answer is the fact that was valid then.</p>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>As-of questions</h3>
-          <p>Athens <code>capital_of</code> as of 1800 returns <strong>Ottoman</strong>; today returns <strong>Greece</strong>.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>As-of through chains</h3>
-          <p>The date carries through every step of a multi-hop <code>/chain</code>, so a historical lookup stays on that date instead of silently switching to today.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Conflicts flagged</h3>
-          <p>When two facts with explicit, overlapping date ranges disagree on the same date, <code>ask()</code> returns <strong>CONFLICT</strong> instead of picking one.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Real date parsing</h3>
-          <p>Years before 1970 and ancient years such as 476 parse as dates, not as text. SPARQL queries accept <code>AS OF</code>.</p>
-        </div>
-      </div>
-
-    <div class="meander" aria-hidden="true"></div>
-      <div id="demi-gods">
-      <h3 class="subhead">Specialist checks (Demi-gods) <span class="pending">VERIFIED BEHAVIOR</span></h3>
-      <p class="sub">Load-on-demand reviewers. They are deterministic checks plus persona text, not a language model. They cannot learn, own the core, or summon each other, and they are dismissed after use.</p>
-      <div class="demi-grid">
-        <article class="card demi-card">
-          <figure class="frame img-hover">
-            <img src="/assets/gods/themis.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Themis with circuit traces, based on a National Archaeological Museum of Greece sculpture" loading="lazy" />
-          </figure>
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Themis</h3>
-          <p>Certifies a result only when the residual core is consistent, Apollo reports success, and the Hades lesson says verified. Missing evidence fails the check.</p>
-        </article>
-        <article class="card demi-card">
-          <figure class="frame img-hover">
-            <img src="/assets/gods/momus.webp" width="825" height="1100" alt="AI-generated marble portrait of Momus with circuit traces" loading="lazy" />
-          </figure>
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Momus</h3>
-          <p>A truly blind reviewer: control history and author notes are stripped first. It lists defects against the stated spec. Missing inputs return <code>need_more</code>, which is not approval.</p>
-        </article>
-        <article class="card demi-card">
-          <figure class="frame img-hover">
-            <img src="/assets/gods/hephaestus.webp" width="825" height="1100" alt="AI-generated marble portrait of Hephaestus with circuit traces" loading="lazy" />
-          </figure>
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Hephaestus</h3>
-          <p>Checks residual consistency, that no scars are left, and the budget guard. A supplied Hermes budget must stay at or under its max items.</p>
-        </article>
-        <article class="card demi-card">
-          <figure class="frame img-hover">
-            <img src="/assets/gods/nike.webp" width="825" height="1100" alt="AI-enhanced terracotta Nike with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" />
-          </figure>
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Nike</h3>
-          <p>Passes or fails strictly against explicit success criteria. With no criteria, it fails.</p>
-        </article>
-        <article class="card demi-card">
-          <figure class="frame img-hover">
-            <img src="/assets/gods/atlas.webp" width="825" height="1100" alt="AI-enhanced marble portrait of the Farnese Atlas with circuit traces, based on a National Archaeological Museum of Naples sculpture" loading="lazy" />
-          </figure>
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Atlas</h3>
-          <p>Checks declared loads against the real capacity functions: the Hopfield limit, the mask-stack layer ceiling, the prime tower's usable levels, primorial count, encoder buffer, and evidence length. An undeclared load is not invented.</p>
-        </article>
-      </div>
-
-      </div>
-    <div class="meander" aria-hidden="true"></div>
-      <div class="patron" id="senses">
-        <figure class="patron-photo pos-body img-hover">
-          <img src="/assets/gods/iris.webp" width="825" height="1100" alt="AI-enhanced marble figure of Iris from the Parthenon west pediment, with circuit traces, based on a British Museum sculpture" loading="lazy" />
-        </figure>
-        <div>
-          <p class="patron-kicker"><strong>Iris</strong>, Senses</p>
-          <h3 class="subhead">Senses and speech <span class="pending">VERIFIED BEHAVIOR</span></h3>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Grounded speech &amp; summaries</h3>
-          <p>Turns stored rows into template sentences marked GROUNDED. Empty rows return “Nothing stored on that.” This is structured wording, not open-ended prose.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Script detection</h3>
-          <p>Classifies characters as latin, non-latin, or mixed. A script guess, not identification of a spoken language.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Image signal stats</h3>
-          <p>Reports mean brightness and edge density from an image array, with a scaffold address. No object or scene recognition.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Audio signal stats</h3>
-          <p>Reports waveform energy, zero-crossing rate, and spectral centroid. No speech recognition or sound identification.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Video signal stats</h3>
-          <p>Reports frame count, brightness, and mean absolute frame difference. No action or scene recognition.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Text signal stats</h3>
-          <p>Counts characters and whitespace-separated tokens. Perception only, not translation or comprehension.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Perception → Psyche</h3>
-          <p>Hands image, audio, video, or text diagnostics into a mind-state container; lists phase, belt, frames, and drive values. These are state fields, not evidence of awareness.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Grounded fact cycle</h3>
-          <p>Looks up, stores, and speaks a fact in a caller-provided dictionary. Studio retains that dictionary in session state.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Credit ledger</h3>
-          <p>Earns and spends credits in process memory and refuses transfers. Not a durable balance. The HTTP free-use count is still client-supplied.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-ok">VERIFIED</span>
-          <h3>Workspace tools</h3>
-          <p>Evaluates expressions, edits workspace files, checks Python syntax, and downloads a URL. Workspace-scoped tools, not a general security sandbox.</p>
-        </div>
-      </div>
-
-    <div class="meander" aria-hidden="true"></div>
-      <div class="patron" id="experimental">
-        <figure class="patron-photo img-hover">
-          <img src="/assets/gods/athena.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Athena with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" />
-        </figure>
-        <div>
-          <p class="patron-kicker"><strong>Athena</strong>, Judgment</p>
-          <h3 class="subhead">Experimental tools <span class="pending">BETA</span></h3>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Harness / Kin</h3>
-          <p>Control packet (confidence, risk, budget, evidence, scars) and a separated write path: Zeus learns only if all reviewers approve. Verification fails closed. Hades checkpoints. Cascade and fan-out routing are still stubs, and the budget is not persisted.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Drives</h3>
-          <p>Copies signal values into named drive fields. Their meaning and usefulness have not been evaluated.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Athena judge</h3>
-          <p>Fail-closed verification when Apollo does not succeed. Still an early reviewer, not independent general judgment.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Agent loop</h3>
-          <p>Runs a default or caller-provided sequence of tool calls. The audited goal was not completed.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Web search</h3>
-          <p>Returns a DuckDuckGo search URL and query. It does not download or evaluate search results.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Offline learn queue</h3>
-          <p>Drains queued tasks, but the learn branch only reports “queued for hub learn”; it does not write facts into a hub.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Guild merit</h3>
-          <p>Creates a candidate merit attestation and earns a process-local credit. Signing is not a visitor promise; the board remains open.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Art into_kin</h3>
-          <p>Passes an encoded-art dictionary through the wiring. Treat the handoff as early; it is not a generator.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">BETA</span>
-          <h3>Grammar counter &amp; etymology</h3>
-          <p>Counts supplied row keys and filters caller-supplied roots. No built-in lexicon; grammar has no dedicated test.</p>
-        </div>
-      </div>
-      <p class="micro note">Full suite on main at <code>ee9199ad</code>, 2026-11-10 America/Chicago (UTC-6): 1252 passed (PR #8 run; GitHub CI on that commit succeeded). Memory and temporal benches below were measured earlier the same day on <code>04ec684</code>. See CAPABILITIES.md for known issues.</p>
-    </div>
-  </section>
-
-  <section id="studio">
-    <div class="meander" aria-hidden="true"></div>
-    <div class="patron">
-      <figure class="patron-photo img-hover">
-        <img src="/assets/gods/hephaestus.webp" width="825" height="1100" alt="AI-generated marble portrait of Hephaestus with circuit traces" loading="lazy" />
-      </figure>
-      <div>
-        <p class="patron-kicker"><strong>Hephaestus</strong>, Forge</p>
-        <h2>Studio — learn, ask, grow the hub</h2>
-        <p class="sub">No Docker for visitors. Open <a href="/chat">chat</a>. The shared demo key is filled in, rate-limited, about 100 usernames. Choose a username there before a thread is saved.</p>
-      </div>
-    </div>
-    <div class="studio-mock" aria-hidden="true">
-      <div class="studio-chrome">
-        <div class="studio-dot"></div><div class="studio-dot"></div><div class="studio-dot"></div>
-        <span>Resileos · /chat</span>
-      </div>
-      <div class="studio-body">
-        <aside class="studio-side">
-          <div class="studio-label">Sidebar</div>
-          <div class="studio-field"><span>API key</span><code>••••••••</code></div>
-          <div class="studio-field"><span>User id</span><code>alice</code></div>
-          <div class="studio-teach">
-            <div class="studio-label">Save fact</div>
-            <div><code>Zeus</code> · <code>domain</code> · <code>sky</code></div>
-            <div class="studio-btn">Save fact</div>
-            <div class="studio-btn ghost">Seed demo facts</div>
-          </div>
-          <div class="studio-metrics"><div>API <strong>Ready</strong></div><div>Facts <strong>+</strong></div></div>
+        <p class="micro">Chat asks for a username. The shared demo key is filled in, rate-limited, about 100 usernames.</p>
+        <aside class="panel" aria-label="Illustrative trace">
+          <div class="tag">ILLUSTRATIVE TRACE · TITANOS</div>
+          <div class="row m"># Store</div>
+          <div class="row">learn Zeus domain sky</div>
+          <div class="row k">→ ACCEPTED · sky</div>
+          <br />
+          <div class="row m"># Derive</div>
+          <div class="row">chain Zeus → parent_of → domain</div>
+          <div class="row k">→ ACCEPTED · wisdom · path</div>
+          <br />
+          <div class="row m"># Abstain</div>
+          <div class="row">Zeus ssn</div>
+          <div class="row c">→ ABSTAINED · empty</div>
         </aside>
-        <div class="studio-main">
-          <div class="studio-tabs"><span class="on">Chat</span><span>Search</span><span>Media</span><span>Residual codec</span><span>Make</span><span>Language</span><span>Tools</span><span>Diagnostics</span><span>Help</span></div>
-          <div class="studio-chat">
-            <div class="bubble asst">Try <code>remember Zeus domain sky</code> or <code>Zeus domain</code>.</div>
-            <div class="bubble user">remember Zeus domain sky</div>
-            <div class="bubble asst ok">Saved <strong>Zeus —domain→ sky</strong></div>
-            <div class="bubble user">Zeus domain</div>
-            <div class="bubble asst ok">sky</div>
-            <div class="bubble user">Zeus ssn</div>
-            <div class="bubble asst empty">ABSTAINED — unknown stays empty</div>
-          </div>
-        </div>
       </div>
-    </div>
-    <p class="cta-row"><a class="btn btn-primary" href="/chat">Open chat</a></p>
-
-    <div class="grid-2 tight-top" id="start">
-      <div>
-        <h2 class="start-title">Three steps — free</h2>
-        <div class="steps">
-          <div class="step"><div><h3>Get a free key</h3><p>No card. Shown once. Send as <code>X-API-Key</code>.</p></div></div>
-          <div class="step"><div><h3>Learn into your hub</h3><p>Studio Save / Seed, or <code>POST /learn</code>. Prefix <code>user:</code> / <code>world:</code> for owned memory.</p></div></div>
-          <div class="step"><div><h3>Ask · derive · abstain</h3><p>Known → the object. Chain → path. Unknown → empty. Hubs fill → more capability.</p></div></div>
-        </div>
-      </div>
-      <div class="card">
-        <span class="badge badge-ok">FREE · NO CARD</span>
-        <h3>Issue your API key</h3>
-        <form class="form" id="free-key-form">
-          <label for="email">Email (optional)</label>
-          <input id="email" name="email" type="email" placeholder="you@lab.dev" autocomplete="email" />
-          <label for="name">Label</label>
-          <input id="name" name="name" type="text" placeholder="my-laptop" maxlength="64" />
-          <button class="btn btn-primary btn-block" type="submit">Get free key</button>
-          <div class="msg" id="free-key-msg" aria-live="polite"></div>
-        </form>
-        <div class="key-reveal" id="key-reveal" role="status"></div>
-        <p class="micro note">Also: <code>python scripts/issue_free_key.py</code> in the repo.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="alt" id="quickstart">
-    <div class="inner">
-    <div class="meander" aria-hidden="true"></div>
-      <h2>API quickstart</h2>
-      <p class="sub">Same store Studio uses. Header: <code>X-API-Key</code>. These are request examples for learn, query, and chain.</p>
-      <div class="tabs" role="tablist" aria-label="API examples">
-        <button class="tab active" data-tab="learn" type="button">1 · Learn</button>
-        <button class="tab" data-tab="query" type="button">2 · Query</button>
-        <button class="tab" data-tab="chain" type="button">3 · Chain</button>
-      </div>
-      <div class="codebox" data-panel="learn">
-        <button class="copy" type="button" data-copy="learn">Copy</button>
-        <pre id="code-learn">export BASE="https://api.resileosai.fun/api/v1"
-export KEY="rsk_…"
-
-curl -sS -X POST "$BASE/learn" \
-  -H "Content-Type: application/json" -H "X-API-Key: $KEY" \
-  -d '{"subject":"Zeus","relation":"domain","obj":"sky"}'</pre>
-      </div>
-      <div class="codebox" data-panel="query" hidden>
-        <button class="copy" type="button" data-copy="query">Copy</button>
-        <pre id="code-query">curl -sS -X POST "$BASE/query" \
-  -H "Content-Type: application/json" -H "X-API-Key: $KEY" \
-  -d '{"subject":"Zeus","relation":"domain"}'
-# → ACCEPTED · sky   |   unknown → ABSTAINED</pre>
-      </div>
-      <div class="codebox" data-panel="chain" hidden>
-        <button class="copy" type="button" data-copy="chain">Copy</button>
-        <pre id="code-chain">curl -sS -X POST "$BASE/chain" \
-  -H "Content-Type: application/json" -H "X-API-Key: $KEY" \
-  -d '{"start":"Zeus","relations":["parent_of","domain"]}'
-# → wisdom · path provenance</pre>
-      </div>
-    </div>
-  </section>
-
-  <section id="bench">
-    <div class="meander" aria-hidden="true"></div>
-    <div class="patron">
-      <figure class="patron-photo img-hover">
-        <img src="/assets/gods/apollo.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Apollo with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" />
+      <figure class="hero-figure img-hover">
+        <!-- video-hook: the loop is a light sweep on the still, site craft only.
+             When a real short clip exists, set data-video-src on this figure.
+             site.js mounts a video only if that URL returns video/*. Do not ship a placeholder. -->
+        <img src="/assets/gods/zeus.webp" width="864" height="1152" alt="AI-generated chrome portrait of Zeus Ammon, from a Metropolitan Museum sculpture reference" fetchpriority="high" />
+        <img class="hero-motion" data-src="/assets/motion/zeus-light.webp" alt="" aria-hidden="true" />
       </figure>
-      <div>
-        <p class="patron-kicker"><strong>Apollo</strong>, Proof</p>
-        <h2>Proof — invent rate</h2>
-        <p class="sub">Real Titanos runs on 2026-11-10 (America/Chicago, UTC-6), against main at <code>04ec684</code>. These tests measure stored-fact recall, abstention, composition of stored relations, and dated facts — not general reasoning. No language-model baseline was run.</p>
-      </div>
-    </div>
-    <div class="grid">
-      <div class="card">
-        <span class="badge badge-ok">MEASURED</span>
-        <h3>Invent rate</h3>
-        <p class="bench-num">0.0</p>
-        <p>12 unknown pairs all <strong>ABSTAINED</strong>. Exact recall on 3 known facts: <strong>1.0</strong>.</p>
-        <p class="micro note">
-          2026-11-10, America/Chicago (UTC-6) ·
-          <code>Titanos(TitanosConfig())</code> · p50 about 35 ms ·
-          3 known + 12 unknown · no language-model baseline
-        </p>
-      </div>
-      <div class="card">
-        <span class="badge badge-ok">MEASURED</span>
-        <h3>Composition via /chain</h3>
-        <p><strong>3/3</strong> — grandchild, grandparent, and parent’s workplace, with path provenance. No language model was used.</p>
-      </div>
-      <div class="card">
-        <span class="badge badge-ok">MEASURED</span>
-        <h3>Invention bench</h3>
-        <p><strong>0 derived, 0 invented.</strong> Novel queries abstain rather than make up new facts.</p>
-      </div>
-      <div class="card">
-        <span class="badge badge-ok">MEASURED</span>
-        <h3>Temporal probe</h3>
-        <p>0 false conflicts out of 141, and 2 of 2 on both synthetic checks. Dated facts and as-of questions are under <a href="#time">Facts with time</a>.</p>
-      </div>
-    </div>
-  </section>
+    </header>
 
-  <section class="alt" id="roadmap">
-    <div class="inner">
-    <div class="meander" aria-hidden="true"></div>
-      <div class="patron">
-        <figure class="patron-photo img-hover">
-          <img src="/assets/gods/metis.webp" width="825" height="1100" alt="AI-generated marble portrait of Metis with circuit traces" loading="lazy" />
-        </figure>
+    <div class="stats">
+      <div class="stats-nums" aria-label="Measured results from 2026-11-10">
         <div>
-          <p class="patron-kicker"><strong>Metis</strong>, Policy</p>
-          <h2>Next <span class="pending">ROADMAP · NOT SHIPPED</span></h2>
-          <p class="sub">Honest backlog — not in the visitor promise yet.</p>
+          <strong class="ok-num">1.0</strong>
+          <span>Exact recall on 3 known facts</span>
+        </div>
+        <div>
+          <strong class="ok-num">0.0</strong>
+          <span>Invent rate on 12 unknown pairs</span>
+        </div>
+        <div>
+          <strong>3/3</strong>
+          <span>Composition via /chain</span>
+        </div>
+        <div>
+          <strong>0/141</strong>
+          <span>False conflicts, temporal probe</span>
+        </div>
+        <div>
+          <strong>~35 ms</strong>
+          <span>Median latency</span>
         </div>
       </div>
-      <div class="grid">
-        <div class="card">
-          <span class="badge badge-soon">IN RESEARCH</span>
-          <h3>Studio generation</h3>
-          <p>A generator that samples new images or video from the same compression core is in research. The engine today compresses; it does not create from a prompt.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">ROADMAP</span>
-          <h3>Translate provider</h3>
-          <p>Without a configured translation provider, text is returned unchanged. Actual translation was not verified.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">ROADMAP</span>
-          <h3>Trusted credit gate</h3>
-          <p>The HTTP free-use count is still supplied by the client, so the gate is not a server-authoritative quota yet.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">NEXT</span>
-          <h3>Deeper persona on the hub</h3>
-          <p>Richer <code>user:</code> packs; tone never overrides store rows.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">NEXT</span>
-          <h3>Kin cycle as hub UX</h3>
-          <p>Routes exist; hub-native product surface still next. Cascade and fan-out routing are still stubs.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">NEXT</span>
-          <h3>Mouth behind the gate</h3>
-          <p>Language only from stored rows — speculative render, store owns truth.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">NEXT</span>
-          <h3>More hubs · more facts</h3>
-          <p>Capability compounds with verified basins — not model-size theatre.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">NEXT</span>
-          <h3>Guild / world product mounts</h3>
-          <p>Code in tree; not mounted on hosted API until smoke-tested.</p>
-        </div>
-        <div class="card">
-          <span class="badge badge-soon">NEXT</span>
-          <h3>Suite residual address</h3>
-          <p>Scale address scaffold still awaits suite residual coding.</p>
-        </div>
+      <div class="strip-inner">
+        <div><strong>Remembers exactly</strong> — learned fact in, same fact out</div>
+        <div><strong>Refuses to invent</strong> — unknowns stay empty</div>
+        <div><strong>Grows with hubs</strong> — user: · world: · org:</div>
+        <div><a href="/how-it-works#bench">Read the proof</a></div>
       </div>
     </div>
-  </section>
 
-  <section id="pricing">
-    <div class="meander" aria-hidden="true"></div>
-    <div class="patron">
-      <figure class="patron-photo img-hover">
-        <img src="/assets/gods/hermes.webp" width="825" height="1100" alt="AI-enhanced marble portrait of Hermes with circuit traces, based on a Metropolitan Museum sculpture" loading="lazy" />
-      </figure>
-      <div>
-        <p class="patron-kicker"><strong>Hermes</strong>, Dispatch</p>
-        <h2>Pricing</h2>
-        <p class="sub">From <code>docs/marketing/pricing.md</code>. Free is the funnel. Stripe for Builder &amp; Team.</p>
+    <section id="does">
+      <div class="meander" aria-hidden="true"></div>
+      <h2>What it does</h2>
+      <p class="sub">Exact memory for structured work. Capability scales with what you store in your hubs, not with guessing harder.</p>
+      <div class="verb-grid">
+        <article class="card">
+          <span class="badge badge-ok">STORES</span>
+          <h3>Remembers exactly</h3>
+          <p>Learn a triple. Ask it back. Get that object — the same fact you put in.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-ok">DERIVES</span>
+          <h3>Follows a stored path</h3>
+          <p>Via <code>/chain</code>, a 2026-11-10 run answered 3 of 3: grandchild, grandparent, and parent's workplace, with path provenance.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-ok">ABSTAINS</span>
+          <h3>Doesn't make things up</h3>
+          <p>Unknown pairs stay empty. On the same run, 12 of 12 unknown probes abstained. The invention bench derived 0 and invented 0.</p>
+        </article>
       </div>
-    </div>
-    <div class="price-grid">
-      <div class="price-card">
-        <span class="badge badge-ok">FUNNEL</span>
-        <h3>Free</h3>
-        <div class="price">$0 <span>/ start</span></div>
-        <ul>
-          <li>1 API key · 5,000 req/mo</li>
-          <li>Personal + world: hubs</li>
-          <li>Structured mouth only</li>
-          <li>Chat at /chat + API</li>
-        </ul>
-        <a class="btn btn-primary btn-block" href="/chat">Open chat</a>
-        <a class="btn btn-ghost btn-block" href="#start">Get free key</a>
-      </div>
-      <div class="price-card featured">
-        <span class="badge">BUILDER · PRO TIER</span>
-        <h3>Builder</h3>
-        <div class="price">$29 <span>/ mo</span></div>
-        <ul>
-          <li>3 keys · 100,000 req/mo</li>
-          <li>Overage $0.50 / 10k</li>
-          <li>Shared worlds · durable volume</li>
-          <li>+ small RAG mouth budget</li>
-        </ul>
-        <p class="soon-note">Founding Builder: $19/mo · 12 months · cap 50</p>
-        <button class="btn btn-primary btn-block" type="button" data-checkout="builder">Checkout with Stripe</button>
-        <a class="micro link-fallback" id="link-builder" href="#" hidden>Or open Payment Link</a>
-      </div>
-      <div class="price-card">
-        <span class="badge">TEAM</span>
-        <h3>Team</h3>
-        <div class="price">$99 <span>/ mo</span></div>
-        <ul>
-          <li>10 keys · 500,000 req/mo</li>
-          <li>Overage $0.40 / 10k</li>
-          <li>Multi-guild seats*</li>
-          <li>Priority email · 99.5% target†</li>
-        </ul>
-        <button class="btn btn-ghost btn-block" type="button" data-checkout="team">Checkout with Stripe</button>
-        <a class="micro link-fallback" id="link-team" href="#" hidden>Or open Payment Link</a>
-      </div>
-      <div class="price-card">
-        <span class="badge badge-muted">ENTERPRISE</span>
-        <h3>Org</h3>
-        <div class="price">Custom</div>
-        <ul>
-          <li>Custom keys &amp; quota</li>
-          <li>Dedicated / multi-region</li>
-          <li>BYO mouth key</li>
-          <li>Slack / contract</li>
-        </ul>
-        <a class="btn btn-ghost btn-block" href="mailto:hello@resileos.dev?subject=Resileos%20Org">Contact sales</a>
-      </div>
-    </div>
-    <p class="micro note">
-      * Guild/world routes not mounted on hosted API yet. † Internal target, not an SLA.
-      Key map: Free→<code>free</code>/5000 · Builder/Team→<code>pro</code> · Org→<code>enterprise</code>.
-    </p>
-    <div class="msg note" id="checkout-msg" aria-live="polite"></div>
-  </section>
+    </section>
 
-  <section id="faq" class="faq">
-    <div class="meander" aria-hidden="true"></div>
-    <h2>FAQ</h2>
-    <details open>
-      <summary>What does Resileos do?</summary>
-      <p>It remembers exact facts you teach it, derives from those facts, and abstains when it does not know.
-        Capability grows as your hubs fill.</p>
-    </details>
-    <details>
-      <summary>Can it answer as of a date?</summary>
-      <p>Yes. Facts can carry a valid-from and valid-to window. Asking Athens <code>capital_of</code> as of 1800 returned Ottoman; today returned Greece. When overlapping dated facts disagree, the answer is CONFLICT.</p>
-    </details>
-    <details>
-      <summary>Does it generate images or video from a prompt?</summary>
-      <p>No. The residual engine compresses images and video frames you already have, with measured round-trip error. Generating new pictures from a prompt is in research, not shipped.</p>
-    </details>
-    <details>
-      <summary>Do I need Docker to try it?</summary>
-      <p>No. Open <a href="/chat">/chat</a>. The shared demo key is filled in and rate-limited, about 100 usernames. Docker is for developers self-hosting (repo HOSTING docs).</p>
-    </details>
-    <details>
-      <summary>How do free keys work?</summary>
-      <p>This site’s form calls the billing free-key API, or run <code>scripts/issue_free_key.py</code> and put the hash in the API key file.</p>
-    </details>
-  </section>
-
+    <section class="alt" id="patrons">
+      <div class="inner">
+        <div class="meander" aria-hidden="true"></div>
+        <h2>A few patrons</h2>
+        <p class="sub">The engine has named roles. The full map, including Kin, Demi-gods, and Studio legions, is on its own page. Hermes is paths and dispatch. Hades is lessons and checkpoints, not Studio. Apollo is proof.</p>
+        <div class="pantheon-grid">
+          <a class="pantheon-card" href="/kin#structure">
+            <span class="frame img-hover"><img src="/assets/gods/zeus.webp" width="864" height="1152" alt="AI-generated chrome portrait of Zeus Ammon, from a Metropolitan Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Zeus</span><span class="role">Routing</span></span>
+          </a>
+          <a class="pantheon-card" href="/how-it-works#bench">
+            <span class="frame img-hover"><img src="/assets/gods/apollo.webp" width="864" height="1152" alt="AI-generated chrome portrait of Apollo, from a Metropolitan Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Apollo</span><span class="role">Proof</span></span>
+          </a>
+          <a class="pantheon-card" href="/how-it-works#time">
+            <span class="frame img-hover"><img src="/assets/gods/hades.webp" width="864" height="1152" alt="AI-generated chrome portrait of a Serapis bust used for Hades, from a Vatican Museums sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Hades</span><span class="role">Lessons</span></span>
+          </a>
+          <a class="pantheon-card" href="/pricing">
+            <span class="frame img-hover"><img src="/assets/gods/hermes.webp" width="864" height="1152" alt="AI-generated chrome portrait of Hermes, from a Metropolitan Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Hermes</span><span class="role">Dispatch</span></span>
+          </a>
+        </div>
+        <p class="cta-row tight-top"><a class="btn btn-ghost" href="/kin">Open the Kin map</a></p>
+      </div>
+    </section>
   </main>
 
   <div class="footer-cta">
@@ -916,14 +181,23 @@ curl -sS -X POST "$BASE/learn" \
     </div>
     <div class="cta-row">
       <a class="btn btn-primary" href="/chat">Open chat</a>
-      <a class="btn btn-ghost" href="#start">Get a free key</a>
+      <a class="btn btn-ghost" href="/pricing#start">Get a free key</a>
     </div>
   </div>
 
   <footer>
-    <div>Resileos-QAI · Exact memory · <a href="/chat">Chat</a> · <a href="https://github.com/jackyreaps/Resileos-QAI">GitHub</a></div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/kin">Kin</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/chat">Chat</a>
+      <a href="/credits">Credits</a>
+      <a href="https://github.com/jackyreaps/Resileos-QAI">GitHub</a>
+    </nav>
+    <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
     <div>No trackers · float32 default · Hubs grow capability</div>
-    <p class="credits">Site portraits are AI-generated compositions of classical marble with code-like traces. Where a public-domain sculpture was used as a reference, the original photograph is kept and credited. <a href="/assets/gods/CREDITS.md">Full credits</a>.</p>
+    <p class="credits">Portraits are AI-generated chrome compositions. Where a public-domain sculpture was the reference, that photograph is credited. <a href="/credits">Image credits</a>.</p>
   </footer>
 
   <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>

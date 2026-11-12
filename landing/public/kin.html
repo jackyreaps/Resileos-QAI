@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kin — Resileos</title>
+  <meta name="description" content="The patron map: Titanos, Zeus routing, Kin, Demi-gods, and Studio legions. Hermes dispatches. Hades checkpoints. Apollo proves. Eat stays Eat." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a href="/">Home</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/kin" aria-current="page">Kin</a>
+        <a href="/pricing">Pricing</a>
+        <a class="nav-cta" href="/chat">Chat</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <header class="page-hero">
+      <p class="eyebrow">Patrons</p>
+      <h1>Roles with edges. Not a circle of equals.</h1>
+      <p class="lede">Titanos is the engine. Zeus routes. The residual core is the source of truth. Kin are standing side-interfaces. Demi-gods are summoned for one check and then dismissed. Hephaestus is Forge patronage, not a Kin. Eat stays Eat.</p>
+    </header>
+
+    <section id="structure">
+      <div class="meander" aria-hidden="true"></div>
+      <p class="patron-kicker"><strong>Order</strong>, Structure</p>
+      <h2>How the work is structured</h2>
+      <p class="sub">Behavior of the engine — learn, chain, abstain, dated facts — is on <a href="/how-it-works">How it works</a>.</p>
+      <div class="hierarchy" aria-label="Hierarchy of Titanos, Zeus routing, the residual core, Kin, Demi-gods, and Legions">
+        <div class="h-spine" aria-hidden="true"></div>
+        <div class="h-stack">
+          <div class="h-node h-top">
+            <span class="h-kicker">Engine</span>
+            <strong>Titanos</strong>
+            <span><code>ask</code> · <code>ask_list</code> · <code>chain</code> return ACCEPTED, ABSTAINED, or CONFLICT</span>
+          </div>
+          <div class="h-node">
+            <span class="h-kicker">Routing</span>
+            <strong>Zeus</strong>
+            <span>Writes apply only after reviewers approve</span>
+          </div>
+          <div class="h-node h-core">
+            <span class="h-kicker">Source of truth</span>
+            <strong>Residual core</strong>
+            <span>Deterministic leaf. Exact store, derivation, and abstention consult this core.</span>
+          </div>
+        </div>
+        <p class="h-label">Kin — standing side-interfaces</p>
+        <ul class="h-kin">
+          <li><strong>Iris</strong><span>Senses, sensors, and log readers</span></li>
+          <li><strong>Metis</strong><span>Policy: routers and risk classifiers. Output is policy only.</span></li>
+          <li><strong>Hermes</strong><span>Paths and dispatch</span></li>
+          <li><strong>Hades</strong><span>Lessons and checkpoints. Not Studio.</span></li>
+          <li><strong>Apollo</strong><span>Proof</span></li>
+          <li><strong>Athena</strong><span>Judgment: fail-closed when Apollo does not succeed</span></li>
+          <li><strong>Eat</strong><span>Ingest gated before residual writes. Not renamed.</span></li>
+        </ul>
+        <p class="h-label">Demi-gods — summoned for one check, then dismissed</p>
+        <ul class="h-demi">
+          <li>Themis</li>
+          <li>Momus</li>
+          <li>Hephaestus</li>
+          <li>Nike</li>
+          <li>Atlas</li>
+        </ul>
+        <p class="h-label">Legions <span class="pending">BETA</span></p>
+        <p class="h-note">Bounded tools registered under one Kin via <code>register_legion</code>. They inherit that Kin's constraints. Example legions are optional and off by default.</p>
+      </div>
+    </section>
+
+    <section class="alt" id="pantheon">
+      <div class="inner">
+        <div class="meander" aria-hidden="true"></div>
+        <p class="patron-kicker"><strong>Pantheon</strong>, Map</p>
+        <h2>Find a role by its patron</h2>
+        <p class="sub">Portraits are AI-generated chrome compositions. Named figures keep the sculpture they were drawn from. Hephaestus is listed with the Demi-gods and with Forge. He is not a Kin.</p>
+        <div class="pantheon-grid">
+          <a class="pantheon-card" href="#structure">
+            <span class="frame img-hover"><img src="/assets/gods/zeus.webp" width="864" height="1152" alt="AI-generated chrome portrait of Zeus Ammon, from a Metropolitan Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Zeus</span><span class="role">Routing</span></span>
+          </a>
+          <a class="pantheon-card" href="/how-it-works#bench">
+            <span class="frame img-hover"><img src="/assets/gods/apollo.webp" width="864" height="1152" alt="AI-generated chrome portrait of Apollo, from a Metropolitan Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Apollo</span><span class="role">Proof</span></span>
+          </a>
+          <a class="pantheon-card" href="/how-it-works#time">
+            <span class="frame img-hover"><img src="/assets/gods/hades.webp" width="864" height="1152" alt="AI-generated chrome portrait of a Serapis bust used for Hades, from a Vatican Museums sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Hades</span><span class="role">Lessons</span></span>
+          </a>
+          <a class="pantheon-card" href="/how-it-works#senses">
+            <span class="frame img-hover"><img src="/assets/gods/iris.webp" width="864" height="1152" alt="AI-generated chrome rendering of the headless Iris from the Parthenon west pediment, from a British Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Iris</span><span class="role">Senses</span></span>
+          </a>
+          <a class="pantheon-card" href="/how-it-works#experimental">
+            <span class="frame img-hover"><img src="/assets/gods/athena.webp" width="864" height="1152" alt="AI-generated chrome portrait of Athena, from a Metropolitan Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Athena</span><span class="role">Judgment</span></span>
+          </a>
+          <a class="pantheon-card" href="/how-it-works#roadmap">
+            <span class="frame img-hover"><img src="/assets/gods/metis.webp" width="864" height="1152" alt="AI-generated chrome portrait of Metis. No public-domain sculpture reference was used." loading="lazy" /></span>
+            <span class="meta"><span class="name">Metis</span><span class="role">Policy</span></span>
+          </a>
+          <a class="pantheon-card" href="/pricing">
+            <span class="frame img-hover"><img src="/assets/gods/hermes.webp" width="864" height="1152" alt="AI-generated chrome portrait of Hermes, from a Metropolitan Museum sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Hermes</span><span class="role">Paths / dispatch</span></span>
+          </a>
+          <a class="pantheon-card" href="#demi-gods">
+            <span class="frame img-hover"><img src="/assets/gods/themis.webp" width="864" height="1152" alt="AI-generated chrome portrait of Themis, from a National Archaeological Museum of Greece sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Themis</span><span class="role">Law</span></span>
+          </a>
+          <a class="pantheon-card" href="#demi-gods">
+            <span class="frame img-hover"><img src="/assets/gods/momus.webp" width="864" height="1152" alt="AI-generated chrome portrait of Momus. No public-domain sculpture reference was used." loading="lazy" /></span>
+            <span class="meta"><span class="name">Momus</span><span class="role">Critique</span></span>
+          </a>
+          <a class="pantheon-card" href="#forge">
+            <span class="frame img-hover"><img src="/assets/gods/hephaestus.webp" width="864" height="1152" alt="AI-generated chrome portrait of Hephaestus. No public-domain sculpture reference was used." loading="lazy" /></span>
+            <span class="meta"><span class="name">Hephaestus</span><span class="role">Forge patronage</span></span>
+          </a>
+          <a class="pantheon-card" href="#demi-gods">
+            <span class="frame img-hover"><img src="/assets/gods/nike.webp" width="864" height="1152" alt="AI-generated chrome portrait of Nike, from a Metropolitan Museum terracotta reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Nike</span><span class="role">Victory</span></span>
+          </a>
+          <a class="pantheon-card" href="#demi-gods">
+            <span class="frame img-hover"><img src="/assets/gods/atlas.webp" width="864" height="1152" alt="AI-generated chrome portrait of the Farnese Atlas, from a National Archaeological Museum of Naples sculpture reference" loading="lazy" /></span>
+            <span class="meta"><span class="name">Atlas</span><span class="role">Capacity</span></span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="kin">
+      <div class="meander" aria-hidden="true"></div>
+      <p class="patron-kicker"><strong>Architecture</strong></p>
+      <h2>Legions under Kin <span class="pending">BETA</span></h2>
+      <p class="sub">Merged on main at <code>ee9199ad</code>. Kin are role classes whose constraints do not move. A legion is one bounded tool registered on that Kin via <code>register_legion</code>. It inherits the Kin's <code>risk_classify</code> gate, <code>evidence_attach</code>, and budget check. Callers reach it only through that Kin's catalogue. There is no global registry. A legion cannot take the residual core, bypass Zeus routing, cross the Hades checkpoint boundary, or turn the verified-cycle mouth on. Example legions for Ollama, JSONL trace, and lesson notes are optional and off by default: <code>register_example_legions</code> registers nothing unless <code>enable=True</code>.</p>
+      <div class="grid">
+        <article class="card">
+          <span class="badge badge-soon">BETA</span>
+          <h3>Iris</h3>
+          <p>Sensors, log readers, and capacity probes. They cannot write residual state. Signal detail is on <a href="/how-it-works#senses">How it works</a>.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-soon">BETA</span>
+          <h3>Metis</h3>
+          <p>Decision routers, risk classifiers, and guide loaders. Output is policy only. They do not execute.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-soon">BETA</span>
+          <h3>Hermes</h3>
+          <p>Paths and dispatch. Navigators and separated-cycle reviewers see the artefact and the lesson, not full history.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-soon">BETA</span>
+          <h3>Hades</h3>
+          <p>Lessons and checkpoints. Save and restore do not carry history or scars into a fresh packet. Hades is not Studio.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-soon">BETA</span>
+          <h3>Apollo</h3>
+          <p>Proof. Only Apollo can mark verified, and only when <code>verify_on_stop</code> passes.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-soon">BETA</span>
+          <h3>Eat</h3>
+          <p>Structured ingest and perception helpers. <code>perception</code> is an alias of <code>eat</code>. They cannot write the residual store before the risk and budget gates.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="alt" id="demi-gods">
+      <div class="inner">
+        <div class="meander" aria-hidden="true"></div>
+        <h2>Specialist checks <span class="pending">VERIFIED BEHAVIOR</span></h2>
+        <p class="sub">Load-on-demand reviewers. Deterministic checks plus persona text, not a language model. They cannot learn, own the core, or summon each other, and they are dismissed after use.</p>
+        <div class="demi-grid">
+          <article class="card demi-card">
+            <figure class="frame img-hover">
+              <img src="/assets/gods/themis.webp" width="864" height="1152" alt="AI-generated chrome portrait of Themis, from a National Archaeological Museum of Greece sculpture reference" loading="lazy" />
+            </figure>
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Themis</h3>
+            <p>Certifies a result only when the residual core is consistent, Apollo reports success, and the Hades lesson says verified. Missing evidence fails the check.</p>
+          </article>
+          <article class="card demi-card">
+            <figure class="frame img-hover">
+              <img src="/assets/gods/momus.webp" width="864" height="1152" alt="AI-generated chrome portrait of Momus. No public-domain sculpture reference was used." loading="lazy" />
+            </figure>
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Momus</h3>
+            <p>A blind reviewer: control history and author notes are stripped first. It lists defects against the stated spec. Missing inputs return <code>need_more</code>, which is not approval.</p>
+          </article>
+          <article class="card demi-card">
+            <figure class="frame img-hover">
+              <img src="/assets/gods/hephaestus.webp" width="864" height="1152" alt="AI-generated chrome portrait of Hephaestus. No public-domain sculpture reference was used." loading="lazy" />
+            </figure>
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Hephaestus</h3>
+            <p>Checks residual consistency, that no scars are left, and the budget guard. A supplied Hermes budget must stay at or under its max items. The check is not a Kin seat. Forge patronage is below.</p>
+          </article>
+          <article class="card demi-card">
+            <figure class="frame img-hover">
+              <img src="/assets/gods/nike.webp" width="864" height="1152" alt="AI-generated chrome portrait of Nike, from a Metropolitan Museum terracotta reference" loading="lazy" />
+            </figure>
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Nike</h3>
+            <p>Passes or fails strictly against explicit success criteria. With no criteria, it fails.</p>
+          </article>
+          <article class="card demi-card">
+            <figure class="frame img-hover">
+              <img src="/assets/gods/atlas.webp" width="864" height="1152" alt="AI-generated chrome portrait of the Farnese Atlas, from a National Archaeological Museum of Naples sculpture reference" loading="lazy" />
+            </figure>
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Atlas</h3>
+            <p>Checks declared loads against the real capacity functions. An undeclared load is not invented. Visual patron only. No new capability claim.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="studio">
+      <div class="meander" aria-hidden="true"></div>
+      <p class="patron-kicker"><strong>Studio legions</strong> <span class="pending">BETA</span></p>
+      <h2>Plan, ingest, forge</h2>
+      <p class="sub">Visitors learn and ask in <a href="/chat">chat</a>. The shared demo key is filled in, rate-limited, about 100 usernames. Choose a username there before a thread is saved.</p>
+      <ul class="h-plan">
+        <li><strong>Plan / test / debug</strong> <span>Hermes dispatches the loop. Mutating steps stay refused until Apollo proof. Lower-tier output stays out of the verified step.</span></li>
+        <li><strong>Graphify</strong> <span>Ingest through Eat: accept, reject, or abstain. Learn only on accept when commit is set.</span></li>
+        <li id="forge"><strong>Forge</strong> <span>Hephaestus patronage, not a Kin. A video legion on Hermes. A configured provider can draft. Otherwise the status is UNAVAILABLE and no URL is invented. Generation from a prompt is in research, not shipped.</span></li>
+      </ul>
+      <div class="studio-mock" aria-hidden="true">
+        <div class="studio-chrome">
+          <div class="studio-dot"></div><div class="studio-dot"></div><div class="studio-dot"></div>
+          <span>Resileos · /chat</span>
+        </div>
+        <div class="studio-body">
+          <aside class="studio-side">
+            <div class="studio-label">Sidebar</div>
+            <div class="studio-field"><span>API key</span><code>••••••••</code></div>
+            <div class="studio-field"><span>User id</span><code>alice</code></div>
+            <div class="studio-teach">
+              <div class="studio-label">Save fact</div>
+              <div><code>Zeus</code> · <code>domain</code> · <code>sky</code></div>
+              <div class="studio-btn">Save fact</div>
+              <div class="studio-btn ghost">Seed demo facts</div>
+            </div>
+          </aside>
+          <div class="studio-main">
+            <div class="studio-tabs"><span class="on">Chat</span><span>Search</span><span>Media</span><span>Help</span></div>
+            <div class="studio-chat">
+              <div class="bubble asst">Try <code>remember Zeus domain sky</code> or <code>Zeus domain</code>.</div>
+              <div class="bubble user">remember Zeus domain sky</div>
+              <div class="bubble asst ok">Saved <strong>Zeus —domain→ sky</strong></div>
+              <div class="bubble user">Zeus ssn</div>
+              <div class="bubble asst empty">ABSTAINED — unknown stays empty</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="cta-row"><a class="btn btn-primary" href="/chat">Open chat</a></p>
+    </section>
+  </main>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/kin">Kin</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/chat">Chat</a>
+      <a href="/credits">Credits</a>
+      <a href="https://github.com/jackyreaps/Resileos-QAI">GitHub</a>
+    </nav>
+    <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
+    <p class="credits">Portraits are AI-generated chrome compositions. <a href="/credits">Image credits</a>.</p>
+  </footer>
+
+  <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
+  <script>window.RESILEOS_BILLING = window.RESILEOS_BILLING || "";</script>
+  <script src="/assets/vendor/lenis.min.js"></script>
+  <script src="/assets/site.js"></script>
+</body>
+</html>

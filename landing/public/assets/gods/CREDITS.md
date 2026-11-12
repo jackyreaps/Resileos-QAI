@@ -1,39 +1,47 @@
 # Image credits
 
+The public page for this note is [/credits](/credits).
+
 The landing page feathers each portrait with a CSS mask and a shared
 edge vignette so the crops blend into the page ground (`#06080e`). The
-files in this folder are the November 2026 generations; the mask is
-presentation, not a new source.
+files in this folder are AI-generated. In November 2026 the series was
+restyled as polished chrome and dark metal. Circuit noise, floating
+glyphs, watermarks, and voxel dust were removed. The mask is presentation,
+not a new source.
+
+Short loops in `../motion/` are a light sweep across the Zeus and Titanos
+stills. They are site craft. They are not videos from the engine. A later
+hero or patron clip can be attached with `data-video-src` on the figure.
+Nothing is shipped until that file exists.
 
 ## Site portraits (AI-generated)
 
 Every portrait the landing page serves as a `*.webp` file in this folder was
-generated for Resileos in November 2026. The series shows classical marble
-busts or statues fused with glowing circuit traces, wireframe or mesh edges,
-flowing monospace glyph dust, data-stream particles, and a partial dissolve
-into voxels or points. They sit on a deep dark ground in the site palette
-(indigo `#5b8cff`, violet `#8b6cff`, teal `#3dd68c`). No names, captions, or
-other readable words were added inside the images.
+generated for Resileos in November 2026 and then restyled in the same month
+as museum-style chrome. They sit on a deep dark ground. No names, captions,
+or other readable words were added inside the images. A thorn-crowned bust
+is not used, and is not labeled as Zeus or any other Greek figure.
 
 Where a public-domain or CC0 museum photograph existed, that photograph was
-used as an edit reference. The original photographs are kept in `cc0/` and
-credited below. They are not the files shown on the page.
+used as an edit reference and is credited below. It is not the file shown on
+the page. A copy, when kept in the repo, lives in `cc0/` and is excluded from
+the public deploy.
 
-| File | Figure | Generation | Reference kept in `cc0/` |
-|------|--------|------------|--------------------------|
-| `zeus.webp` | Zeus | AI-generated edit | `cc0/zeus-met-257864.jpg` |
-| `apollo.webp` | Apollo | AI-generated edit | `cc0/apollo-met-255057.jpg` |
-| `hades.webp` | Hades (Serapis type) | AI-generated edit | `cc0/serapis-vatican-inv689.jpg` |
-| `iris.webp` | Iris | AI-generated edit | `cc0/iris-parthenon-bm.jpg` |
-| `hermes.webp` | Hermes | AI-generated edit | `cc0/hermes-met-254925.jpg` |
-| `athena.webp` | Athena | AI-generated edit | `cc0/athena-met-251476.jpg` |
-| `themis.webp` | Themis | AI-generated edit | `cc0/themis-nama-231.jpg` |
-| `nike.webp` | Nike | AI-generated edit | `cc0/nike-met-247495.jpg` |
-| `atlas.webp` | Atlas | AI-generated edit | `cc0/atlas-farnese-naples.jpg` |
-| `metis.webp` | Metis | AI-generated (no sculpture reference) | — |
-| `momus.webp` | Momus | AI-generated (no sculpture reference) | — |
-| `hephaestus.webp` | Hephaestus | AI-generated (no sculpture reference) | — |
-| `titanos.webp` | Titanos | AI-generated figurehead (no single sculpture reference; series-matched to Zeus and Atlas) | — |
+| File | Figure | Generation | Sculpture reference |
+|------|--------|------------|---------------------|
+| `zeus.webp` | Zeus | AI-generated chrome | Met 257864, CC0 |
+| `apollo.webp` | Apollo | AI-generated chrome | Met 255057, CC0 |
+| `hades.webp` | Hades (Serapis type) | AI-generated chrome | Vatican inv. 689, public domain |
+| `iris.webp` | Iris | AI-generated chrome | Parthenon / British Museum, public domain |
+| `hermes.webp` | Hermes | AI-generated chrome | Met 254925, CC0 |
+| `athena.webp` | Athena | AI-generated chrome | Met 251476, CC0 |
+| `themis.webp` | Themis | AI-generated chrome | NAMA 231, CC0 |
+| `nike.webp` | Nike | AI-generated chrome | Met 247495, CC0 |
+| `atlas.webp` | Atlas | AI-generated chrome | Farnese Atlas, Naples, CC0 |
+| `metis.webp` | Metis | AI-generated chrome (no sculpture reference) | — |
+| `momus.webp` | Momus | AI-generated chrome (no sculpture reference) | — |
+| `hephaestus.webp` | Hephaestus | AI-generated chrome (no sculpture reference) | — |
+| `titanos.webp` | Titanos | AI-generated chrome figurehead (no single sculpture) | — |
 
 Metis, Momus, and Hephaestus had no suitable public-domain sculpture photograph
 in this set, so those three portraits are invented in the same series style.

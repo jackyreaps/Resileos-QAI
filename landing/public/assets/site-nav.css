@@ -1,0 +1,101 @@
+/* Shared strip for /chat. Scoped so it does not restyle the chat app.
+   Marketing pages use the header in site.css instead. */
+.site-strip {
+  position: relative;
+  z-index: 30;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: rgba(6, 8, 14, 0.92);
+  border-bottom: 1px solid #1a2336;
+  backdrop-filter: blur(14px);
+  color: #eef2fb;
+}
+html.signed-in .site-strip { display: none; }
+html:not(.signed-in) body:has(.site-strip) #portal {
+  min-height: calc(100dvh - 64px);
+}
+.site-strip-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.site-strip-logo {
+  font-family: "Instrument Serif", "Iowan Old Style", Palatino, Georgia, serif;
+  color: #eef2fb !important;
+  text-decoration: none !important;
+  font-size: 1.28rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.site-strip-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+}
+.site-strip-links a {
+  color: #8b97b0 !important;
+  text-decoration: none !important;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 8px 12px;
+  border-radius: 8px;
+  line-height: 1.2;
+}
+.site-strip-links a:hover {
+  color: #eef2fb !important;
+  background: rgba(91, 140, 255, 0.08);
+}
+.site-strip-links a[aria-current="page"] { color: #eef2fb !important; }
+.site-strip-links a.is-chat {
+  color: #fff !important;
+  font-weight: 600;
+  background: linear-gradient(135deg, #5b8cff, #8b6cff);
+}
+.site-strip-links a.is-chat:hover {
+  color: #fff !important;
+  filter: brightness(1.08);
+}
+.site-strip-toggle {
+  display: none;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid #243049;
+  border-radius: 10px;
+  background: #101623;
+  cursor: pointer;
+}
+.site-strip-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  margin: 4px auto;
+  background: #eef2fb;
+  border-radius: 1px;
+}
+@media (max-width: 800px) {
+  .site-strip-toggle { display: inline-block; }
+  .site-strip-links {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 18px 18px;
+    background: #06080e;
+    border-bottom: 1px solid #243049;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  }
+  .site-strip-links.open { display: flex; }
+  .site-strip-links a.is-chat { text-align: center; margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-strip-links a.is-chat:hover { filter: none; }
+}
