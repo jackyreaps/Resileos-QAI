@@ -18,6 +18,9 @@ Mounted beside the worker:
 - ``POST /perceive/audio``, ``/perceive/video``, and
   ``/perceive/language`` follow the image route: candidates, and
   ``learn`` only when ``commit`` and eat accept.
+- ``/perceive/language`` also calls ``perceive_language.into_kin`` so
+  Psyche receives the perception. ``into_kin`` does not learn. Eat
+  remains the only ingest gate.
 - ``studio.panel.render_residual_codec`` stays Streamlit-only. The
   gear drawer in ``ui.py`` calls it.
 """
@@ -48,6 +51,9 @@ from resileos.ui.query_scale import to_jsonable
 from resileos.ui.scale_wire import task_with_scale
 
 _MUTATING = {"write_file", "apply_diff", "git_commit"}
+
+# Process Psyche for the language route. Callers pass this into into_kin.
+_language_session: dict[str, Any] = {}
 
 
 class ImagePerceiveBody(BaseModel):
@@ -366,7 +372,12 @@ def register_ui_routes(
 
     @app.post("/api/v1/perceive/language", dependencies=deps)
     def perceive_language_route(body: LanguagePerceiveBody) -> dict[str, Any]:
+        from resileos.ui.perceive_language import into_kin
+        from resileos.ui.studio_app import hand_perception_to_psyche
+
         perceived = perceive_language(body.text, subject=body.subject)
+        # Observation reaches Psyche. Learn stays on the eat gate below.
+        handed = hand_perception_to_psyche(perceived, into_kin, _language_session)
         return _perception(
             _metric_triples(
                 body.subject,
@@ -380,7 +391,7 @@ def register_ui_routes(
             commit=body.commit,
             learn=_learn,
             save=save,
-            extra={"perception": perceived},
+            extra={"perception": perceived, "kin": handed["kin"]},
         )
 
     @app.post("/api/v1/generate/local", dependencies=deps)

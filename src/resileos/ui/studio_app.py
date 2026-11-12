@@ -26,6 +26,20 @@ def register_studio_candidate(
     )
 
 
+def hand_perception_to_psyche(perceived: dict, into_kin, session: dict) -> dict:
+    """Hand a perception to Psyche through that modality's ``into_kin``.
+
+    Observation only. This does not call learn. Ingest stays on Eat.
+    """
+    from resileos.kin.psyche import Psyche
+
+    mind = session.get("psyche")
+    if not isinstance(mind, Psyche):
+        mind = Psyche()
+        session["psyche"] = mind
+    return {"perception": perceived, "kin": into_kin(perceived, psyche=mind)}
+
+
 def main() -> None:
     """Run the Streamlit surface. Mode via RESILEOS_UI_MODE (studio|chat)."""
     mode = os.getenv("RESILEOS_UI_MODE", "studio")
@@ -621,23 +635,25 @@ def _run_surface(mode: str) -> None:
         p1, p2, p3 = st.columns(3)
         with p1:
             if st.button("Perceive text", key="perc_text") and txt:
-                from resileos.ui.perceive_language import perceive_language
-                st.json(perceive_language(txt))
+                from resileos.ui.perceive_language import into_kin, perceive_language
+                st.json(hand_perception_to_psyche(perceive_language(txt), into_kin, st.session_state))
         with p2:
             up_a = st.file_uploader("Audio", type=["wav"], key="perc_audio")
             if st.button("Perceive audio", key="perc_a") and up_a is not None:
                 import numpy as np
-                from resileos.ui.perceive_audio import perceive_audio
+                from resileos.ui.perceive_audio import into_kin, perceive_audio
                 raw = np.frombuffer(up_a.read(), dtype=np.int16).astype(np.float32)
-                st.json(perceive_audio(raw / 32768.0))
+                perceived = perceive_audio(raw / 32768.0)
+                st.json(hand_perception_to_psyche(perceived, into_kin, st.session_state))
         with p3:
             up_v = st.file_uploader("Video frames", type=["png", "jpg"], key="perc_vid", accept_multiple_files=True)
             if st.button("Perceive frames", key="perc_v") and up_v:
                 import numpy as np
                 from PIL import Image
-                from resileos.ui.perceive_video import perceive_video
+                from resileos.ui.perceive_video import into_kin, perceive_video
                 frames = [np.array(Image.open(f).convert("RGB")) for f in up_v]
-                st.json(perceive_video(np.stack(frames)))
+                perceived = perceive_video(np.stack(frames))
+                st.json(hand_perception_to_psyche(perceived, into_kin, st.session_state))
 
 
     with tab_tools:
@@ -657,14 +673,15 @@ def _run_surface(mode: str) -> None:
             st.markdown("**Perceive**")
             txt = st.text_area("Text to perceive", key="tool_perc_text", height=80)
             if st.button("Perceive language", key="tool_perc_lang") and txt:
-                from resileos.ui.perceive_language import perceive_language
-                st.json(perceive_language(txt))
+                from resileos.ui.perceive_language import into_kin, perceive_language
+                st.json(hand_perception_to_psyche(perceive_language(txt), into_kin, st.session_state))
             up = st.file_uploader("Image", type=["png", "jpg"], key="tool_img")
             if st.button("Perceive image", key="tool_perc_img") and up is not None:
                 import numpy as np
                 from PIL import Image
-                from resileos.ui.perceive_image import perceive_image
-                st.json(perceive_image(np.array(Image.open(up).convert("RGB")), subject="upload"))
+                from resileos.ui.perceive_image import into_kin, perceive_image
+                perceived = perceive_image(np.array(Image.open(up).convert("RGB")), subject="upload")
+                st.json(hand_perception_to_psyche(perceived, into_kin, st.session_state))
 
 
         st.divider()
