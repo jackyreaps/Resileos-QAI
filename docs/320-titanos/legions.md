@@ -39,8 +39,8 @@ This layer does not use LangChain, AutoGen, crewAI, or MetaGPT.
 
 `register_studio_legions` registers three tools. Each stays on one Kin.
 
-- Hermes `forge_video` is the Forge video legion. Hephaestus is the Studio patron and is not a Kin, so the gate is Hermes. A configured provider can draft, verify, or upscale. With no provider the status is `UNAVAILABLE` and no URL is invented. A worker process is a Clotho group.
-- Eat `graphify` turns a graph or source into candidates and runs each through `eat_filter`. `learn` runs only for an accept when commit is set. Reject and abstain do not write.
+- Hermes `forge_video` is the Forge video legion. Hephaestus is the Studio patron and is not a Kin, so the gate is Hermes. A matrix or residual packet is drafted and verified with the layer-scale studio codec (one scale on the rank-r product), phi-compressed below a native rank budget, and stepped with `KuramotoField` outward. That path accepts or rejects without a provider. Upscale stays off unless the residual check is inconclusive, and then it sends only the residual delta to a configured provider slot. A prompt with no residual input is a video request: with no provider the status is `UNAVAILABLE` and no URL is invented. The slot does not write residual facts. A worker process is a Clotho group and does not cross a Hades checkpoint.
+- Eat `graphify` turns a graph or text into residual candidates and runs each through `eat_filter`. `learn` runs only for an accept when commit is set. The residual record is what a later question reads. Reject and abstain do not write.
 - Hermes `plan_test_debug` plans, tests, and debugs. A repeated failure stops the loop. Lower-tier output stays out of the verified step. `write_file`, `apply_diff`, and `git_commit` stay refused until `verify_on_stop` passes. The HTTP route does not execute them.
 
 A Demi-god uses one of these only by naming it in the temporary swarm for its parent Kin.

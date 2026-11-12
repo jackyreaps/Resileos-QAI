@@ -141,8 +141,21 @@ def _run_executable(path: str, prompt: str) -> dict[str, Any]:
     }
 
 
+def _has_residual_input(kwargs: dict[str, Any]) -> bool:
+    if kwargs.get("matrix") is not None or isinstance(kwargs.get("residual_packet"), dict):
+        return True
+    frames = kwargs.get("frames")
+    return isinstance(frames, list) and len(frames) > 0
+
+
 def forge_video(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
-    """Forge video under Hephaestus. Draft through a configured provider, or UNAVAILABLE."""
+    """Forge under Hephaestus.
+
+    A matrix, frame list, or residual packet is drafted and verified by the
+    layer-scale codec. A provider is used only for an inconclusive upscale
+    of the residual delta. A prompt with no residual input stays the video
+    request: a configured provider, or UNAVAILABLE with no invented URL.
+    """
     del seen
     prompt = str(kwargs.get("prompt") or "")[:2000]
     stage = str(kwargs.get("stage") or "draft")
@@ -159,6 +172,26 @@ def forge_video(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         refused = _unavailable(prompt, stage, "Unknown forge stage.")
         refused["status"] = "refused"
         return refused
+    if _has_residual_input(kwargs):
+        from resileos.studio.residual_cascade import run_visual_stage
+
+        produced = run_visual_stage(
+            stage=stage,
+            prompt=prompt,
+            matrix=kwargs.get("matrix"),
+            frames=kwargs.get("frames"),
+            residual_packet=kwargs.get("residual_packet")
+            if isinstance(kwargs.get("residual_packet"), dict)
+            else None,
+            provider_fn=kwargs.get("provider_fn"),
+            control=kwargs.get("control"),
+            learn=kwargs.get("learn"),
+            bypass_zeus=bool(kwargs.get("bypass_zeus")),
+            zeus=kwargs.get("zeus"),
+        )
+        produced["checkpoint"] = None
+        produced["hades_checkpoint"] = False
+        return produced
     if stage == "verify":
         return {
             "status": "verified" if proof.get("verified") else "unverified",
@@ -239,8 +272,15 @@ def graphify(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
             "learned": 0,
             "error": "source too long",
         }
+    from resileos.studio.residual_cascade import (
+        cascade_scale,
+        remember_accepted,
+        text_matrix,
+    )
+
     decisions: list[dict[str, Any]] = []
     claims: list[list[str]] = []
+    residual_candidates: list[dict[str, Any]] = []
     for candidate in _candidates(source):
         decision = eat_filter(candidate)
         action = str(getattr(decision, "action", "") or "")
@@ -251,10 +291,44 @@ def graphify(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
             "obj": str(getattr(decision, "obj", "") or ""),
             "reason": str(getattr(decision, "reason", "") or ""),
         }
+        label = " ".join(part for part in (row["subject"], row["relation"], row["obj"]) if part)
+        if not label:
+            label = candidate if isinstance(candidate, str) else json.dumps(candidate, default=str)[:500]
+        evolved = cascade_scale(
+            text_matrix(label),
+            prompt=label[:200],
+            register=False,
+            address=False,
+        )
+        summary = evolved.get("compression") if isinstance(evolved.get("compression"), dict) else {}
+        row["residual_hash"] = str(evolved.get("packet_hash") or "")
+        row["residual"] = {
+            "packet_hash": row["residual_hash"],
+            "scale_mode": evolved.get("scale_mode"),
+            "layer_scale": evolved.get("layer_scale"),
+            "credit_cost": summary.get("credit_cost"),
+            "outcome": evolved.get("outcome"),
+        }
+        residual_candidates.append(
+            {
+                "action": action,
+                "subject": row["subject"],
+                "relation": row["relation"],
+                "obj": row["obj"],
+                "packet_hash": row["residual_hash"],
+                "scale_mode": evolved.get("scale_mode"),
+            }
+        )
         decisions.append(row)
         if commit and action == "accept" and row["subject"] and row["relation"] and row["obj"]:
             claims.append([row["subject"], row["relation"], row["obj"]])
-    return {"decisions": decisions, "claims": claims, "learned": len(claims)}
+            remember_accepted(row["subject"], row["relation"], row["obj"], evolved)
+    return {
+        "decisions": decisions,
+        "claims": claims,
+        "learned": len(claims),
+        "residual_candidates": residual_candidates,
+    }
 
 
 def run_plan_test_debug(
@@ -570,6 +644,12 @@ def run_forge_video(
     scars: list[str] | None = None,
     apollo_result: dict[str, Any] | None = None,
     packet: dict[str, Any] | None = None,
+    matrix: Any = None,
+    frames: list[Any] | None = None,
+    residual_packet: dict[str, Any] | None = None,
+    learn_fn: Callable[..., Any] | None = None,
+    bypass_zeus: bool = False,
+    zeus: Any = None,
 ) -> dict[str, Any]:
     """Invoke the Forge legion and register any worker on the packet owner."""
     from resileos.kin.demigods.swarm import swarm_meta
@@ -587,12 +667,21 @@ def run_forge_video(
         verified=verified,
         scars=list(scars or []),
         apollo_result=apollo_result,
+        matrix=matrix,
+        frames=frames,
+        residual_packet=residual_packet,
+        control=host,
+        learn_fn=learn_fn,
+        bypass_zeus=bypass_zeus,
+        zeus=zeus,
     )
     meta = swarm_meta(host)
     owner = str(meta["attempt_id"]) if meta else str(host.get("id") or "forge")
     if meta is None:
         note_worker(owner, "forge_video", result)
     result["clotho_owner"] = owner
+    result["checkpoint"] = None
+    result["hades_checkpoint"] = False
     return result
 
 

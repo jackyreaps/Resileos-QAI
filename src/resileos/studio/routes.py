@@ -75,6 +75,8 @@ class ExternalBody(BaseModel):
 class ForgeBody(BaseModel):
     prompt: str = Field(default="", max_length=2000)
     stage: str = "draft"
+    matrix: list[Any] | None = None
+    frames: list[Any] | None = None
 
 
 class GraphifyBody(BaseModel):
@@ -241,7 +243,14 @@ def register_studio_routes(
 
         stage = body.stage if body.stage in {"draft", "verify", "upscale"} else body.stage
         try:
-            return to_jsonable(run_forge_video(body.prompt, stage=stage))
+            return to_jsonable(
+                run_forge_video(
+                    body.prompt,
+                    stage=stage,
+                    matrix=body.matrix,
+                    frames=body.frames,
+                )
+            )
         except LegionError as exc:
             raise HTTPException(400, str(exc)) from exc
 
