@@ -4,273 +4,630 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resileos Studio</title>
+    <link rel="icon" href="/assets/gods/hermes.webp" />
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('resileos_theme');
+                document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+                var name = (localStorage.getItem('resileos_username') || '').trim();
+                if (/^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/.test(name)) {
+                    document.documentElement.classList.add('signed-in');
+                }
+            } catch (err) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="/assets/fonts/fonts.css" />
     <style>
         :root {
-            --bg: #f6f4ef;
-            --panel: #fffcf7;
-            --text: #1a1a1a;
-            --muted: #5c6570;
-            --accent: #1a4d8f;
-            --accent-hover: #143c70;
-            --border: #e4dfd4;
-            --user-bg: #1a4d8f;
+            color-scheme: dark;
+            --bg: #07060d;
+            --bg-elev: #100c18;
+            --panel: rgba(16, 12, 26, 0.88);
+            --text: #f7f3ff;
+            --muted: #b7adc9;
+            --faint: #7e748f;
+            --accent: #c4b5fd;
+            --accent-2: #7c5cff;
+            --accent-hover: #ddd6fe;
+            --accent-glow: rgba(167, 139, 250, 0.45);
+            --border: rgba(196, 181, 253, 0.18);
+            --user-a: #7c5cff;
+            --user-b: #c084fc;
             --user-text: #fff;
-            --bot-bg: #fffcf7;
-            --danger: #d93838;
-            --success: #0d9463;
-            --warn: #b58112;
-            --chip-bg: #eef3fa;
+            --bot-bg: rgba(24, 18, 38, 0.92);
+            --danger: #ff6b8a;
+            --success: #3dd68c;
+            --warn: #f0b429;
+            --chip-bg: rgba(124, 92, 255, 0.14);
+            --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
             --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
             --display: "Instrument Serif", "Iowan Old Style", Palatino, Georgia, serif;
             --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
-        [data-theme="dark"] {
-            --bg: #06080e;
-            --panel: #101623;
-            --text: #eef2fb;
-            --muted: #8b97b0;
-            --accent: #5b8cff;
-            --accent-hover: #7aa3ff;
-            --border: #243049;
-            --user-bg: #2563eb;
+        [data-theme="light"] {
+            color-scheme: light;
+            --bg: #f6f3fb;
+            --bg-elev: #fffafc;
+            --panel: rgba(255, 252, 255, 0.92);
+            --text: #1b1430;
+            --muted: #5c546e;
+            --faint: #857c96;
+            --accent: #6d4aff;
+            --accent-2: #9b6dff;
+            --accent-hover: #5336d6;
+            --accent-glow: rgba(109, 74, 255, 0.28);
+            --border: rgba(76, 48, 140, 0.16);
+            --user-a: #6d4aff;
+            --user-b: #b794f6;
             --user-text: #fff;
-            --bot-bg: #141c2c;
-            --danger: #ff6b7a;
-            --success: #3dd68c;
-            --warn: #f0b429;
-            --chip-bg: #182235;
+            --bot-bg: rgba(255, 255, 255, 0.94);
+            --danger: #c4234a;
+            --success: #0d9463;
+            --warn: #9a6408;
+            --chip-bg: rgba(109, 74, 255, 0.08);
+            --shadow: 0 18px 50px rgba(70, 40, 120, 0.12);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; }
         body {
             background: var(--bg);
             color: var(--text);
-            height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            min-height: 100dvh;
             font-family: var(--font);
             -webkit-font-smoothing: antialiased;
         }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                radial-gradient(900px 520px at 12% -10%, rgba(124, 92, 255, 0.28), transparent 58%),
+                radial-gradient(720px 420px at 100% 0%, rgba(192, 132, 252, 0.16), transparent 52%),
+                radial-gradient(640px 380px at 50% 110%, rgba(61, 214, 140, 0.06), transparent 46%);
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.14;
+            background-image: url(/assets/grain.png);
+            mix-blend-mode: overlay;
+        }
+        html:not(.signed-in) body { overflow: auto; }
+        html.signed-in body { height: 100dvh; overflow: hidden; }
+        a { color: var(--accent); }
+        a:hover { color: var(--accent-hover); }
+        button, input, textarea, select { font: inherit; color: inherit; }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        code { font-family: var(--mono); font-size: 0.92em; }
+
+        #portal {
+            position: relative;
+            z-index: 1;
+            min-height: 100dvh;
+            display: grid;
+            place-items: center;
+            padding: 32px 16px;
+        }
+        html.signed-in #portal { display: none; }
+        .portal-card {
+            width: min(460px, 100%);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 28px 26px 22px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+            position: relative;
+            overflow: hidden;
+        }
+        .portal-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        }
+        .portal-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+        .eyebrow {
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .portal-card h1 {
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: clamp(2.6rem, 7vw, 3.4rem);
+            letter-spacing: -0.03em;
+            line-height: 0.95;
+            margin-bottom: 10px;
+        }
+        .lede { color: var(--muted); line-height: 1.55; margin-bottom: 18px; }
+        .portal-card form, .stack { display: grid; gap: 12px; }
+        .portal-card label, .stack label, .settings-grid label, .history-user label, .action-card label {
+            display: grid;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+        .portal-card input, .settings-grid input, .history-user input, .action-card input, .action-card textarea, .action-card select {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--bg) 86%, transparent);
+            color: var(--text);
+            border-radius: 12px;
+            padding: 11px 12px;
+            font-size: 0.98rem;
+        }
+        .portal-card input:focus, .settings-grid input:focus, .history-user input:focus, .action-card input:focus, .action-card textarea:focus, .action-card select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+        }
+        .check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 0.86rem; }
+        .check input { width: auto; accent-color: var(--accent-2); }
+        .portal-go, .history-new, .history-save, .action-card .run, button.send {
+            border: 0;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent-2), var(--user-b));
+            box-shadow: 0 8px 24px var(--accent-glow);
+        }
+        .portal-go {
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .portal-go:hover, .history-new:hover, .history-save:hover, .action-card .run:hover, button.send:hover { filter: brightness(1.06); }
+        .portal-error { min-height: 1.2em; color: var(--danger); font-size: 0.84rem; }
+        .portal-links { margin-top: 14px; font-size: 0.84rem; color: var(--faint); }
+        .settings-hint, .panel-intro, .history-empty { color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+        .app-shell {
+            position: relative;
+            z-index: 1;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        html:not(.signed-in) .app-shell { display: none; }
         .header {
-            padding: 14px 22px;
+            flex-shrink: 0;
+            padding: 12px 16px;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--panel);
-            gap: 16px;
+            gap: 12px;
+            background: color-mix(in srgb, var(--panel) 88%, transparent);
+            backdrop-filter: blur(16px);
         }
-        .header-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 0;
-        }
+        .header-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
         .brand {
             font-family: var(--display);
-            font-size: 1.35rem;
+            font-size: 1.45rem;
             letter-spacing: 0.01em;
             color: var(--text);
             text-decoration: none;
         }
         .brand:hover { color: var(--accent); }
-        .brand span { font-size: 0.95rem; color: var(--muted); font-family: var(--font); margin-left: 6px; }
+        .brand span { font-size: 0.92rem; color: var(--muted); font-family: var(--font); margin-left: 6px; }
         .status {
             display: inline-flex;
             align-items: center;
             gap: 6px;
             font-size: 0.75rem;
             color: var(--muted);
-            letter-spacing: 0.02em;
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--bg) 70%, transparent);
+            border-radius: 999px;
+            padding: 4px 10px 4px 8px;
+            white-space: nowrap;
         }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
-        .dot.online { background: var(--success); }
-        .dot.offline, .dot.error { background: var(--danger); }
-        .dot.connecting { background: var(--warn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 20%, transparent); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex-shrink: 0; }
+        .dot.online { background: var(--success); box-shadow: 0 0 10px var(--success); }
+        .dot.offline, .dot.error { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+        .dot.connecting { background: var(--warn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 25%, transparent); }
         .dot.needs-key { background: var(--warn); }
-        .header-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-        .btn-icon {
-            background: none; border: none; color: var(--muted); cursor: pointer;
-            padding: 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+        .header-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+        .btn-icon, .btn-text {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 10px;
         }
-        .btn-icon:hover { background: var(--bg); color: var(--text); }
-        .btn-icon[aria-pressed="true"] { color: var(--accent); background: var(--chip-bg); }
-        .header { flex-shrink: 0; }
-        .workspace {
-            flex: 1; min-height: 0; display: flex; position: relative; overflow: hidden;
+        .btn-icon { padding: 8px; display: flex; align-items: center; justify-content: center; }
+        .btn-text { padding: 6px 10px; font-size: 0.78rem; border-color: var(--border); }
+        .btn-icon:hover, .btn-text:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); }
+        .btn-icon[aria-pressed="true"] { color: var(--accent); background: var(--chip-bg); border-color: var(--border); }
+        .user-pill {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 4px 8px;
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background: var(--chip-bg);
         }
-        .chat-column {
-            flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
-        }
+        .workspace { flex: 1; min-height: 0; display: flex; position: relative; overflow: hidden; }
+        .chat-column { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
         #chat {
-            flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-            padding: 28px 16px 16px; display: flex; flex-direction: column; gap: 20px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 28px 16px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
-        .input-wrap { flex-shrink: 0; }
         .history {
-            position: absolute; top: 0; bottom: 0; left: 0; z-index: 6;
+            position: absolute;
+            top: 0; bottom: 0; left: 0;
+            z-index: 6;
             width: min(320px, 88vw);
             transform: translateX(-105%);
             transition: transform .32s cubic-bezier(.2, .7, .2, 1);
-            background: var(--panel);
+            background: color-mix(in srgb, var(--panel) 94%, transparent);
+            backdrop-filter: blur(18px);
             border-right: 1px solid var(--border);
-            box-shadow: 16px 0 40px rgba(0, 0, 0, .18);
-            display: flex; flex-direction: column; min-height: 0;
+            box-shadow: 16px 0 40px rgba(0, 0, 0, .28);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
         .history.open { transform: translateX(0); }
         .history-scrim {
             position: absolute; inset: 0; z-index: 5; border: 0; padding: 0;
-            background: rgba(6, 8, 14, .38); cursor: pointer;
+            background: rgba(6, 4, 12, .5); cursor: pointer;
         }
         .history-scrim[hidden] { display: none; }
+        @media (min-width: 960px) {
+            html.signed-in .history {
+                position: relative;
+                transform: none;
+                width: 300px;
+                flex-shrink: 0;
+                box-shadow: none;
+                z-index: 1;
+            }
+            html.signed-in .history:not(.open) {
+                width: 0;
+                min-width: 0;
+                overflow: hidden;
+                border-right-width: 0;
+            }
+            html.signed-in .history-scrim { display: none !important; }
+        }
         .history-head {
-            flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
-            gap: 8px; padding: 14px 14px 8px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 16px 14px 8px;
         }
-        .history-head h2 { font-family: var(--display); font-size: 1.25rem; font-weight: 400; }
-        .history-new, .history-save {
-            background: var(--accent); color: #fff; border: none; border-radius: 8px;
-            padding: 6px 10px; cursor: pointer; font-size: 0.8rem; font-family: var(--font);
-        }
-        .history-new:hover, .history-save:hover { background: var(--accent-hover); }
+        .history-head h2 { font-family: var(--display); font-size: 1.45rem; font-weight: 400; }
+        .history-new, .history-save { border-radius: 9px; padding: 7px 10px; font-size: 0.8rem; }
         .history-user { flex-shrink: 0; display: grid; gap: 8px; padding: 0 14px 8px; }
-        .history-user label { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
-        .history-user input {
-            border: 1px solid var(--border); background: var(--bg); color: var(--text);
-            border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; font-family: var(--font);
-        }
-        .history-user input:focus { outline: none; border-color: var(--accent); }
+        .history-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .history-list {
             flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
             padding: 4px 10px 16px; display: flex; flex-direction: column; gap: 6px;
         }
         .history-item {
-            text-align: left; width: 100%; border: 1px solid var(--border); background: var(--bg);
-            color: var(--text); border-radius: 10px; padding: 8px 10px; cursor: pointer;
+            text-align: left; width: 100%; border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--bg) 75%, transparent);
+            color: var(--text); border-radius: 12px; padding: 10px 12px; cursor: pointer;
             font-family: var(--font); display: grid; gap: 2px;
         }
-        .history-item:hover, .history-item.active { border-color: var(--accent); }
+        .history-item:hover, .history-item.active { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
         .history-title { font-size: 0.88rem; }
         .history-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); }
-        .history-empty { color: var(--muted); font-size: 0.82rem; padding: 8px 4px; }
         #history-note { padding: 0 14px 8px; flex-shrink: 0; }
-        @media (prefers-reduced-motion: reduce) {
-            .history { transition: none; }
+        .empty {
+            margin: auto;
+            width: min(680px, 100%);
+            text-align: center;
+            padding: 24px 8px 8px;
         }
-        .msg-row { display: flex; gap: 14px; max-width: 768px; margin: 0 auto; width: 100%; }
-        .msg-row.user { justify-content: flex-end; }
-        .avatar {
-            width: 28px; height: 28px; border-radius: 6px;
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        .empty[hidden] { display: none !important; }
+        .empty h2 {
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: clamp(2.8rem, 6vw, 4.4rem);
+            letter-spacing: -0.035em;
+            line-height: 0.95;
+            margin: 6px 0 12px;
         }
-        .avatar.bot { background: var(--accent); color: #fff; }
-        .avatar.user { background: #e5e5e0; color: #333; }
-        [data-theme="dark"] .avatar.user { background: #333; color: #fff; }
-        .bubble {
-            padding: 12px 16px; border-radius: 14px; font-size: 0.95rem; line-height: 1.55; max-width: 85%;
-            white-space: pre-wrap; word-break: break-word;
-        }
-        .bubble.user { background: var(--user-bg); color: var(--user-text); border-bottom-right-radius: 4px; }
-        .bubble.bot { background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-        .reply { font-size: 0.98rem; }
-        .meta { font-size: 0.75rem; color: var(--muted); margin-top: 8px; font-family: var(--mono); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .chip {
-            display: inline-flex; align-items: center;
-            font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase;
-            padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border);
-            background: var(--chip-bg); color: var(--muted);
-        }
-        .chip.accepted { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, var(--border)); }
-        .chip.abstained, .chip.no_rows { color: var(--warn); }
-        .chip.conflict, .chip.error { color: var(--danger); }
-        .chip.memory { color: var(--accent); }
-        .panel {
-            background: var(--panel); border-bottom: 1px solid var(--border);
-            padding: 12px 22px; font-size: 0.85rem; display: none;
-            flex-direction: column; gap: 10px; max-height: 46vh; overflow-y: auto;
-        }
-        .panel.open { display: flex; }
-        .panel-intro { color: var(--muted); font-size: 0.8rem; }
-        .panel-grid { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
-        .action-card {
-            background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
-            padding: 10px 12px; min-width: 220px; flex: 1 1 260px;
-        }
-        .action-card h4 { font-size: 0.82rem; margin-bottom: 4px; color: var(--text); }
-        .action-card p { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
-        .action-card textarea, .action-card input[type="text"] {
-            width: 100%; border: 1px solid var(--border); background: var(--panel);
-            color: var(--text); border-radius: 8px; padding: 6px 8px;
-            font-family: var(--mono); font-size: 0.75rem;
-        }
-        .action-card textarea { min-height: 64px; resize: vertical; }
-        .action-card textarea:focus, .action-card input[type="text"]:focus { outline: none; border-color: var(--accent); }
-        .action-card .run {
-            margin-top: 8px; background: var(--accent); color: #fff; border: none;
-            border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 0.8rem;
-        }
-        .action-card .run:hover { background: var(--accent-hover); }
-        .tool-chip {
-            background: var(--bg); border: 1px solid var(--border); padding: 6px 12px;
-            border-radius: 8px; cursor: pointer; color: var(--text); font-size: 0.8rem;
-        }
-        .tool-chip:hover { border-color: var(--accent); }
-        .tool-chip.legion { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
-        .group-row { width: 100%; margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .group-label { font-weight: 600; color: var(--muted); width: 72px; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; }
-        .settings-grid { display: grid; gap: 10px; width: 100%; max-width: 768px; margin: 0 auto; }
-        .settings-grid label { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
-        .settings-grid input {
-            border: 1px solid var(--border); background: var(--bg); color: var(--text);
-            border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; font-family: var(--font);
-        }
-        .settings-grid input:focus { outline: none; border-color: var(--accent); }
-        .settings-hint { font-size: 0.8rem; color: var(--muted); }
-        .input-wrap { padding: 16px; background: var(--bg); display: flex; justify-content: center; }
-        .input-box {
-            width: 100%; max-width: 768px; background: var(--panel);
-            border: 1px solid var(--border); border-radius: 14px; display: flex; align-items: flex-end; padding: 6px;
-        }
-        .input-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
-        input[type="text"] { flex: 1; border: none; background: transparent; padding: 10px; font-size: 1rem; color: var(--text); outline: none; font-family: var(--font); }
-        button.send {
-            background: var(--accent); color: white; border: none; border-radius: 10px;
-            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; margin: 4px;
-        }
-        button.send:disabled { background: #999; cursor: not-allowed; }
-        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; max-width: 640px; margin-left: auto; margin-right: auto; }
-        .suggestions[hidden] { display: none; }
+        .empty .lede { margin-left: auto; margin-right: auto; max-width: 36em; }
+        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
         .suggestion {
-            background: var(--panel); border: 1px solid var(--border); padding: 10px 16px;
-            border-radius: 10px; font-size: 0.88rem; cursor: pointer; color: var(--text);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 12px 14px;
+            border-radius: 14px;
+            font-size: 0.88rem;
+            cursor: pointer;
+            color: var(--text);
+            text-align: left;
+            min-width: min(180px, 100%);
         }
         .suggestion:hover { border-color: var(--accent); color: var(--accent); }
+        .msg-row { display: flex; gap: 12px; max-width: 760px; margin: 0 auto; width: 100%; animation: rise .28s ease; }
+        .msg-row.user { justify-content: flex-end; }
+        .avatar {
+            width: 32px; height: 32px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .avatar.bot {
+            background: linear-gradient(135deg, var(--accent-2), var(--user-b));
+            color: #fff;
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+        .avatar.user { background: #2a2438; color: #fff; }
+        [data-theme="light"] .avatar.user { background: #241b3a; color: #fff; }
+        .bubble {
+            padding: 12px 14px;
+            border-radius: 16px;
+            font-size: 0.96rem;
+            line-height: 1.55;
+            max-width: min(85%, 620px);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .bubble.user {
+            background: linear-gradient(135deg, var(--user-a), var(--user-b));
+            color: var(--user-text);
+            border-bottom-right-radius: 5px;
+            box-shadow: 0 10px 28px var(--accent-glow);
+        }
+        .bubble.bot {
+            background: var(--bot-bg);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 5px;
+        }
+        .reply { font-size: 0.98rem; white-space: pre-wrap; }
+        .meta {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 8px;
+            font-family: var(--mono);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.68rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--chip-bg);
+            color: var(--muted);
+        }
+        .chip.accepted { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, var(--border)); }
+        .chip.abstained, .chip.no_rows, .chip.unavailable { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+        .chip.conflict, .chip.error, .chip.refused { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+        .chip.memory { color: var(--accent); }
+        .bubble a { color: inherit; }
+        .raw-fold { margin-top: 8px; }
+        .raw-fold summary { cursor: pointer; color: var(--faint); font-size: 0.75rem; font-family: var(--mono); }
+        .panel {
+            background: color-mix(in srgb, var(--panel) 94%, transparent);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 68vh;
+            overflow-y: auto;
+        }
+        .panel.open { display: flex; }
+        .panel-grid { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
+        .action-card {
+            background: color-mix(in srgb, var(--bg) 72%, transparent);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            min-width: 220px;
+            flex: 1 1 260px;
+            display: grid;
+            gap: 8px;
+        }
+        .action-card h4 { font-family: var(--display); font-size: 1.15rem; font-weight: 400; color: var(--text); }
+        .action-card p { font-size: 0.78rem; color: var(--muted); }
+        .action-card textarea { min-height: 64px; resize: vertical; font-family: var(--mono); font-size: 0.78rem; }
+        #studio-tools { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+        #studio-tools .action-card { min-width: 0; }
+        .action-card .run { border-radius: 10px; padding: 8px 12px; justify-self: start; font-size: 0.82rem; font-weight: 600; }
+        .action-card .run.stop {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--border));
+            box-shadow: none;
+        }
+        .action-card .run:disabled { filter: grayscale(0.4); cursor: wait; }
+        .tool-chip {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 0.8rem;
+        }
+        .tool-chip:hover, .tool-chip.legion { border-color: var(--accent); }
+        .group-row { width: 100%; margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .group-label { font-weight: 600; color: var(--muted); width: 88px; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
+        .settings-grid { display: grid; gap: 10px; width: 100%; max-width: 720px; }
+        .more-fold { width: 100%; border-top: 1px solid var(--border); padding-top: 8px; }
+        .more-fold summary { cursor: pointer; color: var(--muted); font-size: 0.8rem; margin-bottom: 8px; }
+        .studio-result:empty { display: none; }
+        .studio-result {
+            border-top: 1px solid var(--border);
+            padding-top: 8px;
+            font-size: 0.84rem;
+        }
+        .input-wrap { flex-shrink: 0; padding: 8px 16px 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .input-box {
+            width: 100%;
+            max-width: 760px;
+            min-width: 0;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            align-items: flex-end;
+            padding: 6px;
+            backdrop-filter: blur(12px);
+        }
+        .input-box:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent), 0 0 28px var(--accent-glow);
+        }
+        textarea.composer {
+            flex: 1;
+            min-width: 0;
+            border: 0;
+            background: transparent;
+            resize: none;
+            min-height: 44px;
+            max-height: 160px;
+            padding: 10px 8px;
+            font-size: 1rem;
+            line-height: 1.45;
+            outline: none;
+        }
+        textarea.composer:focus-visible { outline: none; }
+        button.send {
+            border-radius: 12px;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 4px;
+            flex-shrink: 0;
+        }
+        button.send:disabled { background: #6d6780; box-shadow: none; cursor: not-allowed; filter: none; }
+        .composer-hint { width: 100%; max-width: 760px; color: var(--faint); font-size: 0.75rem; font-family: var(--mono); padding: 0 8px; }
+        .file-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: var(--chip-bg);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.78rem;
+            max-width: 46%;
+        }
+        .file-chip[hidden] { display: none !important; }
+        .file-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-chip button { border: 0; background: transparent; color: var(--text); cursor: pointer; padding: 0 2px; }
         .typing { display: flex; gap: 4px; align-items: center; height: 20px; }
         .typing span { width: 5px; height: 5px; background: var(--muted); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
         .typing span:nth-child(1) { animation-delay: -0.32s; }
         .typing span:nth-child(2) { animation-delay: -0.16s; }
+        pre {
+            background: color-mix(in srgb, var(--bg) 80%, transparent);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.75rem;
+            margin-top: 8px;
+            border: 1px solid var(--border);
+            font-family: var(--mono);
+            white-space: pre-wrap;
+        }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
-        pre { background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; border: 1px solid var(--border); font-family: var(--mono); white-space: pre-wrap; }
-        .file-chip { font-size: 0.8rem; color: var(--muted); padding: 0 8px 8px; }
-        .history-user input[type="text"],
-        .settings-grid input[type="text"],
-        .settings-grid input[type="password"] {
-            flex: none; width: 100%;
-            border: 1px solid var(--border); background: var(--bg); color: var(--text);
-            border-radius: 8px; padding: 8px 10px; font-size: 0.95rem;
+        @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) {
+            .history, .msg-row { transition: none; animation: none; }
+        }
+        @media (max-width: 1100px) {
+            #studio-tools { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+            .brand span, .user-pill, #btn-signout-header, #status-label { display: none; }
+            .header { padding: 8px 8px; gap: 8px; }
+            .header-title { min-width: 0; }
+            .header-actions { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
+            #btn-history { position: sticky; left: 0; z-index: 1; background: var(--bg); flex-shrink: 0; }
+            .btn-icon { padding: 6px; }
+            .status { padding: 4px; }
+            .brand { font-size: 1.25rem; }
+            .empty h2 { font-size: 2.5rem; }
+            .portal-card { padding: 22px 16px 16px; }
+            .composer-hint { font-size: 0.7rem; }
+            #studio-tools { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
+    <div id="portal">
+        <div class="portal-card">
+            <div class="portal-top">
+                <a class="brand" href="/">Resileos</a>
+                <button class="btn-icon" id="portal-theme" type="button" title="Theme">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                </button>
+            </div>
+            <p class="eyebrow">Stores · Derives · Abstains</p>
+            <h1>Remembers exactly</h1>
+            <p class="lede">A username opens your saved conversations. No password. The shared demo key is rate-limited, about 100 usernames.</p>
+            <form id="portal-form">
+                <label>Username
+                    <input id="portal-username" type="text" required maxlength="32" autocomplete="username" spellcheck="false" placeholder="ada" />
+                </label>
+                <label>API key <span>optional</span>
+                    <input id="portal-key" type="password" autocomplete="off" spellcheck="false" placeholder="Leave blank for the shared demo key" />
+                </label>
+                <label>Hub id <span>optional</span>
+                    <input id="portal-hub" type="text" maxlength="64" autocomplete="off" spellcheck="false" placeholder="anon" />
+                </label>
+                <p class="settings-hint" id="portal-note">Shared demo key, rate-limited. About 100 usernames. Leave the key blank to keep a key already saved in this browser, including a paid key from checkout.</p>
+                <p class="settings-hint" id="portal-key-state"></p>
+                <p class="portal-error" id="portal-error" role="alert"></p>
+                <button class="portal-go" type="submit">Enter chat</button>
+            </form>
+            <p class="portal-links"><a href="/">Landing</a></p>
+        </div>
+    </div>
+
+    <div class="app-shell">
     <div class="header">
         <div class="header-title">
             <a class="brand" href="/">Resileos<span>Studio</span></a>
             <div class="status"><div class="dot connecting" id="status"></div><span id="status-label">Connecting</span></div>
+            <span class="user-pill" id="user-pill" hidden></span>
         </div>
         <div class="header-actions">
+            <button class="btn-text js-signout" id="btn-signout-header" type="button">Switch user</button>
             <button class="btn-icon" id="btn-history" type="button" onclick="toggleHistory()" title="Conversations" aria-pressed="false" aria-expanded="false" aria-controls="history-panel">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="15" y2="18"></line></svg>
             </button>
@@ -295,7 +652,7 @@
             <button class="btn-icon" id="btn-settings" onclick="toggleSettings()" title="Connection" aria-pressed="false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
-            <button class="btn-icon" onclick="toggleTheme()" title="Theme">
+            <button class="btn-icon" id="btn-theme" type="button" onclick="toggleTheme()" title="Theme">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
         </div>
@@ -308,10 +665,13 @@
             <button type="button" class="history-new" id="history-new">New</button>
         </div>
         <form id="history-user-form" class="history-user">
-            <label>Username
+            <label>Signed in as
                 <input id="history-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="ada" />
             </label>
-            <button type="submit" class="history-save">Use this name</button>
+            <div class="history-actions">
+                <button type="submit" class="history-save">Update name</button>
+                <button type="button" class="btn-text js-signout" id="btn-signout">Switch user</button>
+            </div>
         </form>
         <p class="settings-hint" id="history-note">Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.</p>
         <div id="history-list" class="history-list"></div>
@@ -319,7 +679,7 @@
     <button type="button" class="history-scrim" id="history-scrim" hidden aria-label="Close conversations"></button>
     <div class="chat-column">
     <div id="tools-panel" class="panel">
-        <p class="panel-intro">Every tool from GET /tools, including harness tools. Edit the JSON and run it against POST /tools/{name}.</p>
+        <p class="panel-intro">Every tool from GET /tools, including harness tools. Edit the JSON and run it against POST /tools/{name}. Replies stay readable. The raw payload is folded.</p>
         <div id="tools-list" class="panel-grid"></div>
     </div>
     <div id="kin-panel" class="panel">
@@ -334,11 +694,63 @@
         <div id="legion-list" class="panel-grid"></div>
     </div>
     <div id="studio-panel" class="panel">
-        <p class="panel-intro">Studio codecs, prior, gate, sampler, and candidates.</p>
-        <div id="studio-forms" class="panel-grid"></div>
+        <p class="panel-intro" id="studio-intro">Forge video, graphify, and plan / test / debug. Hermes dispatches Forge and the loop. Hephaestus can mount Forge in a temporary swarm. Graphify goes through Eat. Stop asks Atropos to cut one Clotho owner.</p>
+        <div id="studio-tools" class="panel-grid">
+            <form class="action-card" id="forge-form">
+                <h4>Forge video</h4>
+                <p>forge_video on Hermes. If the API returns UNAVAILABLE, no video URL is shown.</p>
+                <label>Prompt
+                    <textarea id="forge-prompt" spellcheck="true" placeholder="A quiet hill at dusk"></textarea>
+                </label>
+                <label>Stage
+                    <select id="forge-stage">
+                        <option value="draft">draft</option>
+                        <option value="verify">verify</option>
+                        <option value="upscale">upscale</option>
+                    </select>
+                </label>
+                <button type="submit" class="run" id="forge-run">Forge</button>
+                <div class="studio-result" id="forge-result"></div>
+            </form>
+            <form class="action-card" id="graphify-form">
+                <h4>Graphify</h4>
+                <p>graphify on Eat. Candidates go through eat_filter. Learn runs only for an accept when commit is set. Reject and abstain do not write.</p>
+                <label>Source
+                    <textarea id="graphify-source" spellcheck="false" placeholder="Zeus domain sky"></textarea>
+                </label>
+                <label class="check"><input id="graphify-commit" type="checkbox" /> Commit accepted triples</label>
+                <button type="submit" class="run" id="graphify-run">Ingest</button>
+                <div class="studio-result" id="graphify-result"></div>
+            </form>
+            <form class="action-card" id="plan-form">
+                <h4>Plan / test / debug</h4>
+                <p>plan_test_debug on Hermes. write_file, apply_diff, and git_commit stay refused until verify_on_stop. This page does not execute them.</p>
+                <label>Goal
+                    <input id="plan-goal" type="text" spellcheck="true" placeholder="Check the joint" />
+                </label>
+                <label>Steps, one tool name per line. Optional.
+                    <textarea id="plan-steps" spellcheck="false" placeholder="Leave blank for plan, test, and debug"></textarea>
+                </label>
+                <button type="submit" class="run" id="plan-run">Run loop</button>
+                <div class="studio-result" id="plan-result"></div>
+            </form>
+            <form class="action-card" id="stop-form">
+                <h4>Stop</h4>
+                <p>Ask Atropos to cut one Clotho owner. A Forge run can fill this from clotho_owner.</p>
+                <label>Clotho owner
+                    <input id="stop-owner" type="text" spellcheck="false" autocomplete="off" placeholder="forge-owner" />
+                </label>
+                <button type="submit" class="run stop" id="stop-run">Stop</button>
+                <div class="studio-result" id="stop-result"></div>
+            </form>
+        </div>
+        <details class="more-fold">
+            <summary>Codecs, prior, gate, and sampler</summary>
+            <div id="studio-forms" class="panel-grid"></div>
+        </details>
     </div>
     <div id="ui-panel" class="panel">
-        <p class="panel-intro">Perception, generation, language, mouth, explain, remember, and agent tasks. Perception defaults to commit: false. Mutating agent steps are refused server-side.</p>
+        <p class="panel-intro">Perception, generation, language, mouth, explain, remember, and agent tasks. Perception defaults to commit: false. Language uses the same Eat path. Mutating agent steps are refused server-side.</p>
         <div id="ui-forms" class="panel-grid"></div>
     </div>
     <div id="ledger-panel" class="panel">
@@ -364,43 +776,47 @@
                 <input id="settings-hub" type="text" autocomplete="off" spellcheck="false" />
             </label>
             <label>Username
-                <input id="settings-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="Choose a name to save chats" />
+                <input id="settings-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="Required to save chats" />
             </label>
             <p class="settings-hint" id="key-mode"></p>
-            <p class="settings-hint"><strong>Shared demo key, rate-limited</strong>. About 100 usernames. Leave the field as-is to use it, or paste your own key. An override stays in this browser only and is sent as <code>X-API-Key</code>. Choose a username before a conversation is saved.</p>
+            <p class="settings-hint"><strong>Shared demo key, rate-limited</strong>. About 100 usernames. Leave the field as-is to use it, or paste your own key. An override stays in this browser only and is sent as <code>X-API-Key</code>. Choose a username before a conversation is saved. Clearing a paid key here is explicit. Switch user does not remove it.</p>
         </div>
     </div>
 
     <div id="chat">
-        <div class="msg-row bot" data-welcome="1">
-            <div class="avatar bot">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+        <div class="empty" id="empty-state">
+            <p class="eyebrow">Stores · Derives · Abstains</p>
+            <h2>Remembers exactly</h2>
+            <p class="lede">Facts are stored as residual packets. Unknowns are abstained. Tools, Kin, Studio, and the ledger are in the header.</p>
+            <div class="suggestions" id="suggestions">
+                <button type="button" class="suggestion" data-ask="remember alice works_at acme">Teach a fact</button>
+                <button type="button" class="suggestion" data-ask="alice works_at">Ask a stored fact</button>
+                <button type="button" class="suggestion" data-ask="what is the domain of Zeus">Query Zeus domain</button>
+                <button type="button" class="suggestion" data-ask="/search Who won the Super Bowl in 2024?">Unverified web search</button>
+                <button type="button" class="suggestion" data-action="kin">Run Kin cycle</button>
+                <button type="button" class="suggestion" data-action="residual">Residual check</button>
             </div>
-            <div class="bubble bot">Exact residual memory. Facts are stored as residual packets. Unknowns are abstained. Tools, Kin, Studio, and the ledger are in the header.</div>
-        </div>
-        <div class="suggestions" id="suggestions">
-            <div class="suggestion" data-ask="remember alice works_at acme">Teach a fact</div>
-            <div class="suggestion" data-ask="alice works_at">Ask a stored fact</div>
-            <div class="suggestion" data-ask="what is the domain of Zeus">Query Zeus domain</div>
-            <div class="suggestion" data-ask="/search Who won the Super Bowl in 2024?">Unverified web search</div>
-            <div class="suggestion" data-action="kin">Run Kin cycle</div>
-            <div class="suggestion" data-action="residual">Residual check</div>
         </div>
     </div>
 
     <div class="input-wrap">
         <div class="input-box">
-            <input type="file" id="file-input" style="display:none" onchange="handleFileUpload()">
-            <button class="btn-icon" onclick="document.getElementById('file-input').click()" title="Upload file">
+            <input type="file" id="file-input" hidden>
+            <button class="btn-icon" id="btn-file" type="button" title="Upload file">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
             </button>
-            <input type="text" id="input" placeholder="Ask a stored fact, or teach one with remember…" onkeydown="handleEnter(event)" autocomplete="off">
-            <button class="send" id="send" onclick="sendMsg()" title="Send">
+            <div id="file-chip" class="file-chip" hidden>
+                <span id="file-chip-name"></span>
+                <button type="button" id="file-chip-clear" aria-label="Remove file">×</button>
+            </div>
+            <textarea class="composer" id="input" rows="1" placeholder="Ask or teach a fact…" autocomplete="off"></textarea>
+            <button class="send" id="send" type="button" title="Send">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </button>
         </div>
+        <p class="composer-hint">Enter to send · Shift+Enter for a new line</p>
     </div>
-    <div id="file-chip" class="file-chip" hidden></div>
+    </div>
     </div>
     </div>
 
@@ -408,6 +824,8 @@
         const DEFAULT_API_URL = "https://api.resileosai.fun/api/v1";
         const DEMO_API_KEY = "No4dymPJ4tfRn0BZFuNL07kTnMyCeu5xHw2mpsWmjwk";
         const SAMPLE_IMAGE = [[0, 1], [1, 0]];
+        const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/;
+        const HUB_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
         const chat = document.getElementById('chat');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('send');
@@ -426,10 +844,6 @@
         let toolsLoaded = false;
         let kinExtrasLoaded = false;
 
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.documentElement.setAttribute('data-theme', 'dark');
-        }
-
         function apiUrl() {
             return (localStorage.getItem('resileos_api_url') || DEFAULT_API_URL).replace(/\/$/, '');
         }
@@ -437,7 +851,7 @@
         function usingDemoKey() { return apiKey() === DEMO_API_KEY; }
         function hubId() { return localStorage.getItem('resileos_hub_id') || 'anon'; }
         function currentUsername() { return (localStorage.getItem('resileos_username') || '').trim(); }
-        function validUsername(name) { return /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/.test(name || ''); }
+        function validUsername(name) { return USERNAME_RE.test(name || ''); }
         function onlineLabel() {
             const base = usingDemoKey() ? 'Online · demo key' : 'Online';
             const name = currentUsername();
@@ -454,8 +868,15 @@
             const value = name === undefined ? currentUsername() : name;
             const historyName = document.getElementById('history-username');
             const settingsName = document.getElementById('settings-username');
+            const portalName = document.getElementById('portal-username');
             if (historyName && document.activeElement !== historyName) historyName.value = value;
             if (settingsName && document.activeElement !== settingsName) settingsName.value = value;
+            if (portalName && document.activeElement !== portalName) portalName.value = value;
+            const pill = document.getElementById('user-pill');
+            if (pill) {
+                pill.textContent = value;
+                pill.hidden = !value;
+            }
         }
         function fillSettings() {
             document.getElementById('settings-url').value = apiUrl();
@@ -464,6 +885,49 @@
             syncUsernameFields();
             updateDemoLabel();
         }
+        function fillPortal() {
+            const key = document.getElementById('portal-key');
+            const hub = document.getElementById('portal-hub');
+            const state = document.getElementById('portal-key-state');
+            if (key && document.activeElement !== key) key.value = '';
+            if (hub && document.activeElement !== hub) {
+                const storedHub = localStorage.getItem('resileos_hub_id') || '';
+                hub.value = storedHub && storedHub !== 'anon' ? storedHub : '';
+            }
+            syncUsernameFields();
+            if (state) {
+                state.textContent = localStorage.getItem('resileos_api_key')
+                    ? 'A key is already saved in this browser. Leave the field blank to keep it.'
+                    : 'No personal key is saved. Blank uses the shared demo key.';
+            }
+        }
+        function setPortalNote(text) {
+            const note = document.getElementById('portal-note');
+            if (note && text) note.textContent = text;
+        }
+        function applyOptionalKey(raw) {
+            const key = (raw || '').trim();
+            if (!key) return;
+            if (key === DEMO_API_KEY) localStorage.removeItem('resileos_api_key');
+            else localStorage.setItem('resileos_api_key', key);
+        }
+        function showApp() {
+            document.documentElement.classList.add('signed-in');
+            syncUsernameFields();
+            applyHistoryDock();
+            refreshHistory();
+        }
+        function showPortal() {
+            document.documentElement.classList.remove('signed-in');
+            closeHistory();
+            closePanels();
+            fillPortal();
+            const field = document.getElementById('portal-username');
+            if (field) {
+                field.value = currentUsername();
+                field.focus();
+            }
+        }
         function storeUsername(raw) {
             const name = (raw || '').trim();
             if (!name) {
@@ -471,6 +935,7 @@
                 syncUsernameFields('');
                 setHistoryNote('Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.');
                 refreshHistory();
+                showPortal();
                 return false;
             }
             if (!validUsername(name)) {
@@ -485,6 +950,7 @@
             if (snapshotThread().length) schedulePersist();
             refreshHistory();
             if (statusDot.classList.contains('online')) setStatus('online', onlineLabel());
+            showApp();
             return true;
         }
         function saveSettings() {
@@ -500,14 +966,60 @@
             const settingsName = document.getElementById('settings-username');
             if (settingsName) storeUsername(settingsName.value);
             updateDemoLabel();
+            fillPortal();
             checkReady();
             refreshHistory();
+        }
+        function submitPortal(event) {
+            event.preventDefault();
+            const name = document.getElementById('portal-username').value;
+            const key = document.getElementById('portal-key').value;
+            const hub = document.getElementById('portal-hub').value.trim();
+            const err = document.getElementById('portal-error');
+            if (err) err.textContent = '';
+            if (!validUsername(name.trim())) {
+                if (err) err.textContent = 'Use 2–32 letters, digits, underscores, or hyphens.';
+                return;
+            }
+            if (hub && !HUB_RE.test(hub)) {
+                if (err) err.textContent = 'Hub id must be 1–64 characters: letters, digits, and _ . : -';
+                return;
+            }
+            applyOptionalKey(key);
+            const prevHub = hubId();
+            if (hub) localStorage.setItem('resileos_hub_id', hub);
+            if (hub && hub !== prevHub) currentConversationId = null;
+            if (!storeUsername(name)) {
+                if (err) err.textContent = 'Use 2–32 letters, digits, underscores, or hyphens.';
+                return;
+            }
+            fillSettings();
+            checkReady();
+            input.focus();
+        }
+        async function signOut() {
+            clearTimeout(persistTimer);
+            try { await persistThread(); } catch (err) { /* the browser cache remains */ }
+            localStorage.removeItem('resileos_username');
+            currentConversationId = null;
+            chatHistory = [];
+            syncUsernameFields('');
+            closePanels();
+            showPortal();
+            renderThread([]);
+            setPortalNote('Signed out. Saved threads stay with that username. A paid key in this browser was left in place.');
+            setHistoryNote('Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.');
+            if (statusDot.classList.contains('online')) setStatus('online', onlineLabel());
         }
         ['settings-url', 'settings-key', 'settings-hub', 'settings-username'].forEach(id => {
             const node = document.getElementById(id);
             if (node) node.addEventListener('change', saveSettings);
         });
+        document.getElementById('portal-form').addEventListener('submit', submitPortal);
+        document.getElementById('portal-theme').addEventListener('click', toggleTheme);
+        document.querySelectorAll('.js-signout').forEach(btn => btn.addEventListener('click', signOut));
         fillSettings();
+        fillPortal();
 
         function setStatus(kind, label) {
             statusDot.className = 'dot ' + kind;
@@ -525,11 +1037,8 @@
         function checkReady() {
             setStatus('connecting', 'Connecting');
             fetch(`${apiUrl()}/ready`).then(r => {
-                if (r.ok) {
-                    setStatus('online', onlineLabel());
-                } else {
-                    setStatus('offline', 'API not ready');
-                }
+                if (r.ok) setStatus('online', onlineLabel());
+                else setStatus('offline', 'API not ready');
             }).catch(() => setStatus('offline', 'Unreachable'));
         }
         checkReady();
@@ -746,6 +1255,55 @@
             });
         }
 
+        function stepsFromLines(raw) {
+            const steps = [];
+            String(raw || '').split('\n').forEach(line => {
+                const tool = line.trim().split(/\s+/)[0];
+                if (!tool) return;
+                steps.push({ tool: tool.slice(0, 64), args: {} });
+            });
+            return steps.length ? steps.slice(0, 12) : null;
+        }
+
+        function bindStudioTools() {
+            document.getElementById('forge-form').addEventListener('submit', (event) => {
+                event.preventDefault();
+                const prompt = document.getElementById('forge-prompt').value.trim();
+                const stage = document.getElementById('forge-stage').value || 'draft';
+                runStudio('Forge video', '/studio/forge/video', { prompt: prompt, stage: stage }, document.getElementById('forge-result'));
+            });
+            document.getElementById('graphify-form').addEventListener('submit', (event) => {
+                event.preventDefault();
+                const source = document.getElementById('graphify-source').value.trim();
+                const commit = document.getElementById('graphify-commit').checked;
+                if (!source) {
+                    renderReply(addMsg('bot'), { status: 'ERROR', value: 'Graphify needs a source. Eat does not invent triples.' });
+                    return;
+                }
+                runStudio('Graphify', '/studio/graphify', { source: source, commit: commit }, document.getElementById('graphify-result'), { commit: commit });
+            });
+            document.getElementById('plan-form').addEventListener('submit', (event) => {
+                event.preventDefault();
+                const goal = document.getElementById('plan-goal').value.trim();
+                if (!goal) {
+                    renderReply(addMsg('bot'), { status: 'ERROR', value: 'Plan / test / debug needs a goal.' });
+                    return;
+                }
+                const steps = stepsFromLines(document.getElementById('plan-steps').value);
+                const body = steps ? { goal: goal, steps: steps } : { goal: goal };
+                runStudio('Plan / test / debug', '/studio/plan-test-debug', body, document.getElementById('plan-result'));
+            });
+            document.getElementById('stop-form').addEventListener('submit', (event) => {
+                event.preventDefault();
+                const owner = document.getElementById('stop-owner').value.trim();
+                if (!owner) {
+                    renderReply(addMsg('bot'), { status: 'ERROR', value: 'Stop needs a Clotho owner. Forge can fill one after it runs.' });
+                    return;
+                }
+                runStudio('Stop ' + owner, '/studio/stop', { owner: owner }, document.getElementById('stop-result'));
+            });
+        }
+
         function fillUiForms() {
             const mount = document.getElementById('ui-forms');
             if (!mount || mount.dataset.filled) return;
@@ -864,6 +1422,7 @@
 
         fillKinForms();
         fillStudioForms();
+        bindStudioTools();
         fillUiForms();
         fillLedgerForms();
         fillCompanionForms();
@@ -907,19 +1466,19 @@
         }
         function toggleSettings() { togglePanel(settingsPanel, document.getElementById('btn-settings')); }
         function toggleTheme() {
-            const t = document.documentElement.getAttribute('data-theme');
-            document.documentElement.setAttribute('data-theme', t === 'dark' ? 'light' : 'dark');
+            const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('resileos_theme', next);
         }
 
         function hideSuggestions() {
-            const el = document.getElementById('suggestions');
+            const el = document.getElementById('empty-state');
             if (el) el.hidden = true;
         }
         function showSuggestions() {
-            const el = document.getElementById('suggestions');
+            const el = document.getElementById('empty-state');
             if (!el) return;
             el.hidden = false;
-            chat.appendChild(el);
         }
         document.getElementById('suggestions').addEventListener('click', (ev) => {
             const item = ev.target.closest('.suggestion');
@@ -929,29 +1488,52 @@
             else if (item.dataset.ask) quickAsk(item.dataset.ask);
         });
 
-        function quickAsk(text) { input.value = text; sendMsg(); }
-        function handleEnter(e) { if (e.key === 'Enter') sendMsg(); }
+        function quickAsk(text) { input.value = text; growComposer(); sendMsg(); }
+        function handleEnter(e) {
+            if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+            e.preventDefault();
+            sendMsg();
+        }
+        function growComposer() {
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+        }
+        input.addEventListener('keydown', handleEnter);
+        input.addEventListener('input', growComposer);
 
+        function clearFile() {
+            selectedFile = null;
+            const fileInput = document.getElementById('file-input');
+            const chip = document.getElementById('file-chip');
+            if (fileInput) fileInput.value = '';
+            if (chip) chip.hidden = true;
+            const name = document.getElementById('file-chip-name');
+            if (name) name.textContent = '';
+        }
         function handleFileUpload() {
             const fileInput = document.getElementById('file-input');
             const chip = document.getElementById('file-chip');
+            const name = document.getElementById('file-chip-name');
             if (fileInput.files.length > 0) {
                 selectedFile = fileInput.files[0];
                 chip.hidden = false;
-                chip.textContent = 'Attached: ' + selectedFile.name;
+                name.textContent = selectedFile.name;
             }
         }
+        document.getElementById('btn-file').addEventListener('click', () => document.getElementById('file-input').click());
+        document.getElementById('file-input').addEventListener('change', handleFileUpload);
+        document.getElementById('file-chip-clear').addEventListener('click', clearFile);
 
         function addMsg(sender) {
             const row = document.createElement('div');
-            row.className = `msg-row ${sender}`;
+            row.className = 'msg-row ' + sender;
             const avatar = document.createElement('div');
-            avatar.className = `avatar ${sender}`;
+            avatar.className = 'avatar ' + sender;
             avatar.innerHTML = sender === 'user'
-                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`
-                : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>`;
+                ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>'
+                : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>';
             const bubble = document.createElement('div');
-            bubble.className = `bubble ${sender}`;
+            bubble.className = 'bubble ' + sender;
             if (sender === 'user') { row.appendChild(bubble); row.appendChild(avatar); }
             else { row.appendChild(avatar); row.appendChild(bubble); }
             chat.appendChild(row);
@@ -974,9 +1556,137 @@
             return el;
         }
 
-        function renderReply(bubble, d) {
+        function replyText(d) {
+            if (!d) return '';
+            if (typeof d.reply_text === 'string' && d.reply_text) return d.reply_text;
+            if (typeof d.value === 'string' && d.value) return d.value;
+            return '';
+        }
+
+        function statusKind(status) {
+            const s = String(status || '').toLowerCase();
+            if (['accepted', 'answered', 'submitted', 'verified', 'fully_stopped', 'pass'].indexOf(s) !== -1) return 'accepted';
+            if (['abstained', 'abstain', 'no_rows', 'unverified', 'mouth_closed', 'running', 'stop_requested'].indexOf(s) !== -1) return 'abstained';
+            if (s === 'unavailable') return 'unavailable';
+            if (['conflict', 'reject', 'rejected', 'error', 'refused'].indexOf(s) !== -1) return s === 'refused' ? 'refused' : 'conflict';
+            return '';
+        }
+
+        function badgeLabel(status) {
+            const s = String(status || '');
+            const lower = s.toLowerCase();
+            if (['accepted', 'answered', 'submitted', 'verified', 'pass'].indexOf(lower) !== -1) return 'ACCEPTED';
+            if (['abstained', 'abstain', 'no_rows', 'unverified', 'mouth_closed'].indexOf(lower) !== -1) return 'ABSTAINED';
+            if (['conflict', 'reject', 'rejected'].indexOf(lower) !== -1) return 'CONFLICT';
+            if (lower === 'unavailable') return 'UNAVAILABLE';
+            if (lower === 'refused' || lower === 'error') return 'refused';
+            if (lower === 'fully_stopped') return 'fully_stopped';
+            if (lower === 'stop_requested') return 'stop_requested';
+            return s;
+        }
+
+        function scalarLines(obj, limit) {
+            const lines = [];
+            if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return lines;
+            Object.keys(obj).forEach(key => {
+                if (lines.length >= limit) return;
+                const value = obj[key];
+                if (value == null || typeof value === 'object') return;
+                const text = String(value);
+                if (!text || text.length > 240) return;
+                lines.push(key + ': ' + text);
+            });
+            return lines;
+        }
+
+        function safeHttpUrl(value) {
+            if (typeof value !== 'string') return '';
+            const text = value.trim();
+            if (!/^https?:\/\//i.test(text)) return '';
+            return text;
+        }
+
+        function describeResult(d, opts) {
+            const data = d || {};
+            const lines = [];
+            let status = '';
+            let href = '';
+            if (typeof data.status === 'string') status = data.status;
+            if (data.status === 'UNAVAILABLE') {
+                lines.push(typeof data.detail === 'string' && data.detail ? data.detail : 'Unavailable. No video URL was returned.');
+                status = 'UNAVAILABLE';
+            } else if (Array.isArray(data.decisions)) {
+                const learned = Number(data.learned || 0);
+                lines.push('Eat reviewed ' + data.decisions.length + ' candidate' + (data.decisions.length === 1 ? '' : 's') + '. Learned ' + learned + '.');
+                if (opts && opts.commit === false) lines.push('Commit is off. Learn did not run. Reject and abstain do not write.');
+                else if (!learned) lines.push('Nothing was written.');
+                data.decisions.slice(0, 12).forEach(row => {
+                    const action = String((row && row.action) || 'candidate');
+                    const triple = [row && row.subject, row && row.relation, row && row.obj].filter(Boolean).join(' ');
+                    const reason = row && row.reason ? ' · ' + row.reason : '';
+                    lines.push(action + (triple ? ' · ' + triple : '') + reason);
+                });
+                if (!status) {
+                    const actions = data.decisions.map(row => String((row && row.action) || '').toLowerCase());
+                    if (learned > 0) status = 'ACCEPTED';
+                    else if (actions.indexOf('reject') !== -1) status = 'CONFLICT';
+                    else status = 'ABSTAINED';
+                }
+            } else if (Array.isArray(data.trace)) {
+                const verified = !!(data.verified_step && data.verified_step.verified);
+                lines.push(
+                    (data.progress ? 'Progress' : 'No progress')
+                    + ' · ' + (data.rounds || 0) + ' rounds'
+                    + (data.stuck ? ' · stuck' : '')
+                    + (verified ? ' · verified' : ' · not verified')
+                    + (data.goal ? ' · ' + data.goal : '')
+                );
+                let refused = false;
+                data.trace.slice(0, 12).forEach(row => {
+                    if (row && row.refused) refused = true;
+                    const tool = (row && row.tool) || 'step';
+                    const flag = row && row.refused ? 'refused' : row && row.ran ? 'ran' : 'skipped';
+                    lines.push(flag + ' · ' + tool + (row && row.reason ? ' · ' + row.reason : ''));
+                });
+                if (refused) lines.push('Mutating steps stayed refused until verified. This request did not execute them.');
+                if (!status) status = refused ? 'refused' : data.ok ? 'ACCEPTED' : 'ABSTAINED';
+            } else if (data.fully_stopped !== undefined || data.stop_requested !== undefined || (data.state && data.handles)) {
+                if (data.fully_stopped) lines.push('Atropos cut the owner. The Clotho group is fully stopped.');
+                else if (data.stop_requested) lines.push('Atropos requested a stop for that Clotho owner.');
+                else lines.push('No Clotho group is registered for that owner.');
+                lines.push('State: ' + (data.state || 'unknown') + ' · owned ' + (data.owned || 0));
+                status = data.fully_stopped ? 'fully_stopped' : data.stop_requested ? 'stop_requested' : (data.state || status);
+            } else if (data.patron === 'hephaestus' || data.stage || (data.clotho_owner && data.status)) {
+                if (data.status === 'submitted') lines.push(data.draft ? 'Forge submitted a draft.' : 'Forge submitted a video.');
+                else if (data.status === 'refused') lines.push(typeof data.detail === 'string' && data.detail ? data.detail : 'Forge refused this stage.');
+                else if (data.status === 'verified' || data.status === 'unverified') lines.push('Forge ' + data.status + '.');
+                else lines.push(typeof data.detail === 'string' && data.detail ? data.detail : 'Forge finished.');
+                status = data.status || status;
+            } else if (replyText(data) && !data.codecs && !data.tools && !data.legions && !data.checkpoints) {
+                lines.push(replyText(data));
+            } else if (data.result !== undefined || data.name) {
+                lines.push('Tool ' + (data.name || 'result') + ' finished.');
+                scalarLines(data.result, 6).forEach(line => lines.push(line));
+                if (!status && data.result && typeof data.result.status === 'string') status = data.result.status;
+            } else if (typeof data.detail === 'string' && data.detail) {
+                lines.push(data.detail);
+            } else {
+                const scalars = scalarLines(data, 6);
+                if (scalars.length) scalars.forEach(line => lines.push(line));
+                else lines.push('Result received.');
+            }
+            if (data.status !== 'UNAVAILABLE') href = safeHttpUrl(data.url);
+            if (data.stage) lines.push('Stage: ' + data.stage);
+            if (data.patron) lines.push('Patron: ' + data.patron);
+            if (data.clotho_owner) lines.push('Clotho owner: ' + data.clotho_owner);
+            if (!lines.length) lines.push('Result received.');
+            return { text: lines.join('\n'), status: status, href: data.status === 'UNAVAILABLE' ? '' : href };
+        }
+
+        function renderReply(bubble, d, opts) {
+            const options = opts || {};
             bubble.replaceChildren();
-            const text = (d && (d.reply_text || d.value)) || '';
+            const text = replyText(d);
             const reply = document.createElement('div');
             reply.className = 'reply';
             reply.textContent = text || 'No matching residual fact.';
@@ -985,13 +1695,8 @@
             meta.className = 'meta';
             const status = (d && d.status) || '';
             const chip = d && d.chip;
-            if (status === 'ACCEPTED' || status === 'ANSWERED') meta.appendChild(chipEl(status === 'ANSWERED' ? 'answered' : 'accepted', 'accepted'));
-            if (chip) meta.appendChild(chipEl(chip, chip));
-            else if (status === 'ABSTAINED') meta.appendChild(chipEl('abstained', 'abstained'));
-            else if (status === 'NO_ROWS') meta.appendChild(chipEl('no rows', 'no_rows'));
-            else if (status === 'CONFLICT') meta.appendChild(chipEl('conflict', 'conflict'));
-            else if (status === 'MOUTH_CLOSED') meta.appendChild(chipEl('mouth closed', 'abstained'));
-            else if (status === 'ERROR') meta.appendChild(chipEl('error', 'error'));
+            if (status) meta.appendChild(chipEl(badgeLabel(status), statusKind(status)));
+            if (chip && String(chip).toLowerCase() !== String(status).toLowerCase()) meta.appendChild(chipEl(chip, chip));
             if (d && d.memory_chip) meta.appendChild(chipEl('remembered', 'memory'));
             if (d && d.source) meta.appendChild(document.createTextNode('source: ' + d.source));
             if (d && typeof d.verified === 'boolean') meta.appendChild(document.createTextNode('verified: ' + d.verified));
@@ -999,6 +1704,7 @@
             if (d && d.tool_calls && d.tool_calls.length) {
                 meta.appendChild(document.createTextNode('tools: ' + d.tool_calls.map(t => t.tool || t.name).join(', ')));
             }
+            if (typeof options.ms === 'number') meta.appendChild(document.createTextNode(Math.round(options.ms) + ' ms'));
             if (meta.childNodes.length) bubble.appendChild(meta);
             if (d && d.tutorial_fragment) {
                 const note = document.createElement('div');
@@ -1009,7 +1715,56 @@
                 if (slot) slot.textContent = d.tutorial_fragment;
                 refreshCompanion();
             }
-            schedulePersist();
+            if (options.persist !== false) schedulePersist();
+        }
+
+        function renderStructured(target, data, opts) {
+            const options = opts || {};
+            const described = describeResult(data, options);
+            target.replaceChildren();
+            const reply = document.createElement('div');
+            reply.className = 'reply';
+            reply.textContent = described.text;
+            target.appendChild(reply);
+            if (described.href) {
+                const link = document.createElement('a');
+                link.href = described.href;
+                link.textContent = described.href;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                target.appendChild(link);
+            }
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            if (described.status) meta.appendChild(chipEl(badgeLabel(described.status), statusKind(described.status)));
+            if (typeof options.ms === 'number') meta.appendChild(document.createTextNode(Math.round(options.ms) + ' ms'));
+            if (meta.childNodes.length) target.appendChild(meta);
+            const fold = document.createElement('details');
+            fold.className = 'raw-fold';
+            const summary = document.createElement('summary');
+            summary.textContent = 'Raw payload';
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(data, null, 2);
+            fold.append(summary, pre);
+            target.appendChild(fold);
+            if (data && data.clotho_owner) {
+                const owner = document.getElementById('stop-owner');
+                if (owner && !owner.value.trim()) owner.value = String(data.clotho_owner);
+            }
+            if (options.persist !== false) schedulePersist();
+        }
+
+        function isChatReply(d) {
+            if (!d || !d.status) return false;
+            if (!replyText(d)) return false;
+            if (d.decisions || d.trace || d.codecs || d.tools || d.legions || d.checkpoints || d.clotho_owner) return false;
+            if (d.status === 'UNAVAILABLE') return false;
+            return true;
+        }
+
+        function renderOutcome(target, data, opts) {
+            if (isChatReply(data)) renderReply(target, data, opts);
+            else renderStructured(target, data, opts);
         }
 
         async function runEndpoint(label, method, path, body) {
@@ -1017,30 +1772,18 @@
             addMsg('user').textContent = label;
             const bubble = addMsg('bot');
             setTyping(bubble);
+            const started = performance.now();
             try {
                 const opts = { method, headers: authHeaders(body !== undefined) };
                 if (body !== undefined) opts.body = JSON.stringify(body);
                 const r = await fetch(`${apiUrl()}${path}`, opts);
                 const d = await r.json().catch(() => ({}));
+                const ms = performance.now() - started;
                 if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
                     return d;
                 }
-                if (d && (d.reply_text || d.value) && d.status && !d.codecs && !d.tools && !d.legions && !d.checkpoints) {
-                    renderReply(bubble, d);
-                } else {
-                    bubble.replaceChildren();
-                    const pre = document.createElement('pre');
-                    pre.textContent = JSON.stringify(d, null, 2);
-                    bubble.appendChild(pre);
-                    if (d && d.tutorial_fragment) {
-                        const note = document.createElement('div');
-                        note.className = 'reply';
-                        note.textContent = d.tutorial_fragment;
-                        bubble.appendChild(note);
-                    }
-                }
-                schedulePersist();
+                renderOutcome(bubble, d, { ms: ms });
                 if (d && d.persona && d.steps) applyCompanion(d);
                 const step = tutorialStepFor(method, path, d);
                 if (step) postTutorialStep(step);
@@ -1051,11 +1794,45 @@
             }
         }
 
+        async function runStudio(label, path, body, slot, extra) {
+            hideSuggestions();
+            addMsg('user').textContent = label;
+            const bubble = addMsg('bot');
+            setTyping(bubble);
+            if (slot) slot.textContent = 'Running…';
+            const started = performance.now();
+            const options = extra || {};
+            try {
+                const response = await fetch(apiUrl() + path, {
+                    method: 'POST',
+                    headers: authHeaders(true),
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json().catch(() => ({}));
+                const ms = performance.now() - started;
+                options.ms = ms;
+                if (!response.ok) {
+                    const payload = { status: 'ERROR', value: formatError(response, data) };
+                    renderReply(bubble, payload, { ms: ms });
+                    if (slot) renderReply(slot, payload, { ms: ms, persist: false });
+                    return data;
+                }
+                renderOutcome(bubble, data, options);
+                if (slot) renderOutcome(slot, data, Object.assign({}, options, { persist: false }));
+                return data;
+            } catch (err) {
+                renderReply(bubble, { status: 'ERROR', value: label + ' failed.' });
+                if (slot) slot.textContent = label + ' failed.';
+                return null;
+            }
+        }
+
         async function runKinCycle() {
             hideSuggestions();
             addMsg('user').textContent = 'Running Kin cycle…';
             const bubble = addMsg('bot');
             setTyping(bubble);
+            const started = performance.now();
             try {
                 const r = await fetch(`${apiUrl()}/kin/cycle`, {
                     method: 'POST',
@@ -1063,12 +1840,13 @@
                     body: JSON.stringify({ apply_policy: true })
                 });
                 const d = await r.json();
+                const ms = performance.now() - started;
                 if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
                     return;
                 }
                 const lesson = (d.harness && d.harness.lesson) || (d.report && d.report.lesson) || d.lesson || '—';
-                renderReply(bubble, { status: 'ACCEPTED', value: 'Kin cycle complete. Lesson: ' + lesson, source: 'kin', verified: !!(d.harness && d.harness.verified) });
+                renderReply(bubble, { status: 'ACCEPTED', value: 'Kin cycle complete. Lesson: ' + lesson, source: 'kin', verified: !!(d.harness && d.harness.verified) }, { ms: ms });
             } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Kin cycle error: ' + e.message }); }
         }
 
@@ -1090,6 +1868,10 @@
                     return;
                 }
                 bubble.replaceChildren();
+                const reply = document.createElement('div');
+                reply.className = 'reply';
+                reply.textContent = cps.length + ' checkpoint' + (cps.length === 1 ? '' : 's') + '.';
+                bubble.appendChild(reply);
                 cps.forEach(cp => {
                     const row = document.createElement('div');
                     row.style.margin = '6px 0';
@@ -1098,6 +1880,7 @@
                     const btn = document.createElement('button');
                     btn.className = 'tool-chip';
                     btn.style.marginLeft = '8px';
+                    btn.type = 'button';
                     btn.textContent = 'Restore';
                     btn.addEventListener('click', () => restoreCheckpoint(cp.id || cp.name));
                     row.append(code, btn);
@@ -1136,6 +1919,7 @@
             addMsg('user').textContent = 'Calling tool ' + name + '…';
             const bubble = addMsg('bot');
             setTyping(bubble);
+            const started = performance.now();
             try {
                 const payload = name === 'web_search' ? { query: input.value.trim() || 'resileos' } : {};
                 const r = await fetch(`${apiUrl()}/tools/${encodeURIComponent(name)}`, {
@@ -1144,15 +1928,12 @@
                     body: JSON.stringify(payload)
                 });
                 const d = await r.json();
+                const ms = performance.now() - started;
                 if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
                     return;
                 }
-                bubble.replaceChildren();
-                const pre = document.createElement('pre');
-                pre.textContent = JSON.stringify(d, null, 2);
-                bubble.appendChild(pre);
-                schedulePersist();
+                renderOutcome(bubble, d, { ms: ms });
             } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Tool ' + name + ' failed.' }); }
         }
 
@@ -1218,7 +1999,8 @@
                 const bubble = row.querySelector('.bubble');
                 if (!bubble || bubble.querySelector('.typing')) return;
                 const reply = bubble.querySelector('.reply');
-                const text = (reply ? reply.textContent : bubble.textContent).trim();
+                const link = bubble.querySelector('a');
+                const text = ((reply ? reply.textContent : bubble.textContent) + (link ? '\n' + link.textContent : '')).trim();
                 if (!text) return;
                 messages.push({
                     role: row.classList.contains('user') ? 'user' : 'assistant',
@@ -1362,13 +2144,8 @@
         function renderThread(messages) {
             suppressPersist = true;
             clearTimeout(persistTimer);
-            hideSuggestions();
             chat.querySelectorAll('.msg-row').forEach(row => row.remove());
             if (!messages.length) {
-                const bubble = addMsg('bot');
-                bubble.textContent = 'Exact residual memory. Facts are stored as residual packets. Unknowns are abstained. Tools, Kin, Studio, and the ledger are in the header.';
-                const row = bubble.parentElement;
-                if (row) row.setAttribute('data-welcome', '1');
                 showSuggestions();
             } else {
                 hideSuggestions();
@@ -1407,6 +2184,7 @@
                 rememberCache(data);
                 renderThread(data.messages || []);
                 refreshHistory();
+                if (!window.matchMedia('(min-width: 960px)').matches) closeHistory();
             } catch (err) {
                 setHistoryNote('Showing the copy saved in this browser.');
             }
@@ -1438,17 +2216,27 @@
             if (historyOpen) closeHistory();
             else openHistory();
         }
+        function applyHistoryDock() {
+            if (!document.documentElement.classList.contains('signed-in')) {
+                closeHistory();
+                return;
+            }
+            if (window.matchMedia('(min-width: 960px)').matches) openHistory();
+            else closeHistory();
+        }
         document.getElementById('history-new').addEventListener('click', startNewConversation);
         document.getElementById('history-scrim').addEventListener('click', closeHistory);
         document.getElementById('history-user-form').addEventListener('submit', (event) => {
             event.preventDefault();
-            storeUsername(document.getElementById('history-username').value);
+            const err = document.getElementById('portal-error');
+            if (storeUsername(document.getElementById('history-username').value) && err) err.textContent = '';
         });
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
-            if (historyOpen) { closeHistory(); return; }
+            if (historyOpen && !window.matchMedia('(min-width: 960px)').matches) { closeHistory(); return; }
             closePanels();
         });
+        window.matchMedia('(min-width: 960px)').addEventListener('change', applyHistoryDock);
 
         async function claimPaidKey() {
             const params = new URLSearchParams(location.search);
@@ -1462,17 +2250,25 @@
                 if (!response.ok || !data.api_key) {
                     setStatus('needs-key', 'Key not ready');
                     setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Paid key is not ready yet. Refresh in a few seconds.');
+                    setPortalNote(typeof data.detail === 'string' ? data.detail : 'Paid key is not ready yet. Refresh in a few seconds.');
                     return;
                 }
                 localStorage.setItem('resileos_api_key', data.api_key);
                 if (data.base_url) localStorage.setItem('resileos_api_url', String(data.base_url).replace(/\/$/, ''));
                 fillSettings();
+                fillPortal();
                 const url = new URL(location.href);
                 url.searchParams.delete('checkout');
                 url.searchParams.delete('session_id');
                 history.replaceState({}, '', url.pathname + url.search + url.hash);
-                setHistoryNote('Paid key saved in this browser. Choose a username before conversations are saved.');
-                openHistory();
+                if (validUsername(currentUsername())) {
+                    showApp();
+                    openHistory();
+                    setHistoryNote('Paid key saved in this browser.');
+                } else {
+                    showPortal();
+                    setPortalNote('Paid key saved in this browser. Enter a username. Leave the key field blank to keep it.');
+                }
                 checkReady();
             } catch (err) {
                 setStatus('offline', 'Could not claim key');
@@ -1485,9 +2281,11 @@
             hideSuggestions();
             addMsg('user').textContent = text || ('[File: ' + selectedFile.name + ']');
             input.value = '';
+            growComposer();
             sendBtn.disabled = true;
             const bubble = addMsg('bot');
             setTyping(bubble);
+            const started = performance.now();
             try {
                 const endpoint = selectedFile ? '/upload' : '/chat';
                 const fetchOptions = selectedFile
@@ -1510,14 +2308,13 @@
                       };
                 const r = await fetch(`${apiUrl()}${endpoint}`, fetchOptions);
                 const d = await r.json();
-                selectedFile = null;
-                document.getElementById('file-chip').hidden = true;
-                document.getElementById('file-input').value = '';
+                const ms = performance.now() - started;
+                clearFile();
                 if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
+                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
                     return;
                 }
-                renderReply(bubble, d);
+                renderReply(bubble, d, { ms: ms });
                 lastToolEmpty = ['NO_ROWS', 'ABSTAINED'].includes(d.status) || d.chip === 'no_rows' || d.chip === 'abstained';
                 if (text) {
                     chatHistory.push({ role: 'user', content: text });
@@ -1533,11 +2330,14 @@
                 schedulePersist();
             }
         }
+        sendBtn.addEventListener('click', sendMsg);
         claimPaidKey();
         if (validUsername(currentUsername())) {
             setHistoryNote('Conversations for ' + currentUsername() + ' on hub ' + hubId() + '. The shared demo key is rate-limited, about 100 users.');
+            showApp();
+        } else {
+            showPortal();
         }
-        refreshHistory();
     </script>
 </body>
 </html>
