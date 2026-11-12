@@ -186,8 +186,10 @@ class OscillatorOrientedSearch:
         eps = self._current_epsilon()
         self.field.step(epsilon=eps, W=self.W)
         R = self.field.order_parameter()
-        theta = self.field.theta
-        dtheta = np.gradient(theta) if len(theta) > 1 else np.zeros_like(theta)
+        # Orientation is the phase velocity on the r oscillators.
+        # A gradient along the index is the wrong axis, and on a
+        # 3-vector it collapses at the ends instead of reporting dθ/dt.
+        dtheta = self.field.velocity(epsilon=eps, W=self.W)
 
         candidates = [c for c in self._grid if c not in self._visited]
         if not candidates:
