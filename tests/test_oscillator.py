@@ -263,3 +263,124 @@ def test_operator_attach_coupling_validates_shape():
     op = NonConservativeOperator(R, mode="non-conservative")
     with pytest.raises(ValueError, match="W shape"):
         op.attach_coupling(np.zeros((R + 1, R + 1)))
+
+
+# ── depth and orientation ───────────────────────────────────────────────
+def _circ_distance(a, b):
+    d = (np.asarray(a) - np.asarray(b) + np.pi) % (2.0 * np.pi) - np.pi
+    return float(np.mean(np.abs(d)))
+
+
+def test_field_has_outward_depth():
+    """Default construction is a stack, not a flat ring of r phases."""
+    f = KuramotoField(R)
+    assert f.depth >= 2
+    assert f.orientation == "outward"
+    assert f.theta.shape == (R,)
+    assert f.level_phases(0).shape == (R,)
+    assert f.level_phases(f.depth - 1).shape == (R,)
+
+
+def test_flat_ring_is_rejected():
+    with pytest.raises(ValueError, match="depth"):
+        KuramotoField(R, depth=1)
+
+
+def test_too_few_oscillators_rejected():
+    with pytest.raises(ValueError, match="too few"):
+        KuramotoField(1)
+
+
+def test_short_phase_vector_rejected():
+    f = KuramotoField(R)
+    with pytest.raises(ValueError, match="mis-oriented"):
+        f.theta = np.zeros(R - 1)
+    with pytest.raises(ValueError, match="mis-oriented"):
+        f.set_level_phases(1, np.zeros((1, R)))
+
+
+def test_wrong_level_axis_rejected():
+    """`(r, depth)` is the oscillator axis turned outward. Reject it."""
+    f = KuramotoField(R, depth=3)
+    swapped = np.zeros((R, f.depth))
+    with pytest.raises(ValueError, match="wrong axis"):
+        f.set_levels(swapped)
+    flat = np.zeros(R)
+    with pytest.raises(ValueError, match="no depth axis"):
+        f.set_levels(flat)
+
+
+def test_inward_orientation_rejected():
+    with pytest.raises(ValueError, match="outward"):
+        KuramotoField(R, orientation="inward")
+
+
+def test_inner_level_does_not_depend_on_outer():
+    """Outward coupling does not write back into level 0."""
+    base = np.linspace(-1.0, 1.0, R)
+    W = np.ones((R, R)) - np.eye(R)
+    kwargs = dict(kappa=1.0, alpha=0.5, dt=0.05, depth=3, seed=0)
+
+    def run(outer_shift):
+        f = KuramotoField(R, **kwargs)
+        f.set_levels(np.stack([
+            base,
+            base + outer_shift,
+            base - outer_shift,
+        ]))
+        for _ in range(15):
+            f.step(epsilon=0.2, W=W, dt=0.05)
+        return f.level_phases(0)
+
+    assert np.allclose(run(1.0), run(-0.7), atol=1e-6)
+
+
+def test_outer_level_moves_toward_inner():
+    """With no within-level edges, the only pull is outward."""
+    f = KuramotoField(R, kappa=3.0, alpha=0.5, dt=0.05, depth=3)
+    base = np.linspace(-0.8, 0.8, R)
+    f.set_levels(np.stack([base, base + 1.0, base + 1.4]))
+    W = empty_coupling(R)
+    before = _circ_distance(f.level_phases(1), f.level_phases(0))
+    for _ in range(40):
+        f.step(epsilon=0.2, W=W, dt=0.05)
+    after = _circ_distance(f.level_phases(1), f.level_phases(0))
+    assert after < before
+    # level 2 is outside level 1, so it follows level 1 rather than
+    # dragging level 1 back out.
+    assert _circ_distance(f.level_phases(2), f.level_phases(1)) < 1.4
+
+
+def test_coupling_increases_depth_order_in_one_rk4_step_size():
+    """
+    At a gain the subdivider leaves alone, coupling still raises the
+    mean of the per-level order parameters. The #14 substep is a
+    safety for a stiffer within-level term; it is not required here.
+    """
+    f = KuramotoField(
+        R, kappa=0.5, alpha=0.5, dt=0.05, depth=3,
+        random_start=True, seed=0,
+    )
+    W = np.ones((R, R)) - np.eye(R)
+    epsilon = 0.5
+    gain = abs(f.kappa / (f.alpha + epsilon))
+    row = float(np.max(np.sum(np.abs(W), axis=1)))
+    assert gain * row * f.dt <= 0.2
+    R0 = f.depth_order()
+    for _ in range(100):
+        f.step(epsilon=epsilon, W=W, dt=0.05)
+    assert f.depth_order() > R0
+    assert f.order_parameter() > 0.0
+
+
+def test_levels_roundtrip_state_dict():
+    f = KuramotoField(R, depth=3, random_start=True, seed=2)
+    W = np.ones((R, R)) - np.eye(R)
+    f.step(epsilon=0.4, W=W)
+    d = f.state_dict()
+    g = KuramotoField(R, depth=3)
+    g.load_state_dict(d)
+    assert np.allclose(g.level_phases(0), f.level_phases(0))
+    assert np.allclose(g.level_phases(2), f.level_phases(2))
+    assert g.depth == 3
+    assert g.orientation == "outward"

@@ -216,6 +216,27 @@ def test_oriented_first_step_matches_grid_when_center_unset():
     assert oriented._propose() == oriented._grid[0]
 
 
+def test_orientation_is_velocity_not_index_gradient():
+    """dθ is the field velocity. A gradient along three phases is the wrong axis."""
+    s = OscillatorOrientedSearch(
+        r_values=(4, 8), n_loops_values=(4,),
+        feature_masks=(("packet",), ("packet", "csi"), ("packet", "direction")),
+        seed=0,
+    )
+    s.field.set_level_phases(0, np.array([0.4, -0.8, 1.1]))
+    eps = s._current_epsilon()
+    s.field.step(epsilon=eps, W=s.W)
+    vel = s.field.velocity(epsilon=eps, W=s.W)
+    grad = np.gradient(s.field.theta)
+    assert vel.shape == (len(s.field.theta),)
+    assert not np.allclose(np.sign(vel), np.sign(grad))
+    s._center = s._grid[0]
+    R = s.field.order_parameter()
+    vel_best = min(s._grid, key=lambda c: s._score(c, R, vel))
+    grad_best = min(s._grid, key=lambda c: s._score(c, R, grad))
+    assert vel_best != grad_best
+
+
 # ── summary ─────────────────────────────────────────────────────────────
 def test_summary_shape():
     s = OscillatorOrientedSearch(
