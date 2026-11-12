@@ -22,22 +22,94 @@ import json
 from typing import Any, Dict, List, Optional
 
 
+def _residual_rows(packet: Optional[Dict]) -> list:
+    """Rows already on the packet. Fan-out does not invent any."""
+    if not isinstance(packet, dict):
+        return []
+    state = packet.get("state")
+    if not isinstance(state, dict):
+        return []
+    rows: list = []
+    for key in ("rows", "residual_rows"):
+        value = state.get(key)
+        if isinstance(value, list):
+            rows.extend(value)
+    query = state.get("residual_query")
+    if isinstance(query, dict) and isinstance(query.get("rows"), list):
+        rows.extend(query["rows"])
+    elif isinstance(query, str) and query.strip():
+        rows.append(query)
+    return rows
+
+
+def _row_text(row: Any) -> str:
+    if isinstance(row, dict):
+        parts = [row.get("subject"), row.get("relation"), row.get("obj"), row.get("value")]
+        return " ".join(str(part) for part in parts if part)
+    return str(row)
+
+
 def decision_fanout(
     question: str,
     options: List[str],
     packet: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """Jev-style Choice. Returns typed answer + calibrated probability."""
-    scores = {opt: 0.5 for opt in options}
-    if packet and "residual_query" in packet.get("state", {}):
-        pass
-    best = max(scores, key=scores.get)
+    """Choose an option only when it overlaps residual rows.
+
+    No residual support scores 0 and leaves the answer empty. That is an
+    abstain, not a calibrated guess.
+    """
+    del question
+    if not options:
+        return {
+            "type": "Choice",
+            "answer": "",
+            "probability": 0.0,
+            "options": {},
+            "evidence": [],
+        }
+    blob_tokens: set[str] = set()
+    pieces: list[str] = []
+    for row in _residual_rows(packet):
+        text = _row_text(row).strip().lower()
+        if not text:
+            continue
+        pieces.append(text)
+        blob_tokens.update(part for part in text.replace("_", " ").split() if part)
+    joined = " ".join(pieces)
+    scores: Dict[str, float] = {}
+    evidence: list = []
+    for opt in options:
+        opt_text = str(opt).strip().lower()
+        opt_tokens = [part for part in opt_text.replace("_", " ").split() if part]
+        if opt_text and opt_text in joined:
+            score = 0.99
+        elif opt_tokens and blob_tokens:
+            shared = sum(1 for token in opt_tokens if token in blob_tokens)
+            if shared == len(opt_tokens):
+                score = 0.8
+            elif shared:
+                score = 0.75
+            else:
+                score = 0.0
+        else:
+            score = 0.0
+        scores[opt] = score
+        if score > 0:
+            evidence.append({"option": str(opt), "score": score, "source": "residual_rows"})
+    best = max(options, key=lambda opt: scores[opt])
+    if scores[best] <= 0:
+        answer = ""
+        probability = 0.0
+    else:
+        answer = best
+        probability = scores[best]
     return {
         "type": "Choice",
-        "answer": best,
-        "probability": scores[best],
+        "answer": answer,
+        "probability": probability,
         "options": scores,
-        "evidence": [],
+        "evidence": evidence,
     }
 
 

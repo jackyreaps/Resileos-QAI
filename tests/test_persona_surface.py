@@ -75,36 +75,30 @@ def test_chat_five_outcomes_and_ledger(client, open_api):
     assert fact_body["rows"] == ["sky"]
     assert "sea" not in fact_body["reply_text"]
 
-    from resileos.kin.metis import MetisPolicy
-    from resileos.kin.wiring import get_kin_bundle
+    soft = client.post(
+        "/api/v1/chat",
+        json={"text": "hello", "hub_id": "stripuser", "persona": "honest"},
+    )
+    soft_body = soft.json()
+    assert soft_body["router_class"] == "SOFT_CHAT"
+    assert soft_body["action_taken"]["tool"] is None
+    assert soft_body["cycle_verified"] is True
+    assert soft_body["mouth_open"] is True
+    assert soft_body["message_kind"] == "mouth"
+    assert soft_body["status"] == "ACCEPTED"
+    assert "won't assert" in soft_body["reply_text"].lower()
+    assert "sky" not in soft_body["reply_text"]
+    assert "exact_answers" not in soft_body["reply_text"]
 
-    bundle = get_kin_bundle()
-    previous = bundle.last_policy
-    bundle.last_policy = MetisPolicy(allow_mouth=False)
-    try:
-        soft = client.post(
-            "/api/v1/chat",
-            json={"text": "hello", "hub_id": "stripuser", "persona": "honest"},
-        )
-        soft_body = soft.json()
-        assert soft_body["router_class"] == "SOFT_CHAT"
-        assert soft_body["action_taken"]["tool"] is None
-        assert soft_body["allow_mouth"] is False
-        assert soft_body["status"] == "MOUTH_CLOSED"
-        assert soft_body["reply_text"] == ""
-
-        bundle.last_policy = MetisPolicy(allow_mouth=True)
-        spoken = client.post(
-            "/api/v1/chat",
-            json={"text": "hello", "hub_id": "stripuser", "persona": "builder"},
-        )
-        spoken_body = spoken.json()
-        assert spoken_body["status"] == "ACCEPTED"
-        assert spoken_body["allow_mouth"] is True
-        assert "next step" in spoken_body["reply_text"]
-        assert "sky" not in spoken_body["reply_text"]
-    finally:
-        bundle.last_policy = previous
+    spoken = client.post(
+        "/api/v1/chat",
+        json={"text": "hello", "hub_id": "stripuser", "persona": "builder"},
+    )
+    spoken_body = spoken.json()
+    assert spoken_body["status"] == "ACCEPTED"
+    assert spoken_body["mouth_open"] is True
+    assert "next step" in spoken_body["reply_text"]
+    assert "sky" not in spoken_body["reply_text"]
 
     abstain = client.post(
         "/api/v1/chat",

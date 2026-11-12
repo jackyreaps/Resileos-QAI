@@ -40,7 +40,7 @@ Verified means only the behavior described below ran. Perception is scalar signa
 | Psyche | VERIFIED | `kin/psyche.py`. Hub rows include phase, belt, residual bin, persona, mood, depth, frame, and `drive_*`. State fields, not evidence of awareness. |
 | Credit ledger | VERIFIED | Earn and spend change an in-memory balance. `transfer()` is refused. The count cannot go negative. A credit denial returns HTTP 402, not 500. The HTTP `used_free` field is still client-supplied (see Known issues). |
 | Workspace tools | VERIFIED | Expressions, workspace files, syntax checks, URL fetch. `git_commit` and `run_shell` no longer interpolate into a shell string. Still not a general security sandbox. |
-| Harness / Kin control | BETA | Control packet (confidence, risk, budget, evidence, scars). Separated write path: Zeus learns only if all reviewers approve. Verification fails closed. Hades checkpoints. **Cascade and fan-out routing are still stubs, and the budget is not persisted.** |
+| Harness / Kin control | BETA | Control packet (confidence, risk, budget, evidence, scars). Separated write path: Zeus learns only if all reviewers approve. Verification fails closed. Hades checkpoints. Fan-out scores an option only when it overlaps residual rows, and abstains otherwise. The cascade route runs that residual check. **The budget is not persisted.** |
 | Athena judge | BETA | Fail-closed when Apollo does not succeed. Still an early reviewer, not independent general judgment. |
 | Grammar counter | BETA | `grammar_of` counts keys. No dedicated test. |
 | Etymology | BETA | Filters a list the caller supplies. There is no lexicon. |
@@ -61,7 +61,7 @@ Verified means only the behavior described below ran. Perception is scalar signa
 
 ## Known issues
 
-- Cascade and fan-out routing in the harness/kin layer are still stubs (fan-out options score a constant; the cascade middle route is unbuilt).
+- Fan-out scores options from residual rows already on the packet. With no overlap the score is 0 and the route abstains. The cascade route runs that same residual check. The budget is not persisted.
 - The Hermes budget is not persisted across process restarts.
 - `used_free` is still client-supplied, so the HTTP free-use gate is not a server-authoritative quota.
 - An earlier run on `04ec684` had 1206 passed and 2 failed (known float-edge numeric tests: oscillator and stream). The PR #8 suite on `ee9199ad` reported 1252 passed; GitHub CI on that commit succeeded.
@@ -167,7 +167,7 @@ learn  user:alice prefers exact_answers → ACCEPTED on ask
 | LLM invent-rate baseline | Not run. Needs `BENCH_LLM_URL`. Do not publish a comparison. |
 | Healing factor / golden-ladder as product claim | Present as kin/Apollo internals; not a visitor promise |
 | Trusted credit gate | `used_free` is still client-supplied |
-| Cascade / fan-out routing and persisted budget | Still stubs / not persisted; see Known issues |
+| Persisted budget | Not persisted; fan-out and cascade now follow residual rows |
 
 ---
 
