@@ -36,13 +36,14 @@ Depth. The field is not one phase ring. It has `depth` levels (default
 inner vector, and each next level sits at the φ-power address
 `ω · φ^{-level}` (RES-323). Inside a level the ODE above is unchanged.
 Between levels the same sine coupling runs outward only — level L-1
-drives level L with weight φ^{-1}, and the outer level does not drive
-back. `theta` and the order parameter stay the inner vector of length
-`r` (RES-316). A flat ring (`depth < 2`), fewer than two oscillators,
-or a phase vector whose shape is not `(r,)` is rejected. A reversed
-orientation is rejected. Those are the configurations that measure
-order on too few vectors, or on the wrong axis, and then look like the
-coupling failed.
+drives level L with weight ``outward_weight(scale)`` from
+``suite_constants``. The default scale is 1, and that weight is
+φ^{-1}. The outer level does not drive back. `theta` and the order
+parameter stay the inner vector of length `r` (RES-316). A flat ring
+(`depth < 2`), fewer than two oscillators, or a phase vector whose
+shape is not `(r,)` is rejected. A reversed orientation is rejected.
+Those are the configurations that measure order on too few vectors, or
+on the wrong axis, and then look like the coupling failed.
 
 The RK4 subdivision under a stiff within-level step is a numerical
 safety. It is not what orders the field. The sine coupling on this
@@ -55,8 +56,7 @@ import math
 import numpy as np
 
 from ..state_dtype import state_dtype
-
-PHI = (1.0 + np.sqrt(5.0)) / 2.0
+from .suite_constants import PHI, outward_weight
 
 
 # ── frequency ladders ───────────────────────────────────────────────────
@@ -149,6 +149,11 @@ class KuramotoField:
     orientation : str
         Only ``outward`` is accepted: level L-1 drives level L. Any
         other axis is rejected rather than silently reversed.
+    scale : float
+        Multiplier on the outward weight. The default 1 leaves the
+        weight at φ^{-1} (``outward_weight(1)``). Pass another finite
+        scale, such as the healing factor, to change that weight
+        without editing this class.
     """
 
     def __init__(
@@ -163,6 +168,7 @@ class KuramotoField:
         random_start: bool = False,
         depth: int = 2,
         orientation: str = "outward",
+        scale: float = 1.0,
     ) -> None:
         if r < 2:
             raise ValueError(
@@ -186,10 +192,13 @@ class KuramotoField:
             raise ValueError("alpha must be > 0")
         if dt <= 0.0:
             raise ValueError("dt must be > 0")
+        # Reject a non-finite scale here. outward_weight applies it.
+        outward_weight(scale)
 
         self.r = int(r)
         self.depth = int(depth)
         self.orientation = orientation
+        self.scale = float(scale)
         self.ladder = ladder
         self.omega_base = float(omega_base)
         self.kappa = float(kappa)
@@ -390,15 +399,16 @@ class KuramotoField:
         `ω` scaled by `φ^{-level}` (the ingestion address of that level).
         The extra term is the same sine coupling, outward only:
 
-            φ^{-1} * κ/(α+ε) * sin(θ_{level-1} - θ_level)
+            outward_weight(scale) * κ/(α+ε) * sin(θ_{level-1} - θ_level)
 
-        Level 0 is not modified here. The inner phase is the value after
-        this step's inner update, held while the outer level is integrated.
+        The default scale is 1, so the weight is φ^{-1}. Level 0 is not
+        modified here. The inner phase is the value after this step's
+        inner update, held while the outer level is integrated.
         """
         if self.depth < 2:
             return
         gain = self.kappa / (self.alpha + float(epsilon))
-        outward_weight = float(PHI ** -1)
+        weight = outward_weight(self.scale)
         h = float(dt) / int(nsub)
         levels = np.asarray(self._levels, dtype=np.float64)
         coupling = np.asarray(W, dtype=np.float64)
@@ -408,7 +418,7 @@ class KuramotoField:
             diff = phases[None, :] - phases[:, None]
             within = (coupling * np.sin(diff)).sum(axis=1)
             omega = omega0 * (PHI ** (-int(level)))
-            pull = outward_weight * np.sin(inner - phases)
+            pull = weight * np.sin(inner - phases)
             return omega + gain * within + gain * pull
 
         def rk4(phases: np.ndarray, level: int, inner: np.ndarray) -> np.ndarray:
@@ -452,6 +462,7 @@ class KuramotoField:
             "r": self.r,
             "depth": self.depth,
             "orientation": self.orientation,
+            "scale": self.scale,
             "ladder": self.ladder,
             "omega_base": self.omega_base,
             "kappa": self.kappa,
@@ -481,6 +492,9 @@ class KuramotoField:
         self.kappa = float(d.get("kappa", self.kappa))
         self.alpha = float(d.get("alpha", self.alpha))
         self.dt = float(d.get("dt", self.dt))
+        if "scale" in d:
+            self.scale = float(d["scale"])
+            outward_weight(self.scale)
 
 
 __all__ = [
