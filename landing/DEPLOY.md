@@ -150,7 +150,7 @@ The marketing site is deployed as Cloudflare Pages project `resileos`.
 - Plaintext env: `STRIPE_PRICE_*`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`, `RESILEOS_SITE_URL`, `RESILEOS_API_BASE_URL`, `FREE_KEY_RATE_PER_HOUR`
 - Encrypted secret: `STRIPE_SECRET_KEY` (Stripe **test** mode)
 - Success URL: `https://resileosai.fun/chat?checkout=success`
-- Cancel URL: `https://resileosai.fun/#pricing`
+- Cancel URL: `https://resileosai.fun/#pricing` (the homepage forwards that hash to `/pricing`. Do not add a `/chat` → `/chat.html` rewrite.)
 - Claim does not require a webhook: it retrieves the Checkout Session from Stripe, mints once, and stores the hash in KV
 - Redeploy from the project root: `wrangler pages deploy public --project-name resileos`
 

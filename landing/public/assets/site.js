@@ -123,12 +123,12 @@
       } catch (err) { /* the key is still on the page once */ }
       // Prefer server-provided curls if present
       if (data.quickstart) {
-        if (data.quickstart.learn)
-          document.getElementById("code-learn").textContent = data.quickstart.learn;
-        if (data.quickstart.query)
-          document.getElementById("code-query").textContent = data.quickstart.query;
-        if (data.quickstart.chain)
-          document.getElementById("code-chain").textContent = data.quickstart.chain;
+        const learn = document.getElementById("code-learn");
+        const query = document.getElementById("code-query");
+        const chain = document.getElementById("code-chain");
+        if (data.quickstart.learn && learn) learn.textContent = data.quickstart.learn;
+        if (data.quickstart.query && query) query.textContent = data.quickstart.query;
+        if (data.quickstart.chain && chain) chain.textContent = data.quickstart.chain;
       }
     } catch (err) {
       msg.textContent =
@@ -274,6 +274,43 @@
 
   // Motion: Lenis, reveal, card glow, figurehead parallax
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Decorative light sweeps. src is applied only when motion is allowed, so a
+  // reduced-motion visit does not download the loop. These loops are site craft.
+  if (!reduceMotion) {
+    document.querySelectorAll("img.hero-motion[data-src]").forEach((img) => {
+      img.addEventListener("error", () => img.remove());
+      img.src = img.getAttribute("data-src");
+    });
+  }
+
+  // Later hook for a real short hero or patron clip.
+  // Put a video URL on the figure: data-video-src="/assets/motion/example.mp4"
+  // Nothing is mounted unless that URL returns a video. Do not set a placeholder,
+  // and do not describe the clip as something the engine generated.
+  if (!reduceMotion) {
+    document.querySelectorAll("[data-video-src]").forEach((fig) => {
+      const src = (fig.getAttribute("data-video-src") || "").trim();
+      if (!src) return;
+      fetch(src, { method: "HEAD" })
+        .then((res) => {
+          if (!res.ok) return;
+          const type = res.headers.get("content-type") || "";
+          if (type && type.indexOf("video/") !== 0) return;
+          const video = document.createElement("video");
+          video.className = "hero-motion";
+          video.src = src;
+          video.muted = true;
+          video.loop = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          video.setAttribute("aria-hidden", "true");
+          fig.appendChild(video);
+        })
+        .catch(() => {});
+    });
+  }
+
   if (!reduceMotion) {
     document.documentElement.classList.add("js-motion");
 

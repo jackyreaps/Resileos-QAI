@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pricing — Resileos</title>
+  <meta name="description" content="Free start, Builder $29/mo, Founding Builder $19/mo, Team $99/mo. Shared demo key on chat, about 100 usernames." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a href="/">Home</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/kin">Kin</a>
+        <a href="/pricing" aria-current="page">Pricing</a>
+        <a class="nav-cta" href="/chat">Chat</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <header class="page-hero">
+      <p class="eyebrow">Hermes · Dispatch</p>
+      <h1>Start free. Pay for quota when the hub is yours.</h1>
+      <p class="lede">Prices from the packaging notes. Free is the funnel. Stripe checkout is for Builder and Team. Chat also has a shared demo key, separate from a key you mint here.</p>
+    </header>
+
+    <section id="pricing">
+      <div class="meander" aria-hidden="true"></div>
+      <div class="patron">
+        <figure class="patron-photo img-hover">
+          <img src="/assets/gods/hermes.webp" width="864" height="1152" alt="AI-generated portrait of Hermes, from a Metropolitan Museum sculpture reference" />
+        </figure>
+        <div>
+          <p class="patron-kicker"><strong>Hermes</strong>, Paths and dispatch</p>
+          <h2>Pricing</h2>
+          <p class="sub">Free to open <a href="/chat">chat</a>. Builder and Team use Stripe. Founding Builder is $19/mo for 12 months, cap 50, on the Builder seat limits.</p>
+        </div>
+      </div>
+      <div class="price-grid">
+        <div class="price-card">
+          <span class="badge badge-ok">FUNNEL</span>
+          <h3>Free</h3>
+          <div class="price">$0 <span>/ start</span></div>
+          <ul>
+            <li>1 API key · 5,000 req/mo</li>
+            <li>Personal + world: hubs</li>
+            <li>Structured mouth only</li>
+            <li>Chat at /chat + API</li>
+          </ul>
+          <a class="btn btn-primary btn-block" href="/chat">Open chat</a>
+          <a class="btn btn-ghost btn-block" href="#start">Get free key</a>
+        </div>
+        <div class="price-card featured">
+          <span class="badge">BUILDER · PRO TIER</span>
+          <h3>Builder</h3>
+          <div class="price">$29 <span>/ mo</span></div>
+          <ul>
+            <li>3 keys · 100,000 req/mo</li>
+            <li>Overage $0.50 / 10k</li>
+            <li>Shared worlds · durable volume</li>
+            <li>+ small RAG mouth budget</li>
+          </ul>
+          <p class="soon-note">Founding Builder: $19/mo · 12 months · cap 50</p>
+          <button class="btn btn-primary btn-block" type="button" data-checkout="builder">Checkout with Stripe</button>
+          <a class="micro link-fallback" id="link-builder" href="#" hidden>Or open Payment Link</a>
+        </div>
+        <div class="price-card">
+          <span class="badge">TEAM</span>
+          <h3>Team</h3>
+          <div class="price">$99 <span>/ mo</span></div>
+          <ul>
+            <li>10 keys · 500,000 req/mo</li>
+            <li>Overage $0.40 / 10k</li>
+            <li>Multi-guild seats*</li>
+            <li>Priority email · 99.5% target†</li>
+          </ul>
+          <button class="btn btn-ghost btn-block" type="button" data-checkout="team">Checkout with Stripe</button>
+          <a class="micro link-fallback" id="link-team" href="#" hidden>Or open Payment Link</a>
+        </div>
+        <div class="price-card">
+          <span class="badge badge-muted">ENTERPRISE</span>
+          <h3>Org</h3>
+          <div class="price">Custom</div>
+          <ul>
+            <li>Custom keys &amp; quota</li>
+            <li>Dedicated / multi-region</li>
+            <li>BYO mouth key</li>
+            <li>Slack / contract</li>
+          </ul>
+          <a class="btn btn-ghost btn-block" href="mailto:hello@resileos.dev?subject=Resileos%20Org">Contact sales</a>
+        </div>
+      </div>
+      <p class="micro note">
+        * Guild/world routes not mounted on hosted API yet. † Internal target, not an SLA.
+        Key map: Free→<code>free</code>/5000 · Builder/Team→<code>pro</code> · Org→<code>enterprise</code>.
+      </p>
+      <div class="msg note" id="checkout-msg" aria-live="polite"></div>
+    </section>
+
+    <section class="alt" id="start">
+      <div class="inner">
+        <div class="grid-2">
+          <div>
+            <h2 class="start-title">Three steps — free</h2>
+            <div class="steps">
+              <div class="step"><div><h3>Get a free key</h3><p>No card. Shown once. Send as <code>X-API-Key</code>.</p></div></div>
+              <div class="step"><div><h3>Learn into your hub</h3><p>Chat, or <code>POST /learn</code>. Prefix <code>user:</code> / <code>world:</code> for owned memory.</p></div></div>
+              <div class="step"><div><h3>Ask · derive · abstain</h3><p>Known → the object. Chain → path. Unknown → empty.</p></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <span class="badge badge-ok">FREE · NO CARD</span>
+            <h3>Issue your API key</h3>
+            <form class="form" id="free-key-form">
+              <label for="email">Email (optional)</label>
+              <input id="email" name="email" type="email" placeholder="you@lab.dev" autocomplete="email" />
+              <label for="name">Label</label>
+              <input id="name" name="name" type="text" placeholder="my-laptop" maxlength="64" />
+              <button class="btn btn-primary btn-block" type="submit">Get free key</button>
+              <div class="msg" id="free-key-msg" aria-live="polite"></div>
+            </form>
+            <div class="key-reveal" id="key-reveal" role="status"></div>
+            <p class="micro note">Also: <code>python scripts/issue_free_key.py</code> in the repo. The shared demo key inside chat is separate, rate-limited, about 100 usernames.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="faq">
+      <h2>Pricing questions</h2>
+      <details open>
+        <summary>Do I need Docker to try it?</summary>
+        <p>No. Open <a href="/chat">/chat</a>. The shared demo key is filled in and rate-limited, about 100 usernames. Choose a username before a thread is saved.</p>
+      </details>
+      <details>
+        <summary>How do free keys work?</summary>
+        <p>This page’s form calls the billing free-key API and shows the key once. You can also run <code>scripts/issue_free_key.py</code> and put the hash in the API key file.</p>
+      </details>
+      <details>
+        <summary>What is Founding Builder?</summary>
+        <p>$19/mo, locked for 12 months, capped at 50. Same Builder seat shape: 3 keys and 100,000 requests a month. It does not auto-renew at the founding rate.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/kin">Kin</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/chat">Chat</a>
+      <a href="/credits">Credits</a>
+      <a href="https://github.com/jackyreaps/Resileos-QAI">GitHub</a>
+    </nav>
+    <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
+    <p class="credits">Portraits expand the earlier figures in bronze, marble, and crystal. <a href="/credits">Image credits</a>.</p>
+  </footer>
+
+  <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
+  <script>window.RESILEOS_BILLING = window.RESILEOS_BILLING || "";</script>
+  <script src="/assets/vendor/lenis.min.js"></script>
+  <script src="/assets/site.js"></script>
+</body>
+</html>

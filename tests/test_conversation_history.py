@@ -281,6 +281,7 @@ def test_username_is_required_and_modest(client, monkeypatch, conv_path):
 
 def test_public_site_links_chat_and_history_panel():
     index = (ROOT / "landing" / "public" / "index.html").read_text(encoding="utf-8")
+    kin = (ROOT / "landing" / "public" / "kin.html").read_text(encoding="utf-8")
     chat = (ROOT / "landing" / "public" / "chat.html").read_text(encoding="utf-8")
     checkout = (
         ROOT / "landing" / "functions" / "api" / "create-checkout-session.js"
@@ -296,4 +297,4 @@ def test_public_site_links_chat_and_history_panel():
     assert "const DEMO_API_KEY" in chat
     assert "/chat?checkout=success" in checkout
     assert "/chat?checkout=success" in wrangler
-    assert "Eat" in index
+    assert "Eat stays Eat" in kin

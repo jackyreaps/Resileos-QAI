@@ -11,18 +11,30 @@ OFL fonts: Instrument Serif, Inter, and JetBrains Mono. Portraits are in
 [README.md](../README.md).
 
 ```
-public/                 static site (Cloudflare Pages output)
-public/assets/gods/     AI-styled portraits, including titanos.webp
-public/assets/fonts/    Instrument Serif, Inter, JetBrains Mono
-public/assets/vendor/   vendored Lenis
-functions/api/          Cloudflare Pages Functions (free key, checkout, claim)
-api/                    local FastAPI server for the same billing routes
-scripts/stripe_setup.py idempotent Stripe product and price creator
-wrangler.toml           Pages project and the KEYS KV binding
-artifacts/              measured bench reports
-CAPABILITIES.md         capability notes
-DEPLOY.md               go-live notes
+public/                     static site (Cloudflare Pages output)
+public/index.html           home
+public/how-it-works.html    engine, proof, dated facts  → /how-it-works
+public/kin.html             patrons, Kin, Demi-gods     → /kin
+public/pricing.html         plans and the free-key form → /pricing
+public/credits.html         portrait credits            → /credits
+public/chat.html            product chat                → /chat
+public/assets/gods/         expanded portraits (bronze, marble, crystal)
+public/assets/motion/       short decorative light sweeps
+public/assets/fonts/        Instrument Serif, Inter, JetBrains Mono
+public/assets/vendor/       vendored Lenis
+functions/api/              Cloudflare Pages Functions (free key, checkout, claim)
+api/                        local FastAPI server for the same billing routes
+scripts/stripe_setup.py     idempotent Stripe product and price creator
+wrangler.toml               Pages project and the KEYS KV binding
+artifacts/                  measured bench reports
+CAPABILITIES.md             capability notes
+DEPLOY.md                   go-live notes
 ```
+
+Pretty URLs are Cloudflare Pages defaults (`how-it-works.html` is served at
+`/how-it-works`). Do not add a `_redirects` rule from `/chat` to
+`/chat.html`. That rewrite looped with the Pages redirect. Old homepage
+hashes such as `/#pricing` are forwarded in the browser to the new page.
 
 ## Public site
 
@@ -76,7 +88,7 @@ export API_KEYS_PATH=./data/api_keys.json
 export RESILEOS_API_BASE_URL=http://127.0.0.1:8000/api/v1
 export RESILEOS_SITE_URL=http://127.0.0.1:8787
 export STRIPE_SUCCESS_URL=http://127.0.0.1:8787/chat?checkout=success
-export STRIPE_CANCEL_URL=http://127.0.0.1:8787/#pricing
+export STRIPE_CANCEL_URL=http://127.0.0.1:8787/pricing
 # also export STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, and STRIPE_PRICE_*
 uvicorn api.server:app --app-dir . --host 127.0.0.1 --port 8787 --reload
 ```

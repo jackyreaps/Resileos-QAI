@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How it works — Resileos</title>
+  <meta name="description" content="Titanos over the residual core: learn, query, chain, dated facts, abstain, and conflict. Measured on 2026-11-10." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a href="/">Home</a>
+        <a href="/how-it-works" aria-current="page">How it works</a>
+        <a href="/kin">Kin</a>
+        <a href="/pricing">Pricing</a>
+        <a class="nav-cta" href="/chat">Chat</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <header class="page-hero">
+      <p class="eyebrow">Engine</p>
+      <h1>Learn a fact. Ask it back. Leave the rest empty.</h1>
+      <p class="lede">Titanos sits over a deterministic residual core. <code>ask</code>, <code>ask_list</code>, and <code>chain</code> return <strong>ACCEPTED</strong>, <strong>ABSTAINED</strong>, or <strong>CONFLICT</strong>. The patron map is on <a href="/kin">Kin</a>.</p>
+    </header>
+
+    <section id="titanos">
+      <div class="meander" aria-hidden="true"></div>
+      <figure class="titanos-figure img-hover">
+        <!-- video-hook: light sweep only. Set data-video-src here for a real short clip.
+             site.js mounts it only after the file loads as video. Do not ship a placeholder,
+             and do not claim the engine generated the picture. -->
+        <img src="/assets/gods/titanos.webp" width="1280" height="720" alt="AI-generated figurehead of Titanos, series-matched and not a single museum sculpture" />
+        <img class="hero-motion" data-src="/assets/motion/titanos-light.webp" alt="" aria-hidden="true" />
+      </figure>
+      <p class="patron-kicker"><strong>Titanos</strong>, Engine</p>
+      <h2>The figurehead</h2>
+      <p class="sub">Titanos is the engine over the deterministic residual core. Zeus routing stands over that core. Writes apply only after reviewers approve. The core is the source of truth for exact store, derivation, and abstention.</p>
+      <div class="grid">
+        <article class="card">
+          <span class="badge badge-ok">ACCEPTED</span>
+          <h3>A stored fact</h3>
+          <p><code>learn Zeus domain sky</code> then <code>query</code> returns <strong>ACCEPTED · sky</strong> (mode CLASSICAL).</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-ok">ABSTAINED</span>
+          <h3>An unknown</h3>
+          <p>Unknown pairs return <strong>ABSTAINED</strong>, value empty. Missing entities and relations stayed empty in the measured probes.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-soon">CONFLICT</span>
+          <h3>Dated facts that disagree</h3>
+          <p>When two facts with explicit, overlapping date ranges disagree on the same date, <code>ask()</code> returns <strong>CONFLICT</strong> instead of picking one.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="alt" id="capable">
+      <div class="inner">
+        <div class="meander" aria-hidden="true"></div>
+        <h2>What ran</h2>
+        <p class="sub">Verified means the described behavior ran on 2026-11-10 (America/Chicago, UTC-6), not that every route is a finished product. Memory and temporal benches were measured that day on <code>04ec684</code>. Full suite on main at <code>ee9199ad</code>: 1252 passed. No language-model baseline was run.</p>
+        <div class="grid">
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Learn and exact query</h3>
+            <p><code>learn Zeus domain sky</code> → <code>query</code> returns <strong>ACCEPTED · sky</strong>.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Abstain</h3>
+            <p>Memory bench invent rate on 12 unknown pairs: <strong>0.0</strong>. Exact recall on 3 known facts: <strong>1.0</strong>.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Chain / derive</h3>
+            <p>Via <code>/chain</code>: <strong>3 of 3</strong> on grandchild, grandparent, and parent's workplace, with path provenance. No language model was used.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Hubs</h3>
+            <p><code>learn user:alice prefers exact_answers</code> → ask returns that object. <code>user:</code>, <code>world:</code>, and <code>org:</code> use the same prefix contract.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Chat and Studio</h3>
+            <p>Visitors use <a href="/chat">/chat</a>. The Streamlit surface still has Save fact, Seed demo, Chat (<code>remember S R O</code>), Search, Media, Residual codec, Make, Language, Tools, Diagnostics, and Help, on the same API keys.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Hub search, then explain</h3>
+            <p>Search the hub first. If it is empty, offer a lookup URL and a remember helper.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>float32 default</h3>
+            <p><code>RESILEOS_STATE_DTYPE</code> unset → float32.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Free key</h3>
+            <p>The form on <a href="/pricing#start">Pricing</a> calls the billing free-key API. <code>scripts/issue_free_key.py</code> mints a free-tier key and hash. No Stripe on that path.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Kin eat / cycle</h3>
+            <p>Ingest filter and the Iris → Metis → Hermes cycle on <code>/api/v1/eat</code> and <code>/kin/cycle</code>. Eat stays Eat. <code>perception</code> is an alias.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Residual compression</h3>
+            <p>Low-rank compression of images and video frames you already have, with measured round-trip error. It does not generate pixels from a prompt.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Make world / art path</h3>
+            <p>Studio Make and Apollo art encoders write scene or art facts under <code>world:</code>. The renderer is fallback-local.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Apollo / improve cycle</h3>
+            <p>Golden-ladder hops with eat verification. Internals tested. The product surface is still early.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Optional mouth</h3>
+            <p>The structured renderer ships. Hosted or local mouths need keys and dependencies. Off by default.</p>
+          </article>
+          <article class="card">
+            <span class="badge">CHECKS</span>
+            <h3>Demi-gods</h3>
+            <p>Load-on-demand checks, dismissed after use. They are not a language model. The roles and portraits are on <a href="/kin#demi-gods">Kin</a>.</p>
+          </article>
+        </div>
+
+        <div class="patron" id="time">
+          <figure class="patron-photo img-hover">
+            <img src="/assets/gods/hades.webp" width="864" height="1152" alt="AI-generated portrait of a Serapis bust used for Hades, from a Vatican Museums sculpture reference" loading="lazy" />
+          </figure>
+          <div>
+            <p class="patron-kicker"><strong>Hades</strong>, Lessons</p>
+            <h3 class="subhead">Facts with time <span class="pending">VERIFIED BEHAVIOR</span></h3>
+            <p class="sub">Facts can carry a valid-from and valid-to window (half-open). Ask as of a date, and the answer is the fact that was valid then. Hades checkpoints lessons. Hades is not Studio.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>As-of questions</h3>
+            <p>Athens <code>capital_of</code> as of 1800 returns <strong>Ottoman</strong>. Today returns <strong>Greece</strong>.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>As-of through chains</h3>
+            <p>The date carries through every step of a multi-hop <code>/chain</code>, so a historical lookup stays on that date.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Conflicts flagged</h3>
+            <p>Overlapping dated facts that disagree return <strong>CONFLICT</strong> instead of a silent pick.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Real date parsing</h3>
+            <p>Years before 1970 and ancient years such as 476 parse as dates. SPARQL queries accept <code>AS OF</code>.</p>
+          </article>
+        </div>
+
+        <div class="patron" id="senses">
+          <figure class="patron-photo pos-body img-hover">
+            <img src="/assets/gods/iris.webp" width="864" height="1152" alt="AI-generated rendering of the headless Iris from the Parthenon west pediment, from a British Museum sculpture reference" loading="lazy" />
+          </figure>
+          <div>
+            <p class="patron-kicker"><strong>Iris</strong>, Senses</p>
+            <h3 class="subhead">Senses and speech <span class="pending">VERIFIED BEHAVIOR</span></h3>
+            <p class="sub">Signal statistics and grounded wording. Not recognition, translation, or awareness.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Grounded speech</h3>
+            <p>Turns stored rows into template sentences marked GROUNDED. Empty rows return “Nothing stored on that.”</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Script detection</h3>
+            <p>Classifies characters as latin, non-latin, or mixed. A script guess, not a spoken language.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Image, audio, video, text</h3>
+            <p>Brightness and edges. Energy, zero-cross, and centroid. Frame difference. Token counts. No object, speech, or scene recognition.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Perception into Psyche</h3>
+            <p>Hands diagnostics into a state container: phase, belt, frames, drive fields. State fields, not evidence of awareness.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Credit ledger</h3>
+            <p>Earn and spend in process memory. Transfers are refused. The HTTP free-use count is still client-supplied.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-ok">VERIFIED</span>
+            <h3>Workspace tools</h3>
+            <p>Expressions, workspace files, syntax checks, and a URL download. Not a general security sandbox.</p>
+          </article>
+        </div>
+
+        <div class="patron" id="experimental">
+          <figure class="patron-photo img-hover">
+            <img src="/assets/gods/athena.webp" width="864" height="1152" alt="AI-generated portrait of Athena, from a Metropolitan Museum sculpture reference" loading="lazy" />
+          </figure>
+          <div>
+            <p class="patron-kicker"><strong>Athena</strong>, Judgment</p>
+            <h3 class="subhead">Experimental tools <span class="pending">BETA</span></h3>
+            <p class="sub">Fail-closed when Apollo does not succeed. Still an early reviewer, not general judgment.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Harness / Kin</h3>
+            <p>Zeus learns only if reviewers approve. Verification fails closed. Hades checkpoints. Fan-out scores an option only when it overlaps residual rows, and abstains otherwise. The cascade route runs that residual check. The budget is not persisted.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Agent loop</h3>
+            <p>Runs a default or caller-provided sequence of tool calls. The audited goal was not completed.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Web search</h3>
+            <p>Returns a DuckDuckGo search URL and query. It does not download the page.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Offline learn queue</h3>
+            <p>The learn branch reports “queued for hub learn” and does not write facts into a hub.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">BETA</span>
+            <h3>Still early</h3>
+            <p>Drives, guild merit, art handoff, grammar counts, and etymology filters are beta. There is no built-in lexicon.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="bench">
+      <div class="meander" aria-hidden="true"></div>
+      <div class="patron">
+        <figure class="patron-photo img-hover">
+          <img src="/assets/gods/apollo.webp" width="864" height="1152" alt="AI-generated portrait of Apollo, from a Metropolitan Museum sculpture reference" loading="lazy" />
+        </figure>
+        <div>
+          <p class="patron-kicker"><strong>Apollo</strong>, Proof</p>
+          <h2>Proof</h2>
+          <p class="sub">Real Titanos runs on 2026-11-10 (America/Chicago, UTC-6), against main at <code>04ec684</code>. These tests measure stored-fact recall, abstention, composition of stored relations, and dated facts. They do not measure general reasoning. No language-model baseline was run.</p>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <span class="badge badge-ok">MEASURED</span>
+          <h3>Invent rate</h3>
+          <p class="bench-num">0.0</p>
+          <p>12 unknown pairs all <strong>ABSTAINED</strong>. Exact recall on 3 known facts: <strong>1.0</strong>.</p>
+          <p class="micro note"><code>Titanos(TitanosConfig())</code> · p50 about 35 ms · 3 known + 12 unknown</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-ok">MEASURED</span>
+          <h3>Composition via /chain</h3>
+          <p><strong>3/3</strong> — grandchild, grandparent, and parent's workplace, with path provenance.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-ok">MEASURED</span>
+          <h3>Invention bench</h3>
+          <p><strong>0 derived, 0 invented.</strong> Novel queries abstain rather than make up new facts.</p>
+        </article>
+        <article class="card">
+          <span class="badge badge-ok">MEASURED</span>
+          <h3>Temporal probe</h3>
+          <p>0 false conflicts out of 141, and 2 of 2 on both synthetic checks. Dated facts are under <a href="#time">Facts with time</a>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="alt" id="roadmap">
+      <div class="inner">
+        <div class="meander" aria-hidden="true"></div>
+        <div class="patron">
+          <figure class="patron-photo img-hover">
+            <img src="/assets/gods/metis.webp" width="864" height="1152" alt="AI-generated portrait of Metis. No public-domain sculpture reference was used." loading="lazy" />
+          </figure>
+          <div>
+            <p class="patron-kicker"><strong>Metis</strong>, Policy</p>
+            <h2>Not shipped <span class="pending">ROADMAP</span></h2>
+            <p class="sub">Honest backlog. Policy output does not execute. These items are not in the visitor promise.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <span class="badge badge-soon">IN RESEARCH</span>
+            <h3>Studio generation</h3>
+            <p>Sampling new images or video from a prompt is in research. The engine today compresses frames you already have. Forge, when no provider is configured, is <strong>UNAVAILABLE</strong> and invents no URL. See <a href="/kin#forge">Forge on the Kin page</a>.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">ROADMAP</span>
+            <h3>Translate provider</h3>
+            <p>Without a configured translation provider, text is returned unchanged. Actual translation was not verified.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">ROADMAP</span>
+            <h3>Trusted credit gate</h3>
+            <p>The HTTP free-use count is still supplied by the client, so the gate is not a server-authoritative quota yet.</p>
+          </article>
+          <article class="card">
+            <span class="badge badge-soon">NEXT</span>
+            <h3>Still next</h3>
+            <p>Deeper persona packs, a hub-native Kin cycle, a mouth that speaks only from stored rows, guild and world mounts, and the suite residual address. Fan-out and the cascade route follow residual rows and abstain when none match. The budget is not persisted.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="quickstart">
+      <div class="meander" aria-hidden="true"></div>
+      <h2>API quickstart</h2>
+      <p class="sub">Same store chat uses. Header: <code>X-API-Key</code>. Examples below use a placeholder key.</p>
+      <div class="tabs" role="tablist" aria-label="API examples">
+        <button class="tab active" data-tab="learn" type="button">1 · Learn</button>
+        <button class="tab" data-tab="query" type="button">2 · Query</button>
+        <button class="tab" data-tab="chain" type="button">3 · Chain</button>
+      </div>
+      <div class="codebox" data-panel="learn">
+        <button class="copy" type="button" data-copy="learn">Copy</button>
+        <pre id="code-learn">export BASE="https://api.resileosai.fun/api/v1"
+export KEY="rsk_…"
+
+curl -sS -X POST "$BASE/learn" \
+  -H "Content-Type: application/json" -H "X-API-Key: $KEY" \
+  -d '{"subject":"Zeus","relation":"domain","obj":"sky"}'</pre>
+      </div>
+      <div class="codebox" data-panel="query" hidden>
+        <button class="copy" type="button" data-copy="query">Copy</button>
+        <pre id="code-query">curl -sS -X POST "$BASE/query" \
+  -H "Content-Type: application/json" -H "X-API-Key: $KEY" \
+  -d '{"subject":"Zeus","relation":"domain"}'
+# → ACCEPTED · sky   |   unknown → ABSTAINED</pre>
+      </div>
+      <div class="codebox" data-panel="chain" hidden>
+        <button class="copy" type="button" data-copy="chain">Copy</button>
+        <pre id="code-chain">curl -sS -X POST "$BASE/chain" \
+  -H "Content-Type: application/json" -H "X-API-Key: $KEY" \
+  -d '{"start":"Zeus","relations":["parent_of","domain"]}'
+# → wisdom · path provenance</pre>
+      </div>
+    </section>
+
+    <section id="faq" class="faq">
+      <div class="meander" aria-hidden="true"></div>
+      <h2>FAQ</h2>
+      <details open>
+        <summary>What does Resileos do?</summary>
+        <p>It remembers exact facts you teach it, derives from those facts, and abstains when it does not know. Capability grows as your hubs fill. It does not make things up.</p>
+      </details>
+      <details>
+        <summary>Can it answer as of a date?</summary>
+        <p>Yes. Facts can carry a valid-from and valid-to window. Asking Athens <code>capital_of</code> as of 1800 returned Ottoman. Today returned Greece. When overlapping dated facts disagree, the answer is CONFLICT.</p>
+      </details>
+      <details>
+        <summary>Does it generate images or video from a prompt?</summary>
+        <p>No. The residual engine compresses images and video frames you already have, with measured round-trip error. Generating new pictures from a prompt is in research, not shipped. A Forge draft with no configured provider is UNAVAILABLE, and no URL is invented.</p>
+      </details>
+      <details>
+        <summary>Do I need Docker to try it?</summary>
+        <p>No. Open <a href="/chat">/chat</a>. The shared demo key is filled in and rate-limited, about 100 usernames. Choose a username before a thread is saved. Docker is for developers self-hosting.</p>
+      </details>
+      <details>
+        <summary>How do free keys work?</summary>
+        <p>The form on <a href="/pricing#start">Pricing</a> calls the billing free-key API, or run <code>scripts/issue_free_key.py</code> and put the hash in the API key file. The shared demo key in chat is separate, and intentional.</p>
+      </details>
+    </section>
+  </main>
+
+  <div class="footer-cta">
+    <div>
+      <h2>Try it on a username</h2>
+      <p>Chat needs a username before a thread is saved. The shared demo key is already filled in.</p>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/chat">Open chat</a>
+      <a class="btn btn-ghost" href="/pricing">See pricing</a>
+    </div>
+  </div>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/kin">Kin</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/chat">Chat</a>
+      <a href="/credits">Credits</a>
+      <a href="https://github.com/jackyreaps/Resileos-QAI">GitHub</a>
+    </nav>
+    <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
+    <p class="credits">Portraits expand the earlier figures in bronze, marble, and crystal. <a href="/credits">Image credits</a>.</p>
+  </footer>
+
+  <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
+  <script>window.RESILEOS_BILLING = window.RESILEOS_BILLING || "";</script>
+  <script src="/assets/vendor/lenis.min.js"></script>
+  <script src="/assets/site.js"></script>
+</body>
+</html>
