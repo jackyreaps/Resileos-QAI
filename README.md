@@ -151,11 +151,14 @@ uvicorn asgi:app --port 8000 --reload
 
 ## Roadmap
 
-These items are **PLANNED**. None of them are in the tree.
+These three are in the tree. `register_studio_legions` attaches each one to a single Kin.
 
-- A plan/test/debug loop on the Hermes / `SeparatedCycle` path, before Apollo or Hades mark the cycle verified.
-- A graphify ingest legion under Iris and Eat. It would turn external documents into residual triples through the eat/learn path.
-- A Forge video legion wrapping the Higgsfield CLI/MCP or the Seedance API. The path would be draft, then verify, then upscale, behind `risk_classify`.
+- `plan_test_debug` on Hermes. It plans, tests, and debugs before Apollo `verify_on_stop`. Mutating steps (`write_file`, `apply_diff`, `git_commit`) stay refused until that proof. Lower-tier output stays out of the verified step. The HTTP surface does not execute mutating steps.
+- `graphify` on Eat. It turns a graph or text into candidates and runs each through `eat_filter`. `learn` runs only on accept when commit is set.
+- `forge_video` on Hermes, under Hephaestus. Stages are draft, verify, and upscale. A configured provider can return an asset. With no provider the status is `UNAVAILABLE` and no URL is invented. Worker processes are Clotho groups; Atropos stops them before a Hades checkpoint.
+
+Still planned, and not in the tree:
+
 - Optional legions, each gated: browser-use, an impeccable design audit, and Google Workspace.
 
 The candidate status on the query path is also unbuilt. The quantum backend in `docs/500-notes/roadmap.md` stays speculative.

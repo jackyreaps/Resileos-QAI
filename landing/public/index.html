@@ -149,9 +149,9 @@
         <ul class="h-kin">
           <li><strong>Iris</strong><span>Senses, sensors, and log readers</span></li>
           <li><strong>Metis</strong><span>Policy: routers and risk classifiers; output is policy only</span></li>
-          <li><strong>Hermes</strong><span>Navigators and reviewers within budget</span></li>
-          <li><strong>Hades</strong><span>Memory: checkpoint, restore, and lesson notes</span></li>
-          <li><strong>Apollo</strong><span>Verification gate</span></li>
+          <li><strong>Hermes</strong><span>Paths and dispatch</span></li>
+          <li><strong>Hades</strong><span>Lessons and checkpoints. Not Studio.</span></li>
+          <li><strong>Apollo</strong><span>Proof</span></li>
           <li><strong>Athena</strong><span>Judgment: fail-closed when Apollo does not succeed</span></li>
           <li><strong>Eat / perception</strong><span>Ingest gated before residual writes</span></li>
         </ul>
@@ -165,11 +165,11 @@
         </ul>
         <p class="h-label">Legions <span class="pending">BETA</span></p>
         <p class="h-note">Bounded tools registered under one Kin via <code>register_legion</code>. They inherit that Kin's constraints. Example legions are optional and off by default.</p>
-        <p class="h-label">Future legions <span class="pending">PLANNED · NOT SHIPPED</span></p>
+        <p class="h-label">Studio legions <span class="pending">BETA</span></p>
         <ul class="h-plan">
-          <li><strong>Superpowers loop</strong> <span>A plan / test / debug loop on Hermes and SeparatedCycle. Not shipped.</span></li>
-          <li><strong>Graphify</strong> <span>Document-to-triples ingest under Iris and Eat. Not shipped.</span></li>
-          <li><strong>Forge</strong> <span>A video legion that would draft, then verify, then upscale, for Higgsfield / Seedance. Not shipped.</span></li>
+          <li><strong>Plan / test / debug</strong> <span>Hermes dispatches the loop. Mutating steps stay refused until Apollo proof. Lower-tier output stays out of the verified step.</span></li>
+          <li><strong>Graphify</strong> <span>Ingest through Eat: accept, reject, or abstain. Learn only on accept when commit is set.</span></li>
+          <li><strong>Forge</strong> <span>Hephaestus patronage. A video legion on Hermes. A configured provider can draft. Otherwise the status is UNAVAILABLE and no URL is invented.</span></li>
         </ul>
       </div>
     </div>
@@ -252,17 +252,17 @@
         <div class="card">
           <span class="badge badge-soon">BETA</span>
           <h3>Hermes</h3>
-          <p>Navigators, separated-cycle reviewers, and blind verifiers, under Hermes. They see the artefact and the lesson, not full history.</p>
+          <p>Paths and dispatch. Navigators and separated-cycle reviewers see the artefact and the lesson, not full history.</p>
         </div>
         <div class="card">
           <span class="badge badge-soon">BETA</span>
           <h3>Hades</h3>
-          <p>Save, restore, fresh-context seeds, and equal-budget baselines, under Hades. They cannot carry history or scars into a restored packet.</p>
+          <p>Lessons and checkpoints. Save and restore do not carry history or scars into a fresh packet. Hades is not Studio.</p>
         </div>
         <div class="card">
           <span class="badge badge-soon">BETA</span>
           <h3>Apollo</h3>
-          <p>Outer verification and cleanup checks, under Apollo. Only Apollo can mark verified, and only when <code>verify_on_stop</code> passes.</p>
+          <p>Proof. Only Apollo can mark verified, and only when <code>verify_on_stop</code> passes.</p>
         </div>
         <div class="card">
           <span class="badge badge-soon">BETA</span>

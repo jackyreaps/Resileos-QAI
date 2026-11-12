@@ -330,6 +330,79 @@ def checkpoint_allowed(owner: str, *, residual_consistent: bool) -> tuple[bool, 
     return True, "no stop requested"
 
 
+def reserve_spawner(owner: str, name: str) -> str:
+    """Record a process-group slot for one attempt. Idle until a pid is known."""
+    handle = f"{owner}:{name}"
+    desk = get_coordination()
+    if handle not in desk.clotho.threads:
+        desk.clotho.spin(owner, handle_id=handle)
+    return handle
+
+
+def note_worker(owner: str, name: str, produced: Any) -> str | None:
+    """Attach a live process group to an attempt.
+
+    A result with no pid and no live flag is ignored. The current process
+    group is never recorded.
+    """
+    if not isinstance(produced, dict):
+        return None
+    raw_pgid = produced.get("pgid")
+    alive = bool(produced.get("process_alive"))
+    parsed: int | None = None
+    if raw_pgid is not None:
+        try:
+            parsed = int(raw_pgid)
+        except (TypeError, ValueError):
+            parsed = None
+        if parsed is not None and (parsed <= 1 or parsed == os.getpgrp()):
+            parsed = None
+    if parsed is None and not alive:
+        return None
+    handle = reserve_spawner(owner, name)
+    thread = get_coordination().clotho.threads[handle]
+    thread.pgid = parsed
+    thread.manual_exit = parsed is None
+    thread.exited = False
+    thread.stop_requested = False
+    return handle
+
+
+def stop_owner(owner: str) -> dict[str, Any]:
+    """Cut one owner's group. Drop the record only once it is fully stopped.
+
+    A second cut must not revive a group that has already exited. Calling
+    this while members are still alive leaves the stop requested.
+    """
+    desk = get_coordination()
+    threads = desk.clotho.owned(owner)
+    handles = [thread.handle_id for thread in threads]
+    if not threads and desk.atropos.stops.get(owner) != "cut":
+        return {
+            "state": "running",
+            "stop_requested": False,
+            "fully_stopped": False,
+            "owned": 0,
+            "handles": [],
+        }
+    if desk.atropos.state(owner) == "fully_stopped":
+        report = {
+            "state": "fully_stopped",
+            "stop_requested": True,
+            "fully_stopped": True,
+            "owned": len(threads),
+            "handles": handles,
+        }
+    else:
+        report = desk.atropos.cut(owner)
+        report["handles"] = handles
+    if report.get("fully_stopped"):
+        for thread in list(desk.clotho.owned(owner)):
+            desk.clotho.threads.pop(thread.handle_id, None)
+        desk.atropos.stops.pop(owner, None)
+    return report
+
+
 __all__ = [
     "OVERLAP_THRESHOLD",
     "Atropos",
@@ -342,7 +415,10 @@ __all__ = [
     "cut_owned",
     "get_coordination",
     "hash_prefix_ratio",
+    "note_worker",
     "overlap_score",
     "packet_prefix_ratio",
+    "reserve_spawner",
     "reset_coordination",
+    "stop_owner",
 ]

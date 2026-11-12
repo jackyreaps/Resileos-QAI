@@ -43,6 +43,13 @@ def demigod_duty(name: str) -> Iterator[str]:
         _active.reset(token)
 
 
+def promote_temporary(*_args: Any, **_kwargs: Any) -> None:
+    """A temporary swarm member cannot become a permanent legion."""
+    raise DemigodHierarchyError(
+        "a demigod cannot promote a temporary legion to permanent status"
+    )
+
+
 def refuse_learn(*_args: Any, **_kwargs: Any) -> None:
     """The learn entry a Demi-god can see. It always refuses."""
     raise DemigodHierarchyError("a demigod cannot call learn")

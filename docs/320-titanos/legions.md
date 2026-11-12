@@ -17,10 +17,10 @@ Legions serve under Kin. Kin serve under the residual core. A legion cannot take
 |---|---|---|---|
 | Iris | Observation metrics, flags | Sensors, log readers, capacity probes | Write residual state |
 | Metis | Policy rules, disable lists, mouth policy | Decision routers, risk classifiers, guide loaders | Execute. Output is policy only |
-| Hermes | Budget, depth, item limits | Navigators, separated-cycle reviewers, blind verifiers | See full history. They get the artefact and the lesson |
-| Hades | Checkpoint store, lesson, restart policy | Save, restore, fresh-context seeds, equal-budget baselines | Carry history or scars into the fresh packet |
-| Apollo | Success criteria, residual consistency | Outer verification and cleanup checks | Mark `verified` unless `verify_on_stop` passes |
-| Eat / Perception | Ingest filters, `learn_fn` | Structured ingest and perception helpers | Write the residual store before the risk and budget gates |
+| Hermes | Budget, depth, item limits. Paths and dispatch | Navigators, separated-cycle reviewers, Forge video, plan/test/debug | See full history. They get the artefact and the lesson |
+| Hades | Lessons and checkpoints. Not Studio | Save, restore, fresh-context seeds, equal-budget baselines | Carry history or scars into the fresh packet |
+| Apollo | Proof: success criteria, residual consistency | Outer verification and cleanup checks | Mark `verified` unless `verify_on_stop` passes |
+| Eat / Perception | Ingest filters, `learn_fn`. The public name stays Eat | Structured ingest, including graphify | Write the residual store before the risk and budget gates |
 
 `perception` is an alias of `eat`.
 
@@ -34,6 +34,16 @@ Legions serve under Kin. Kin serve under the residual core. A legion cannot take
 - Hermes and Apollo `action_placeholder` do not execute code. `risk_classify` still denies a hard-deny action. Only Apollo can set `verified`, and only through `verify_on_stop`.
 
 This layer does not use LangChain, AutoGen, crewAI, or MetaGPT.
+
+## Studio legions
+
+`register_studio_legions` registers three tools. Each stays on one Kin.
+
+- Hermes `forge_video` is the Forge video legion. Hephaestus is the Studio patron and is not a Kin, so the gate is Hermes. A configured provider can draft, verify, or upscale. With no provider the status is `UNAVAILABLE` and no URL is invented. A worker process is a Clotho group.
+- Eat `graphify` turns a graph or source into candidates and runs each through `eat_filter`. `learn` runs only for an accept when commit is set. Reject and abstain do not write.
+- Hermes `plan_test_debug` plans, tests, and debugs. A repeated failure stops the loop. Lower-tier output stays out of the verified step. `write_file`, `apply_diff`, and `git_commit` stay refused until `verify_on_stop` passes. The HTTP route does not execute them.
+
+A Demi-god uses one of these only by naming it in the temporary swarm for its parent Kin.
 
 ## Code
 

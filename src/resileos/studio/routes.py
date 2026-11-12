@@ -1,7 +1,8 @@
 """HTTP wrappers for the studio coding layer.
 
 Each route validates its body, requires the API-key dependency, and calls
-the module function it is named for. Nothing here calls ``learn``.
+the module function it is named for. Codec and sampler routes do not call
+``learn``. Graphify calls ``learn`` only for an Eat accept when commit is set.
 
 ``render_residual_codec`` is a Streamlit renderer. ``GET /panel`` returns
 the data that renderer shows. The gear drawer in ``ui.py`` calls the
@@ -71,6 +72,30 @@ class ExternalBody(BaseModel):
     store_candidate: bool = Field(default=True, alias="register")
 
 
+class ForgeBody(BaseModel):
+    prompt: str = Field(default="", max_length=2000)
+    stage: str = "draft"
+
+
+class GraphifyBody(BaseModel):
+    source: dict[str, Any] | list[Any] | str = ""
+    commit: bool = False
+
+
+class PlanStep(BaseModel):
+    tool: str = Field(min_length=1, max_length=64)
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlanBody(BaseModel):
+    goal: str = Field(min_length=1, max_length=2000)
+    steps: list[PlanStep] | None = None
+
+
+class StopBody(BaseModel):
+    owner: str = Field(min_length=1, max_length=200)
+
+
 def _image(data: list[Any]) -> Any:
     import numpy as np
 
@@ -87,7 +112,11 @@ def _sampler_enabled() -> bool:
     return bool(resolve_external_sampler().enabled)
 
 
-def register_studio_routes(app: FastAPI, auth_dep: Any) -> None:
+def register_studio_routes(
+    app: FastAPI,
+    auth_dep: Any,
+    get_titanos: Any = None,
+) -> None:
     deps = [Depends(auth_dep)]
 
     @app.get("/api/v1/studio/codecs", dependencies=deps)
@@ -204,3 +233,50 @@ def register_studio_routes(app: FastAPI, auth_dep: Any) -> None:
         payload["refused"] = False
         payload["risk"] = risk
         return payload
+
+    @app.post("/api/v1/studio/forge/video", dependencies=deps)
+    def studio_forge_video(body: ForgeBody) -> dict[str, Any]:
+        from resileos.kin.legions import LegionError
+        from resileos.kin.studio_tools import run_forge_video
+
+        stage = body.stage if body.stage in {"draft", "verify", "upscale"} else body.stage
+        try:
+            return to_jsonable(run_forge_video(body.prompt, stage=stage))
+        except LegionError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/v1/studio/graphify", dependencies=deps)
+    def studio_graphify(body: GraphifyBody) -> dict[str, Any]:
+        from resileos.kin.legions import LegionError
+        from resileos.kin.studio_tools import run_graphify
+
+        learn = None
+        if body.commit and get_titanos is not None:
+            titan = get_titanos()
+
+            def learn(subject: str, relation: str, obj: str) -> None:
+                titan.learn(subject, relation, obj)
+
+        try:
+            return to_jsonable(run_graphify(body.source, commit=body.commit, learn_fn=learn))
+        except LegionError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/v1/studio/plan-test-debug", dependencies=deps)
+    def studio_plan_test_debug(body: PlanBody) -> dict[str, Any]:
+        from resileos.kin.legions import LegionError
+        from resileos.kin.studio_tools import run_plan_loop
+
+        if body.steps is not None and len(body.steps) > 12:
+            raise HTTPException(400, "at most 12 steps")
+        steps = None if body.steps is None else [step.model_dump() for step in body.steps]
+        try:
+            return to_jsonable(run_plan_loop(body.goal, steps=steps))
+        except LegionError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/v1/studio/stop", dependencies=deps)
+    def studio_stop(body: StopBody) -> dict[str, Any]:
+        from resileos.kin.moirai import stop_owner
+
+        return to_jsonable(stop_owner(body.owner))
