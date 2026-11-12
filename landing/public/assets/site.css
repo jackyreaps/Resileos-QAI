@@ -784,10 +784,12 @@ section > .meander, .inner > .meander { margin: 0 0 28px; }
 .demi-card img { width: 100%; height: 100%; object-fit: cover; object-position: center 16%; display: block; }
 .demi-card .badge, .demi-card h3, .demi-card p { margin-left: 14px; margin-right: 14px; }
 .demi-card h3 { margin-top: 0; }
-@media (max-width: 980px) { .demi-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 620px) { .demi-grid { grid-template-columns: 1fr 1fr; } }
+#moirai .demi-grid { grid-template-columns: repeat(4, 1fr); }
+#aphrodite-legions .demi-grid { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 980px) { .demi-grid, #moirai .demi-grid, #aphrodite-legions .demi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 620px) { .demi-grid, #moirai .demi-grid, #aphrodite-legions .demi-grid { grid-template-columns: 1fr 1fr; } }
 
-#pantheon, #kin, #demi-gods { scroll-margin-top: 84px; }
+#pantheon, #kin, #demi-gods, #moirai, #aphrodite-legions { scroll-margin-top: 84px; }
 section { padding: 88px 22px; }
 section.alt .inner { padding: 88px 22px; }
 

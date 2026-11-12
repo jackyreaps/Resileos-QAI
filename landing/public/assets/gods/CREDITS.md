@@ -4,10 +4,11 @@ The public page for this note is [/credits](/credits).
 
 The landing page feathers each portrait with a CSS mask and a shared
 edge vignette so the crops blend into the page ground (`#06080e`). The
-files in this folder are AI-generated. In November 2026 the series was
-restyled as polished chrome and dark metal. Circuit noise, floating
-glyphs, watermarks, and voxel dust were removed. The mask is presentation,
-not a new source.
+files in this folder are AI-generated. In November 2026 the named figures
+were expanded from the earlier portraits: bronze, marble catching metal,
+gold accents, and restrained crystal traces. Not one chrome coating, and
+not a flat museum cast. Floating glyphs, watermarks, and voxel dust were
+removed. The mask is presentation, not a new source.
 
 Short loops in `../motion/` are a light sweep across the Zeus and Titanos
 stills. They are site craft. They are not videos from the engine. A later
@@ -17,8 +18,8 @@ Nothing is shipped until that file exists.
 ## Site portraits (AI-generated)
 
 Every portrait the landing page serves as a `*.webp` file in this folder was
-generated for Resileos in November 2026 and then restyled in the same month
-as museum-style chrome. They sit on a deep dark ground. No names, captions,
+generated for Resileos in November 2026 and then expanded from the earlier
+named figures. They sit on a deep dark ground. No names, captions,
 or other readable words were added inside the images. A thorn-crowned bust
 is not used, and is not labeled as Zeus or any other Greek figure.
 
@@ -29,19 +30,29 @@ the public deploy.
 
 | File | Figure | Generation | Sculpture reference |
 |------|--------|------------|---------------------|
-| `zeus.webp` | Zeus | AI-generated chrome | Met 257864, CC0 |
-| `apollo.webp` | Apollo | AI-generated chrome | Met 255057, CC0 |
-| `hades.webp` | Hades (Serapis type) | AI-generated chrome | Vatican inv. 689, public domain |
-| `iris.webp` | Iris | AI-generated chrome | Parthenon / British Museum, public domain |
-| `hermes.webp` | Hermes | AI-generated chrome | Met 254925, CC0 |
-| `athena.webp` | Athena | AI-generated chrome | Met 251476, CC0 |
-| `themis.webp` | Themis | AI-generated chrome | NAMA 231, CC0 |
-| `nike.webp` | Nike | AI-generated chrome | Met 247495, CC0 |
-| `atlas.webp` | Atlas | AI-generated chrome | Farnese Atlas, Naples, CC0 |
-| `metis.webp` | Metis | AI-generated chrome (no sculpture reference) | — |
-| `momus.webp` | Momus | AI-generated chrome (no sculpture reference) | — |
-| `hephaestus.webp` | Hephaestus | AI-generated chrome (no sculpture reference) | — |
-| `titanos.webp` | Titanos | AI-generated chrome figurehead (no single sculpture) | — |
+| `zeus.webp` | Zeus | Expanded from the earlier portrait | Met 257864, CC0 |
+| `apollo.webp` | Apollo | Expanded from the earlier portrait | Met 255057, CC0 |
+| `hades.webp` | Hades (Serapis type) | Expanded from the earlier portrait | Vatican inv. 689, public domain |
+| `iris.webp` | Iris | Expanded from the earlier portrait | Parthenon / British Museum, public domain |
+| `hermes.webp` | Hermes | Expanded from the earlier portrait | Met 254925, CC0 |
+| `athena.webp` | Athena | Expanded from the earlier portrait | Met 251476, CC0 |
+| `themis.webp` | Themis | Expanded from the earlier portrait | NAMA 231, CC0 |
+| `nike.webp` | Nike | Expanded from the earlier portrait | Met 247495, CC0 |
+| `atlas.webp` | Atlas | Expanded from the earlier portrait | Farnese Atlas, Naples, CC0 |
+| `metis.webp` | Metis | Invented, no sculpture reference | — |
+| `momus.webp` | Momus | Invented, no sculpture reference | — |
+| `hephaestus.webp` | Hephaestus | Invented, no sculpture reference | — |
+| `titanos.webp` | Titanos | Invented figurehead, no single sculpture | — |
+| `aphrodite.webp` | Aphrodite | Invented, no sculpture reference | — |
+| `psyche.webp` | Psyche | Invented, no sculpture reference | — |
+| `eat.webp` | Eat | Invented, no sculpture reference. Not Cerberus. | — |
+| `clotho.webp` | Clotho | Invented, no sculpture reference | — |
+| `lachesis.webp` | Lachesis | Invented, no sculpture reference | — |
+| `atropos.webp` | Atropos | Invented, no sculpture reference | — |
+| `harmonia.webp` | Harmonia | Invented, no sculpture reference | — |
+| `calliope.webp` | Calliope | Invented, no sculpture reference | — |
+| `ligeia.webp` | Ligeia | Invented, no sculpture reference | — |
+| `echo.webp` | Echo | Invented, no sculpture reference | — |
 
 Metis, Momus, and Hephaestus had no suitable public-domain sculpture photograph
 in this set, so those three portraits are invented in the same series style.

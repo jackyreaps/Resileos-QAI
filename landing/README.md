@@ -18,7 +18,7 @@ public/kin.html             patrons, Kin, Demi-gods     → /kin
 public/pricing.html         plans and the free-key form → /pricing
 public/credits.html         portrait credits            → /credits
 public/chat.html            product chat                → /chat
-public/assets/gods/         AI chrome portraits
+public/assets/gods/         expanded portraits (bronze, marble, crystal)
 public/assets/motion/       short decorative light sweeps
 public/assets/fonts/        Instrument Serif, Inter, JetBrains Mono
 public/assets/vendor/       vendored Lenis
