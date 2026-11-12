@@ -90,14 +90,14 @@ def test_no_coupling_theta_advances_at_omega():
 
 
 def test_coupling_increases_order_parameter():
-    """From random start, high coupling should drive R up over time."""
-    rng = np.random.default_rng(0)
-    f = KuramotoField(R, kappa=10.0, alpha=1e-3, dt=0.05,
+    """From a random start, coupling raises the order parameter."""
+    f = KuramotoField(R, kappa=1.0, alpha=1e-3, dt=0.01,
                       random_start=True, seed=0)
     W = np.ones((R, R)) - np.eye(R)
     R0 = f.order_parameter()
     for _ in range(200):
-        f.step(epsilon=0.01, W=W, dt=0.05)   # small epsilon -> strong coupling
+        # One RK4 update stays under a radian at this gain.
+        f.step(epsilon=0.05, W=W, dt=0.01)
     R1 = f.order_parameter()
     assert R1 > R0, f"R did not increase: {R0} -> {R1}"
 
