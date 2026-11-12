@@ -548,7 +548,7 @@
         <div class="card">
           <span class="badge badge-soon">BETA</span>
           <h3>Harness / Kin</h3>
-          <p>Control packet (confidence, risk, budget, evidence, scars) and a separated write path: Zeus learns only if all reviewers approve. Verification fails closed. Hades checkpoints. Cascade and fan-out routing are still stubs, and the budget is not persisted.</p>
+          <p>Control packet (confidence, risk, budget, evidence, scars) and a separated write path: Zeus learns only if all reviewers approve. Verification fails closed. Hades checkpoints. Fan-out scores an option only when it overlaps residual rows, and abstains otherwise. The cascade route runs that residual check. The budget is not persisted.</p>
         </div>
         <div class="card">
           <span class="badge badge-soon">BETA</span>
@@ -782,7 +782,7 @@ curl -sS -X POST "$BASE/learn" \
         <div class="card">
           <span class="badge badge-soon">NEXT</span>
           <h3>Kin cycle as hub UX</h3>
-          <p>Routes exist; hub-native product surface still next. Cascade and fan-out routing are still stubs.</p>
+          <p>Routes exist; hub-native product surface still next. Fan-out and the cascade route follow residual rows and abstain when none match. The budget is not persisted.</p>
         </div>
         <div class="card">
           <span class="badge badge-soon">NEXT</span>
