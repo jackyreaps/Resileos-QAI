@@ -40,3 +40,7 @@ Accuracy delta (hierarchy minus residual): 0.0. False-accept delta: 0.
 On this fixture the hierarchy buys nothing. Both paths are correct, and both refuse the six cases that should abstain. The hierarchy spends the shared budget: 6 steps against 1, and about 120 times the mean latency on this machine. Latency will move from run to run. The step counts will not, unless the path changes.
 
 This is not a claim about prose, planning, or tasks where a second check can catch a bad artefact. Here the artefact is the lookup. Momus is agreeing with that lookup, not with a second source. A tighter budget than 6 steps would stop the hierarchy before Hades and force an abstain, which would lower its accuracy. That case was not the recorded run. Budget 0 does abstain on both paths; the unit test covers it.
+
+## Rerun, 2026-11-12
+
+Same 22 tasks and budget 8, on a cursor cloud agent VM. Both paths were again 22/22 with 0 false accepts. Mean steps stayed 1.0 and 6.0. Mean latency on that VM was 0.388 ms and 32.821 ms. The hierarchy cycle reported residual consistency true on 22/22 and `verified` true on 0/22. The harness reason on every cycle was `no evidence attached`. The call does not pass a residual packet, and `kin_cycle` requires evidence before `verified` is true. False accepts stayed 0. Artifact: `landing/artifacts/report_equal_budget_2026-11-12.json`. The 2026-11-10 table above is a different machine.

@@ -167,9 +167,14 @@ def main() -> int:
     ref = _reference_corpus_m9(titan, facts, as_of_list)
     synth = _synthetic_overlap_m9(titan, as_of_list)
 
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from bench.measure_meta import environment, utc_now
+
     report = {
         "probe": "temporal_conflict",
         "metric": "M9",
+        "measured_at": utc_now(),
+        "environment": environment(),
         "corpus": str(facts_path),
         "n_facts": len(facts),
         "reference": ref,

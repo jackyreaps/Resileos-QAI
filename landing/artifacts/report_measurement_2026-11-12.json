@@ -1,0 +1,155 @@
+{
+  "measured_at": "2026-11-12T22:26:58Z",
+  "environment": {
+    "label": "cursor cloud agent VM",
+    "system": "Linux",
+    "release": "6.12.113+",
+    "machine": "x86_64",
+    "python": "3.12.3",
+    "cpu_count": 4,
+    "cpu_model": "Intel(R) Xeon(R) Processor",
+    "note": "Numbers in this file were measured in this process on this VM. They are not a hosted API sample and not a claim about another machine."
+  },
+  "scope": "Exact recall, abstention, residual consistency under the equal-budget hierarchy path, temporal conflict, and in-process ask/chain latency. Not generation, coding, or general reasoning.",
+  "artifacts": {
+    "memory_vs_llm": "landing/artifacts/report_memory_vs_llm_2026-11-12.json",
+    "equal_budget": "landing/artifacts/report_equal_budget_2026-11-12.json",
+    "temporal_probe": "landing/artifacts/report_temporal_probe_2026-11-12.json",
+    "compositional": "landing/artifacts/report_compositional_2026-11-12.json",
+    "latency_m5": "landing/artifacts/report_latency_m5_2026-11-12.json",
+    "mouth_leak": "landing/artifacts/report_mouth_leak_2026-11-12.json"
+  },
+  "runs": {
+    "memory_vs_llm": {
+      "exit_code": 0
+    },
+    "equal_budget": {
+      "exit_code": 0
+    },
+    "temporal_probe": {
+      "exit_code": 0
+    },
+    "compositional": {
+      "exit_code": 0
+    },
+    "latency_m5": {
+      "exit_code": 0
+    },
+    "mouth_leak": {
+      "exit_code": 0
+    }
+  },
+  "memory_vs_llm": {
+    "backend": "titanos",
+    "exact_match_rate": 1.0,
+    "invent_rate": 0.0,
+    "abstain_rate": 1.0,
+    "n_known": 3,
+    "n_unknown": 12,
+    "p50_latency_ms_known": 111.77061900002627,
+    "mean_latency_ms_known": 115.58511166663266,
+    "llm_status": "skipped",
+    "llm_exact_match_rate": null,
+    "llm_invent_rate": null,
+    "llm_reason": "LLM leg skipped: BENCH_LLM_URL and BENCH_LLM_KEY unset"
+  },
+  "equal_budget": {
+    "n_tasks": 22,
+    "budget_steps": 8,
+    "residual_false_accepts": 0,
+    "hierarchy_false_accepts": 0,
+    "residual_accuracy": 1.0,
+    "hierarchy_accuracy": 1.0,
+    "hierarchy_cycle_consistent": 22,
+    "hierarchy_cycle_observed": 22,
+    "hierarchy_cycle_verified": 0,
+    "hierarchy_cycle_reasons": {
+      "no evidence attached": 22
+    }
+  },
+  "temporal": {
+    "pass": true,
+    "reference_m9": 0.0,
+    "reference_conflicts": 0,
+    "reference_checks": 141,
+    "synthetic_pass": true,
+    "overlap_detected": 2,
+    "non_overlap_singular": 2
+  },
+  "composition": {
+    "transport": "in-process Titanos.ask / ask_inverse / chain",
+    "http_status": "skipped",
+    "composition_rate": 1.0,
+    "hits": 3,
+    "total": 3,
+    "http_server_listening": false
+  },
+  "m5_latency": {
+    "transport": "in-process Titanos.ask and Titanos.chain",
+    "ask": {
+      "n": 100,
+      "p50_ms": 164.29300850006712,
+      "p95_ms": 254.5748292999974,
+      "p99_ms": 280.9854760601208,
+      "min_ms": 134.70412499987106,
+      "max_ms": 307.5329260000217,
+      "mean_ms": 171.59828085998925,
+      "percentile_method": "linear interpolation between nearest ranks on the sorted sample; p50 of 100 values is the midpoint of sorted indexes 49 and 50",
+      "exact_accepts": 100,
+      "exact_rate": 1.0,
+      "distinct_queries": 66,
+      "p50_ms_exact_only": 164.29300850006712,
+      "p95_ms_exact_only": 254.5748292999974,
+      "p95_under_500ms": true
+    },
+    "chain": {
+      "n": 100,
+      "p50_ms": 495.6920715000024,
+      "p95_ms": 543.9713666001694,
+      "p99_ms": 644.0478075401211,
+      "min_ms": 277.4730369999361,
+      "max_ms": 644.7397720000936,
+      "mean_ms": 469.66889222000873,
+      "percentile_method": "linear interpolation between nearest ranks on the sorted sample; p50 of 100 values is the midpoint of sorted indexes 49 and 50",
+      "exact_accepts": 100,
+      "exact_rate": 1.0,
+      "distinct_queries": 41,
+      "p50_ms_exact_only": 495.6920715000024,
+      "p95_ms_exact_only": 543.9713666001694,
+      "p95_under_500ms": false
+    }
+  },
+  "m7_mouth_leak": {
+    "leak_count": 0,
+    "target_leak_count": 0,
+    "require_verified_default": true,
+    "spoken_text_when_unverified": 1704,
+    "factual_prose_when_unverified": 0,
+    "writer_token_in_text_when_unverified": 0,
+    "preference_echo_when_unverified": 480
+  },
+  "skipped": [
+    {
+      "name": "M6 5k-fact corpus",
+      "reason": "Skipped. scripts/generate_scaled_facts.py can build a deterministic corpus, but this run does not generate or commit a 5k-fact fixture and does not seed it into Titanos. M6 is unmeasured."
+    },
+    {
+      "name": "composition HTTP",
+      "reason": "The HTTP compositional script was not aimed at a live server. RESILEOS_BASE_URL was not accepting connections. The in-process Titanos leg is the recorded composition sample."
+    },
+    {
+      "name": "M5 HTTP",
+      "reason": "p50/p95 are in-process method calls, not HTTP requests. No API server was started."
+    },
+    {
+      "name": "LLM baseline",
+      "reason": "LLM leg skipped: BENCH_LLM_URL and BENCH_LLM_KEY unset"
+    }
+  ],
+  "not_claimed": [
+    "generation quality",
+    "fluent coding",
+    "general reasoning",
+    "superiority to an LLM on any unmeasured dimension"
+  ]
+}

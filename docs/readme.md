@@ -94,6 +94,7 @@ Harness and current product surface (code on main; some numbered docs above stil
 - [Studio residual codec study](studio/research.md) — STUDIO-001
 - [External samplers and the MiniMax-H3-Image license](studio/external-samplers.md) — STUDIO-002
 - [Exact memory bench](benchmarks/memory-vs-llm.md), [chain composition](benchmarks/compositional-generalization.md), [invention bench](benchmarks/invention-without-hallucination.md) — 2026-11-10 runs; no model key was set
+- [Measurement sample, 2026-11-12](benchmarks/measurement-2026-11-12.md) — exact recall, abstention, composition, equal budget, temporal conflict, in-process latency, mouth-policy leak count. No model was called. Chain p95 on that VM was above 500 ms.
 
 Reference:
 52. [Glossary](900-reference/glossary.md) — RES-900
@@ -134,7 +135,7 @@ Reference:
 | Doc | Module | Status | Notes |
 |---|---|---|---|
 | RES-330 | `capacity-contract.md` | proposed | Capacity rules C0–C8; metrics M1–M9 |
-| RES-331 | `capacity-results.md` | stable | M1–M4 pass on 2026-11-03. The note still marks M5–M9 deferred. `scripts/run_temporal_probe.py` on this tree reports reference M9 0/141 and synthetic overlap 2/2. |
+| RES-331 | `capacity-results.md` | stable | M1–M4 pass on 2026-11-03. A 2026-11-12 sample measured M5, M7, and M9 (chain p95 on that VM was above 500 ms). M6 and M8 were not measured. Reference M9 on that sample was 0/141. |
 | RES-401 | `phi-compress-redesign.md` | draft | Golden-ladder contraction under R-gating |
 
 ## 600-series QD-TER bridge

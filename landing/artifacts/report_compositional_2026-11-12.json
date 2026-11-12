@@ -1,0 +1,161 @@
+{
+  "generated_at": "2026-11-12T22:25:49Z",
+  "measured_at": "2026-11-12T22:25:49Z",
+  "environment": {
+    "label": "cursor cloud agent VM",
+    "system": "Linux",
+    "release": "6.12.113+",
+    "machine": "x86_64",
+    "python": "3.12.3",
+    "cpu_count": 4,
+    "cpu_model": "Intel(R) Xeon(R) Processor",
+    "note": "Numbers in this file were measured in this process on this VM. They are not a hosted API sample and not a claim about another machine."
+  },
+  "base_facts": [
+    [
+      "alice",
+      "parent_of",
+      "bob"
+    ],
+    [
+      "bob",
+      "parent_of",
+      "carol"
+    ],
+    [
+      "dave",
+      "parent_of",
+      "eve"
+    ],
+    [
+      "alice",
+      "works_at",
+      "acme"
+    ],
+    [
+      "bob",
+      "works_at",
+      "globex"
+    ]
+  ],
+  "compositions": [
+    {
+      "kind": "chain",
+      "start": "alice",
+      "relations": [
+        "parent_of",
+        "parent_of"
+      ],
+      "expected": "carol",
+      "question": "Who is alice's grandchild?",
+      "note": "forward 2-hop: alice -> bob -> carol",
+      "optional": false
+    },
+    {
+      "kind": "compose",
+      "start": "carol",
+      "steps": [
+        {
+          "subject": "carol",
+          "relation": "parent_of",
+          "inverse": true
+        },
+        {
+          "subject": "@prev",
+          "relation": "parent_of",
+          "inverse": true
+        }
+      ],
+      "expected": "alice",
+      "question": "Who is carol's grandparent?",
+      "note": "inverse 2-hop: carol <- bob <- alice",
+      "optional": false
+    },
+    {
+      "kind": "compose",
+      "start": "carol",
+      "steps": [
+        {
+          "subject": "carol",
+          "relation": "parent_of",
+          "inverse": true
+        },
+        {
+          "subject": "@prev",
+          "relation": "works_at",
+          "inverse": false
+        }
+      ],
+      "expected": "globex",
+      "question": "Where does carol's parent work?",
+      "note": "inverse then forward: carol <- bob -> globex",
+      "optional": false
+    }
+  ],
+  "http": {
+    "status": "skipped",
+    "reason": "--in-process set; no HTTP server was called"
+  },
+  "resileos": {
+    "transport": "in-process Titanos.ask / ask_inverse / chain",
+    "backend": "titanos",
+    "config": "Titanos(TitanosConfig())",
+    "composition_rate": 1.0,
+    "hits": 3,
+    "total": 3,
+    "results": [
+      {
+        "kind": "chain",
+        "question": "Who is alice's grandchild?",
+        "expected": "carol",
+        "got": "carol",
+        "ok": true,
+        "latency_ms": 240.2,
+        "note": "forward 2-hop: alice -> bob -> carol",
+        "error": null
+      },
+      {
+        "kind": "compose",
+        "question": "Who is carol's grandparent?",
+        "expected": "alice",
+        "got": "alice",
+        "ok": true,
+        "latency_ms": 222.5,
+        "note": "inverse 2-hop: carol <- bob <- alice",
+        "error": null
+      },
+      {
+        "kind": "compose",
+        "question": "Where does carol's parent work?",
+        "expected": "globex",
+        "got": "globex",
+        "ok": true,
+        "latency_ms": 222.5,
+        "note": "inverse then forward: carol <- bob -> globex",
+        "error": null
+      }
+    ]
+  },
+  "llm": null,
+  "llm_note": "LLM leg not called on the in-process path",
+  "scale": {
+    "address": {
+      "belt": 0,
+      "frame": 0,
+      "residual_bin": "r00_s0",
+      "mean_luma": 0.0,
+      "edge_density": 0.0,
+      "debt": 1.0,
+      "note": "Scaffold address. Replace residual_bin with suite residual when coded."
+    },
+    "gate": {
+      "triple": {
+        "subject": "result",
+        "relation": "residual_address",
+        "obj": "belt0_frame0_r00_s0"
+      },
+      "debt": 1,
+      "frame": "abstained"
+    }
+  }
+}
