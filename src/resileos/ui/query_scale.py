@@ -30,7 +30,11 @@ def to_jsonable(obj: Any) -> Any:
 
 def with_scale(response: dict[str, Any], subject: str, relation: str) -> dict[str, Any]:
     shared = get_shared()
-    addr = scale_address(np.zeros((8, 8, 3), dtype=np.uint8), subject=subject)
+    addr = scale_address(
+        np.zeros((8, 8, 3), dtype=np.uint8),
+        subject=subject,
+        step_core=False,
+    )
     response["scale"] = {
         "address": addr["embed"],
         "gate": addr["gate"],

@@ -7,13 +7,15 @@ generator: the control packet stores only layer 0's factors and no
 per-layer scale, so a packet alone cannot rebuild the matrix, and
 nothing in the core samples pixels from a prompt.
 
-``encode_frame`` runs that stack. ``decode_frame`` sums the same
-layers the core produced. The reconstruction error is
-mean((W - decode)^2) on the grayscale projection, not on the
-original pixel grid.
+``encode_frame`` runs that stack and does not call ``ResidualCore.step``,
+so it does not update the scar matrix. ``decode_frame`` sums the same
+layers. The reconstruction error is mean((W - decode)^2) on the
+grayscale projection, not on the original pixel grid. It is not a
+photograph score and it is not a video score.
 """
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 import numpy as np
@@ -56,6 +58,17 @@ def residual_bin(relative_mse: float) -> str:
     return f"rcore_{band}"
 
 
+def _stack_digest(shape: tuple[int, int], layers: list[tuple[Any, Any, float]]) -> str:
+    """Hash the quantizer stack. This is not a RES-201 packet and has no scar."""
+    hasher = hashlib.sha256()
+    hasher.update(f"{int(shape[0])},{int(shape[1])},{len(layers)}".encode("ascii"))
+    for ub, vb, scale in layers:
+        hasher.update(np.ascontiguousarray(ub, dtype=np.float32).tobytes())
+        hasher.update(np.ascontiguousarray(vb, dtype=np.float32).tobytes())
+        hasher.update(np.float64(scale).tobytes())
+    return hasher.hexdigest()
+
+
 def encode_frame(
     arr: np.ndarray,
     *,
@@ -65,10 +78,11 @@ def encode_frame(
     n_layers: int = 4,
     seed: int = 0,
 ) -> dict[str, Any]:
-    """Project one frame and compress it with ResidualCore.
+    """Project one frame and quantize it with the residual stack.
 
-    ``layers`` is the stack ``_factorize_residual_stack`` produced.
-    ``mse`` compares the projection with ``core.last_reconstruction``.
+    ``layers`` is what ``_factorize_residual_stack`` produced. ``mse``
+    compares the projection with that stack's reconstruction. This does
+    not call ``ResidualCore.step`` and does not update ``Lambda``.
     """
     matrix = project_gray(arr, m, n).astype(np.float32)
     rank_i = max(1, min(int(rank), m, n))
@@ -76,9 +90,8 @@ def encode_frame(
         CoreConfig(m=m, n=n, r=rank_i, n_residual_layers=int(n_layers)),
         seed=int(seed),
     )
-    stack, _ = core._factorize_residual_stack(matrix)
-    packet = core.step(matrix)
-    recon = np.asarray(core.last_reconstruction, dtype=np.float64)
+    stack, recon_hat = core._factorize_residual_stack(matrix)
+    recon = np.asarray(recon_hat, dtype=np.float64)
     mse = float(np.mean((matrix - recon) ** 2))
     energy = float(np.mean(matrix ** 2))
     relative = mse / (energy + 1e-12)
@@ -97,11 +110,13 @@ def encode_frame(
         "mse": mse,
         "relative_mse": relative,
         "residual_bin": residual_bin(relative),
-        "packet_hash": packet.packet_hash,
+        "packet_hash": _stack_digest((m, n), stack),
         "shape": [m, n],
         "rank": rank_i,
         "n_layers": int(n_layers),
         "engine": "ResidualCore",
+        "scar_matrix_updated": False,
+        "learned": False,
     }
 
 
@@ -127,6 +142,8 @@ def codec_summary(encoded: dict[str, Any]) -> dict[str, Any]:
         "shape": list(encoded["shape"]),
         "rank": encoded["rank"],
         "n_layers": encoded["n_layers"],
+        "scar_matrix_updated": False,
+        "learned": False,
     }
 
 
@@ -152,4 +169,6 @@ def encode_clip(frames: np.ndarray, **kwargs: Any) -> dict[str, Any]:
         "residual_bin": residual_bin(rel),
         "frames": codes,
         "engine": "ResidualCore",
+        "scar_matrix_updated": False,
+        "learned": False,
     }

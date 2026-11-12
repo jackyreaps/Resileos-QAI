@@ -28,7 +28,7 @@ def perceive_language(text: str, *, subject: str = "text") -> dict[str, Any]:
         arr = np.resize(arr if arr.size else np.zeros(1), 8)
     frame = arr.reshape(-1, 1)
     frame = np.hstack([frame, frame])
-    addr = scale_address(frame, subject=subject)
+    addr = scale_address(frame, subject=subject, step_core=False)
     return {
         "subject": subject,
         "chars": n,

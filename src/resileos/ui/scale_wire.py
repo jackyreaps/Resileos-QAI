@@ -30,6 +30,7 @@ def task_with_scale(
         frame=0,
         persona=persona,
         subject=goal[:40] or "goal",
+        step_core=False,
     )
     result["scale"] = {
         "address": addr["embed"],
@@ -51,7 +52,14 @@ def perceive_with_scale(
     from resileos.ui.perceive_image import perceive_image
 
     base = perceive_image(arr, subject=subject)
-    addr = scale_address(arr, belt=belt, frame=frame, persona=persona, subject=subject)
+    addr = scale_address(
+        arr,
+        belt=belt,
+        frame=frame,
+        persona=persona,
+        subject=subject,
+        step_core=False,
+    )
     triple = addr.get("triple") or {
         "subject": subject,
         "relation": "residual_address",

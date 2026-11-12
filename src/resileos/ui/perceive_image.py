@@ -21,7 +21,7 @@ def perceive_image(arr: np.ndarray, *, subject: str = "image") -> dict[str, Any]
     image = np.asarray(arr)
     diag = diagnose_image(image)
     coded = encode_frame(image)
-    addr = scale_address(image, subject=subject)
+    addr = scale_address(image, subject=subject, step_core=False)
     embed = dict(addr["embed"])
     embed["residual_bin"] = coded["residual_bin"]
     embed["reconstruction_mse"] = round(coded["mse"], 6)

@@ -114,6 +114,8 @@ def test_frame_codec_round_trip_and_perceive_bin():
     assert factor_mse < 1e-5
     assert coded["mse"] >= 0.0
     assert coded["packet_hash"]
+    assert coded["scar_matrix_updated"] is False
+    assert coded["learned"] is False
     assert coded["residual_bin"].startswith("rcore_")
     perceived = perceive_image(image, subject="photo")
     assert perceived["address"]["residual_bin"] == coded["residual_bin"]

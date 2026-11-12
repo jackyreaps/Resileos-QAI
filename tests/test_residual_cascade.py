@@ -35,6 +35,35 @@ def _ramp() -> np.ndarray:
     return np.linspace(0.0, 1.0, 64, dtype=np.float64).reshape(8, 8)
 
 
+def test_visual_quantizer_does_not_step_or_update_scars(monkeypatch):
+    """Studio stills and frame perception quantize without ResidualCore.step."""
+    from resileos.core import ResidualCore
+    from resileos.ui.frame_codec import encode_frame
+    from resileos.ui.perceive_image import perceive_image
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("a visual path called ResidualCore.step or _scar_update")
+
+    monkeypatch.setattr(ResidualCore, "step", boom)
+    monkeypatch.setattr(ResidualCore, "_scar_update", boom)
+
+    coded = encode_frame(_const())
+    assert coded["scar_matrix_updated"] is False
+    assert coded["learned"] is False
+    assert coded["residual_bin"].startswith("rcore_")
+    assert coded["packet_hash"]
+
+    still = cascade_scale(_const(), prompt="flat field")
+    assert still["learned"] is False
+    assert still["learn_called"] is False
+    assert still["scale"]["core"]["scar_matrix_updated"] is False
+    assert still["scale"]["core"]["backend"] == "not_stepped"
+
+    perceived = perceive_image((_const() * 255).astype(np.uint8), subject="photo")
+    assert perceived["address"]["residual_bin"].startswith("rcore_")
+    assert perceived["codec"]["scar_matrix_updated"] is False
+
+
 def test_cascade_attaches_layer_scale_packet_and_hash():
     packet = ControlPacket(id="still")
     out = cascade_scale(_const(), control=packet, prompt="flat field")
