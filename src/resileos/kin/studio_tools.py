@@ -152,9 +152,10 @@ def forge_video(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
     """Forge under Hephaestus.
 
     A matrix, frame list, or residual packet is drafted and verified by the
-    layer-scale codec. A provider is used only for an inconclusive upscale
-    of the residual delta. A prompt with no residual input stays the video
-    request: a configured provider, or UNAVAILABLE with no invented URL.
+    layer-scale codec. Two frames are a residual phase step: only the
+    residual packet travels. A provider is used only for an inconclusive
+    upscale of that residual. A prompt with no residual input stays the
+    video request: a configured provider, or UNAVAILABLE with no invented URL.
     """
     del seen
     prompt = str(kwargs.get("prompt") or "")[:2000]
@@ -188,6 +189,10 @@ def forge_video(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
             learn=kwargs.get("learn"),
             bypass_zeus=bool(kwargs.get("bypass_zeus")),
             zeus=kwargs.get("zeus"),
+            previous=kwargs.get("previous"),
+            keyframe=kwargs.get("keyframe"),
+            draft=kwargs.get("draft"),
+            prediction=str(kwargs.get("prediction") or "previous"),
         )
         produced["checkpoint"] = None
         produced["hades_checkpoint"] = False
@@ -650,6 +655,10 @@ def run_forge_video(
     learn_fn: Callable[..., Any] | None = None,
     bypass_zeus: bool = False,
     zeus: Any = None,
+    previous: Any = None,
+    keyframe: Any = None,
+    draft: Any = None,
+    prediction: str = "previous",
 ) -> dict[str, Any]:
     """Invoke the Forge legion and register any worker on the packet owner."""
     from resileos.kin.demigods.swarm import swarm_meta
@@ -674,6 +683,10 @@ def run_forge_video(
         learn_fn=learn_fn,
         bypass_zeus=bypass_zeus,
         zeus=zeus,
+        previous=previous,
+        keyframe=keyframe,
+        draft=draft,
+        prediction=prediction,
     )
     meta = swarm_meta(host)
     owner = str(meta["attempt_id"]) if meta else str(host.get("id") or "forge")

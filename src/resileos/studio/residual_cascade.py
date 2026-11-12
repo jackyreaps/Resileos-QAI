@@ -11,6 +11,11 @@ An external upscale slot runs only when that residual check is inconclusive.
 It receives the residual delta of the frames that did not close, and it
 returns an asset URL. No weights are vendored. With no provider the slot
 stays unavailable and does not invent a URL.
+
+Two frames are not two stills. The signal is ``F_t - F_{t-1}`` from
+``residual_frame``. Only that residual is quantized. Its mean gradient,
+scaled by ``MAGNETIC_PHASE / PHI``, is a phase step. Healing and det J
+stay off that vector. The mirror energy is a check.
 """
 from __future__ import annotations
 
@@ -45,6 +50,14 @@ from resileos.studio.candidates import register_candidate
 from resileos.studio.codecs import project_gray
 from resileos.substrate.oscillator import KuramotoField
 from resileos.ui.cascade_address import cascade_address
+from resileos.ui.residual_frame import (
+    apply_residual,
+    bilinear_upsample,
+    frame_residual,
+    mirror_check,
+    motion_vector,
+    predict_frame,
+)
 from resileos.ui.scale_address import scale_address
 
 # Relative residual energy at which one layer-scale packet closes the still.
@@ -968,6 +981,384 @@ def upscale_residual(
     return verdict
 
 
+def _is_frame_motion(
+    matrix: Any,
+    frames: Any,
+    previous: Any,
+    keyframe: Any,
+    draft: Any,
+    prediction: str,
+) -> bool:
+    """Two frames, or an explicit cheap prediction, are a phase step."""
+    if previous is not None or keyframe is not None or draft is not None:
+        return True
+    if str(prediction or "") in {"keyframe", "bilinear"}:
+        return True
+    return isinstance(frames, list) and len(frames) >= 2
+
+
+def _retry_for(outcome: str) -> str | None:
+    if outcome == "accepted":
+        return None
+    if outcome == "rejected":
+        return "residual_packet"
+    return "cheap_draft"
+
+
+def _matrix_lists(array: np.ndarray) -> list[list[float]]:
+    return [
+        [round(float(value), 6) for value in row]
+        for row in np.asarray(array, dtype=np.float64)
+    ]
+
+
+def _drop_arrays(result: dict[str, Any]) -> dict[str, Any]:
+    for key in ("_residual", "_prediction", "_current"):
+        result.pop(key, None)
+    return result
+
+
+def _resolve_pair(
+    matrix: Any,
+    frames: Any,
+    previous: Any,
+    keyframe: Any,
+    draft: Any,
+    prediction: str,
+) -> tuple[np.ndarray, np.ndarray, str]:
+    current = None
+    if isinstance(frames, list) and frames:
+        current = frames[-1]
+    elif matrix is not None:
+        current = matrix
+    if current is None:
+        raise ValueError("inter-frame motion needs a current frame")
+    prev = previous
+    kind = str(prediction or "previous")
+    if kind == "previous" and prev is None and isinstance(frames, list) and len(frames) >= 2:
+        prev = frames[-2]
+    return predict_frame(
+        current,
+        previous=prev,
+        keyframe=keyframe,
+        draft=draft,
+        kind=kind,
+    )
+
+
+def _motion_rejected(prompt: str, stage: str, reason: str, risk: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "outcome": "rejected",
+        "status": "rejected",
+        "stage": stage,
+        "prompt": prompt,
+        "url": None,
+        "draft": False,
+        "produces_video": False,
+        "learned": False,
+        "learn_called": False,
+        "retry": "residual_packet",
+        "reason": reason,
+        "risk": risk,
+        "checkpoint": None,
+        "hades_checkpoint": False,
+        "patron": "hephaestus",
+        "generative": False,
+        "full_clip": False,
+        "provider_frames": 0,
+        "provider_cost": 0.0,
+        "note": (
+            "The frames could not enter the residual codec. "
+            "Re-request a residual packet or a cheap draft. Not a full clip."
+        ),
+    }
+
+
+def _frame_motion(
+    *,
+    stage: str,
+    prompt: str,
+    matrix: Any = None,
+    frames: Any = None,
+    residual_packet: dict[str, Any] | None = None,
+    control: Any = None,
+    learn: Any = None,
+    bypass_zeus: bool = False,
+    zeus: Any = None,
+    previous: Any = None,
+    keyframe: Any = None,
+    draft: Any = None,
+    prediction: str = "previous",
+    register: bool = True,
+    keep_arrays: bool = False,
+) -> dict[str, Any]:
+    """Quantize R, attach the phase step, and add the decode to the prediction.
+
+    Draft and verify do not call a provider. The scar matrix is not updated.
+    """
+    _refuse_bypass(learn=learn, bypass_zeus=bypass_zeus, zeus=zeus)
+    risk = risk_classify(prompt or "studio frame residual")
+    try:
+        current_gray, predicted, kind = _resolve_pair(
+            matrix, frames, previous, keyframe, draft, prediction
+        )
+        prepared_current = _prepare_matrix(current_gray)
+        prepared_prediction = _prepare_matrix(predicted)
+        if prepared_prediction.shape != prepared_current.shape:
+            prepared_prediction = bilinear_upsample(
+                prepared_prediction,
+                (int(prepared_current.shape[0]), int(prepared_current.shape[1])),
+            )
+        residual = frame_residual(prepared_current, prepared_prediction)
+        evolved = _evolve_matrix(
+            residual,
+            requested_rank=4,
+            requested_layers=4,
+            seed=0,
+        )
+    except (ValueError, TypeError) as exc:
+        return _motion_rejected(prompt, stage, str(exc), risk)
+    motion = motion_vector(residual)
+    mirror = mirror_check(residual)
+    scar = "risk_deny" if risk["risk_class"] == "deny" else None
+    view = _attach(
+        control,
+        packet=evolved["packet"],
+        digest=evolved["packet_hash"],
+        confidence=0.0,
+        risk=risk,
+        scar=scar,
+    )
+    state = view.get("state")
+    if isinstance(state, dict):
+        state["motion"] = motion
+        state["mirror_energy"] = mirror["energy"]
+    evidence_attach(
+        {
+            "packet_hash": evolved["packet_hash"],
+            "mirror_energy": mirror["energy"],
+            "check": True,
+            "second_motion_vector": False,
+        },
+        "mirror_residual",
+        view,
+    )
+    if isinstance(control, ControlPacket):
+        # evidence_attach rebinds the dict copy from to_dict(). Keep the
+        # packet's own list on the same records, including the mirror check.
+        control.evidence = list(view.get("evidence") or [])
+    judged = _judge(evolved, view, risk)
+    if isinstance(control, ControlPacket):
+        control.confidence = judged["confidence"]
+    elif isinstance(control, dict):
+        control["confidence"] = judged["confidence"]
+    result = _still_result(
+        evolved,
+        judged,
+        prompt=prompt,
+        stage=stage,
+        address=False,
+        register=False,
+    )
+    decoded = np.asarray(evolved["recon"], dtype=np.float64)
+    candidate = apply_residual(prepared_prediction, decoded)
+    if register and judged["outcome"] != "rejected":
+        result["candidate"] = register_candidate(
+            kind="image",
+            path=f"candidate://studio/frame/{evolved['packet_hash'][:12]}",
+            title=f"CANDIDATE frame {evolved['packet_hash'][:8]}",
+            world_id="studio",
+            note="candidate frame from a residual phase step; learn was not called",
+        )
+    result["frame"] = _matrix_lists(candidate)
+    result["motion"] = motion
+    result["mirror"] = mirror
+    result["prediction"] = kind
+    result["signal"] = "residual"
+    result["travels"] = "residual_packet"
+    result["phase_step"] = True
+    result["healing_on_vector"] = False
+    result["volume_on_vector"] = False
+    result["generative"] = False
+    result["full_clip"] = False
+    result["url"] = None
+    result["produces_video"] = False
+    result["learned"] = False
+    result["learn_called"] = False
+    result["provider_frames"] = 0
+    result["provider_cost"] = 0.0
+    result["risk"] = risk
+    if isinstance(residual_packet, dict):
+        claimed = str(residual_packet.get("packet_hash") or "")
+        if claimed and claimed != result.get("packet_hash"):
+            result["outcome"] = "rejected"
+            result["status"] = "rejected"
+            result["escalate"] = False
+            result["closes_question"] = False
+            result["draft"] = False
+            result["checks"]["hash_match"] = False
+            result["apollo"] = apollo_success({"status": "failed"})
+            result["checks"]["apollo"] = False
+            result["reason"] = "residual hash mismatch"
+    result["retry"] = _retry_for(str(result["outcome"]))
+    result["note"] = (
+        "Candidate frame from a residual phase step. Only the residual packet travels. "
+        "Healing stays on the oscillator. det J stays on the cascade. "
+        "A failure re-requests a residual packet or a cheap draft, not a full clip. "
+        "No production video is claimed."
+    )
+    result["_residual"] = residual
+    result["_prediction"] = prepared_prediction
+    result["_current"] = prepared_current
+    if not keep_arrays:
+        _drop_arrays(result)
+    return result
+
+
+def _upscale_motion(
+    *,
+    stage: str,
+    prompt: str,
+    matrix: Any = None,
+    frames: Any = None,
+    residual_packet: dict[str, Any] | None = None,
+    provider_fn: Any = None,
+    control: Any = None,
+    learn: Any = None,
+    bypass_zeus: bool = False,
+    zeus: Any = None,
+    previous: Any = None,
+    keyframe: Any = None,
+    draft: Any = None,
+    prediction: str = "previous",
+) -> dict[str, Any]:
+    """Upscale only an unclosed residual. The slot stays off when R already closed."""
+    verdict = _frame_motion(
+        stage="verify",
+        prompt=prompt,
+        matrix=matrix,
+        frames=frames,
+        residual_packet=residual_packet,
+        control=control,
+        learn=learn,
+        bypass_zeus=bypass_zeus,
+        zeus=zeus,
+        previous=previous,
+        keyframe=keyframe,
+        draft=draft,
+        prediction=prediction,
+        register=False,
+        keep_arrays=True,
+    )
+    residual = verdict.pop("_residual", None)
+    prediction_frame = verdict.pop("_prediction", None)
+    current = verdict.pop("_current", None)
+    verdict["stage"] = stage
+    verdict["url"] = None
+    verdict["produces_video"] = False
+    verdict["generative"] = False
+    verdict["full_clip"] = False
+    if verdict.get("outcome") == "rejected":
+        verdict["status"] = "refused"
+        verdict["detail"] = "Upscale waits until the residual packet is consistent."
+        verdict["provider_frames"] = 0
+        verdict["provider_cost"] = 0.0
+        verdict["retry"] = "residual_packet"
+        return verdict
+    if verdict.get("outcome") == "accepted":
+        verdict["status"] = "not_required"
+        verdict["detail"] = "Residual packet closed the frame. Upscale stays off."
+        verdict["provider_frames"] = 0
+        verdict["provider_cost"] = 0.0
+        verdict["retry"] = None
+        return verdict
+    checks = verdict.get("checks") if isinstance(verdict.get("checks"), dict) else {}
+    if not (
+        checks.get("hash_match")
+        and checks.get("residual_consistency")
+        and checks.get("hephaestus")
+        and checks.get("risk_class") == "allow"
+    ):
+        verdict["status"] = "refused"
+        verdict["detail"] = "External upscale stays refused until residual and Hephaestus checks pass."
+        verdict["provider_frames"] = 0
+        verdict["provider_cost"] = 0.0
+        verdict["retry"] = "cheap_draft"
+        return verdict
+    residual_array = np.asarray(residual, dtype=np.float64)
+    cost = float(np.mean(residual_array ** 2))
+    current_array = np.asarray(current if current is not None else residual_array, dtype=np.float64)
+    prediction_array = np.asarray(
+        prediction_frame if prediction_frame is not None else 0.0,
+        dtype=np.float64,
+    )
+    full_cost = float(np.mean(current_array ** 2) + np.mean(np.asarray(prediction_array) ** 2))
+    payload = {
+        "kind": "residual_delta",
+        "packet_hash": verdict.get("packet_hash"),
+        "n_frames": 1,
+        "full_clip": False,
+        "disagreement": round(float(verdict.get("energy") or 0.0), 6),
+        "motion": {
+            "v_x": verdict["motion"]["v_x"],
+            "v_y": verdict["motion"]["v_y"],
+            "unit": "phase_step",
+        },
+        "frames": [
+            {
+                "index": 0,
+                "shape": [int(residual_array.shape[0]), int(residual_array.shape[1])],
+                "delta": [round(float(value), 6) for value in residual_array.ravel()],
+            }
+        ],
+    }
+    called = _call_slot(provider_fn, payload)
+    verdict["provider_frames"] = 1
+    verdict["provider_cost"] = cost
+    verdict["full_duration_cost"] = full_cost
+    verdict["upscale_payload"] = {
+        "kind": payload["kind"],
+        "n_frames": 1,
+        "full_clip": False,
+        "disagreement": payload["disagreement"],
+    }
+    verdict["retry"] = "cheap_draft"
+    if not called["ok"]:
+        verdict["status"] = "UNAVAILABLE"
+        verdict["url"] = None
+        verdict["draft"] = False
+        verdict["detail"] = called["detail"]
+        verdict["produces_video"] = False
+        return verdict
+    verdict["status"] = "submitted"
+    verdict["url"] = called["url"]
+    verdict["draft"] = False
+    verdict["produces_video"] = False
+    verdict["reencoded"] = False
+    verdict["outcome"] = "submitted"
+    verdict["next_verify"] = True
+    asset = called["payload"].get("matrix", called["payload"].get("image"))
+    if asset is not None and current is not None:
+        fresh = _frame_motion(
+            stage="upscale",
+            prompt=prompt,
+            matrix=current,
+            draft=asset,
+            prediction="bilinear",
+            control=control,
+            register=True,
+        )
+        if fresh.get("packet_hash"):
+            verdict["residual_packet"] = fresh.get("residual_packet")
+            verdict["packet_hash"] = fresh.get("packet_hash")
+            verdict["residual_hash"] = fresh.get("packet_hash")
+            verdict["motion"] = fresh.get("motion")
+            verdict["mirror"] = fresh.get("mirror")
+            verdict["frame"] = fresh.get("frame")
+            verdict["reencoded"] = True
+    return verdict
+
+
 def run_visual_stage(
     *,
     stage: str,
@@ -980,8 +1371,50 @@ def run_visual_stage(
     learn: Any = None,
     bypass_zeus: bool = False,
     zeus: Any = None,
+    previous: Any = None,
+    keyframe: Any = None,
+    draft: Any = None,
+    prediction: str = "previous",
 ) -> dict[str, Any]:
-    """Draft, verify, or selectively upscale. Draft and verify do not call a provider."""
+    """Draft, verify, or selectively upscale. Draft and verify do not call a provider.
+
+    Two frames, or a previous frame, keyframe, or draft, travel as a residual
+    phase step. A provider is not required for that draft.
+    """
+    if _is_frame_motion(matrix, frames, previous, keyframe, draft, prediction):
+        if stage == "upscale":
+            return _upscale_motion(
+                stage=stage,
+                prompt=prompt,
+                matrix=matrix,
+                frames=frames,
+                residual_packet=residual_packet,
+                provider_fn=provider_fn,
+                control=control,
+                learn=learn,
+                bypass_zeus=bypass_zeus,
+                zeus=zeus,
+                previous=previous,
+                keyframe=keyframe,
+                draft=draft,
+                prediction=prediction,
+            )
+        return _frame_motion(
+            stage="verify" if stage == "verify" else "draft",
+            prompt=prompt,
+            matrix=matrix,
+            frames=frames,
+            residual_packet=residual_packet,
+            control=control,
+            learn=learn,
+            bypass_zeus=bypass_zeus,
+            zeus=zeus,
+            previous=previous,
+            keyframe=keyframe,
+            draft=draft,
+            prediction=prediction,
+            register=stage != "verify",
+        )
     if stage == "verify":
         return verify_residual(
             matrix,
