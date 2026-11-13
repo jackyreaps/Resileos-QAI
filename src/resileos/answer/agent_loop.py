@@ -188,6 +188,7 @@ def _finish(
     cycle: dict[str, Any] | None,
     *,
     assertive: bool,
+    utterance: str = "",
 ) -> dict[str, Any]:
     action = body.get("action_taken") or {}
     body.setdefault("factual_mouth", False)
@@ -202,6 +203,12 @@ def _finish(
             "value": body.get("reply_text") or "",
         },
     )
+    try:
+        from resileos.persona.reflect import apply_turn_recall
+
+        apply_turn_recall(body, utterance)
+    except Exception:
+        log.exception("persona recall failed")
     return turn_cycle.attach_turn_fields(
         body,
         window=window,
@@ -353,14 +360,14 @@ async def run_agent_chat(
         )
         body["verified"] = False
         body["file"] = {key: value for key, value in file_data.items() if key != "bytes"}
-        return _finish(body, window, None, assertive=False)
+        return _finish(body, window, None, assertive=False, utterance=text)
 
     if text.lower().startswith("/search "):
         body = await _maybe_search(text[8:].strip())
-        return _finish(body, window, None, assertive=False)
+        return _finish(body, window, None, assertive=False, utterance=text)
     if text.lower() == "/search":
         body = await _maybe_search("")
-        return _finish(body, window, None, assertive=False)
+        return _finish(body, window, None, assertive=False, utterance=text)
 
     if text.lower().startswith("/tool "):
         name = text[6:].strip().split()[0] if text[6:].strip() else ""
@@ -385,7 +392,7 @@ async def run_agent_chat(
                 persona=persona,
                 source="tool",
             )
-            return _finish(body, window, None, assertive=False)
+            return _finish(body, window, None, assertive=False, utterance=text)
         try:
             raw = _call_named_tool(name, {})
             import json
@@ -417,10 +424,19 @@ async def run_agent_chat(
         )
         body["verified"] = False
         body["tool_result"] = raw
-        return _finish(body, window, None, assertive=False)
+        return _finish(body, window, None, assertive=False, utterance=text)
 
     if not text:
         raise ValueError("turn text is empty")
+
+    if text.lower().startswith("persona:"):
+        from resileos.persona.hook import persona_command_action
+
+        reply, status, action = persona_command_action(text, hub_id)
+        body = present_chat(reply, status, action, hub_id=hub_id, persona=persona)
+        body["verified"] = False
+        body["factual_mouth"] = False
+        return _finish(body, window, None, assertive=False, utterance=text)
 
     try:
         cycle = turn_cycle.run_bounded_cycle(text, window, hub_id, titanos)
@@ -468,7 +484,7 @@ async def run_agent_chat(
             persona=persona,
         )
         body["verified"] = False
-        return _finish(body, window, cycle, assertive=False)
+        return _finish(body, window, cycle, assertive=False, utterance=text)
 
     store = titanos
     if triple is not None and cycle.get("verified"):
@@ -494,7 +510,7 @@ async def run_agent_chat(
             )
             body = present_chat(reply, "ABSTAINED", action, hub_id=hub_id, persona=persona)
             body["verified"] = False
-            return _finish(body, window, cycle, assertive=assertive)
+            return _finish(body, window, cycle, assertive=assertive, utterance=text)
         store = turn_cycle.LearnProxy(titanos)
 
     try:
@@ -560,4 +576,4 @@ async def run_agent_chat(
         note = _upload_note(file_data)
         body["value"] = f"{note}\n\n{reply}".strip()
         body["reply_text"] = body["value"]
-    return _finish(body, window, cycle, assertive=assertive and status != "MOUTH_CLOSED")
+    return _finish(body, window, cycle, assertive=assertive and status != "MOUTH_CLOSED", utterance=text)
