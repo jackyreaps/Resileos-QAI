@@ -34,6 +34,7 @@ from resileos.kin.hades import Hades
 from resileos.kin.hermes import HermesBudget, make_hermes_navigator
 from resileos.kin.residual_trace import append_stage
 from resileos.studio.candidates import register_candidate
+from resileos.studio.clip_metrics import clip_check_metrics
 from resileos.studio.clip_codec import (
     TEMPORAL_SIGMA,
     decode_sequence,
@@ -213,6 +214,12 @@ def _attach_video(body: dict[str, Any], stage: str) -> None:
     reused = sum(1 for step in steps if isinstance(step, dict) and step.get("kind") == "reuse")
     generative = sum(1 for step in steps if isinstance(step, dict) and step.get("escalated"))
     stage_name = stage if stage in {"draft", "verify", "upscale"} else "draft"
+    previews = body.get("preview") if isinstance(body.get("preview"), list) else []
+    try:
+        metrics = clip_check_metrics(previews)
+    except (TypeError, ValueError):
+        metrics = clip_check_metrics([])
+    body["check_metrics"] = metrics
     packet = VideoPacket(
         id=str(body.get("packet_hash") or "clip")[:80],
         frame_residuals=hashes,
@@ -220,6 +227,7 @@ def _attach_video(body: dict[str, Any], stage: str) -> None:
         keyframe_ids=keyframes,
         provider_stage=stage_name,
         scene_script_hash=None,
+        check_metrics=metrics,
     )
     body["video_packet"] = packet.to_dict()
     body["cost"] = {
@@ -228,7 +236,6 @@ def _attach_video(body: dict[str, Any], stage: str) -> None:
         "sigma": float(sequence.get("sigma") or TEMPORAL_SIGMA),
         "unit": "rms",
     }
-    previews = body.get("preview") if isinstance(body.get("preview"), list) else []
     body["keyframes"] = [
         {"index": index, "frame": previews[index]}
         for index in keyframes

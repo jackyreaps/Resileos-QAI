@@ -6,6 +6,17 @@ are stable and never reused.
 ## [Unreleased]
 
 ### Added
+- `docs/outer-layer.md` — outer-layer flow: Hermes envelopes → Eat → Zeus
+  reviewers → Titanos; Iris trace sensor; Hades lesson notes; clip check
+  metrics. Lists renames from the drafts and what was left out.
+- `src/resileos/kin/eat_envelope.py` — temporal envelope check, attention
+  metric stripping, write-time interval CONFLICT, commit through `zeus_head`.
+- `src/resileos/kin/outer_legions.py` — Hermes `search_envelope`,
+  `crawl_envelope`, `sandbox_request` (gate only); Iris `trace_sensor`;
+  Hades `lesson_note`. Off by default.
+- `src/resileos/kin/iris_trace.py`, `src/resileos/kin/hades_notes.py`.
+- `src/resileos/studio/clip_metrics.py` — motion phase coherence (R) and
+  residual Betti counts, recorded on `VideoPacket.check_metrics`; not gating.
 - `docs/600-qdter/fep-reduction.md` — RES-600, FEP Reduction Bridge
   (`conditional`). Records the QD-TER local reduction, the Γ definition
   discrepancy (§4.1), and the numerical verification harness (§4.2).

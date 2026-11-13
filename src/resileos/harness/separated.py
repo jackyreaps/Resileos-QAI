@@ -142,10 +142,19 @@ class SeparatedCycle:
         accepted = 0
         trail_all: list[dict] = []
 
-        for s, r, o in proposal.claims:
-            rep = run_verifiers(
-                {"subject": s, "relation": r, "obj": o}, ctx=ctx
-            )
+        # Optional validity windows aligned with proposal.claims. Eat's
+        # temporal envelope sets these so the verifier swarm checks the
+        # same interval Titanos will store.
+        bounds = proposal.metadata.get("temporal_bounds") or []
+        for index, (s, r, o) in enumerate(proposal.claims):
+            row: dict[str, Any] = {"subject": s, "relation": r, "obj": o}
+            if index < len(bounds) and isinstance(bounds[index], (list, tuple)):
+                valid_from, valid_to = (list(bounds[index]) + [None, None])[:2]
+                if valid_from:
+                    row["valid_from"] = str(valid_from)
+                if valid_to:
+                    row["valid_to"] = str(valid_to)
+            rep = run_verifiers(row, ctx=ctx)
             trail_all.append({
                 "claim": f"{s} {r} {o}",
                 "action": rep.action,
@@ -383,7 +392,32 @@ def run_separated(
         action_type=action_type,
         **(writer_kwargs or {}),
     )
+    reviewers = default_reviewers(
+        sc,
+        ask_fn=ask_fn,
+        use_council=use_council,
+        use_athena=use_athena,
+        profile=profile,
+        verifier_ctx=verifier_ctx,
+    )
+    return zeus_head(proposal, reviewers, learn_fn, cycle=sc)
 
+
+def default_reviewers(
+    sc: SeparatedCycle,
+    *,
+    ask_fn: Optional[Callable[[str, str], Any]] = None,
+    use_council: bool = True,
+    use_athena: bool = False,
+    profile: str = "personal",
+    verifier_ctx: Optional[dict] = None,
+) -> list[tuple[str, Callable[[Proposal], Verdict]]]:
+    """The reviewer set ``run_separated`` assigns.
+
+    The verifier swarm always reviews. The council reviews when an
+    ``ask_fn`` is supplied and ``use_council`` is on. Athena reviews only
+    when asked. Other callers reuse this list so the set stays in one place.
+    """
     reviewers: list[tuple[str, Callable[[Proposal], Verdict]]] = [
         ("verifiers", lambda p: sc.review_verifiers(p, ctx=verifier_ctx)),
     ]
@@ -395,8 +429,7 @@ def run_separated(
         )
     if use_athena:
         reviewers.append(("athena", lambda p: sc.review_athena(p)))
-
-    return zeus_head(proposal, reviewers, learn_fn, cycle=sc)
+    return reviewers
 
 
 def _claims_from_artefact(artefact: Any) -> list[tuple[str, str, str]]:
@@ -581,5 +614,5 @@ def maker_blind_verifier_cycle(
 
 __all__ = [
     "Proposal", "Verdict", "SeparatedCycle", "zeus_head",
-    "run_separated", "maker_blind_verifier_cycle", "_capture_eat",
+    "run_separated", "default_reviewers", "maker_blind_verifier_cycle", "_capture_eat",
 ]
