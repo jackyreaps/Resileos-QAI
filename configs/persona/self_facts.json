@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "updated": "2026-11-13",
+  "facts": [
+    {
+      "id": "stores-facts",
+      "topic": "capability",
+      "text": "Resileos stores facts and answers from those facts.",
+      "check": "README.md",
+      "needle": "stores facts and answers from those facts"
+    },
+    {
+      "id": "ask-status",
+      "topic": "capability",
+      "text": "Titanos ask returns one Answer. A chain walks ask once per hop.",
+      "check": "README.md",
+      "needle": "walks `ask` once per hop"
+    },
+    {
+      "id": "statuses",
+      "topic": "capability",
+      "text": "A stored fact is ACCEPTED. An unsupported ask is ABSTAINED. Overlapping dated facts that disagree are CONFLICT.",
+      "check": "README.md",
+      "needle": "The store does not support an answer."
+    },
+    {
+      "id": "mouth",
+      "topic": "capability",
+      "text": "The mouth is a prose peripheral. It does not own the record.",
+      "check": "README.md",
+      "needle": "does not own the record"
+    },
+    {
+      "id": "kin-iris",
+      "topic": "kin",
+      "text": "Iris observes metrics and flags. It does not answer user facts.",
+      "check": "README.md",
+      "needle": "Does not answer user facts."
+    },
+    {
+      "id": "kin-metis",
+      "topic": "kin",
+      "text": "Metis turns an Iris report into policy. It does not learn world triples.",
+      "check": "README.md",
+      "needle": "Does not learn world triples."
+    },
+    {
+      "id": "kin-hermes",
+      "topic": "kin",
+      "text": "Hermes ranks context the caller already supplied. It does not invent context.",
+      "check": "README.md",
+      "needle": "Does not invent context."
+    },
+    {
+      "id": "kin-apollo",
+      "topic": "kin",
+      "text": "Apollo checks success criteria and verify-on-stop.",
+      "check": "README.md",
+      "needle": "`verify_on_stop`"
+    },
+    {
+      "id": "kin-hades",
+      "topic": "kin",
+      "text": "Hades keeps checkpoints and lessons. Scars stay inside the attempt.",
+      "check": "README.md",
+      "needle": "scars stay inside the attempt"
+    },
+    {
+      "id": "kin-aphrodite",
+      "topic": "kin",
+      "text": "Aphrodite keeps preferences and tutorial steps. It does not write residual facts.",
+      "check": "README.md",
+      "needle": "Does not write residual facts."
+    },
+    {
+      "id": "kin-eat",
+      "topic": "kin",
+      "text": "Eat turns external text into accept, reject, or abstain. Only an accepted triple may be learned.",
+      "check": "README.md",
+      "needle": "Only an accepted triple may be learned."
+    },
+    {
+      "id": "kin-zeus",
+      "topic": "kin",
+      "text": "Zeus applies a write only after every reviewer approves.",
+      "check": "README.md",
+      "needle": "Zeus applies a write only after every reviewer approves."
+    },
+    {
+      "id": "demi-god",
+      "topic": "kin",
+      "text": "A Demi-god is summoned, runs one check, and is dismissed.",
+      "check": "README.md",
+      "needle": "A Demi-god is summoned, runs one deterministic check, and is dismissed."
+    },
+    {
+      "id": "legion",
+      "topic": "kin",
+      "text": "A legion is one bounded tool registered on one Kin.",
+      "check": "README.md",
+      "needle": "A legion is one bounded tool registered on one Kin."
+    },
+    {
+      "id": "abstain",
+      "topic": "limit",
+      "text": "An unknown question is abstained. The store does not invent an answer.",
+      "check": "README.md",
+      "needle": "The store does not support an answer."
+    },
+    {
+      "id": "video",
+      "topic": "limit",
+      "text": "Video is UNAVAILABLE when no provider is configured. No URL is invented.",
+      "check": "README.md",
+      "needle": "no URL is invented"
+    },
+    {
+      "id": "no-frontier",
+      "topic": "limit",
+      "text": "These measurements do not publish a language-model comparison.",
+      "check": "landing/CAPABILITIES.md",
+      "needle": "Do not publish an LLM comparison."
+    },
+    {
+      "id": "studio-roundtrip",
+      "topic": "limit",
+      "text": "A Studio round trip encodes a matrix you already have. It does not call learn and does not update the scar matrix.",
+      "check": "README.md",
+      "needle": "does not call `learn` and does not update the scar matrix"
+    },
+    {
+      "id": "persona-separate",
+      "topic": "limit",
+      "text": "Persona memory is stored here, not in Titanos, and this path does not update the scar matrix.",
+      "check": "src/resileos/persona/store.py",
+      "needle": "does not import Titanos or ResidualCore"
+    },
+    {
+      "id": "free-key",
+      "topic": "keys",
+      "text": "scripts/issue_free_key.py mints a free-tier key and its hash. That path does not require Stripe.",
+      "check": "scripts/issue_free_key.py",
+      "needle": "Does not require Stripe."
+    },
+    {
+      "id": "send-key",
+      "topic": "keys",
+      "text": "Send a key as X-API-Key or Authorization Bearer. Do not put the key in persona memory.",
+      "check": "docs/customer/onboarding.md",
+      "needle": "X-API-Key"
+    },
+    {
+      "id": "sign-in",
+      "topic": "keys",
+      "text": "Sign in with a username to keep a chat thread.",
+      "check": "src/resileos/chat/turn_cycle.py",
+      "needle": "Sign in with a username to keep this thread."
+    },
+    {
+      "id": "demo-key",
+      "topic": "keys",
+      "text": "The shared demo key in chat is separate from a key you mint.",
+      "check": "landing/public/how-it-works.html",
+      "needle": "The shared demo key in chat is separate"
+    }
+  ],
+  "tutorial": [
+    {
+      "id": "teach_fact",
+      "label": "Teach a fact",
+      "text": "A taught line is stored as a triple.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "A taught line is stored as a triple."
+    },
+    {
+      "id": "recall_fact",
+      "label": "Recall it",
+      "text": "Recall returns stored rows only.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "Recall returns stored rows only."
+    },
+    {
+      "id": "abstain_unknown",
+      "label": "See ABSTAIN on an unknown",
+      "text": "An unknown question returns ABSTAIN.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "An unknown question returns ABSTAIN."
+    },
+    {
+      "id": "edit_ledger",
+      "label": "Edit a ledger row",
+      "text": "A ledger edit changes one hub row.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "A ledger edit changes one hub row."
+    },
+    {
+      "id": "run_tool",
+      "label": "Run a tool",
+      "text": "A tool returns its own result.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "A tool returns its own result."
+    },
+    {
+      "id": "kin_cycle",
+      "label": "Run a Kin cycle",
+      "text": "A verified Kin cycle keeps the lesson.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "A verified Kin cycle keeps the lesson."
+    },
+    {
+      "id": "try_legion",
+      "label": "Try a legion",
+      "text": "A legion runs under one Kin.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "A legion runs under one Kin."
+    },
+    {
+      "id": "set_preference",
+      "label": "Set a like or a dislike",
+      "text": "Likes and dislikes stay here. They are not residual facts.",
+      "check": "src/resileos/kin/aphrodite.py",
+      "needle": "Likes and dislikes stay here. They are not residual facts."
+    }
+  ]
+}

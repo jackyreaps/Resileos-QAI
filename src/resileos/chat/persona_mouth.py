@@ -53,6 +53,25 @@ _LEXICON = frozenset(
 _TOKEN = re.compile(r"[A-Za-z0-9_']+")
 
 
+def _persona_recall(hub_id: str) -> dict[str, Any]:
+    """Self-facts and this individual's stated facts. Failures abstain."""
+    try:
+        from resileos.persona.reflect import recall_packet
+
+        return recall_packet(hub_id)
+    except Exception:
+        return {
+            "tier": "individual",
+            "self": [],
+            "user": [],
+            "abstain": True,
+            "reason": "persona-store-unavailable",
+            "writes_titanos": False,
+            "writes_residual_core": False,
+            "gnosis": "unfilled",
+        }
+
+
 def _persona(name: str) -> str:
     if name in PERSONA_PACKS:
         return name
@@ -384,6 +403,7 @@ def render_persona_mouth(
         "structured": structured,
         "audit": audit,
         "lessons": list(lesson_window),
+        "persona_recall": _persona_recall(hub_id),
     }
     if not prose_requested:
         return result

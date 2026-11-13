@@ -9,3 +9,5 @@ Chat lines `I like X` and `I don't like X` update the preference map. A tutorial
 Legions on Aphrodite: Calliope (next fragment from the preference map and a residual hash), Ligeia (suggestion only), Echo (lesson only, via Hades).
 
 A verified Kin cycle stores `AphroditeState` on the Hades checkpoint `extra` field and may attach `tutorial_fragment`.
+
+Tutorial steps the mouth reads at the start of a turn come from `configs/persona/self_facts.json`. User-stated name, goal, skill, and tutorial progress live in the persona store ([persona-store.md](persona-store.md)), labeled user-stated. That store does not write Titanos or the scar matrix. Aphrodite preferences are unchanged.
