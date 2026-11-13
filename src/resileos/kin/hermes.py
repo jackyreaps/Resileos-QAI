@@ -9,6 +9,11 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
 
+# Hephaestus caps the navigator. Metis may widen inside these, not past them.
+HEPHAESTUS_MAX_DEPTH = 4
+HEPHAESTUS_MAX_ITEMS = 16
+
+
 @dataclass
 class HermesBudget:
     max_depth: int = 2
@@ -29,12 +34,17 @@ def make_hermes_navigator(*, max_depth: int = 2, max_items: int = 8):
     def navigate(
         contexts: list[Any],
         budget: Optional[HermesBudget] = None,
+        *,
+        neighbours: Optional[list[str]] = None,
     ) -> list[Any]:
         b = budget or HermesBudget(max_depth=max_depth, max_items=max_items)
         if not contexts:
             return []
-        # Prefer items that look like structured triples/dicts with subject
-        scored: list[tuple[int, Any]] = []
+        neighbour_set = {str(token).lower() for token in (neighbours or []) if str(token).strip()}
+        # Prefer items that look like structured triples/dicts with subject.
+        # Neighbour tokens from Dionysus can raise a provided item. They
+        # do not add a triple that was not already in `contexts`.
+        scored: list[tuple[int, int, Any]] = []
         for i, item in enumerate(contexts):
             score = 0
             if isinstance(item, dict):
@@ -42,11 +52,22 @@ def make_hermes_navigator(*, max_depth: int = 2, max_items: int = 8):
                     score += 2
                 if item.get("value") is not None or item.get("obj") is not None:
                     score += 1
+                text = " ".join(
+                    str(item.get(key) or "")
+                    for key in ("content", "subject", "relation", "obj", "value")
+                )
             elif isinstance(item, (list, tuple)) and len(item) >= 3:
                 score += 2
-            scored.append((score, item))
-        scored.sort(key=lambda x: (-x[0],))
-        out = [x for _, x in scored[: max(0, int(b.max_items))]]
+                text = " ".join(str(part) for part in item)
+            else:
+                text = str(item)
+            if neighbour_set:
+                tokens = {part.lower() for part in text.replace("_", " ").split()}
+                if tokens & neighbour_set:
+                    score += 1
+            scored.append((score, i, item))
+        scored.sort(key=lambda row: (-row[0], row[1]))
+        out = [item for _, _, item in scored[: max(0, int(b.max_items))]]
         b.used = len(out)
         return out
 

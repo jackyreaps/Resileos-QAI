@@ -90,6 +90,7 @@ def budget_history(
     history: list[dict] | None,
     *,
     max_items: int = HERMES_MAX_ITEMS,
+    max_depth: int = HERMES_MAX_DEPTH,
 ) -> list[dict[str, Any]]:
     """Keep the recent window, then let Hermes rank inside that budget.
 
@@ -118,9 +119,9 @@ def budget_history(
         cleaned.append(item)
     window = cleaned[-max(0, int(max_items)) :]
     navigate, _handler = make_hermes_navigator(
-        max_depth=HERMES_MAX_DEPTH, max_items=max_items
+        max_depth=max_depth, max_items=max_items
     )
-    budget = HermesBudget(max_depth=HERMES_MAX_DEPTH, max_items=max_items)
+    budget = HermesBudget(max_depth=max_depth, max_items=max_items)
     ranked = list(navigate(window, budget))
     window_ids = {id(item): index for index, item in enumerate(window)}
     ranked.sort(key=lambda item: window_ids.get(id(item), 0))
@@ -409,9 +410,16 @@ def attach_turn_fields(
     window: list[dict[str, Any]],
     cycle: dict[str, Any] | None,
     assertive: bool,
+    budget: Any = None,
 ) -> dict[str, Any]:
     body["history_used"] = len(window)
-    body["hermes_budget"] = {"max_items": HERMES_MAX_ITEMS, "used": len(window)}
+    max_items = int(getattr(budget, "max_items", HERMES_MAX_ITEMS) or HERMES_MAX_ITEMS)
+    max_depth = int(getattr(budget, "max_depth", HERMES_MAX_DEPTH) or HERMES_MAX_DEPTH)
+    body["hermes_budget"] = {
+        "max_items": max_items,
+        "max_depth": max_depth,
+        "used": len(window),
+    }
     verified = bool(cycle and cycle.get("verified"))
     body["cycle_verified"] = verified
     body["mouth_open"] = bool(assertive) if cycle else False

@@ -29,6 +29,7 @@ PARENT_KIN = {
     "hephaestus": "hermes",
     "atlas": "iris",
     "nike": "apollo",
+    "morpheus": "hades",
 }
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")

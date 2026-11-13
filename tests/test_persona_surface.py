@@ -82,11 +82,13 @@ def test_chat_five_outcomes_and_ledger(client, open_api):
     soft_body = soft.json()
     assert soft_body["router_class"] == "SOFT_CHAT"
     assert soft_body["action_taken"]["tool"] is None
-    assert soft_body["cycle_verified"] is True
+    assert soft_body["cycle_verified"] is False
+    assert soft_body["verified"] is False
+    assert soft_body["source"] == "conversational"
     assert soft_body["mouth_open"] is True
     assert soft_body["message_kind"] == "mouth"
     assert soft_body["status"] == "ACCEPTED"
-    assert "with you" in soft_body["reply_text"].lower()
+    assert "not a stored fact" in soft_body["reply_text"].lower()
     assert soft_body["factual_mouth"] is False
     assert "sky" not in soft_body["reply_text"]
     assert "exact_answers" not in soft_body["reply_text"]
@@ -98,7 +100,9 @@ def test_chat_five_outcomes_and_ledger(client, open_api):
     spoken_body = spoken.json()
     assert spoken_body["status"] == "ACCEPTED"
     assert spoken_body["mouth_open"] is True
-    assert "next step" in spoken_body["reply_text"]
+    assert spoken_body["verified"] is False
+    assert "builder" in spoken_body["reply_text"].lower()
+    assert spoken_body["reply_text"] != soft_body["reply_text"]
     assert "sky" not in spoken_body["reply_text"]
 
     abstain = client.post(

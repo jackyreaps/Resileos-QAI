@@ -264,7 +264,8 @@ def test_chat_prose_follow_up_abstain_and_closed_mouth(client, monkeypatch, isol
     hello = greeted.json()
     assert hello["router_class"] == "SOFT_CHAT"
     assert hello["factual_mouth"] is False
-    assert "listening" in hello["reply_text"].lower()
+    assert hello["verified"] is False
+    assert "not a stored fact" in hello["reply_text"].lower()
     assert topic not in hello["reply_text"]
 
     missing = client.post(
