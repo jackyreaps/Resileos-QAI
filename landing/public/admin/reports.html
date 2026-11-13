@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upgrade reports — Resileos</title>
+  <meta name="description" content="Admin-only list of auto-applied and pending upgrade proposals." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a href="/">Home</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/kin">Kin</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/account">Account</a>
+        <a class="nav-cta" href="/chat">Chat</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <header class="page-hero">
+      <p class="eyebrow">Admin</p>
+      <h1>Upgrade reports</h1>
+      <p class="lede">Pending review items and the auto-applied log. Approval marks a proposal for a later PR; it never changes code from this page. The key stays on the server.</p>
+    </header>
+    <section>
+      <div class="inner" style="max-width: 48rem;">
+        <div class="card">
+          <p class="msg" id="status-msg">Loading…</p>
+          <div id="report" hidden></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <nav aria-label="Footer">
+      <a href="/how-it-works">How it works</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/account">Account</a>
+    </nav>
+    <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
+  </footer>
+  <script src="/assets/site.js"></script>
+  <script>
+    let csrf = "";
+
+    function setMsg(text, kind) {
+      const el = document.getElementById("status-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (kind ? " " + kind : "");
+    }
+
+    function field(label, value) {
+      const row = document.createElement("div");
+      const dt = document.createElement("dt");
+      dt.textContent = label;
+      const dd = document.createElement("dd");
+      dd.textContent = value == null ? "" : String(value);
+      row.append(dt, dd);
+      return row;
+    }
+
+    async function decide(id, action) {
+      setMsg(action === "approve" ? "Approving…" : "Rejecting…");
+      const res = await fetch("/api/session/reports/" + action, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrf,
+        },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(data.detail || "Could not update the proposal.", "err");
+        return;
+      }
+      setMsg(action === "approve" ? "Marked approved for a later PR. Nothing was applied." : "Proposal rejected.", "ok");
+      await loadReport();
+    }
+
+    function render(data) {
+      const root = document.getElementById("report");
+      root.hidden = false;
+      root.replaceChildren();
+
+      const pending = document.createElement("h2");
+      pending.textContent = "Pending review";
+      root.append(pending);
+      const pendingItems = (data.proposals || []).filter((item) => item.proposal_status === "pending");
+      if (!pendingItems.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No pending proposals.";
+        root.append(empty);
+      }
+      pendingItems.forEach((item) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.style.marginTop = "12px";
+        const list = document.createElement("dl");
+        list.className = "form";
+        list.append(
+          field("Id", item.id),
+          field("Kind", item.kind),
+          field("Target", item.target),
+          field("Tier", item.tier),
+          field("Verification", item.verification_status),
+          field("Status", item.proposal_status)
+        );
+        const row = document.createElement("div");
+        row.className = "cta-row";
+        const approve = document.createElement("button");
+        approve.type = "button";
+        approve.className = "btn btn-primary";
+        approve.textContent = "Approve";
+        approve.addEventListener("click", () => decide(item.id, "approve"));
+        const reject = document.createElement("button");
+        reject.type = "button";
+        reject.className = "btn btn-ghost";
+        reject.textContent = "Reject";
+        reject.addEventListener("click", () => decide(item.id, "reject"));
+        row.append(approve, reject);
+        const note = document.createElement("p");
+        note.className = "msg";
+        note.textContent = "Approve only marks this for a later PR. It does not apply code.";
+        card.append(list, row, note);
+        root.append(card);
+      });
+
+      const others = document.createElement("h2");
+      others.textContent = "Decided and auto-applied";
+      others.style.marginTop = "24px";
+      root.append(others);
+      const decided = (data.proposals || []).filter((item) => item.proposal_status !== "pending");
+      if (!decided.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No decided or auto-applied proposals yet.";
+        root.append(empty);
+      }
+      decided.forEach((item) => {
+        const list = document.createElement("dl");
+        list.className = "form";
+        list.style.marginTop = "12px";
+        list.append(
+          field("Id", item.id),
+          field("Kind", item.kind),
+          field("Target", item.target),
+          field("Tier", item.tier),
+          field("Status", item.proposal_status)
+        );
+        root.append(list);
+      });
+
+      const logTitle = document.createElement("h2");
+      logTitle.textContent = "Auto-tier log";
+      logTitle.style.marginTop = "24px";
+      root.append(logTitle);
+      if (!(data.auto_log || []).length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No auto-tier changes recorded.";
+        root.append(empty);
+      }
+      (data.auto_log || []).forEach((record) => {
+        const line = document.createElement("p");
+        line.textContent = "v" + (record.version || "?") + " " + (record.target || "") + " status=" + (record.status || "") + " reverted=" + String(Boolean(record.reverted));
+        root.append(line);
+      });
+
+      const footer = document.createElement("p");
+      footer.className = "msg";
+      footer.style.marginTop = "24px";
+      footer.textContent = data.email_digest || "A daily email digest is a future step once email sending is configured.";
+      root.append(footer);
+    }
+
+    async function loadReport() {
+      const res = await fetch("/api/session/reports", { credentials: "same-origin" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        location.assign("/login?next=/admin/reports");
+        return;
+      }
+      if (res.status === 403) {
+        document.getElementById("report").hidden = true;
+        setMsg(data.detail || "Not an admin.", "err");
+        return;
+      }
+      if (!res.ok) {
+        setMsg(data.detail || "Could not load the report.", "err");
+        return;
+      }
+      setMsg("");
+      render(data);
+    }
+
+    async function load() {
+      const me = await fetch("/api/session/me", { credentials: "same-origin" });
+      const account = await me.json().catch(() => ({}));
+      csrf = account.csrf || "";
+      if (!account.signed_in) {
+        location.assign("/login?next=/admin/reports");
+        return;
+      }
+      await loadReport();
+    }
+
+    load().catch(() => setMsg("Could not load the report.", "err"));
+  </script>
+</body>
+</html>
