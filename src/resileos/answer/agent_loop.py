@@ -54,8 +54,10 @@ def present_chat(
     """
     flags = present(status, action)
     klass = str(action.get("class") or "")
-    verified = status == "ACCEPTED" and klass in _FACT_CLASSES
     src = _source_for(action, source)
+    verified = status == "ACCEPTED" and klass in _FACT_CLASSES
+    if klass == "SOFT_CHAT" or src == "conversational":
+        verified = False
     tool = action.get("tool")
     tool_calls = [{"tool": tool}] if tool else []
     try:
@@ -182,6 +184,115 @@ def _upload_note(file_data: dict[str, Any]) -> str:
     )
 
 
+def conversational_reply(text: str, persona: str, intent: str) -> str:
+    """A line that varies with the turn and does not assert a stored fact."""
+    from resileos.answer.user_profile import PERSONA_PACKS
+
+    name = persona if persona in PERSONA_PACKS else "honest"
+    pack = PERSONA_PACKS[name]
+    words = (text or "").strip().split()
+    lead = words[0] if words else "hello"
+    if intent == "greeting":
+        heard = " ".join(words[:4]) or lead
+        return f"{pack['label']}. {heard}. This is not a stored fact."
+    if intent == "smalltalk":
+        heard = " ".join(words[:6])
+        return f"{pack['label']} ({pack['tone']}): {heard}. I will not assert a stored fact."
+    if intent == "meta":
+        return (
+            f"I am {pack['label']}. I keep exact rows, derive only from those rows, "
+            "and abstain when a row is missing."
+        )
+    clip = " ".join(words[:8])[:80]
+    return f"I heard “{clip}”. That line states no stored fact."
+
+
+def _fast_reply(
+    text: str,
+    intent: str,
+    persona: str,
+    hub_id: str,
+    window: list[dict[str, Any]],
+    budget: Any,
+) -> dict[str, Any]:
+    """Persona mouth only. Skips Themis, Momus, Atlas, and the Kin cycle."""
+    from resileos.chat.deferred_review import schedule_review
+
+    reply = conversational_reply(text, persona, intent)
+    action = {
+        "class": "SOFT_CHAT",
+        "action": "none",
+        "tool": None,
+        "subject": None,
+        "relation": None,
+        "relations": [],
+        "obj": None,
+        "rows": [],
+        "wrote": False,
+        "inverse": False,
+    }
+    body = present_chat(
+        reply,
+        "ACCEPTED",
+        action,
+        hub_id=hub_id,
+        persona=persona,
+        source="conversational",
+    )
+    body["verified"] = False
+    body["evidence"] = []
+    body["intent"] = intent
+    body["checks_skipped"] = ["themis", "momus", "atlas"]
+    body["factual_mouth"] = False
+    schedule_review(lambda: _post_fast_review(reply))
+    body["review"] = "deferred"
+    try:
+        from resileos.chat.turn_cycle import COMPANION_INTRO
+        from resileos.kin.aphrodite import get_store
+
+        stage = int(get_store().get(hub_id).tutorial_stage)
+    except Exception:
+        stage = 0
+    finished = _finish(
+        body, window, None, assertive=False, utterance=text, budget=budget
+    )
+    finished["verified"] = False
+    finished["cycle_verified"] = False
+    finished["mouth_open"] = True
+    finished["factual_mouth"] = False
+    finished["evidence"] = []
+    if stage == 0:
+        finished["companion_prompt"] = COMPANION_INTRO
+    return finished
+
+
+def _post_fast_review(reply: str) -> dict[str, Any]:
+    from resileos.harness.packet import ControlPacket
+    from resileos.harness.separated import Proposal, Verdict, zeus_head
+
+    learned: list[tuple[str, str, str]] = []
+
+    def learn(subject: str, relation: str, obj: str) -> None:
+        learned.append((subject, relation, obj))
+
+    packet = ControlPacket(id="chat-fast")
+    proposal = Proposal(
+        id=packet.id,
+        writer="mouth",
+        action_type="learn",
+        result={"status": "conversational"},
+        claims=[],
+        packet=packet,
+    )
+
+    def reject(item: Proposal) -> Verdict:
+        return Verdict(item.id, "fast-path", False, "conversational reply is not a fact", [])
+
+    head = zeus_head(proposal, [("fast-path", reject)], learn)
+    head["learned"] = learned
+    return head
+
+
 def _finish(
     body: dict[str, Any],
     window: list[dict[str, Any]],
@@ -189,6 +300,7 @@ def _finish(
     *,
     assertive: bool,
     utterance: str = "",
+    budget: Any = None,
 ) -> dict[str, Any]:
     action = body.get("action_taken") or {}
     body.setdefault("factual_mouth", False)
@@ -214,6 +326,7 @@ def _finish(
         window=window,
         cycle=cycle,
         assertive=assertive,
+        budget=budget,
     )
 
 
@@ -438,6 +551,29 @@ async def run_agent_chat(
         body["factual_mouth"] = False
         return _finish(body, window, None, assertive=False, utterance=text)
 
+    from resileos.kin.iris import FAST_INTENTS, classify_intent
+    from resileos.kin.metis import hermes_budget_for
+
+    from resileos.chat.router import parse_preference
+
+    intent = classify_intent(text, titanos=titanos)
+    budget = hermes_budget_for(text)
+    window = turn_cycle.budget_history(
+        history,
+        max_items=budget.max_items,
+        max_depth=budget.max_depth,
+    )
+    # A preference still goes through the router. A follow-up after an
+    # empty tool result still abstains. Neither one is a fast greeting.
+    forced = bool((force_class or "").strip())
+    if (
+        intent in FAST_INTENTS
+        and parse_preference(text) is None
+        and not last_tool_empty
+        and not forced
+    ):
+        return _fast_reply(text, intent, persona, hub_id, window, budget)
+
     try:
         cycle = turn_cycle.run_bounded_cycle(text, window, hub_id, titanos)
     except Exception:
@@ -484,7 +620,9 @@ async def run_agent_chat(
             persona=persona,
         )
         body["verified"] = False
-        return _finish(body, window, cycle, assertive=False, utterance=text)
+        return _finish(
+            body, window, cycle, assertive=False, utterance=text, budget=budget
+        )
 
     store = titanos
     if triple is not None and cycle.get("verified"):
@@ -510,7 +648,9 @@ async def run_agent_chat(
             )
             body = present_chat(reply, "ABSTAINED", action, hub_id=hub_id, persona=persona)
             body["verified"] = False
-            return _finish(body, window, cycle, assertive=assertive, utterance=text)
+            return _finish(
+                body, window, cycle, assertive=assertive, utterance=text, budget=budget
+            )
         store = turn_cycle.LearnProxy(titanos)
 
     try:
@@ -576,4 +716,11 @@ async def run_agent_chat(
         note = _upload_note(file_data)
         body["value"] = f"{note}\n\n{reply}".strip()
         body["reply_text"] = body["value"]
-    return _finish(body, window, cycle, assertive=assertive and status != "MOUTH_CLOSED", utterance=text)
+    return _finish(
+        body,
+        window,
+        cycle,
+        assertive=assertive and status != "MOUTH_CLOSED",
+        utterance=text,
+        budget=budget,
+    )
