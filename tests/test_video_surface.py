@@ -28,6 +28,8 @@ def test_page_layout_is_one_surface_and_names_no_other_product():
     assert "does not generate video" in html
     assert "Mouth off" in html
     assert 'href="/assets/site.css"' in html
+    assert 'href="/assets/chat-ui.css"' in html
+    assert "btn-label" in html
     assert 'id="timeline"' in html
     assert 'id="cost-meter"' in html
     assert "Reused frames" in html

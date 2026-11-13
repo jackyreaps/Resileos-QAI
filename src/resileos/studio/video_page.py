@@ -22,8 +22,14 @@ VIDEO_HTML = """<!DOCTYPE html>
 <title>Studio clip</title>
 <link rel="stylesheet" href="/assets/fonts/fonts.css">
 <link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/chat-ui.css">
 <style>
-  main.studio-clip { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; display: flex; flex-direction: column; gap: 16px; }
+  main.studio-clip {
+    --chip-bg: rgba(124, 92, 255, 0.14);
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+    max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; display: flex; flex-direction: column; gap: 16px;
+  }
+  main.studio-clip .btn-label { cursor: pointer; font: inherit; }
   main.studio-clip > section { max-width: none; margin: 0; padding: 16px 18px; }
   main.studio-clip h1 { font-size: 1.8rem; margin: 0; }
   main.studio-clip h2 { font-size: 1.15rem; margin: 0 0 8px; }
@@ -59,15 +65,15 @@ VIDEO_HTML = """<!DOCTYPE html>
     <input id="frames" type="file" accept="image/*" multiple>
     <label for="packet">Residual packet</label>
     <input id="packet" type="file" accept="application/json,.json">
-    <div class="row"><button id="scene" class="btn btn-ghost" type="button">Run scene steps</button></div>
+    <div class="row"><button id="scene" class="btn-label" type="button">Run scene steps</button></div>
     <p class="muted">Scene steps are stubs: geometry, lighting and materials, then camera and animation. No generator is called.</p>
   </section>
   <section id="stages" class="card">
     <h2>Stages</h2>
     <div class="row">
-      <button id="draft" class="btn btn-ghost" type="button">Draft</button>
-      <button id="verify" class="btn btn-ghost" type="button">Verify</button>
-      <button id="upscale" class="btn btn-ghost" type="button" disabled>Upscale</button>
+      <button id="draft" class="btn-label" type="button">Draft</button>
+      <button id="verify" class="btn-label" type="button">Verify</button>
+      <button id="upscale" class="btn-label" type="button" disabled>Upscale</button>
     </div>
     <p id="stage-note" class="muted"></p>
   </section>
@@ -77,8 +83,8 @@ VIDEO_HTML = """<!DOCTYPE html>
     <p>Lesson <span id="lesson">—</span></p>
     <p>Residual hash <span id="hash">—</span></p>
     <div class="row">
-      <button id="checkpoint" class="btn btn-ghost" type="button">Checkpoint</button>
-      <button id="restore" class="btn btn-ghost" type="button">Restore fresh</button>
+      <button id="checkpoint" class="btn-label" type="button">Checkpoint</button>
+      <button id="restore" class="btn-label" type="button">Restore fresh</button>
     </div>
     <pre id="fresh" class="codebox"></pre>
   </section>
@@ -92,7 +98,7 @@ VIDEO_HTML = """<!DOCTYPE html>
     <p id="mouth" class="muted">Mouth off</p>
     <p id="candidate" class="muted">No promotable candidate</p>
     <p id="url" class="muted"></p>
-    <div class="row"><button id="download" class="btn btn-ghost" type="button">Download packet</button></div>
+    <div class="row"><button id="download" class="btn-label" type="button">Download packet</button></div>
     <h2>Control history</h2>
     <pre id="history"></pre>
   </section>
