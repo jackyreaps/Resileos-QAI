@@ -61,7 +61,7 @@ The meta-aware root does five things. It recognizes a frame as a frame, keeps ax
 
 The collapse check runs before a residual is written upward. It refuses the promotion, returns `ABSTAINED` with `failure: false`, and does not write when axes are merged without a stated reason, a lower non-claim is missing, or an open frame would become closed. A stated `axis_merge_reason` is what allows a combine. The default frames keep the same axes, keep every lower non-claim, and stay open, so an ordinary opt-in still promotes. The HTTP API does not accept a client frame.
 
-`src/resileos/latent_hub.py` is the language hub: `put`, `get`, and `nearest` on hypervectors. It is not a fact store, and `nearest` is a similarity score, so this path never calls it and never ranks a statement that way. `PersonaStore.latent_hub().read(scope)` reads this store's own residual (`self`, `promoted`, or `all`) as `{id, text, label, source}`. The two stay separate.
+`src/resileos/latent_hub.py` is the language hub. Its interface is `encode`, `bind_bundle`, `put`, `get`, and `nearest` on hypervectors. It is not a fact store, and `nearest` is a similarity score, so this path never calls those methods and never ranks a statement that way. `writes_latent_hub` stays false. `PersonaStore.latent_hub().read(scope)` reads this store's own residual (`self`, `promoted`, or `all`) as `{id, text, label, source}`. The two stay separate.
 
 ## Guild names this tier reuses
 

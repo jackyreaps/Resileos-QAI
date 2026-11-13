@@ -19,7 +19,13 @@ from resileos.persona.principal import (
 from resileos.persona.reflection import Openness, hub_frame, individual_frame
 from resileos.persona.reflect import apply_turn_recall, recall_packet, reflect_utterance
 from resileos.persona.seed import load_self_facts
-from resileos.persona.store import PersonaStore, get_persona_store, guild_subject, set_persona_store
+from resileos.persona.store import (
+    LANGUAGE_HUB_INTERFACE,
+    PersonaStore,
+    get_persona_store,
+    guild_subject,
+    set_persona_store,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SHARED = "Ask again when the row is missing."
@@ -55,14 +61,19 @@ def test_seed_needles_match_the_repo():
 
 
 def test_package_does_not_call_titanos_or_residual_core():
+    hub_source = (ROOT / "src" / "resileos" / "latent_hub.py").read_text(encoding="utf-8")
+    assert LANGUAGE_HUB_INTERFACE == ("encode", "bind_bundle", "put", "get", "nearest")
+    for name in LANGUAGE_HUB_INTERFACE:
+        assert f"def {name}(" in hub_source
     for path in (ROOT / "src" / "resileos" / "persona").glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 names = [alias.name for alias in node.names]
-                assert all("titanos" not in name for name in names)
+                assert all("titanos" not in name and "latent_hub" not in name for name in names)
             if isinstance(node, ast.ImportFrom) and node.module:
                 assert "titanos" not in node.module
+                assert "latent_hub" not in node.module
                 assert not node.module.endswith("core")
 
 
@@ -90,6 +101,7 @@ def test_individual_isolation_edit_and_delete(store: PersonaStore):
     remaining = {cell["id"] for cell in store.list_stated(alice)}
     assert remaining == {"goal"}
     assert store.writes_titanos is False
+    assert store.writes_latent_hub is False
     assert store.writes_residual_core is False
 
 

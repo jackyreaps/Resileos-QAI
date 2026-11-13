@@ -169,13 +169,18 @@ class GuildRecord:
         }
 
 
+# ``resileos.latent_hub.LatentHub`` from the language pipeline. Persona
+# frames do not use these methods: ``nearest`` scores similarity, and
+# that hub is not a fact store.
+LANGUAGE_HUB_INTERFACE = ("encode", "bind_bundle", "put", "get", "nearest")
+
+
 class LatentHubRead:
     """Read the persona latent residual. This is not ``resileos.latent_hub``.
 
-    The language hub (``LatentHub.put`` / ``get`` / ``nearest``) stores
-    hypervectors. It is not a fact store and it scores similarity, so
-    persona frames never go through it. ``read(scope)`` returns seed and
-    promoted rows ``{id, text, label, source}`` from this store only.
+    ``read(scope)`` returns seed and promoted rows ``{id, text, label, source}``
+    from this store only. It does not call ``encode``, ``bind_bundle``,
+    ``put``, ``get``, or ``nearest``.
     """
 
     def __init__(self, store: PersonaStore) -> None:
@@ -212,6 +217,7 @@ class PersonaStore:
         self._lock = threading.Lock()
         self.writes_titanos = False
         self.writes_residual_core = False
+        self.writes_latent_hub = False
 
     def seed(self) -> SelfFacts:
         if self._seed is None:
