@@ -2,7 +2,7 @@
 
 One editable place for the address base, the recovery scale, and the
 phase per debt quantum. ``KuramotoField`` reads the outward weight from
-``outward_weight`` instead of a literal. See ``docs/oscillator-depth.md``.
+``outward_weight`` instead of a literal. See ``docs/300-substrate/oscillator-depth.md``.
 """
 from __future__ import annotations
 

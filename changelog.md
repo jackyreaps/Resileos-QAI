@@ -23,10 +23,10 @@ are stable and never reused.
   Waist N=36 caps factors (clip, with `within_waist` to refuse).
   Debt quantum ε=1/64: `keep_packet` is false below 1/64, true at
   equality. Persona-store tiers map Individual→individual, Hub→local,
-  Latent→global with no promotion. See `docs/five-pin.md`.
+  Latent→global with no promotion. See `docs/200-core/five-pin.md`.
 - Optional `pin` and `address` fields on `ControlPacket`/`VideoPacket`
   (default `None`, recorded only; verify gates unchanged).
-- `docs/outer-layer.md` — outer-layer flow: Hermes envelopes → Eat → Zeus
+- `docs/320-titanos/outer-layer.md` — outer-layer flow: Hermes envelopes → Eat → Zeus
   reviewers → Titanos; Iris trace sensor; Hades lesson notes; clip check
   metrics. Lists renames from the drafts and what was left out.
 - `src/resileos/kin/eat_envelope.py` — temporal envelope check, attention
@@ -56,8 +56,12 @@ are stable and never reused.
 - `src/resileos/substrate/__init__.py` — substrate package.
 
 ### Changed
+- Loose docs at the `docs/` root moved into the existing folders:
+  `five-pin.md` → `200-core/`, `oscillator-depth.md` → `300-substrate/`,
+  `outer-layer.md` and `guild-merit.md` → `320-titanos/`.
 - `docs/readme.md` — RES-600/601/602 added to reading order; 600-series added
-  to the categories table.
+  to the categories table. Index also lists the moved pages, belt-scale,
+  and cascade promotion.
 
 ### Notes
 ### Notes

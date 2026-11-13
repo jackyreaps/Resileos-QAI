@@ -97,6 +97,12 @@ Harness and current product surface (code on main; some numbered docs above stil
 - [Exact memory bench](benchmarks/memory-vs-llm.md), [chain composition](benchmarks/compositional-generalization.md), [invention bench](benchmarks/invention-without-hallucination.md) — 2026-11-10 runs; no model key was set
 - [Measurement sample, 2026-11-12](benchmarks/measurement-2026-11-12.md) — exact recall, abstention, composition, equal budget, temporal conflict, in-process latency, mouth-policy leak count. No model was called. Chain p95 on that VM was above 500 ms.
 - [Component inventory](320-titanos/component-inventory.md) — RES-346. What Kin, demi-gods, legions, swarms, and studio modules do on this tree, and which shells were left alone.
+- [Five-pin cascade address](200-core/five-pin.md) — 5-pin construction on frames (3, 5, 9, 12)
+- [Belt scale](studio/belt-scale.md) — visual matrix control; belt here is a scale index
+- [Oscillator depth](300-substrate/oscillator-depth.md) — Kuramoto field depth and outward weight
+- [Outer layer](320-titanos/outer-layer.md) — Hermes envelopes → Eat → Zeus reviewers → Titanos
+- [Cascade promotion](320-titanos/cascade-learn.md) — one-step, opt-in subject for a verified fact
+- [Guild merit](320-titanos/guild-merit.md) — merit and credit in a guild
 
 Reference:
 52. [Glossary](900-reference/glossary.md) — RES-900

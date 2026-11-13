@@ -19,7 +19,7 @@ module does not build images, call learn, or write a scar.
 ## The word "belt" here
 
 The `belt` field on this control is the scale's index in the list
-above. It is not the 5-mod Human Belt in the [five-pin](../five-pin.md)
+above. It is not the 5-mod Human Belt in the [five-pin](../200-core/five-pin.md)
 construction, which is always 5 (2 dyadic + 3 triadic). The name
 `local` also differs: five-pin `local` is the hub pin at frame 5;
 belt-scale `local` is the edge scale at frame 3.

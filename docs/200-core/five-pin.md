@@ -84,7 +84,7 @@ this module.
 ## Related
 
 Visual-path matrix control is described in
-[belt-scale](studio/belt-scale.md). That page's `belt` field is a
+[belt-scale](../studio/belt-scale.md). That page's `belt` field is a
 scale index (0..3), not this 5-mod Human Belt. One-step outward
 promotion of a verified, opted-in fact is described in
-[cascade promotion](320-titanos/cascade-learn.md).
+[cascade promotion](../320-titanos/cascade-learn.md).
