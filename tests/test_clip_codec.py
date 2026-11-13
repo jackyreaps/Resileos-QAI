@@ -145,7 +145,7 @@ def test_a_wide_frame_is_projected_before_it_is_coded():
 
 
 def test_sequence_records_keep_floor_without_changing_the_gate():
-    from resileos.ui.five_pin import keep_packet
+    from resileos.ui.cascade_address import keep_packet
 
     encoded = encode_sequence(_edge())
     assert encoded["kept"] is keep_packet(encoded["energy"])

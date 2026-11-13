@@ -10,18 +10,18 @@ The coordinate is a stable address:
 
 Later encoders replace the feature function. The address shape stays.
 
-An optional ``scale`` names a belt-scale control (see
-``resileos.ui.belt_scale``). That control sets the cascade address
-(belt index and frame) via ``cascade_address``. It does not rebuild
-the pixel matrix, call learn, or write a scar.
+An optional ``scale`` names an orientation scale (see
+``orientation_scale`` in ``resileos.ui.cascade_address``). That
+control sets the cascade frame (and records ``scale_level``). The
+cascade ``belt`` is the 5-mod Human Belt. It does not rebuild the
+pixel matrix, call learn, or write a scar.
 
 ``suite_residual`` still receives the original ``belt`` argument, not
-the scale index. The scale index would change ``residual_bin``
-(the placeholder label includes ``belt % 4``), and the orientation
-index is only meant to change the address. Pixel features and
-``residual_bin`` therefore stay the same as a no-scale call that
-used the same ``belt``. With ``scale`` omitted or empty, the returned
-dict is unchanged from the previous signature.
+the scale level. A scale level passed as belt would change
+``residual_bin`` (the placeholder label includes ``belt % 4``).
+Pixel features and ``residual_bin`` therefore stay the same as a
+no-scale call that used the same ``belt``. With ``scale`` omitted or
+empty, the returned dict is unchanged from the previous signature.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from typing import Any
 
 import numpy as np
 
-from resileos.ui.cascade_address import cascade_address
+from resileos.ui.cascade_address import BELT, cascade_address, orientation_scale
 from resileos.ui.suite_residual import suite_residual
 
 
@@ -54,19 +54,17 @@ def embed_frame(
     """Embed one frame into a residual address.
 
     arr: HxW or HxWxC
-    scale: optional belt scale name. When set, the cascade address
-    uses that control's belt index and frame. The original ``belt``
-    is still passed to ``suite_residual``.
+    scale: optional orientation-scale name. When set, the cascade
+    address uses the Human Belt and that control's frame. The
+    original ``belt`` argument is still passed to ``suite_residual``.
     """
     bin_belt = int(belt)
     address_belt = bin_belt
     address_frame = int(frame)
     control = None
     if scale:
-        from resileos.ui.belt_scale import matrix_control
-
-        control = matrix_control(scale)
-        address_belt = int(control["belt"])
+        control = orientation_scale(scale)
+        address_belt = BELT
         address_frame = int(control["frame"])
     if arr.ndim == 3:
         gray = arr[..., :3].astype(np.float32)
@@ -93,6 +91,7 @@ def embed_frame(
     if control is not None:
         path = cascade_address(address_belt, address_frame, rbin)
         out["scale"] = control["scale"]
+        out["scale_level"] = control["scale_level"]
         out["orientation"] = control["orientation"]
         out["proportion"] = control["proportion"]
         out["phi_weight"] = control["phi_weight"]

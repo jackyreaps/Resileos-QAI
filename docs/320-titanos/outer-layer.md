@@ -129,16 +129,15 @@ These are milliseconds, not microseconds.
 ## Five-pin address
 
 The 5-pin is a construction on the ordered cascade (3, 5, 9, 12), not
-a label. It sits at the 5-frame. See [five-pin](../200-core/five-pin.md) for
-the belt, the three pins, the waist (N=36), and the debt quantum
-(ε = 1/64). `VideoPacket` and `ControlPacket` record optional `pin`
-and `address` fields that default to `None`. They are not a verify
-gate.
+a label. It sits at the 5-frame. See
+[cascade address](../200-core/cascade-address.md) for the Human Belt,
+the three pins, orientation scales, the waist (N=36), and the debt
+quantum (ε = 1/64). `VideoPacket` and `ControlPacket` record optional
+`pin` and `address` fields that default to `None`. They are not a
+verify gate.
 
-Visual matrix control on the same cascade of frames is in
-[belt-scale](../studio/belt-scale.md). One-step, opt-in promotion of a
-verified fact (user → org → world) is in
-[cascade promotion](cascade-learn.md).
+One-step, opt-in promotion of a verified fact (user → org → world) is
+in [cascade promotion](tier-promotion.md).
 
 ## Defaults
 

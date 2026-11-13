@@ -26,6 +26,6 @@ verification:
 guides:
   always:
     - "docs/harness/CONSTRAINTS.md"
-    - "docs/RES-100/architecture.md"
+    - "docs/100-foundations/architecture.md"
   jit:
     - "docs/harness/AGENTS.md"

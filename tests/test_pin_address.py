@@ -1,9 +1,8 @@
-"""Five-pin cascade address on the 5-frame."""
+"""Pin cascade address on the 5-frame."""
 import pytest
 
 from resileos.harness.packet import ControlPacket, VideoPacket
-from resileos.ui.cascade_address import cascade_address
-from resileos.ui.five_pin import (
+from resileos.ui.cascade_address import (
     BELT,
     CASCADE_FRAMES,
     DYADIC,
@@ -11,18 +10,19 @@ from resileos.ui.five_pin import (
     OUTER_FRAME,
     TRIADIC,
     WAIST,
-    address,
+    cascade_address,
     cap_factor_count,
     clip_factors,
     keep_packet,
+    pin_address,
     pin_for_tier,
     tier_for_pin,
     within_waist,
 )
 
 
-def test_address_local_returns_belt_5_frame_5_waist_36():
-    addr = address("local")
+def test_pin_address_local_returns_belt_5_frame_5_waist_36():
+    addr = pin_address("local")
     assert addr["belt"] == 5
     assert addr["frame"] == 5
     assert addr["waist"] == 36
@@ -32,8 +32,8 @@ def test_address_local_returns_belt_5_frame_5_waist_36():
     assert addr["epsilon"] == 1 / 64
 
 
-def test_address_global_returns_frame_9():
-    addr = address("global")
+def test_pin_address_global_returns_frame_9():
+    addr = pin_address("global")
     assert addr["frame"] == 9
     assert addr["belt"] == 5
     assert addr["pin"] == "global"
@@ -43,8 +43,8 @@ def test_address_global_returns_frame_9():
     assert addr["frame"] != 12
 
 
-def test_address_individual():
-    addr = address("individual")
+def test_pin_address_individual():
+    addr = pin_address("individual")
     assert addr["pin"] == "individual"
     assert addr["level"] == 0
     assert addr["belt"] == 5
@@ -56,15 +56,14 @@ def test_address_individual():
 
 def test_unknown_pin_raises():
     with pytest.raises(ValueError, match="unknown pin"):
-        address("hub")
+        pin_address("hub")
     with pytest.raises(ValueError, match="unknown pin"):
-        address("edge")
+        pin_address("edge")
     with pytest.raises(ValueError, match="unknown pin"):
-        address("")
+        pin_address("")
 
 
 def test_epsilon_floor_keeps_equality_and_drops_below():
-    # Energy < 1/64 is not kept. Energy == 1/64 is kept.
     assert keep_packet(1 / 64) is True
     assert keep_packet(EPSILON) is True
     assert keep_packet(1 / 64 + 1e-18) is True
@@ -91,35 +90,37 @@ def test_waist_caps_factor_counts_and_sequences():
 
 
 def test_persona_store_tiers_map_to_pins():
-    # Reuses persona-store tier names (individual, hub, latent). No promotion.
     assert pin_for_tier("individual") == "individual"
     assert pin_for_tier("hub") == "local"
     assert pin_for_tier("latent") == "global"
     assert tier_for_pin("individual") == "individual"
     assert tier_for_pin("local") == "hub"
     assert tier_for_pin("global") == "latent"
-    assert address(pin_for_tier("hub"))["frame"] == 5
-    assert address(pin_for_tier("latent"))["frame"] == 9
+    assert pin_address(pin_for_tier("hub"))["frame"] == 5
+    assert pin_address(pin_for_tier("latent"))["frame"] == 9
     with pytest.raises(ValueError, match="unknown persona tier"):
         pin_for_tier("edge")
     with pytest.raises(ValueError, match="unknown pin"):
         tier_for_pin("latent")
 
 
-def test_address_uses_cascade_address_path():
-    addr = address("local")
+def test_pin_address_uses_cascade_address_path():
+    addr = pin_address("local")
     expected = cascade_address(5, 5, "hub")
     assert addr["path"] == expected["path"]
     assert addr["residual"] == expected["residual"]
-    custom = address("global", residual="packet-hash")
+    custom = pin_address("global", residual="packet-hash")
     assert custom["path"] == cascade_address(5, 9, "packet-hash")["path"]
     assert custom["scale"] == "latent_hub"
 
 
-def test_belt_and_cascade_constants():
+def test_belt_is_only_the_human_belt():
     assert DYADIC + TRIADIC == BELT == 5
     assert CASCADE_FRAMES == (3, 5, 9, 12)
     assert OUTER_FRAME == 12
+    assert pin_address("individual")["belt"] == BELT
+    assert pin_address("local")["belt"] == BELT
+    assert pin_address("global")["belt"] == BELT
 
 
 def test_video_packet_pin_and_address_default_to_none():
@@ -129,9 +130,7 @@ def test_video_packet_pin_and_address_default_to_none():
     data = packet.to_dict()
     assert data["pin"] is None
     assert data["address"] is None
-    # Recorded only: attaching an address does not mark the packet verified
-    # and does not invent a learn or scar write.
-    held = address("local")
+    held = pin_address("local")
     recorded = VideoPacket(id="clip-local", pin="local", address=held)
     assert recorded.verified is False
     assert recorded.scars == []

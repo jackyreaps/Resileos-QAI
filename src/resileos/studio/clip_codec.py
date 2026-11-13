@@ -35,7 +35,7 @@ from studio.codec import logical_bits, pack_packet  # noqa: E402
 from resileos.phi_compress import contract_depth, contract_rank
 from resileos.studio.residual_cascade import ACCEPT_ENERGY, LAYER_GAIN
 from resileos.ui.frame_codec import project_gray
-from resileos.ui.five_pin import keep_packet
+from resileos.ui.cascade_address import keep_packet
 from resileos.ui.residual_frame import (
     apply_residual,
     as_gray,

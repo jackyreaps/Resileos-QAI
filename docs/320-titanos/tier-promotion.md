@@ -1,6 +1,6 @@
 # Cascade promotion
 
-`src/resileos/answer/cascade_learn.py` returns the next-scale subject
+`src/resileos/persona/promote.py` returns the next-scale subject
 for a residual fact. It does not re-verify (the live CascadeRouter
 sets `verified`), it does not write, and it does not call Eat, learn,
 or the scar matrix. A caller that wants the fact stored hands the
@@ -18,8 +18,9 @@ stay at their current scale. There is no automatic promotion.
 
 ## Scales and namespaces
 
-The scale names are the five-pin names, mapped onto the persona-store
-tiers from PR #31. One vocabulary is used.
+The scale names are the pin names from
+[cascade address](../200-core/cascade-address.md), mapped onto the
+persona-store tiers from PR #31. One vocabulary is used.
 
 | Pin / scale | Persona tier | Hub prefix |
 | ----------- | ------------ | ---------- |
@@ -42,3 +43,8 @@ The persona store already stores only the residual against the tier
 above when a fact is promoted on that store. This helper does not
 write. Titanos `learn` stores a full fact at the new subject, not a
 residual against the tier above. That gap is left with the learn path.
+
+## Renames
+
+See the rename table in [cascade address](../200-core/cascade-address.md).
+The draft module `cascade_learn.py` is now `resileos.persona.promote`.

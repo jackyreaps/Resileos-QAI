@@ -1,14 +1,14 @@
 """Opt-in, one-step outward promotion on the cascade scales."""
 import pytest
 
-from resileos.answer.cascade_learn import (
+from resileos.persona.promote import (
     PREFIX,
     SCALES,
     promote,
     scale_of_subject,
     subject_at,
 )
-from resileos.ui.five_pin import PIN_TO_TIER, pin_for_tier
+from resileos.ui.cascade_address import PIN_TO_TIER, pin_for_tier
 
 
 FACT = {"subject": "user:ada", "relation": "likes", "obj": "tea"}

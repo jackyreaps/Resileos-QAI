@@ -11,12 +11,12 @@ subject to the existing Eat / learn path. Studio, visual, and persona
 paths must not call learn. No scar update beyond the learn at the scale
 that accepted it.
 
-Scales are the five-pin names (individual, local, global), which map
-onto the persona-store tiers (individual, hub, latent). One vocabulary
-is used; see ``resileos.ui.five_pin``.
+Scales are the pin names (individual, local, global), which map onto
+the persona-store tiers (individual, hub, latent). One vocabulary is
+used; see ``resileos.ui.cascade_address``.
 
 Hub namespaces in ``hub_train.py`` are ``user:``, ``world:``, and
-``org:``. The draft mapped individual→user, local→world, global→org.
+``org:``. A draft mapped individual→user, local→world, global→org.
 That pairing is backwards relative to the repo: ``org:`` is the tenant
 and guild-hub namespace (``org:guild:...``), and ``world:`` is the
 shared project / world-facts namespace. The mapping used here is:
@@ -38,9 +38,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from resileos.ui.five_pin import PIN_TO_TIER, PINS, TIER_TO_PIN, pin_for_tier, tier_for_pin
+from resileos.ui.cascade_address import (
+    PIN_TO_TIER,
+    PINS,
+    TIER_TO_PIN,
+    pin_for_tier,
+    tier_for_pin,
+)
 
-# Pin names, outward. Same sequence as ``resileos.ui.five_pin.PINS``.
+# Pin names, outward. Same sequence as ``resileos.ui.cascade_address.PINS``.
 SCALES: tuple[str, ...] = ("individual", "local", "global")
 
 # Corrected hub_train prefixes. Draft had local=world, global=org.
@@ -52,7 +58,6 @@ PREFIX: dict[str, str] = {
 
 _PREFIX_TO_SCALE: dict[str, str] = {prefix: scale for scale, prefix in PREFIX.items()}
 
-# Re-export the shared pin/tier maps so callers do not define a parallel set.
 __all__ = [
     "PREFIX",
     "SCALES",
