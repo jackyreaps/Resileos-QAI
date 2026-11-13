@@ -145,7 +145,7 @@ The marketing site is deployed as Cloudflare Pages project `resileos`.
 - Production URL: https://resileos.pages.dev
 - Custom domains: https://resileosai.fun and https://www.resileosai.fun
 - Static assets: `public/` (exclude `public/assets/gods/cc0/`)
-- Functions: `functions/api/config.js`, `free-key.js`, `create-checkout-session.js`, `claim/[session_id].js`, and `functions/api/session/*` (magic link, password, account, proxy)
+- Functions: `functions/api/config.js`, `free-key.js`, `create-checkout-session.js`, `claim/[session_id].js`, and `functions/api/session/*` (magic link, password, account, proxy, admin reports)
 - KV namespace `resileos-keys` bound as `KEYS` (hashed key records, sealed key material, sessions, email and IP limits, one-time claim)
 - Plaintext env: `STRIPE_PRICE_*`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`, `RESILEOS_SITE_URL`, `RESILEOS_API_BASE_URL=https://api.resileosai.fun/api/v1`, `FREE_KEY_RATE_PER_HOUR`, `MAGIC_LINK_TTL_SECONDS` (900), `SESSION_TTL_SECONDS` (1209600), `PASSWORD_PBKDF2_ITERATIONS` (100000)
 - Encrypted secrets: `STRIPE_SECRET_KEY`, `SESSION_SECRET`, `KEY_SEAL_SECRET`, `RESILEOS_PROXY_SECRET`, and one email provider (below)
@@ -186,6 +186,7 @@ Pages → project `resileos` → Settings → Variables and secrets. Do not comm
 | `CLOUDFLARE_KV_NAMESPACE_ID` | API host. This namespace is `463f5f1f1d0a484fb3b9a8e79f0fc413` | yes with the token |
 | `RESILEOS_KV_CACHE_TTL` | API host, seconds, default 30 | optional |
 | `RESILEOS_TRIAL_DAILY_LIMIT` | API host, default 20 | optional |
+| `ADMIN_EMAILS` | Pages env, comma-separated operator addresses, empty by default | optional; leave unset and `/admin/reports` stays closed. Do not commit addresses in the repo |
 
 Email, pick one:
 

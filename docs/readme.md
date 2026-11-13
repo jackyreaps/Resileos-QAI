@@ -101,6 +101,9 @@ Harness and current product surface (code on main; some numbered docs above stil
 - [Oscillator depth](300-substrate/oscillator-depth.md) — Kuramoto field depth and outward weight
 - [Outer layer](320-titanos/outer-layer.md) — Hermes envelopes → Eat → Zeus reviewers → Titanos
 - [Cascade promotion](320-titanos/tier-promotion.md) — one-step, opt-in subject for a verified fact
+- [Residual factors](320-titanos/residual-factors.md) — content-free default hub training, with opt-out
+- [Upgrade proposals](320-titanos/upgrade-proposals.md) — auto and review tiers, admin report view
+- [Chroma orientation](studio/chroma-orientation.md) — belt codes, φ-stepped variations, measured cost
 - [Guild merit](320-titanos/guild-merit.md) — merit and credit in a guild
 
 Reference:

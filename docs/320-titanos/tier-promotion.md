@@ -11,10 +11,16 @@ No scar update beyond the learn at the scale that accepted it.
 
 ## Opt-in
 
-Data moves up a tier only by explicit opt-in. `promote` requires both
-`verified=True` and `opt_in=True` (or a non-empty consent token).
-Unverified facts, and verified facts without opt-in, are refused and
-stay at their current scale. There is no automatic promotion.
+Richer material still moves up a tier only by explicit opt-in.
+`promote` requires both `verified=True` and `opt_in=True` (or a
+non-empty consent token). Unverified facts, and verified facts
+without opt-in, are refused and stay at their current scale. There
+is no automatic promotion of content.
+
+Content-free residual factors are a separate, default path: verified
+factors with no source content may train `org:` and `world:` without
+opt-in, subject to opt-out, the 1/64 floor, the waist cap, and a
+minimum contributor count. See [residual factors](residual-factors.md).
 
 ## Scales and namespaces
 
@@ -42,7 +48,10 @@ refused. The global scale cannot promote further.
 The persona store already stores only the residual against the tier
 above when a fact is promoted on that store. This helper does not
 write. Titanos `learn` stores a full fact at the new subject, not a
-residual against the tier above. That gap is left with the learn path.
+residual against the tier above. The [residual-factors](residual-factors.md)
+path narrows that gap for the default factor path: Eat still writes a
+triple, but the object is the factor aggregate, not source content.
+The richer promote path is unchanged.
 
 ## Renames
 

@@ -6,6 +6,24 @@ are stable and never reused.
 ## [Unreleased]
 
 ### Added
+- Content-free residual factors (`src/resileos/persona/residual_factors.py`)
+  train `org:` and `world:` by default when verified, not opted out,
+  above 1/64, within the waist of 36, and aggregated with at least
+  three contributors. Richer promotion still needs opt-in. Morpheus
+  recombines aggregates into unverified dream candidates and never
+  learns, scars, or writes Titanos from that stage. See
+  `docs/320-titanos/residual-factors.md`.
+- Upgrade proposals (`upgrade_report.py`, `operational_tune.py`) split
+  auto and review tiers. Auto applies only allowlisted operational
+  state, versioned and metric-gated, with auto-revert. Review stays
+  pending. Approval only marks a proposal for a later PR. The
+  admin-only view is `/admin/reports`, behind the PR #33 session
+  cookie, gated by `ADMIN_EMAILS` (empty by default). A daily email
+  digest is documented as a future step. See
+  `docs/320-titanos/upgrade-proposals.md`.
+- Belt chroma compression (`src/resileos/ui/chroma.py`): five-channel
+  codes, φ-stepped variations, measured against naive frames. See
+  `docs/studio/chroma-orientation.md`.
 - `src/resileos/ui/cascade_address.py` — Human Belt, pins, and
   orientation scales on frames (3, 5, 9, 12). Belt means only the
   5-mod Human Belt. `pin_address("local")` is belt 5, frame 5.

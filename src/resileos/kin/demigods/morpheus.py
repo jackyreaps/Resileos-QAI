@@ -179,3 +179,127 @@ def run_idle(
         "device": "cpu",
         "writes_before_review": False,
     }
+
+
+def dream_factor_candidates(
+    aggregates: list[dict[str, Any]],
+    *,
+    min_improvement: float = 0.0,
+) -> dict[str, Any]:
+    """Recombine content-free factor aggregates into unverified candidates.
+
+    This is the dream / creative consolidation path for residual
+    factors: error and scar signals, factorization fingerprints,
+    belt and orientation coordinates, and residual improvement.
+    Candidates stay unverified. This function never calls learn,
+    never writes Titanos, and never updates a scar matrix. A later
+    verification gate (Eat, with reviewer approval) is the only way
+    a candidate can be stored.
+    """
+    candidates: list[dict[str, Any]] = []
+    for item in aggregates or []:
+        if not isinstance(item, dict):
+            continue
+        body = item.get("aggregate") if isinstance(item.get("aggregate"), dict) else item
+        error = float(body.get("error") or 0.0)
+        scar = float(body.get("scar") or 0.0)
+        improvement = float(body.get("improvement") or 0.0)
+        if improvement < float(min_improvement) and error <= 0.0 and scar <= 0.0:
+            # Nothing to improve: skip empty or flat aggregates.
+            if not body.get("fingerprint") and not body.get("bins"):
+                continue
+        candidate = {
+            "kind": "factor_improvement",
+            "verified": False,
+            "fingerprint": body.get("fingerprint"),
+            "belt": body.get("belt"),
+            "chroma": body.get("chroma"),
+            "scale_level": body.get("scale_level"),
+            "factor_count": body.get("factor_count"),
+            "error": error,
+            "scar": scar,
+            "improvement": improvement,
+            "phi_weight": body.get("phi_weight"),
+            "bins": body.get("bins"),
+            "count": body.get("n") or body.get("count"),
+            "aggregate": dict(body),
+            "writes": False,
+            "learned": False,
+            "scar_matrix_updated": False,
+        }
+        candidates.append(candidate)
+    return {
+        "candidates": candidates,
+        "verified": False,
+        "writes": False,
+        "learned": False,
+        "scar_matrix_updated": False,
+        "writes_titanos": False,
+        "stage": "morpheus",
+    }
+
+
+def offer_factor_candidate(
+    candidate: dict[str, Any],
+    *,
+    verified: bool,
+    to_scale: str = "local",
+    ident: str = "cohort",
+) -> dict[str, Any]:
+    """Verification gate for a dream factor candidate.
+
+    Unverified candidates stay candidates. A verified candidate is
+    turned into an Eat envelope and is not written here. This gate
+    does not call learn, does not touch scars, and does not write
+    Titanos.
+    """
+    body = dict(candidate or {})
+    if not verified or not body:
+        return {
+            "ok": False,
+            "decision": "refuse",
+            "reason": "unverified; stays a candidate",
+            "candidate": body,
+            "verified": False,
+            "writes": False,
+            "learned": False,
+            "scar_matrix_updated": False,
+        }
+    from resileos.persona.residual_factors import FACTOR_RELATION
+    from resileos.persona.promote import subject_at
+    import json
+
+    offered = dict(body)
+    offered["verified"] = True
+    subject = subject_at(to_scale, ident)
+    obj = json.dumps(
+        {
+            "fingerprint": offered.get("fingerprint"),
+            "belt": offered.get("belt"),
+            "chroma": offered.get("chroma"),
+            "scale_level": offered.get("scale_level"),
+            "factor_count": offered.get("factor_count"),
+            "error": offered.get("error"),
+            "scar": offered.get("scar"),
+            "improvement": offered.get("improvement"),
+            "phi_weight": offered.get("phi_weight"),
+            "bins": offered.get("bins"),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return {
+        "ok": True,
+        "decision": "accept",
+        "verified": True,
+        "subject": subject,
+        "relation": FACTOR_RELATION,
+        "obj": obj,
+        "envelope": {"claim": {"subject": subject, "relation": FACTOR_RELATION, "obj": obj}, "source": "morpheus-dream"},
+        "candidate": offered,
+        "writes": False,
+        "learned": False,
+        "scar_matrix_updated": False,
+        "writes_titanos": False,
+        "note": "write only through Eat with reviewer approval",
+    }
