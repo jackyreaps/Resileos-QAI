@@ -57,8 +57,10 @@ Morpheus is a summoned demi-god under Hades, not a legion and not a Kin. It repl
 | `argus` | Hermes | Camera and animation stub. | Argus, the many-eyed watcher. |
 | `graphify` | Eat | Ingest a graph through `eat_filter`. | Not a god name. The public tool name stays `graphify`. |
 | `plan_test_debug` | Hermes | Plan, test, and debug. | Not a god name. The public tool name stays `plan_test_debug`. |
+| `dionysus` | Hermes | Expand synonym, root, and translation neighbours. Does not write Titanos. | Dionysus. Already registered on main. Not renamed, and not one of the scene stubs. |
+| Morpheus | Hades, as a demi-god | Replay logged turns and compress a recurring pattern. Not a legion. | Morpheus. Already on main. Not renamed. |
 
-No existing public API was renamed. A name already in use stays, and these three were checked against the Kin and legion names on this tree before they were added.
+No existing public API was renamed. Daedalus, Helios, and Argus were checked against the Kin names, the legion names, Dionysus, and Morpheus. None of those names were already in use.
 
 A Demi-god uses one of these only by naming it in the temporary swarm for its parent Kin.
 
