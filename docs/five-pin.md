@@ -80,3 +80,11 @@ recorded fields only. The clip stage does not assign a pin on its own,
 and the existing verify gates are unchanged. Studio, visual, and
 persona paths still do not call learn or write the scar matrix through
 this module.
+
+## Related
+
+Visual-path matrix control is described in
+[belt-scale](studio/belt-scale.md). That page's `belt` field is a
+scale index (0..3), not this 5-mod Human Belt. One-step outward
+promotion of a verified, opted-in fact is described in
+[cascade promotion](320-titanos/cascade-learn.md).

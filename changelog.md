@@ -6,6 +6,17 @@ are stable and never reused.
 ## [Unreleased]
 
 ### Added
+- `src/resileos/ui/belt_scale.py` — visual matrix control. Same
+  pentagram at every scale, phi as the proportion. `matrix_control`
+  belt is the scale index (orion → belt 2, frame 9), not the 5-mod
+  Human Belt. `embed_frame(..., scale=...)` sets the cascade address;
+  `suite_residual` still gets the original belt so `residual_bin` is
+  unchanged. No image is built. See `docs/studio/belt-scale.md`.
+- `src/resileos/answer/cascade_learn.py` — one-step outward subject
+  for a verified, opted-in fact. Never re-verifies, never writes.
+  Draft mapping local=world / global=org was reversed to match
+  hub_train and the persona tiers: individual→user, local→org,
+  global→world. See `docs/320-titanos/cascade-learn.md`.
 - `src/resileos/ui/five_pin.py` — 5-pin construction on the cascade
   (frames 3, 5, 9, 12) using `cascade_address`. Pins: individual
   (frame 5, edge), local (frame 5, hub), global (frame 9, latent_hub).

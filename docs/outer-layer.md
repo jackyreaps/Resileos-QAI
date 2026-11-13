@@ -135,6 +135,11 @@ the belt, the three pins, the waist (N=36), and the debt quantum
 and `address` fields that default to `None`. They are not a verify
 gate.
 
+Visual matrix control on the same cascade of frames is in
+[belt-scale](studio/belt-scale.md). One-step, opt-in promotion of a
+verified fact (user → org → world) is in
+[cascade promotion](320-titanos/cascade-learn.md).
+
 ## Defaults
 
 Nothing here changes `require_verified`, the Metis `allow_mouth`
