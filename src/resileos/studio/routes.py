@@ -18,6 +18,7 @@ import os
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from resileos.harness.tools import risk_classify
@@ -102,6 +103,29 @@ class StopBody(BaseModel):
     owner: str = Field(min_length=1, max_length=200)
 
 
+class VideoBody(BaseModel):
+    prompt: str = Field(default="", max_length=2000)
+    stage: str = "draft"
+    frames: list[Any] | None = None
+    sequence: dict[str, Any] | None = None
+    context: list[Any] | None = None
+    history: list[Any] | None = None
+
+
+class VideoRestoreBody(BaseModel):
+    checkpoint_id: str = ""
+
+
+class VideoCheckpointBody(BaseModel):
+    prompt: str = Field(default="", max_length=2000)
+    frames: list[Any] | None = None
+    sequence: dict[str, Any] | None = None
+
+
+class SceneBody(BaseModel):
+    script: str = Field(default="", max_length=8000)
+
+
 def _image(data: list[Any]) -> Any:
     import numpy as np
 
@@ -118,12 +142,28 @@ def _sampler_enabled() -> bool:
     return bool(resolve_external_sampler().enabled)
 
 
+def _mount_shared_assets(app: FastAPI) -> None:
+    """Serve the public site styles so studio pages use the same sheet."""
+    from pathlib import Path
+
+    from fastapi.staticfiles import StaticFiles
+
+    assets = Path(__file__).resolve().parents[3] / "landing" / "public" / "assets"
+    if not assets.is_dir():
+        return
+    for route in getattr(app, "routes", []):
+        if getattr(route, "path", None) == "/assets":
+            return
+    app.mount("/assets", StaticFiles(directory=str(assets)), name="shared-assets")
+
+
 def register_studio_routes(
     app: FastAPI,
     auth_dep: Any,
     get_titanos: Any = None,
 ) -> None:
     deps = [Depends(auth_dep)]
+    _mount_shared_assets(app)
 
     @app.get("/api/v1/studio/codecs", dependencies=deps)
     def studio_codecs() -> dict[str, Any]:
@@ -297,3 +337,54 @@ def register_studio_routes(
         from resileos.kin.moirai import stop_owner
 
         return to_jsonable(stop_owner(body.owner))
+
+    @app.get("/studio/video", response_class=HTMLResponse)
+    def studio_video_page() -> HTMLResponse:
+        from resileos.studio.video_page import VIDEO_HTML
+
+        return HTMLResponse(VIDEO_HTML)
+
+    @app.post("/api/v1/studio/video", dependencies=deps)
+    def studio_video(body: VideoBody) -> dict[str, Any]:
+        from resileos.kin.legions import LegionError
+        from resileos.kin.studio_tools import run_forge_video
+
+        stage = body.stage if body.stage in {"draft", "verify", "upscale"} else body.stage
+        try:
+            return to_jsonable(
+                run_forge_video(
+                    body.prompt,
+                    stage=stage,
+                    frames=body.frames,
+                    clip=True,
+                    sequence=body.sequence,
+                    context=body.context,
+                    clip_history=body.history,
+                )
+            )
+        except LegionError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/v1/studio/video/restore", dependencies=deps)
+    def studio_video_restore(body: VideoRestoreBody) -> dict[str, Any]:
+        from resileos.studio.sequence_stage import restore_clip_checkpoint
+
+        return to_jsonable(restore_clip_checkpoint(body.checkpoint_id))
+
+    @app.post("/api/v1/studio/video/checkpoint", dependencies=deps)
+    def studio_video_checkpoint(body: VideoCheckpointBody) -> dict[str, Any]:
+        from resileos.studio.sequence_stage import checkpoint_verified_clip
+
+        return to_jsonable(
+            checkpoint_verified_clip(
+                prompt=body.prompt,
+                frames=body.frames,
+                sequence=body.sequence,
+            )
+        )
+
+    @app.post("/api/v1/studio/video/scene", dependencies=deps)
+    def studio_video_scene(body: SceneBody) -> dict[str, Any]:
+        from resileos.kin.scene_legions import run_scene_workflow
+
+        return to_jsonable(run_scene_workflow(body.script))

@@ -37,14 +37,30 @@ This layer does not use LangChain, AutoGen, crewAI, or MetaGPT.
 
 ## Studio legions
 
-`register_studio_legions` registers three tools. Each stays on one Kin.
+`register_studio_legions` registers the studio tools. Each stays on one Kin. The three scene stubs are registered with them.
 
-- Hermes `forge_video` is the Forge video legion. Hephaestus is the Studio patron and is not a Kin, so the gate is Hermes. A matrix or residual packet is drafted and verified with the layer-scale studio codec (one scale on the rank-r product), phi-compressed below a native rank budget, and stepped with `KuramotoField` outward. That path accepts or rejects without a provider. Upscale stays off unless the residual check is inconclusive, and then it sends only the residual delta to a configured provider slot. A prompt with no residual input is a video request: with no provider the status is `UNAVAILABLE` and no URL is invented. The slot does not write residual facts. A worker process is a Clotho group and does not cross a Hades checkpoint.
+- Hermes `forge_video` is the Forge video legion. Hephaestus is the Studio patron and is not a Kin, so the gate is Hermes. The legion compresses and checks. It does not generate video. A matrix or a two-frame phase step is drafted and verified with the layer-scale studio codec (one scale on the rank-r product), phi-compressed below a native rank budget, and stepped with `KuramotoField` outward. A supplied clip is different: frame 0 is a base packet and each later frame is a residual against the previous reconstruction (`src/resileos/studio/clip_codec.py`). A later frame whose temporal residual RMS is at or under 0.05 is marked `residual-consistent, reuse previous packet` and does not add a packet. A frame over that gate is a delta packet. That path accepts or rejects without a provider. Upscale stays off unless the residual check is inconclusive, and then it sends only the failing-frame residual deltas that also clear the sigma gate to a configured provider slot. A prompt with no frames and no packet is `UNAVAILABLE` and no URL is invented. The slot does not write residual facts. Stable Video Diffusion weights are not a production path and are not wired. A worker process is a Clotho group and does not cross a Hades checkpoint. A Hades checkpoint for a clip stores the lesson and the packet hash, and only after the sequence verifies. `VideoPacket` carries frame-residual hashes, the temporal delta, keyframe ids, the provider stage, and an optional scene-script hash. It does not carry a script.
+- Hermes `daedalus`, `helios`, and `argus` are scene stubs under the same forge gate. Daedalus writes geometry, Helios writes lighting and materials, and Argus writes camera and animation. Each hashes its artifact and checkpoints through Hades. Restore starts from the lesson and the residual hash. The classical core sees that hash, not the script. No Blender executor is configured. See the naming table below.
 - Eat `graphify` turns a graph or text into residual candidates and runs each through `eat_filter`. `learn` runs only for an accept when commit is set. The residual record is what a later question reads. Reject and abstain do not write.
 - Hermes `plan_test_debug` plans, tests, and debugs. A repeated failure stops the loop. Lower-tier output stays out of the verified step. `write_file`, `apply_diff`, and `git_commit` stay refused until `verify_on_stop` passes. The HTTP route does not execute them.
 - Hermes `dionysus` expands a prompt into synonym, root, and translation neighbours. Bind and bundle run in `latent_hub`, which is not Titanos. Hermes may use those neighbours to re-rank items the caller already supplied. Dionysus does not write a fact, and it is not a Kin. The tables are closed. This is not open-ended translation, coding, or general reasoning.
 
 Morpheus is a summoned demi-god under Hades, not a legion and not a Kin. It replays logged turns and candidate branches on CPU, compresses a recurring pattern with the studio residual codec, and runs Hephaestus and Themis before Zeus may promote a triple. A candidate-only pattern is not promoted.
+
+## Naming
+
+| Tool | Kin | Job | Named for |
+|---|---|---|---|
+| `forge_video` | Hermes | Compress and check a supplied still or clip. Does not generate video. | The forge, under Hephaestus. The tool name is unchanged. |
+| `daedalus` | Hermes | Scene geometry stub. Writes an artifact and a residual hash. | Daedalus, the craftsman. |
+| `helios` | Hermes | Lighting and materials stub. | Helios, the sun. |
+| `argus` | Hermes | Camera and animation stub. | Argus, the many-eyed watcher. |
+| `graphify` | Eat | Ingest a graph through `eat_filter`. | Not a god name. The public tool name stays `graphify`. |
+| `plan_test_debug` | Hermes | Plan, test, and debug. | Not a god name. The public tool name stays `plan_test_debug`. |
+| `dionysus` | Hermes | Expand synonym, root, and translation neighbours. Does not write Titanos. | Dionysus. Already registered on main. Not renamed, and not one of the scene stubs. |
+| Morpheus | Hades, as a demi-god | Replay logged turns and compress a recurring pattern. Not a legion. | Morpheus. Already on main. Not renamed. |
+
+No existing public API was renamed. Daedalus, Helios, and Argus were checked against the Kin names, the legion names, Dionysus, and Morpheus. None of those names were already in use.
 
 A Demi-god uses one of these only by naming it in the temporary swarm for its parent Kin.
 

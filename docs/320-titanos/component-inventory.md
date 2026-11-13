@@ -50,8 +50,8 @@ Samples stay candidates. No visual path calls `learn`.
 | Nike on `apollo_cycle`, Themis inside `plan_test_debug` | `nike_check` fails when the lesson has no explicit criterion line. The plan loop's "themis" role is the existing mutate refusal (`verify_on_stop`), and the loop does not build a Hades lesson. Calling the checks without those inputs would fail closed for a reason the caller did not supply. |
 | Rheology coordinates and the canonical metric-bridge head | `NotImplementedError` by design until the coordinate system in RES-601 is derived. Not a studio shell. |
 | External samplers and video providers | Slots stay off. Unconfigured calls return unavailable and do not invent a URL. Higgsfield, Seedance, ComfyUI, OpenAI, Kapwing, vidful.ai, aifreevideo.com, and Stable Video Diffusion are not wired. Official SVD weights are research-licensed and are not a path for this product. |
-| A residual-gated video page | Documented under "Video surface" below. Not built. |
-| Clip-level temporal residual tracking | The next change after this inventory. See the last section. This pull request does not start it. |
+| A residual-gated video page | Left out of PR #28. This tree now has `GET /studio/video` and the Streamlit Video tab. See "Video surface". |
+| Clip-level temporal residual tracking | Left out of PR #28. This tree now has `src/resileos/studio/clip_codec.py`. See "Temporal residual clip". |
 | PR #27 | Squash-merged to `main` at `a640101`. `src/resileos/ui/residual_frame.py` is on this tree. |
 
 ## Residual core and packets
@@ -121,7 +121,10 @@ Registered when the app process starts (`app.py` `_register_runtime_legions`):
 | Legion | Kin | What it does | Facts / Zeus | Class | Next increment |
 |---|---|---|---|---|---|
 | `web_search` | Hermes | Posts the query to the DuckDuckGo HTML endpoint and parses result anchors. | No residual write. | Wrapper around that site. Real when the network call works. | Keep it off the residual store. Failures return `ERROR` and an empty result list. |
-| `forge_video` | Hermes | A matrix or residual packet is drafted and verified with the layer-scale codec, phi-compressed, and stepped with `KuramotoField` outward. `produces_video` stays false. A prompt with no residual input is `UNAVAILABLE` and `url` is null when no provider is configured. Upscale runs only after an inconclusive residual, and only if a provider slot is set. | The wrapper strips `learn_fn` and `bypass_zeus`. The cascade raises if those are passed. | Residual-native for a matrix. The prompt-only branch is an optional provider slot, off by default. | Do not point the empty slot at a hosted video product. |
+| `forge_video` | Hermes | Compresses and checks a supplied matrix, a frame pair, or a clip. A clip is one base packet plus delta packets for frames whose temporal residual RMS is over 0.05. Frames at or under that gate reuse the previous packet. `produces_video` stays false. It does not generate video. A prompt with no frames and no packet is `UNAVAILABLE` and `url` is null. Upscale runs only after an inconclusive residual, and only if a provider slot is set. | The wrapper strips `learn_fn` and `bypass_zeus`. The cascade raises if those are passed. The clip path does not call `ResidualCore.step`. | Residual-native for frames that already exist. The prompt-only branch is an optional provider slot, off by default. | Do not point the empty slot at a hosted video product. Stable Video Diffusion weights are not a path. |
+| `daedalus` | Hermes | Scene geometry stub. Writes an artifact and a residual hash, then a Hades checkpoint. | No residual write. The classical core sees the hash only. | Stub. No Blender executor. | Leave it a stub until an executor exists. |
+| `helios` | Hermes | Lighting and materials stub. Same checkpoint boundary as Daedalus. | No residual write. | Stub. | Same as Daedalus. |
+| `argus` | Hermes | Camera and animation stub. Same checkpoint boundary as Daedalus. | No residual write. | Stub. | Same as Daedalus. |
 | `graphify` | Eat | Parses edges, runs `eat_filter`, and records a residual candidate hash. `commit` plus an allow risk can call `learn_fn`. | Writes only through the Eat legion gate. | Residual-native. Real. | — |
 | `plan_test_debug` | Hermes | Budgeted plan / test / debug. `write_file`, `apply_diff`, and `git_commit` stay refused until `verify_on_stop` passes and `allow_mutate` is set. The HTTP route does not execute them. | No learn. | Real loop. The role labels `themis: "law"` and `hades: "lessons"` do not call `themis_check` or `Hades.save` (`checkpoint` is null). | Leave the labels honest in this inventory rather than calling checks that lack a lesson. |
 | `dionysus` | Hermes | Expands synonym, root, and translation neighbours into the latent hub and can re-rank items Hermes already has. | No Titanos write. | Real closed tables plus bind/bundle. | Not a translation model. |
@@ -147,7 +150,7 @@ Importing the library registers nothing until `register_*` runs.
 
 | Module | Path | What it does | Facts / Zeus / scars | Class | Next increment |
 |---|---|---|---|---|---|
-| Residual cascade | `src/resileos/studio/residual_cascade.py` | Layer-scale codec, outward Kuramoto order, Hephaestus, residual consistency, confidence route, Apollo status. Accepts, rejects, or leaves the still inconclusive. `produces_video` is false. Energy is relative residual energy, not digit PSNR. | `_refuse_bypass` on `learn` and `bypass_zeus`. `remember_accepted` is a 256-entry RAM index, not Titanos. Scale address no longer steps a core. | Real for a still candidate. | Clip residuals are the next PR. |
+| Residual cascade | `src/resileos/studio/residual_cascade.py` | Layer-scale codec, outward Kuramoto order, Hephaestus, residual consistency, confidence route, Apollo status. Accepts, rejects, or leaves the still inconclusive. `produces_video` is false. Energy is relative residual energy, not digit PSNR. | `_refuse_bypass` on `learn` and `bypass_zeus`. `remember_accepted` is a 256-entry RAM index, not Titanos. Scale address no longer steps a core. | Real for a still candidate. | Clip residuals live in `clip_codec.py`. This module still owns the still and the two-frame phase step. |
 | Candidates | `src/resileos/studio/candidates.py` | In-memory id. `learn` arguments are ignored. | No. | Thin, real. | A restart drops the id. Persistence would be a new store. |
 | Gate | `src/resileos/studio/gate.py` | Hephaestus, consistency, and Themis on a component packet. | `scar_matrix_updated` false. | Real. | — |
 | Routes and service | `src/resileos/studio/routes.py`, `service.py` | Round trip, toy prior, gate, forge, graphify. Graphify `commit` can learn. External sampler returns 403 when off. | Codec paths do not learn. | Real. | — |
@@ -164,20 +167,42 @@ Importing the library registers nothing until `register_*` runs.
 
 `landing/public/_redirects` is not in the tree. This change does not add a `/chat` → `/chat.html` rewrite.
 
-## Video surface (not built)
+## Temporal residual clip
 
-A later page can sit beside the Streamlit studio panel (`ui_studio.py`, `src/resileos/studio/panel.py`) or as its own FastAPI route plus a small frontend. It would take a prompt, an image, or a packet, and show a preview, a residual badge, stage status, and candidates. It would call `forge_video` and the studio codec that already exist. Candidates stay candidates. The residual core stays the quantizer. Provider slots stay off and keep returning `UNAVAILABLE` with no URL when nothing is configured.
+`src/resileos/studio/clip_codec.py` sits next to the studio codec service. It compresses frames that were already supplied. It does not sample a prompt and it does not call a provider.
 
-This inventory does not build that page, and it does not copy another product's layout or name.
+Frame 0 is a base packet from the layer-scale studio codec: bipolar factors, one scale per layer, greedy residual layers under the phi rank and depth ceiling. Each later frame is the residual of that frame against the previous packet's chain reconstruction. The temporal residual magnitude is the RMS of that residual. When the RMS is at or under `TEMPORAL_SIGMA` (0.05), the frame is marked `residual-consistent, reuse previous packet` and no delta packet is stored. When the RMS is over the gate, the same stack encodes a delta packet and the frame is marked escalated. The stored sequence is the base packet, the delta list (only the escalated frames), a timeline, and a SHA-256 over the stored packets. Bits per frame are the studio logical bits of those stored packets. The count of reused frames and the count of frames that would need a generative call are reported separately. This inventory does not turn those counts into a savings claim.
 
-## Open work and the next change
+`VideoPacket` (`src/resileos/harness/packet.py`) extends `ControlPacket` with `frame_residuals` (packet hashes, one per frame), `temporal_delta` (the largest later-frame RMS), `keyframe_ids`, `provider_stage` (`draft`, `verify`, or `upscale`), and an optional `scene_script_hash`. The script source is not a field.
 
-PR #27 is on `main` at `a640101`. It treats inter-frame motion as a residual phase step (`src/resileos/ui/residual_frame.py`). This branch includes that commit.
+Phase step and mirror energy come from `residual_frame.py` (`MAGNETIC_PHASE / PHI` times the mean residual gradient, and the mirror-energy check). The clip codec calls those functions. It does not reimplement them. It does not call `ResidualCore.step`, `learn`, or `_scar_update`. `step_core` stays false. `scar_matrix_updated` and `learned` stay false.
 
-The change after this inventory is still clip-level temporal residual tracking, not another pass over the shells above:
+`src/resileos/studio/sequence_stage.py` is the verify stage. It decodes the packets and runs `residual_consistency` between consecutive decoded frames, then the sequence hash, Hephaestus, `verify_on_stop`, and Themis when a lesson, an Apollo status, and evidence exist. A passing sequence sets `sequence_verified`. Only that result is written to Hades, and the checkpoint keeps the lesson and the packet hash, not the frame history. Only that result is registered as a candidate.
 
-- Frame 0 is a base packet.
-- Each later frame is the residual of that frame against the previous reconstruction.
-- Iris and Hades gain a JSONL record of that residual path.
+Upscale is the still contract, with the sigma gate in front of any provider call. It stays off when the residual closes. It is refused on a bad hash, a Hephaestus failure, or a deny risk. An inconclusive residual sends only the failing-frame residual deltas that also clear the sigma gate. A frame marked `residual-consistent, reuse previous packet` is not sent. With no provider the status is `UNAVAILABLE` and `url` is null. No provider is wired. Higgsfield, Seedance, ComfyUI, OpenAI, Kapwing, vidful.ai, aifreevideo.com, and Grok Imagine are not connected. Stable Video Diffusion official weights are non-commercial research only and are not a production path. There is no local SVD slot.
 
-That work is a later pull request. This one does not add it.
+Iris and Hades each append one JSONL record per stage: control id, stage, packet hash, residual energy, consistency score, verify result, budget used, checkpoint id. `RESILEOS_IRIS_JSONL` and `RESILEOS_HADES_JSONL` set the files. `RESILEOS_RESIDUAL_TRACE_CAP_BYTES` caps each file (default 65536). The record has no prompt and no secret. `forge_video` remains a Hermes legion under Hephaestus.
+
+## Video surface
+
+`GET /studio/video` is a plain page. The Streamlit Video tab (`src/resileos/studio/video_page.py`, opened from `ui_studio.py`) is the sibling of the codec panel (`src/resileos/studio/panel.py`). Both call `forge_video` with `clip=True`.
+
+Top to bottom: a prompt and spec box (Hermes ranks the supplied context), Draft / Verify / Upscale, a Hades panel (checkpoint id, lesson, residual hash, a Checkpoint button, and restore fresh), and an output strip. The strip has a timeline of keyframes as residual-decoded stills, a cost meter with the reused-frame count and the count of frames that would need a generative call, decoded previews, a residual badge, packet download, a short control history, and a URL only when an upscale call actually returned one. Upscale stays disabled until Verify returns verified or inconclusive. Draft accepts uploaded frames or a residual packet. A prompt with no frames and no packet is `UNAVAILABLE`. Mouth stays off unless this sequence is verified. A leftover Metis policy from another request does not close a verified clip. Candidates are only the verified sequences. The page links `landing/public/assets/site.css`, `landing/public/assets/chat-ui.css`, and the shared font sheet. Stage buttons use the shared `btn-label` class. Button labels stay plain language.
+
+The page does not copy another product's name or layout. `landing/public/_redirects` is not part of this surface.
+
+## Scene legions
+
+Three Hermes tools sit under the forge, next to `forge_video`. Hephaestus remains the patron and is not a Kin. Each tool is a stub: it writes a scene-description artifact, residual-hashes that file, and asks Hades to checkpoint. No Blender executor is configured. Restore uses `restore_fresh`: the lesson and the residual hash cross the boundary, and the script source does not. The classical core is shown `{"packet_hash": ...}` only.
+
+| Tool | Job | Named for |
+|---|---|---|
+| `daedalus` | Scene geometry. Stub. | Daedalus, the craftsman who built the labyrinth |
+| `helios` | Lighting and materials. Stub. | Helios, the sun |
+| `argus` | Camera and animation. Stub. | Argus, the many-eyed watcher |
+
+Existing public names are unchanged. `forge_video` is still the video legion. Dionysus, when present on Hermes, is a different tool and is not one of these three.
+
+## Open work
+
+PR #27 is on `main` at `a640101`. PR #28 is the inventory this section used to follow. The clip codec and the video page are the work that inventory deferred. What is still out is listed in "Left out, and why": `suite_residual`, `LearnedConvCodec`, unwired Lachesis and Harmonia, Nike and Themis on paths that do not have their inputs, and the rheology head. Provider slots stay empty.

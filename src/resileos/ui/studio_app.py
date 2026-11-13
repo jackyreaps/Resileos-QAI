@@ -352,8 +352,8 @@ def _run_surface(mode: str) -> None:
             sc, sb = api_post("/learn_batch", key, {"facts": demo})
             st.success(str(sb)) if sc == 200 else st.error(f"{sc}: {sb}")
 
-    tab_chat, tab_search, tab_media, tab_codec, tab_make, tab_lang, tab_tools, tab_diag, tab_help = st.tabs(
-        ["Chat", "Search", "Media", "Residual codec", "Make", "Language", "Tools", "Diagnostics", "Help"]
+    tab_chat, tab_search, tab_media, tab_codec, tab_video, tab_make, tab_lang, tab_tools, tab_diag, tab_help = st.tabs(
+        ["Chat", "Search", "Media", "Residual codec", "Video", "Make", "Language", "Tools", "Diagnostics", "Help"]
     )
 
     with tab_chat:
@@ -564,6 +564,11 @@ def _run_surface(mode: str) -> None:
             st.session_state.assets_local = assets
 
         render_residual_codec(st, on_candidate=_keep)
+
+    with tab_video:
+        from resileos.studio.video_page import render_video_page
+
+        render_video_page(st)
 
     with tab_make:
         st.subheader("Make a world")

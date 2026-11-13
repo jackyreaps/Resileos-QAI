@@ -245,6 +245,14 @@ try:
 except Exception as e:
     log.warning("Kin wiring failed; kin routes unavailable: %s", e)
 
+try:
+    from resileos.persona.routes import register_persona_routes
+
+    register_persona_routes(app, auth_dep=verify_api_key)
+    log.info("Persona store routes wired: /api/v1/persona/*")
+except Exception as e:
+    log.warning("Persona store routes not wired: %s", e)
+
 def _register_runtime_legions() -> None:
     """Hermes web_search is the host's default legion. Examples stay off."""
     import asyncio
