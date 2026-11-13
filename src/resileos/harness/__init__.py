@@ -3,7 +3,7 @@
 Integrates AgenC-style risk/session, Jev-style cascade, and Harness
 Engineering patterns.
 """
-from .packet import ControlPacket
+from .packet import ControlPacket, VideoPacket
 from .tools import (
     apollo_success,
     budget_and_stuck_guard,
@@ -44,6 +44,7 @@ def __getattr__(name: str):
 
 __all__ = [
     "ControlPacket",
+    "VideoPacket",
     "CascadeRouter",
     "decision_fanout",
     "confidence_route",

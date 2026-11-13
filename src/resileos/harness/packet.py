@@ -43,3 +43,40 @@ class ControlPacket:
             "scars": self.scars,
             "history": self.history[-20:],  # keep recent for context
         }
+
+
+_PROVIDER_STAGES = ("draft", "verify", "upscale")
+
+
+@dataclass
+class VideoPacket(ControlPacket):
+    """Control packet for one clip or one scene step.
+
+    ``frame_residuals`` are packet hashes, not pixels. ``scene_script_hash``
+    is the hash of a scene artifact when a scene legion wrote one. The
+    script source does not live on this packet.
+    """
+
+    frame_residuals: List[str] = field(default_factory=list)
+    temporal_delta: float = 0.0
+    keyframe_ids: List[int] = field(default_factory=list)
+    provider_stage: str = "draft"
+    scene_script_hash: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.provider_stage not in _PROVIDER_STAGES:
+            self.provider_stage = "draft"
+        self.frame_residuals = [str(item) for item in self.frame_residuals]
+        self.keyframe_ids = [int(item) for item in self.keyframe_ids]
+        self.temporal_delta = float(self.temporal_delta)
+        if self.scene_script_hash is not None:
+            self.scene_script_hash = str(self.scene_script_hash)
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = super().to_dict()
+        data["frame_residuals"] = list(self.frame_residuals)
+        data["temporal_delta"] = self.temporal_delta
+        data["keyframe_ids"] = list(self.keyframe_ids)
+        data["provider_stage"] = self.provider_stage
+        data["scene_script_hash"] = self.scene_script_hash
+        return data
