@@ -1,11 +1,9 @@
-"""Cascade address scaffold.
+"""Cascade address: belt -> frame -> residual.
 
-A hierarchical address for world or video state:
-  belt -> frame -> residual
-
-This is the shape Genesis world-building and video embedding
-can share later. The values are placeholders until the suite
-quantities are coded.
+A hierarchical address for world or video state. The 5-pin
+construction in ``resileos.ui.five_pin`` uses this helper: the belt
+is the 5-mod Human Belt, the frame is taken from the pin, and the
+residual token completes the path.
 """
 from __future__ import annotations
 

@@ -125,6 +125,16 @@ These are milliseconds, not microseconds.
   leaf is configured, and the metrics are not a gate.
 - **networkx.** Not needed; the component counts are a few lines of numpy.
 
+
+## Five-pin address
+
+The 5-pin is a construction on the ordered cascade (3, 5, 9, 12), not
+a label. It sits at the 5-frame. See [five-pin.md](five-pin.md) for
+the belt, the three pins, the waist (N=36), and the debt quantum
+(ε = 1/64). `VideoPacket` and `ControlPacket` record optional `pin`
+and `address` fields that default to `None`. They are not a verify
+gate.
+
 ## Defaults
 
 Nothing here changes `require_verified`, the Metis `allow_mouth`

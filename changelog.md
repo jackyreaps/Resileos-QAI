@@ -6,6 +6,15 @@ are stable and never reused.
 ## [Unreleased]
 
 ### Added
+- `src/resileos/ui/five_pin.py` — 5-pin construction on the cascade
+  (frames 3, 5, 9, 12) using `cascade_address`. Pins: individual
+  (frame 5, edge), local (frame 5, hub), global (frame 9, latent_hub).
+  Waist N=36 caps factors (clip, with `within_waist` to refuse).
+  Debt quantum ε=1/64: `keep_packet` is false below 1/64, true at
+  equality. Persona-store tiers map Individual→individual, Hub→local,
+  Latent→global with no promotion. See `docs/five-pin.md`.
+- Optional `pin` and `address` fields on `ControlPacket`/`VideoPacket`
+  (default `None`, recorded only; verify gates unchanged).
 - `docs/outer-layer.md` — outer-layer flow: Hermes envelopes → Eat → Zeus
   reviewers → Titanos; Iris trace sensor; Hades lesson notes; clip check
   metrics. Lists renames from the drafts and what was left out.

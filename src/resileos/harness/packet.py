@@ -23,6 +23,9 @@ class ControlPacket:
     scars: List[str] = field(default_factory=list)  # residual scars / constraints applied
     history: List[Dict[str, Any]] = field(default_factory=list)  # log-as-queue
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    # Optional 5-pin cascade address. Recorded only; not a verify gate.
+    pin: Optional[str] = None
+    address: Optional[Dict[str, Any]] = None
 
     def append(self, event: Dict[str, Any]) -> None:
         self.history.append({**event, "ts": datetime.utcnow().isoformat()})
@@ -42,6 +45,8 @@ class ControlPacket:
             "evidence": self.evidence,
             "scars": self.scars,
             "history": self.history[-20:],  # keep recent for context
+            "pin": self.pin,
+            "address": dict(self.address) if self.address is not None else None,
         }
 
 
