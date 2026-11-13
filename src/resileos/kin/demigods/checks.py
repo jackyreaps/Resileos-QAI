@@ -22,7 +22,7 @@ from resileos.hierarchy.encoder import default_capacity
 from resileos.hierarchy.mask import DEFAULT_K, MaskStackConfig
 from resileos.hierarchy.prime_tower import PrimeTower
 from resileos.hierarchy.primorial import n_usable_primorials
-from resileos.kin.hermes import HermesBudget
+from resileos.kin.hermes import HEPHAESTUS_MAX_DEPTH, HEPHAESTUS_MAX_ITEMS, HermesBudget
 from resileos.kin.verifiers import Claim, check_capacity
 
 from .hierarchy import (
@@ -537,6 +537,8 @@ def _hermes_limits(budget: Any) -> tuple[bool, dict[str, Any]]:
     else:
         return True, {"checked": True, "reason": "unreadable hermes budget"}
     over = used > max_items or max_items < 0 or max_depth < 0
+    if max_depth > HEPHAESTUS_MAX_DEPTH or max_items > HEPHAESTUS_MAX_ITEMS:
+        over = True
     return over, {
         "checked": True,
         "used": used,
