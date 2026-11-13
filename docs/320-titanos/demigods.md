@@ -17,7 +17,7 @@ A summon loads one persona file into the caller's control packet, capped at `GUI
 |---|---|---|
 | Core | Residual core / Zeus | Deterministic authority. Zeus applies a write only after every reviewer approves. |
 | Kin | Iris, Metis, Hermes, Apollo, Hades | Standing side-interfaces. |
-| Demi-gods | Themis, Momus, Hephaestus, Atlas, Nike | Summoned skills. One duty, then dismiss. |
+| Demi-gods | Themis, Momus, Hephaestus, Atlas, Nike, Morpheus | Summoned skills. One duty, then dismiss. |
 | Skills / tools | Everything else | Deferred. Not in the always-visible catalog unless it already lives there. |
 
 A Demi-god cannot call `learn`, take ownership of a residual core, summon another Demi-god, or persist anything beyond the Hades lesson and the residual packet hash. Those two are the only durable values that cross attempts. Guide text stays on the attempt that summoned it. Hades does not store `guide_bodies`.
@@ -31,6 +31,7 @@ A Demi-god cannot call `learn`, take ownership of a residual core, summon anothe
 | Hephaestus | Residual core, for the joints | `hephaestus_check` | `residual_consistency` passes, scars are empty, and `budget_and_stuck_guard` passes. A supplied Hermes budget must not be over `max_items`. |
 | Atlas | Residual core, for capacity | `atlas_check` | Declared loads sit inside `check_capacity` / `hopfield_cap`, `MaskStackConfig` (which calls `PrimeTower.n_usable`), `PrimeTower.max_usable_level`, `n_usable_primorials`, `default_capacity`, and `EVIDENCE_CAP`. |
 | Nike | Apollo | `nike_check` | Every explicit criterion holds, backed by Apollo success or residual consistency. |
+| Morpheus | Hades | `run_idle` | Recurring patterns are compressed on CPU. Hephaestus and Themis pass before Zeus may learn. Candidate-only patterns stay unpromoted. |
 
 Missing evidence fails. Themis fails when the packet, the Apollo `status`, the lesson's verified signal, or a real evidence entry is absent. Momus cannot approve when it has no requirement checks to run. A missing requirement, residual hash, or spec field is outcome `need_more` with a stable code (`missing_requirement`, `missing_residual_hash`, `missing_spec_field`). That outcome is not approval. A present value that disagrees is a defect. Nike fails when the lesson and the task brief contain no `criterion:`, `success:`, or `must:` line (and no `criteria` list). Hephaestus fails a missing budget, an unresolved scar, or a guard failure. Atlas fails a declared load that exceeds the real function for that load. An undeclared load is not invented.
 

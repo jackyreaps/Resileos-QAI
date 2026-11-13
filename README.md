@@ -161,7 +161,7 @@ Still planned, and not in the tree:
 
 - Optional legions, each gated: browser-use, an impeccable design audit, and Google Workspace.
 
-The candidate status on the query path is also unbuilt. The quantum backend in `docs/500-notes/roadmap.md` stays speculative.
+A near miss on `ask` or `chain` can return `CANDIDATE` with a null value. That is not a stored fact and it is not open-ended generation. The quantum backend in `docs/500-notes/roadmap.md` stays speculative.
 
 ## Documentation
 

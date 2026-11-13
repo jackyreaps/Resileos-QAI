@@ -43,6 +43,9 @@ This layer does not use LangChain, AutoGen, crewAI, or MetaGPT.
 - Hermes `daedalus`, `helios`, and `argus` are scene stubs under the same forge gate. Daedalus writes geometry, Helios writes lighting and materials, and Argus writes camera and animation. Each hashes its artifact and checkpoints through Hades. Restore starts from the lesson and the residual hash. The classical core sees that hash, not the script. No Blender executor is configured. See the naming table below.
 - Eat `graphify` turns a graph or text into residual candidates and runs each through `eat_filter`. `learn` runs only for an accept when commit is set. The residual record is what a later question reads. Reject and abstain do not write.
 - Hermes `plan_test_debug` plans, tests, and debugs. A repeated failure stops the loop. Lower-tier output stays out of the verified step. `write_file`, `apply_diff`, and `git_commit` stay refused until `verify_on_stop` passes. The HTTP route does not execute them.
+- Hermes `dionysus` expands a prompt into synonym, root, and translation neighbours. Bind and bundle run in `latent_hub`, which is not Titanos. Hermes may use those neighbours to re-rank items the caller already supplied. Dionysus does not write a fact, and it is not a Kin. The tables are closed. This is not open-ended translation, coding, or general reasoning.
+
+Morpheus is a summoned demi-god under Hades, not a legion and not a Kin. It replays logged turns and candidate branches on CPU, compresses a recurring pattern with the studio residual codec, and runs Hephaestus and Themis before Zeus may promote a triple. A candidate-only pattern is not promoted.
 
 ## Naming
 

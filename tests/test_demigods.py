@@ -198,7 +198,7 @@ def test_roster_is_package_data_not_cwd():
     assert text.is_file()
     assert text.read_text(encoding="utf-8").startswith("# Themis")
     names = {item["name"] for item in list_demigods()}
-    assert names == {"themis", "momus", "hephaestus", "nike", "atlas"}
+    assert names == {"themis", "momus", "hephaestus", "nike", "atlas", "morpheus"}
 
 
 def test_search_finds_by_description_and_rejects_blank_query():

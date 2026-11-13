@@ -199,6 +199,9 @@ class Answer:
     raw_confidence: float = 0.0
     order_parameter_scale: float = 1.0
     recovery_loss: float = 0.0
+    candidate: str | None = None
+    evidence: list = field(default_factory=list)
+    unverified: bool = False
 
 
 class Titanos:
@@ -819,6 +822,91 @@ class Titanos:
             return True
         return self._fact_valid_at(fact, as_of)
 
+    def _propose_candidate(
+        self,
+        subject: str,
+        relation: str,
+        inverse: bool,
+        as_of: Optional[str],
+    ) -> dict | None:
+        """Nearest stored object when an exact close failed.
+
+        Unknown entities, relations with no facts, and an empty slot
+        stay abstentions. A candidate is not written and is not the
+        answer value.
+        """
+        if subject not in self.entities:
+            return None
+        if self._counts.get(relation, 0) == 0:
+            return None
+        stored = self.ask_list(subject, relation, inverse=inverse, as_of=as_of)
+        if len(stored) < 2:
+            return None
+        probe = self._encode_probe(subject, relation, inverse=inverse)
+        scores = self._score_candidates(
+            probe,
+            acc=self._bands.get(relation),
+            exclude={subject},
+            restrict_to=set(stored),
+        )
+        if not scores:
+            return None
+        scores.sort(key=lambda row: (-row[1], -row[2], row[0]))
+        top_name, sim, mag = scores[0]
+        confidence = float(max(0.0, min(1.0, (sim + 1.0) / 2.0)))
+        evidence = [
+            {
+                "signal": "residual_nearest_neighbour",
+                "name": name,
+                "similarity": float(score),
+                "magnitude": float(magnitude),
+                "unverified": True,
+            }
+            for name, score, magnitude in scores[:3]
+        ]
+        evidence.append(
+            {
+                "signal": "hypervector_similarity",
+                "name": top_name,
+                "similarity": float(sim),
+                "magnitude": float(mag),
+                "unverified": True,
+            }
+        )
+        return {
+            "candidate": top_name,
+            "confidence": confidence,
+            "evidence": evidence,
+            "reason": (
+                f"I don't have that on record; closest match is {top_name}, unverified"
+            ),
+        }
+
+    def _upgrade_abstain(
+        self,
+        ans: Answer,
+        subject: str,
+        relation: str,
+        inverse: bool,
+        as_of: Optional[str],
+    ) -> Answer:
+        """Mark a failed exact close as CANDIDATE when a stored neighbour exists."""
+        if ans.status != "ABSTAINED":
+            return ans
+        proposal = self._propose_candidate(subject, relation, inverse, as_of)
+        if proposal is None:
+            return ans
+        ans.status = "CANDIDATE"
+        ans.mode = "CANDIDATE"
+        ans.value = None
+        ans.candidate = proposal["candidate"]
+        ans.evidence = proposal["evidence"]
+        ans.unverified = True
+        ans.confidence = proposal["confidence"]
+        prior = ans.reason
+        ans.reason = proposal["reason"] if not prior else f"{proposal['reason']} ({prior})"
+        return ans
+
     # ── single query ─────────────────────────────────────────────────
     def _ask(self, subject: str, relation: str, inverse: bool,
              conf_mode_override: str | None = None,
@@ -904,7 +992,7 @@ class Titanos:
         rec_action, rec_loss, rec_reason = self._evaluate_recovery_gate()
         if rec_action == "ABSTAIN":
             self._recovery_veto_count += 1
-            return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", len(history),
+            return self._upgrade_abstain(Answer(None, 0.0, "ABSTAINED", "ABSTAIN", len(history),
                           loop_history=history, gate_state=gate_state,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -918,10 +1006,10 @@ class Titanos:
                           raw_confidence=fast_conf,
                           order_parameter_scale=scale,
                           recovery_loss=rec_loss,
-                          reason=f"recovery gate: {rec_reason}")
+                          reason=f"recovery gate: {rec_reason}"), subject, relation, inverse, as_of)
 
         if exit_reason == "ABSTAIN":
-            return Answer(None, 0.0, "ABSTAINED", "ABSTAIN", len(history),
+            return self._upgrade_abstain(Answer(None, 0.0, "ABSTAINED", "ABSTAIN", len(history),
                           loop_history=history, gate_state=gate_state,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -935,7 +1023,7 @@ class Titanos:
                           raw_confidence=fast_conf,
                           order_parameter_scale=scale,
                           recovery_loss=rec_loss,
-                          reason="sigma-1 gate routed to ABSTAIN")
+                          reason="sigma-1 gate routed to ABSTAIN"), subject, relation, inverse, as_of)
 
         readout2 = self._readout(relation)
         retrieved = (readout2 * probe).astype(np.int8)
@@ -953,7 +1041,7 @@ class Titanos:
                 best, conf = best_q, conf_q
             mode = "QUANTUM_SIM"
         else:
-            return Answer(None, conf, "ABSTAINED", "ABSTAIN", len(history),
+            return self._upgrade_abstain(Answer(None, conf, "ABSTAINED", "ABSTAIN", len(history),
                           loop_history=history, gate_state=gate_state,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -968,10 +1056,10 @@ class Titanos:
                           order_parameter_scale=scale,
                           recovery_loss=rec_loss,
                           reason=(f"gated confidence {conf:.4f} < abstain "
-                                  f"{abstain_thresh:.4f}"))
+                                  f"{abstain_thresh:.4f}")), subject, relation, inverse, as_of)
 
         if best is None or conf < abstain_thresh:
-            return Answer(None, conf, "ABSTAINED", mode, len(history),
+            return self._upgrade_abstain(Answer(None, conf, "ABSTAINED", mode, len(history),
                           loop_history=history, gate_state=gate_state,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -986,7 +1074,7 @@ class Titanos:
                           order_parameter_scale=scale,
                           recovery_loss=rec_loss,
                           reason=f"post-quantum gated conf {conf:.4f} "
-                                 f"< {abstain_thresh:.4f}")
+                                 f"< {abstain_thresh:.4f}"), subject, relation, inverse, as_of)
 
         aligned = self._value_consistent_with_store(
             subject, relation, inverse, best, as_of=as_of)
@@ -1007,7 +1095,7 @@ class Titanos:
                           recovery_loss=rec_loss,
                           reason="temporal conflict: overlapping validity")
         if aligned is None:
-            return Answer(None, conf, "ABSTAINED", "ABSTAIN", len(history),
+            return self._upgrade_abstain(Answer(None, conf, "ABSTAINED", "ABSTAIN", len(history),
                           loop_history=history, gate_state=gate_state,
                           noise_sigma=sigma_eff,
                           noise_sigma_base=sigma_base,
@@ -1021,7 +1109,7 @@ class Titanos:
                           raw_confidence=raw_conf,
                           order_parameter_scale=scale,
                           recovery_loss=rec_loss,
-                          reason="not a stored fact")
+                          reason="not a stored fact"), subject, relation, inverse, as_of)
         path = ([(aligned, relation, subject)] if inverse
                 else [(subject, relation, aligned)])
         return Answer(aligned, conf, "ACCEPTED", mode, len(history),
@@ -1144,13 +1232,63 @@ class Titanos:
             modes.append(a.mode)
             hist_acc.extend(a.loop_history)
             if a.status != "ACCEPTED":
-                status = "CONFLICT" if a.status == "CONFLICT" else "ABSTAINED"
-                return Answer(None, conf, status, "ABSTAIN", total_loops,
-                              path=path, loop_history=hist_acc,
-                              emergent=self.cfg.emergent,
-                              csi=self._csi.value(),
-                              order_parameter=self._order_parameter(),
-                              reason=(a.reason or f"chain broke at '{current} --{rel}--> ?'"))
+                broke = a.reason or f"chain broke at '{current} --{rel}--> ?'"
+                if a.status == "CONFLICT" or not path:
+                    status = "CONFLICT" if a.status == "CONFLICT" else "ABSTAINED"
+                    if a.status == "CANDIDATE" and not path:
+                        return Answer(
+                            None, conf, "CANDIDATE", "CANDIDATE", total_loops,
+                            path=list(a.path), loop_history=hist_acc,
+                            emergent=self.cfg.emergent,
+                            csi=self._csi.value(),
+                            order_parameter=self._order_parameter(),
+                            candidate=a.candidate,
+                            evidence=list(a.evidence),
+                            unverified=True,
+                            reason=broke,
+                        )
+                    return Answer(None, conf, status, "ABSTAIN", total_loops,
+                                  path=path, loop_history=hist_acc,
+                                  emergent=self.cfg.emergent,
+                                  csi=self._csi.value(),
+                                  order_parameter=self._order_parameter(),
+                                  reason=broke)
+                evidence = [
+                    {
+                        "signal": "partial_chain_hop",
+                        "subject": hop_s,
+                        "relation": hop_r,
+                        "obj": hop_o,
+                        "unverified": False,
+                    }
+                    for hop_s, hop_r, hop_o in path
+                ]
+                evidence.append(
+                    {
+                        "signal": "chain_break",
+                        "at": current,
+                        "relation": rel,
+                        "status": a.status,
+                        "reason": broke,
+                        "unverified": True,
+                    }
+                )
+                evidence.extend(list(a.evidence or []))
+                nearest = a.candidate or path[-1][2]
+                return Answer(
+                    None, conf, "CANDIDATE", "CANDIDATE", total_loops,
+                    path=path, loop_history=hist_acc,
+                    emergent=self.cfg.emergent,
+                    csi=self._csi.value(),
+                    order_parameter=self._order_parameter(),
+                    candidate=nearest,
+                    evidence=evidence,
+                    unverified=True,
+                    reason=(
+                        f"I don't have that on record; closest match is {nearest}, "
+                        f"unverified. {broke}"
+                    ),
+                )
             path.extend(a.path)
             conf *= a.confidence
             current = a.value
@@ -1215,6 +1353,11 @@ class Titanos:
         if ans.emergent:
             head += (f" sigma_eff={ans.noise_sigma:.4f} "
                      f"aniso={ans.anisotropy:.3f}")
+        if ans.status == "CANDIDATE":
+            return (
+                f"{head}\n  unverified candidate: {ans.candidate}\n"
+                f"  reason: {ans.reason}"
+            )
         if ans.status == "ABSTAINED":
             return f"{head}\n  reason: {ans.reason}"
         lines = [head, f"  answer: {ans.value}"]

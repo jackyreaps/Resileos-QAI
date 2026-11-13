@@ -45,8 +45,8 @@ make.
 ## bench_invention.py
 
 Measures derivation rate and assertion rate on novel output: how often the
-system presents a new fact as if it were stored. The candidate tier is not
-on the query path. The 2026-11-10 run is in
+system presents a new fact as if it were stored. A `CANDIDATE` row keeps
+a null value, so it is not counted as an assertion. The 2026-11-10 run is in
 `docs/benchmarks/invention-without-hallucination.md`
 (`derivation_rate` 0.0, `invention_assertion_rate` 0.0, `p50_ms` 3.4).
 
