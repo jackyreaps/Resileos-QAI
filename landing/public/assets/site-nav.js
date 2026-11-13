@@ -11,6 +11,8 @@
     ["/how-it-works", "How it works"],
     ["/kin", "Kin"],
     ["/pricing", "Pricing"],
+    ["/login", "Sign in"],
+    ["/account", "Account"],
     ["/chat", "Chat"]
   ];
 

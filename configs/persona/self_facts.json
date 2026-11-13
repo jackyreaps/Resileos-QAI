@@ -159,9 +159,9 @@
     {
       "id": "demo-key",
       "topic": "keys",
-      "text": "The shared demo key in chat is separate from a key you mint.",
-      "check": "landing/public/how-it-works.html",
-      "needle": "The shared demo key in chat is separate"
+      "text": "Sign in with a magic link or an optional password. Chat and account calls use a server-side session proxy that adds the API key from a sealed copy, so the key does not reach the browser. Signed-out chat is not a shared key: the API allows 20 requests per IP per UTC day by default.",
+      "check": "landing/DEPLOY.md",
+      "needle": "Signed-out chat is not a shared key."
     }
   ],
   "tutorial": [

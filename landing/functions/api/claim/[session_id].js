@@ -1,13 +1,7 @@
-import {
-  TIER_QUOTA,
-  apiBase,
-  detail,
-  json,
-  mintPlaintext,
-  sha256Hex,
-} from "../../_lib.js";
+import { TIER_QUOTA, apiBase, detail, json } from "../../_lib.js";
+import { attachDigest, ensureAccount, mintStoredKey, originAllowed, readSession } from "../../_auth.js";
 
-export async function onRequestGet({ params, env }) {
+export async function onRequestGet({ request, params, env }) {
   const sessionId = params.session_id;
   if (!sessionId || !/^(cs_test_|cs_live_)[A-Za-z0-9]+$/.test(sessionId)) {
     return detail("Invalid session.", 400);
@@ -19,7 +13,7 @@ export async function onRequestGet({ params, env }) {
   const claimed = await kv.get(`claim:${sessionId}`);
   if (claimed === "taken") {
     return detail(
-      "Key not ready yet (webhook pending) or already claimed. Refresh in a few seconds, or check your email once mailer is wired.",
+      "Key not ready yet (webhook pending) or already claimed. Refresh in a few seconds, or sign in with the checkout email.",
       404
     );
   }
@@ -37,30 +31,48 @@ export async function onRequestGet({ params, env }) {
     return detail("Key not ready yet (webhook pending) or already claimed.", 404);
   }
 
+  const signedIn = await readSession({ kv, env, request, now: Date.now() });
+  if (signedIn && !originAllowed(request, env)) {
+    return detail("Cross-site request blocked.", 403);
+  }
+
   const plan = (session.metadata && session.metadata.plan) || "builder";
   const mapped = TIER_QUOTA[plan] ? plan : "builder";
-  const quota = TIER_QUOTA[mapped];
-  const plaintext = mintPlaintext();
-  const digest = await sha256Hex(plaintext);
-  const record = {
-    name: `stripe:${mapped}`,
-    tier: quota.tier,
-    quota: quota.quota,
+  const email =
+    (session.metadata && session.metadata.account_email) ||
+    (session.customer_details && session.customer_details.email) ||
+    session.customer_email ||
+    null;
+  const minted = await mintStoredKey({
+    kv,
+    env,
     plan: mapped,
-    email: (session.customer_details && session.customer_details.email) || session.customer_email || null,
-    stripe_customer_id: session.customer || null,
-    created_at: new Date().toISOString(),
-  };
-  await kv.put(`key:${digest}`, JSON.stringify(record));
+    email,
+    name: `stripe:${mapped}`,
+  });
+  if (!minted.ok) return detail(minted.detail, minted.status);
+  if (email) await kv.put(`pending:${String(email).trim().toLowerCase()}`, minted.digest);
+
+  let attached = false;
+  if (signedIn) {
+    const account = await ensureAccount(kv, signedIn.email, Date.now());
+    await attachDigest(kv, account, minted.digest);
+    if (email) await kv.delete(`pending:${String(email).trim().toLowerCase()}`);
+    attached = true;
+  }
+
   const payload = {
-    api_key: plaintext,
-    tier: record.tier,
-    quota: record.quota,
-    plan: record.plan,
+    tier: minted.record.tier,
+    quota: minted.record.quota,
+    plan: minted.record.plan,
+    prefix: minted.prefix,
+    email,
+    attached,
     base_url: apiBase(env),
     header: "X-API-Key",
   };
-  await kv.put(`claim:${sessionId}`, JSON.stringify(payload));
+  const reveal = new URL(request.url).searchParams.get("delivery") === "key";
+  if (reveal && !attached) payload.api_key = minted.plaintext;
   await kv.put(`claim:${sessionId}`, "taken");
   return json(payload);
 }

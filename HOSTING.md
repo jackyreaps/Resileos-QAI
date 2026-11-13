@@ -96,9 +96,41 @@ Point container healthchecks at `/healthz` **and** `/api/v1/ready`. The Dockerfi
 Auth is implemented in `middleware/auth.py` and wired in `asgi.py`.
 
 - Send `X-API-Key: <key>` or `Authorization: Bearer <key>`.
-- Monthly quotas are enforced per key.
+- Monthly quotas are enforced per key and reset on the calendar month (the host clock, same as before). `tier: enterprise` with `quota: 0` is unlimited.
 - Per-minute rate limit defaults to 60; override with `RESILEOS_RATE_LIMIT_PER_MIN`.
 - Browser CORS origins are set with `RESILEOS_CORS_ORIGINS` (comma-separated). Leave empty for server-to-server only.
+- Pages-minted keys are read from Cloudflare KV. File and env keys above still work. A record with `"revoked": true` is rejected.
+- Signed-out chat is a per-IP daily trial, not a shared key. The Pages proxy sends `X-Resileos-Trial` plus an HMAC. Default allowance is 20 requests per IP per UTC day.
+
+### Pages key directory (Cloudflare KV)
+
+The API looks up `key:<sha256>` in the `resileos-keys` namespace. It never reads seal or session values. Cache TTL defaults to 30 seconds, so a revocation shows up on the next refresh after that.
+
+Create an API token with **Account → Workers KV Storage → Read**. Set these on the API host (shell or an uncommitted env file, never git):
+
+```bash
+export CLOUDFLARE_API_TOKEN='...'          # Workers KV Storage Read
+export CLOUDFLARE_ACCOUNT_ID='...'
+export CLOUDFLARE_KV_NAMESPACE_ID='463f5f1f1d0a484fb3b9a8e79f0fc413'
+export RESILEOS_KV_CACHE_TTL='30'          # optional, seconds
+export RESILEOS_PROXY_SECRET='...'         # same value as the Pages secret
+export RESILEOS_TRIAL_DAILY_LIMIT='20'     # optional, per IP per UTC day
+```
+
+`RESILEOS_PROXY_SECRET` must match the Pages project. Without it, anonymous trial requests are rejected and visitors are asked to sign in.
+
+Rebuild and restart so the container picks up the variables. No host ports are published:
+
+```bash
+docker compose build
+docker compose up -d
+docker compose exec resileos printenv CLOUDFLARE_ACCOUNT_ID
+curl -sf http://127.0.0.1:8000/healthz
+```
+
+`printenv` should show the account id only. Do not print `CLOUDFLARE_API_TOKEN` or `RESILEOS_PROXY_SECRET`. Existing `API_KEYS_PATH`, `RESILEOS_API_KEYS`, and `RESILEOS_API_KEY` keep working when the token is unset; KV-minted keys then return 403 until the token is set.
+
+Free-tier records minted by Pages use `tier: free` and `quota: 5000` per calendar month. Builder and Founding Builder are `pro` / 100000. Team is `pro` / 500000. Org is `enterprise` / 0.
 
 Bootstrap without a file:
 

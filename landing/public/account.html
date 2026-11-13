@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Account — Resileos</title>
+  <meta name="description" content="Plan, key prefix, and this month's usage for a Resileos account." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a href="/">Home</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/kin">Kin</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/account" aria-current="page">Account</a>
+        <a class="nav-cta" href="/chat">Chat</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <header class="page-hero">
+      <p class="eyebrow">Account</p>
+      <h1 id="account-title">Account</h1>
+      <p class="lede" id="account-lede">The key stays on the server. This page shows the prefix and this month's usage.</p>
+    </header>
+    <section>
+      <div class="inner" style="max-width: 40rem;">
+        <div class="card" id="summary">
+          <p class="msg" id="summary-msg">Loading…</p>
+          <dl class="form" id="summary-list" hidden>
+            <div><dt>Email</dt><dd id="f-email"></dd></div>
+            <div><dt>Plan</dt><dd id="f-plan"></dd></div>
+            <div><dt>Key prefix</dt><dd id="f-prefix"></dd></div>
+            <div><dt>This month</dt><dd id="f-usage"></dd></div>
+          </dl>
+        </div>
+
+        <div class="card" style="margin-top: 16px;">
+          <h2>Key</h2>
+          <div class="cta-row">
+            <button class="btn btn-primary" id="free-btn" type="button">Create free key</button>
+            <button class="btn btn-ghost" id="rotate-btn" type="button">Rotate key</button>
+            <button class="btn btn-ghost" id="reveal-btn" type="button">Email a reveal link</button>
+          </div>
+          <p class="msg" id="key-msg" role="status"></p>
+          <div class="key-reveal" id="key-reveal" role="status"></div>
+        </div>
+
+        <div class="card" style="margin-top: 16px;">
+          <h2>Upgrade</h2>
+          <p class="micro">Builder $29/mo · Founding Builder $19/mo · Team $99/mo. Checkout while signed in attaches the plan to this account.</p>
+          <div class="cta-row">
+            <button class="btn btn-primary" type="button" data-plan="builder">Builder</button>
+            <button class="btn btn-ghost" type="button" data-plan="founding_builder">Founding Builder</button>
+            <button class="btn btn-ghost" type="button" data-plan="team">Team</button>
+          </div>
+          <p class="msg" id="plan-msg" role="status"></p>
+        </div>
+
+        <div class="card" style="margin-top: 16px;" id="password-card">
+          <h2>Password</h2>
+          <p class="micro">Optional. Reset uses the email link. Stored as a PBKDF2-SHA256 hash.</p>
+          <form class="form" id="password-form">
+            <label for="current-password">Current password</label>
+            <input id="current-password" type="password" autocomplete="current-password" />
+            <label for="new-password">New password</label>
+            <input id="new-password" type="password" autocomplete="new-password" minlength="10" required />
+            <button class="btn btn-ghost" type="submit">Save password</button>
+            <p class="msg" id="password-msg" role="status"></p>
+          </form>
+        </div>
+
+        <p class="cta-row" style="margin-top: 18px;">
+          <a class="btn btn-primary" href="/chat">Open chat</a>
+          <button class="btn btn-ghost" id="logout-btn" type="button">Log out</button>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/login">Sign in</a>
+      <a href="/chat">Chat</a>
+    </nav>
+    <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
+  </footer>
+  <script src="/assets/site.js"></script>
+  <script>
+    let csrf = "";
+    let account = null;
+
+    function setMsg(id, text, kind) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text || "";
+      el.className = "msg" + (kind ? " " + kind : "");
+    }
+
+    async function api(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrf,
+        },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    }
+
+    function render(data) {
+      account = data;
+      csrf = data.csrf || "";
+      document.getElementById("summary-msg").hidden = true;
+      const list = document.getElementById("summary-list");
+      list.hidden = false;
+      document.getElementById("f-email").textContent = data.email || "";
+      document.getElementById("f-plan").textContent = data.plan || "free";
+      document.getElementById("f-prefix").textContent = data.prefix || "No key yet";
+      const count = typeof data.count === "number" ? data.count : "—";
+      const quota = data.usage && data.usage.unlimited ? "unlimited" : (data.quota ?? "—");
+      document.getElementById("f-usage").textContent = count + " / " + quota;
+      document.getElementById("free-btn").hidden = Boolean(data.has_key || data.free_issued);
+      const params = new URLSearchParams(location.search);
+      if (params.get("reset") === "1" || data.reset_ready) {
+        document.getElementById("current-password").disabled = true;
+        setMsg("password-msg", "Reset link accepted. Set a new password.");
+      }
+    }
+
+    async function load() {
+      const res = await fetch("/api/session/me", { credentials: "same-origin" });
+      const data = await res.json().catch(() => ({}));
+      if (!data.signed_in) {
+        const next = encodeURIComponent(location.pathname + location.search);
+        location.replace("/login?next=" + next);
+        return;
+      }
+      render(data);
+      const params = new URLSearchParams(location.search);
+      if (params.get("checkout") === "success" && params.get("session_id")) {
+        const claim = await fetch("/api/claim/" + encodeURIComponent(params.get("session_id")), { credentials: "same-origin" });
+        const claimed = await claim.json().catch(() => ({}));
+        if (claim.ok) setMsg("plan-msg", claimed.attached ? "Plan attached to this account." : "Checkout recorded. It attaches when this email matches.", "ok");
+        else setMsg("plan-msg", claimed.detail || "Plan not ready yet.", "err");
+        params.delete("checkout");
+        params.delete("session_id");
+        history.replaceState({}, "", location.pathname + (params.toString() ? "?" + params.toString() : ""));
+        const again = await fetch("/api/session/me", { credentials: "same-origin" });
+        render(await again.json());
+      }
+      if (params.get("reveal") === "ready" || data.reveal_ready) {
+        const revealed = await api("/api/session/reveal");
+        if (revealed.res.ok && revealed.data.api_key) showKey(revealed.data.api_key, revealed.data.prefix);
+        else if (!revealed.res.ok) setMsg("key-msg", revealed.data.detail || "Reveal is not ready.", "err");
+        params.delete("reveal");
+        history.replaceState({}, "", location.pathname + (params.toString() ? "?" + params.toString() : ""));
+      }
+    }
+
+    function showKey(value, prefix) {
+      const box = document.getElementById("key-reveal");
+      box.classList.add("show");
+      box.replaceChildren();
+      const note = document.createElement("p");
+      note.textContent = "Copy this key now. Later visits show only the prefix " + (prefix || "") + ".";
+      const line = document.createElement("div");
+      line.textContent = value;
+      const hide = document.createElement("button");
+      hide.type = "button";
+      hide.className = "btn btn-ghost";
+      hide.textContent = "Hide key";
+      hide.addEventListener("click", () => {
+        box.classList.remove("show");
+        box.replaceChildren();
+      });
+      box.append(note, line, hide);
+      setMsg("key-msg", "Shown once for this confirmation.", "ok");
+    }
+
+    document.getElementById("free-btn").addEventListener("click", async () => {
+      setMsg("key-msg", "Creating…");
+      const { res, data } = await api("/api/session/free-key");
+      if (!res.ok) {
+        setMsg("key-msg", data.detail || "Could not create a key.", "err");
+        return;
+      }
+      setMsg("key-msg", "Free key created. Prefix " + (data.prefix || "") + ". Chat uses it from this account.", "ok");
+      load();
+    });
+    document.getElementById("rotate-btn").addEventListener("click", async () => {
+      setMsg("key-msg", "Rotating…");
+      const { res, data } = await api("/api/session/rotate");
+      if (!res.ok) {
+        setMsg("key-msg", data.detail || "Could not rotate.", "err");
+        return;
+      }
+      location.assign("/login?next=/account");
+    });
+    document.getElementById("reveal-btn").addEventListener("click", async () => {
+      setMsg("key-msg", "Sending…");
+      const { res, data } = await api("/api/session/magic-link", { purpose: "reveal" });
+      if (res.status === 503) {
+        setMsg("key-msg", "email not configured", "err");
+        return;
+      }
+      setMsg("key-msg", res.ok ? "Check your email and open the link on this browser." : (data.detail || "Could not send."), res.ok ? "ok" : "err");
+    });
+    document.querySelectorAll("[data-plan]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        setMsg("plan-msg", "Opening Stripe…");
+        const { res, data } = await api("/api/create-checkout-session", { plan: btn.getAttribute("data-plan") });
+        if (!res.ok || !data.url) {
+          setMsg("plan-msg", data.detail || "Checkout is not available.", "err");
+          return;
+        }
+        location.assign(data.url);
+      });
+    });
+    document.getElementById("password-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const { res, data } = await api("/api/session/password", {
+        password: document.getElementById("new-password").value,
+        current_password: document.getElementById("current-password").value,
+      });
+      setMsg("password-msg", res.ok ? "Password saved." : (data.detail || "Could not save the password."), res.ok ? "ok" : "err");
+      if (res.ok) document.getElementById("current-password").disabled = false;
+    });
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await api("/api/session/logout");
+      location.assign("/login");
+    });
+    load().catch(() => setMsg("summary-msg", "Could not load the account.", "err"));
+  </script>
+</body>
+</html>

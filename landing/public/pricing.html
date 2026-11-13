@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pricing — Resileos</title>
-  <meta name="description" content="Free start, Builder $29/mo, Founding Builder $19/mo, Team $99/mo. Shared demo key on chat, about 100 usernames." />
+  <meta name="description" content="Free start, Builder $29/mo, Founding Builder $19/mo, Team $99/mo." />
   <meta name="theme-color" content="#06080e" />
   <link rel="icon" href="/assets/gods/hermes.webp" />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
@@ -33,7 +33,7 @@
     <header class="page-hero">
       <p class="eyebrow">Hermes · Dispatch</p>
       <h1>Start free. Pay for quota when the hub is yours.</h1>
-      <p class="lede">Prices from the packaging notes. Free is the funnel. Stripe checkout is for Builder and Team. Chat also has a shared demo key, separate from a key you mint here.</p>
+      <p class="lede">Prices from the packaging notes. Free is the funnel. Stripe checkout is for Builder and Team. A signed-in checkout attaches the plan to that account.</p>
     </header>
 
     <section id="pricing">
@@ -60,7 +60,7 @@
             <li>Chat at /chat + API</li>
           </ul>
           <a class="btn btn-primary btn-block" href="/chat">Open chat</a>
-          <a class="btn btn-ghost btn-block" href="#start">Get free key</a>
+          <a class="btn btn-ghost btn-block" href="/login?next=/account">Sign in for a free key</a>
         </div>
         <div class="price-card featured">
           <span class="badge">BUILDER · PRO TIER</span>
@@ -115,24 +115,17 @@
           <div>
             <h2 class="start-title">Three steps — free</h2>
             <div class="steps">
-              <div class="step"><div><h3>Get a free key</h3><p>No card. Shown once. Send as <code>X-API-Key</code>.</p></div></div>
+              <div class="step"><div><h3>Sign in</h3><p>Email link. The free key stays on the account. Chat sends it for you.</p></div></div>
               <div class="step"><div><h3>Learn into your hub</h3><p>Chat, or <code>POST /learn</code>. Prefix <code>user:</code> / <code>world:</code> for owned memory.</p></div></div>
               <div class="step"><div><h3>Ask · derive · abstain</h3><p>Known → the object. Chain → path. Unknown → empty.</p></div></div>
             </div>
           </div>
           <div class="card">
             <span class="badge badge-ok">FREE · NO CARD</span>
-            <h3>Issue your API key</h3>
-            <form class="form" id="free-key-form">
-              <label for="email">Email (optional)</label>
-              <input id="email" name="email" type="email" placeholder="you@lab.dev" autocomplete="email" />
-              <label for="name">Label</label>
-              <input id="name" name="name" type="text" placeholder="my-laptop" maxlength="64" />
-              <button class="btn btn-primary btn-block" type="submit">Get free key</button>
-              <div class="msg" id="free-key-msg" aria-live="polite"></div>
-            </form>
-            <div class="key-reveal" id="key-reveal" role="status"></div>
-            <p class="micro note">Also: <code>python scripts/issue_free_key.py</code> in the repo. The shared demo key inside chat is separate, rate-limited, about 100 usernames.</p>
+            <h3>Create a free key</h3>
+            <p>One free key per account. It is not shown here. Chat uses it after you sign in.</p>
+            <a class="btn btn-primary btn-block" href="/login?next=/account">Sign in</a>
+            <p class="micro note">Self-hosting can still run <code>python scripts/issue_free_key.py</code> and put the hash in the API key file.</p>
           </div>
         </div>
       </div>
@@ -142,11 +135,11 @@
       <h2>Pricing questions</h2>
       <details open>
         <summary>Do I need Docker to try it?</summary>
-        <p>No. Open <a href="/chat">/chat</a>. The shared demo key is filled in and rate-limited, about 100 usernames. Choose a username before a thread is saved.</p>
+        <p>No. Open <a href="/chat">/chat</a>. Signed-out use is a short per-network daily trial. Choose a username before a thread is saved.</p>
       </details>
       <details>
         <summary>How do free keys work?</summary>
-        <p>This page’s form calls the billing free-key API and shows the key once. You can also run <code>scripts/issue_free_key.py</code> and put the hash in the API key file.</p>
+        <p>Sign in and create the free key on Account. Direct API use can reveal that key once after another email confirmation. <code>scripts/issue_free_key.py</code> is the self-hosted path.</p>
       </details>
       <details>
         <summary>What is Founding Builder?</summary>

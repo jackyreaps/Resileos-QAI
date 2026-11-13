@@ -22,7 +22,7 @@ public/assets/gods/         expanded portraits (bronze, marble, crystal)
 public/assets/motion/       short decorative light sweeps
 public/assets/fonts/        Instrument Serif, Inter, JetBrains Mono
 public/assets/vendor/       vendored Lenis
-functions/api/              Cloudflare Pages Functions (free key, checkout, claim)
+functions/api/              Cloudflare Pages Functions (sign-in, account, free key, checkout, claim)
 api/                        local FastAPI server for the same billing routes
 scripts/stripe_setup.py     idempotent Stripe product and price creator
 wrangler.toml               Pages project and the KEYS KV binding

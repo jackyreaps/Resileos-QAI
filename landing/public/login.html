@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in — Resileos</title>
+  <meta name="description" content="Sign in to Resileos with an email link. A password is optional." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a href="/">Home</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/kin">Kin</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/login" aria-current="page">Sign in</a>
+        <a class="nav-cta" href="/chat">Chat</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <header class="page-hero">
+      <p class="eyebrow">Account</p>
+      <h1>Sign in with email</h1>
+      <p class="lede">A one-time link is the sign-in. A password is optional. Nothing on this page asks for an API key.</p>
+    </header>
+    <section>
+      <div class="inner" style="max-width: 32rem;">
+        <div class="card">
+          <h2>Email me a link</h2>
+          <form class="form" id="magic-form">
+            <label for="magic-email">Email</label>
+            <input id="magic-email" name="email" type="email" autocomplete="email" required />
+            <button class="btn btn-primary" type="submit">Send sign-in link</button>
+            <p class="msg" id="magic-msg" role="status"></p>
+          </form>
+        </div>
+        <div class="card" style="margin-top: 16px;">
+          <h2>Password</h2>
+          <p class="micro">Use this only after a password is saved on the account. Reset sends the same email link.</p>
+          <form class="form" id="password-form">
+            <label for="password-email">Email</label>
+            <input id="password-email" name="email" type="email" autocomplete="username" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+            <button class="btn btn-ghost" type="submit">Sign in</button>
+            <button class="btn btn-ghost" id="reset-btn" type="button">Email a reset link</button>
+            <p class="msg" id="password-msg" role="status"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/account">Account</a>
+      <a href="/chat">Chat</a>
+    </nav>
+    <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
+  </footer>
+  <script src="/assets/site.js"></script>
+  <script>
+    function nextPath() {
+      const next = new URLSearchParams(location.search).get("next") || "/account";
+      if (!next.startsWith("/") || next.startsWith("//")) return "/account";
+      return next;
+    }
+    function setMsg(id, text, kind) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = "msg" + (kind ? " " + kind : "");
+    }
+    async function post(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    }
+    document.getElementById("magic-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setMsg("magic-msg", "Sending…");
+      try {
+        const { res, data } = await post("/api/session/magic-link", {
+          email: document.getElementById("magic-email").value,
+          purpose: "login",
+        });
+        if (res.status === 503) {
+          setMsg("magic-msg", "email not configured", "err");
+          return;
+        }
+        if (!res.ok) {
+          setMsg("magic-msg", data.detail || "Could not send the link.", "err");
+          return;
+        }
+        setMsg("magic-msg", "Check that inbox for a sign-in link. It expires soon and works once.", "ok");
+      } catch {
+        setMsg("magic-msg", "Could not reach sign-in.", "err");
+      }
+    });
+    document.getElementById("password-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setMsg("password-msg", "Checking…");
+      try {
+        const { res, data } = await post("/api/session/login", {
+          email: document.getElementById("password-email").value,
+          password: document.getElementById("password").value,
+        });
+        if (!res.ok) {
+          setMsg("password-msg", data.detail || "Could not sign in.", "err");
+          return;
+        }
+        location.assign(nextPath());
+      } catch {
+        setMsg("password-msg", "Could not reach sign-in.", "err");
+      }
+    });
+    document.getElementById("reset-btn").addEventListener("click", async () => {
+      setMsg("password-msg", "Sending…");
+      try {
+        const { res, data } = await post("/api/session/magic-link", {
+          email: document.getElementById("password-email").value,
+          purpose: "reset",
+        });
+        if (res.status === 503) {
+          setMsg("password-msg", "email not configured", "err");
+          return;
+        }
+        if (!res.ok) {
+          setMsg("password-msg", data.detail || "Could not send the reset link.", "err");
+          return;
+        }
+        setMsg("password-msg", "Check that inbox for a reset link.", "ok");
+      } catch {
+        setMsg("password-msg", "Could not reach sign-in.", "err");
+      }
+    });
+  </script>
+</body>
+</html>

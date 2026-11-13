@@ -1,10 +1,9 @@
 """Conversation threads for the public chat.
 
-Threads are stored by API-key hash, then username, then hub. The shared
-demo key (the default on the public chat page) accepts about 100
-usernames so people sharing that key do not overwrite each other.
-Paid and personal keys use the same username + hub layout, without that
-cap. The plaintext demo key is read only to hash it, and is never logged.
+Threads are stored by API-key hash, then username, then hub. A digest in
+RESILEOS_DEMO_KEY_SHA256 still caps distinct usernames on that one key.
+The public chat page no longer embeds a shared key. Paid and personal
+keys use the same username + hub layout, without that cap.
 """
 from __future__ import annotations
 

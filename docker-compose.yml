@@ -16,6 +16,14 @@ services:
       - RESILEOS_SUBSTRATE_STATE=/app/data/substrate_state.pt
       - USAGE_PATH=/app/data/usage.json
       - API_KEYS_PATH=/app/configs/api_keys.json
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
+      - CLOUDFLARE_KV_NAMESPACE_ID=${CLOUDFLARE_KV_NAMESPACE_ID:-}
+      - RESILEOS_KV_CACHE_TTL=${RESILEOS_KV_CACHE_TTL:-30}
+      - RESILEOS_PROXY_SECRET=${RESILEOS_PROXY_SECRET:-}
+      - RESILEOS_TRIAL_DAILY_LIMIT=${RESILEOS_TRIAL_DAILY_LIMIT:-20}
+      # Set the exports in HOSTING.md before `docker compose up`.
+      # Do not commit token, proxy secret, or key values.
     volumes:
       - ./titanos_live_state.json:/app/titanos_live_state.json
       - resileos_substrate:/app/data
