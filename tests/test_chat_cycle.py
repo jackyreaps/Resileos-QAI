@@ -154,17 +154,19 @@ def test_verified_turn_speaks_and_unverified_turn_does_not_write(client, monkeyp
     )
     assert greeted.status_code == 200, greeted.text
     hello = greeted.json()
-    assert hello["cycle_verified"] is True
+    assert hello["cycle_verified"] is False
+    assert hello["verified"] is False
     assert hello["mouth_open"] is True
     assert hello["message_kind"] == "mouth"
-    assert "with you" in hello["reply_text"].lower()
+    assert hello["source"] == "conversational"
     assert hello["factual_mouth"] is False
+    assert hello["evidence"] == []
+    assert "not a stored fact" in hello["reply_text"].lower()
+    assert "i am online and ready" not in hello["reply_text"].lower()
     assert hello.get("companion_prompt")
     assert "Stores · Derives · Abstains" in hello["companion_prompt"]
     assert "username" in hello["companion_prompt"].lower()
-    legions = hello.get("legions") or {}
-    assert legions.get("calliope", {}).get("writes_residual") is False
-    assert legions.get("ligeia", {}).get("writes_residual") is False
+    assert hello.get("checks_skipped") == ["themis", "momus", "atlas"]
 
     taught = client.post(
         "/api/v1/chat",
@@ -215,8 +217,8 @@ def test_verified_turn_speaks_and_unverified_turn_does_not_write(client, monkeyp
     assert quiet.status_code == 200, quiet.text
     quiet_body = quiet.json()
     assert quiet_body["cycle_verified"] is False
-    assert quiet_body["mouth_open"] is False
-    assert quiet_body["message_kind"] == "orientation"
-    assert "invent" in quiet_body["reply_text"].lower()
-    assert "i'm here" not in quiet_body["reply_text"].lower()
+    assert quiet_body["verified"] is False
+    assert quiet_body["source"] == "conversational"
+    assert quiet_body["factual_mouth"] is False
+    assert "not a stored fact" in quiet_body["reply_text"].lower()
     assert "cycle_tea_2a49" not in quiet_body["reply_text"]

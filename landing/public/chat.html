@@ -593,8 +593,10 @@
         @media (max-width: 1100px) {
             #studio-tools { grid-template-columns: 1fr; }
         }
+    </style>
+    <style>
         @media (max-width: 720px) {
-            .brand span, .user-pill, #btn-signout-header, #status-label { display: none; }
+            .brand span, .user-pill, #status-label { display: none; }
             .header { padding: 8px 8px; gap: 8px; }
             .header-title { min-width: 0; }
             .header-actions { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
@@ -608,13 +610,14 @@
             #studio-tools { grid-template-columns: 1fr; }
         }
     </style>
+    <link rel="stylesheet" href="/assets/chat-ui.css" />
 </head>
 <body>
     <div id="portal">
         <div class="portal-card">
             <div class="portal-top">
                 <a class="brand" href="/">Resileos</a>
-                <button class="btn-icon" id="portal-theme" type="button" title="Theme">
+                <button class="btn-icon" id="portal-theme" type="button" title="Theme" aria-label="Theme">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                 </button>
             </div>
@@ -646,34 +649,53 @@
         <div class="header-actions">
             <a class="btn-text" id="login-link" href="/login">Sign in</a>
             <a class="btn-text" id="account-link" href="/account" hidden>Account</a>
-            <button class="btn-text js-signout" id="btn-signout-header" type="button">Switch user</button>
-            <button class="btn-icon" id="btn-history" type="button" onclick="toggleHistory()" title="Conversations" aria-pressed="false" aria-expanded="false" aria-controls="history-panel">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="15" y2="18"></line></svg>
+            <button class="btn-icon btn-label" id="btn-history" type="button" onclick="toggleHistory()" title="Conversations" aria-label="Conversations" aria-pressed="false" aria-expanded="false" aria-controls="history-panel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="15" y2="18"></line></svg>
+                <span>Conversations</span>
             </button>
-            <button class="btn-icon" id="btn-tools" onclick="toggleTools()" title="Tools" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+            <button class="btn-icon" id="btn-theme" type="button" onclick="toggleTheme()" title="Theme. Switch light or dark." aria-label="Theme">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
-            <button class="btn-icon" id="btn-kin" onclick="toggleKin()" title="Kin" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-            </button>
-            <button class="btn-icon" id="btn-studio" onclick="toggleStudio()" title="Studio" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            </button>
-            <button class="btn-icon" id="btn-ui" onclick="toggleUi()" title="Perceive, language, agent" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            </button>
-            <button class="btn-icon" id="btn-companion" onclick="toggleCompanion()" title="Meet the companion" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-            </button>
-            <button class="btn-icon" id="btn-ledger" onclick="toggleLedger()" title="Memory ledger" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-            </button>
-            <button class="btn-icon" id="btn-settings" onclick="toggleSettings()" title="Connection" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </button>
-            <button class="btn-icon" id="btn-theme" type="button" onclick="toggleTheme()" title="Theme">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-            </button>
+            <div class="more-wrap">
+                <button class="btn-icon btn-label" id="btn-more" type="button" title="More actions" aria-label="More" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>More</span>
+                </button>
+                <div id="more-menu" class="more-menu" role="menu" hidden aria-label="More actions">
+                    <button class="menu-item" id="btn-tools" type="button" role="menuitem" onclick="toggleTools()" title="Run a tool" aria-pressed="false">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+                        <span class="menu-copy"><span class="menu-label">Run a tool</span><span class="menu-desc">Open the tool list and run one</span></span>
+                    </button>
+                    <button class="menu-item" id="btn-kin" type="button" role="menuitem" onclick="toggleKin()" title="Learning cycle" aria-pressed="false">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                        <span class="menu-copy"><span class="menu-label">Learning cycle</span><span class="menu-desc">Run a cycle, preview a claim, or restore a checkpoint</span></span>
+                    </button>
+                    <button class="menu-item" id="btn-studio" type="button" role="menuitem" onclick="toggleStudio()" title="Studio" aria-pressed="false">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        <span class="menu-copy"><span class="menu-label">Studio</span><span class="menu-desc">Make a video, add source text, or plan a task</span></span>
+                    </button>
+                    <button class="menu-item" id="btn-ui" type="button" role="menuitem" onclick="toggleUi()" title="See and speak" aria-pressed="false">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <span class="menu-copy"><span class="menu-label">See and speak</span><span class="menu-desc">Perception, language, and agent tasks</span></span>
+                    </button>
+                    <button class="menu-item" id="btn-companion" type="button" role="menuitem" onclick="toggleCompanion()" title="Companion" aria-pressed="false">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                        <span class="menu-copy"><span class="menu-label">Companion</span><span class="menu-desc">Meet the companion for this hub</span></span>
+                    </button>
+                    <button class="menu-item" id="btn-ledger" type="button" role="menuitem" onclick="toggleLedger()" title="Memory" aria-pressed="false">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        <span class="menu-copy"><span class="menu-label">Memory</span><span class="menu-desc">Read or edit saved memory</span></span>
+                    </button>
+                    <button class="menu-item" id="btn-settings" type="button" role="menuitem" onclick="toggleSettings()" title="Connection" aria-pressed="false">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        <span class="menu-copy"><span class="menu-label">Connection</span><span class="menu-desc">Hub and persona</span></span>
+                    </button>
+                    <button class="menu-item js-signout" id="btn-signout-header" type="button" role="menuitem" title="Switch user">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        <span class="menu-copy"><span class="menu-label">Switch user</span><span class="menu-desc">Sign in with a different username</span></span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -698,25 +720,25 @@
     <button type="button" class="history-scrim" id="history-scrim" hidden aria-label="Close conversations"></button>
     <div class="chat-column">
     <div id="tools-panel" class="panel">
-        <p class="panel-intro">Every tool from GET /tools, including harness tools. Edit the JSON and run it against POST /tools/{name}. Replies stay readable. The raw payload is folded.</p>
+        <p class="panel-intro">Run a tool from the list. You can edit the request. The raw response stays folded under Details.</p>
         <div id="tools-list" class="panel-grid"></div>
     </div>
     <div id="kin-panel" class="panel">
-        <p class="panel-intro">Kin cycle, Eat preview, council, Hades, and registered legions.</p>
+        <p class="panel-intro">Run a learning cycle, preview a claim, or restore a checkpoint. The forms below are the advanced controls.</p>
         <div class="group-row">
-            <span class="group-label">Kin</span>
-            <span class="tool-chip" onclick="runKinCycle()">Iris → Metis → Hermes</span>
-            <span class="tool-chip" onclick="listCheckpoints()">Hades checkpoints</span>
-            <span class="tool-chip" onclick="runResidualCheck()">Residual check</span>
+            <span class="group-label">Actions</span>
+            <button type="button" class="tool-chip" onclick="runKinCycle()">Run a learning cycle</button>
+            <button type="button" class="tool-chip" onclick="listCheckpoints()">Saved checkpoints</button>
+            <button type="button" class="tool-chip" onclick="runResidualCheck()">Check consistency</button>
         </div>
         <div id="kin-forms" class="panel-grid"></div>
         <div id="legion-list" class="panel-grid"></div>
     </div>
     <div id="studio-panel" class="panel">
-        <p class="panel-intro" id="studio-intro">Forge video, graphify, and plan / test / debug. Hermes dispatches Forge and the loop. Hephaestus can mount Forge in a temporary swarm. Graphify goes through Eat. Stop asks Atropos to cut one Clotho owner.</p>
+        <p class="panel-intro" id="studio-intro">Make a video, add source text, or plan a task. Stop ends one running job.</p>
         <div id="studio-tools" class="panel-grid">
             <form class="action-card" id="forge-form">
-                <h4>Forge video</h4>
+                <h4>Make a video</h4>
                 <p>forge_video on Hermes. If the API returns UNAVAILABLE, no video URL is shown.</p>
                 <label>Prompt
                     <textarea id="forge-prompt" spellcheck="true" placeholder="A quiet hill at dusk"></textarea>
@@ -732,7 +754,7 @@
                 <div class="studio-result" id="forge-result"></div>
             </form>
             <form class="action-card" id="graphify-form">
-                <h4>Graphify</h4>
+                <h4>Add source text</h4>
                 <p>graphify on Eat. Candidates go through eat_filter. Learn runs only for an accept when commit is set. Reject and abstain do not write.</p>
                 <label>Source
                     <textarea id="graphify-source" spellcheck="false" placeholder="Zeus domain sky"></textarea>
@@ -742,7 +764,7 @@
                 <div class="studio-result" id="graphify-result"></div>
             </form>
             <form class="action-card" id="plan-form">
-                <h4>Plan / test / debug</h4>
+                <h4>Plan a task</h4>
                 <p>plan_test_debug on Hermes. write_file, apply_diff, and git_commit stay refused until verify_on_stop. This page does not execute them.</p>
                 <label>Goal
                     <input id="plan-goal" type="text" spellcheck="true" placeholder="Check the joint" />
@@ -754,8 +776,8 @@
                 <div class="studio-result" id="plan-result"></div>
             </form>
             <form class="action-card" id="stop-form">
-                <h4>Stop</h4>
-                <p>Ask Atropos to cut one Clotho owner. A Forge run can fill this from clotho_owner.</p>
+                <h4>Stop a job</h4>
+                <p>Stop one running job. A video run can fill the owner name. Ask Atropos to cut one Clotho owner.</p>
                 <label>Clotho owner
                     <input id="stop-owner" type="text" spellcheck="false" autocomplete="off" placeholder="forge-owner" />
                 </label>
@@ -764,16 +786,16 @@
             </form>
         </div>
         <details class="more-fold">
-            <summary>Codecs, prior, gate, and sampler</summary>
+            <summary>Advanced studio tools</summary>
             <div id="studio-forms" class="panel-grid"></div>
         </details>
     </div>
     <div id="ui-panel" class="panel">
-        <p class="panel-intro">Perception, generation, language, mouth, explain, remember, and agent tasks. Perception defaults to commit: false. Language uses the same Eat path. Mutating agent steps are refused server-side.</p>
+        <p class="panel-intro">See, translate, explain, or remember. Perception defaults to commit: false and does not save on its own. Language uses the same Eat path. Mutating agent steps are refused server-side.</p>
         <div id="ui-forms" class="panel-grid"></div>
     </div>
     <div id="ledger-panel" class="panel">
-        <p class="panel-intro">Hub memory ledger for the current hub id. Load is a read. Edit and delete write to that hub.</p>
+        <p class="panel-intro">Saved memory for this hub. Load reads it. Edit and delete write to that hub.</p>
         <div id="ledger-forms" class="panel-grid"></div>
     </div>
     <div id="companion-panel" class="panel">
@@ -799,7 +821,7 @@
                     <option value="mythic">Mythic</option>
                 </select>
             </label>
-            <label class="check"><input id="settings-debug" type="checkbox" /> Show source, tools, and timing on the reply</label>
+            <label class="check"><input id="settings-debug" type="checkbox" /> Show technical details on each reply</label>
             <p class="settings-hint" id="key-mode"></p>
             <p class="settings-hint">Requests go through this site. A signed-in account uses its own key on the server. A signed-out browser uses the per-network daily trial. Choose a username before a conversation is saved.</p>
         </div>
@@ -809,15 +831,25 @@
         <div class="empty" id="empty-state">
             <p class="eyebrow">Stores · Derives · Abstains</p>
             <h2>Remembers exactly</h2>
-            <p class="lede">Sign in with a username to keep this thread. Teach a fact, then ask it back. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented. Studio, Kin, and the ledger are in the header.</p>
+            <p class="lede">Sign in with a username to keep this thread. Ask in a normal sentence, or try an example. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented.</p>
             <p class="companion-line" id="returning-companion" hidden></p>
             <div class="suggestions" id="suggestions">
-                <button type="button" class="suggestion" data-ask="remember alice works_at acme">Teach a fact</button>
-                <button type="button" class="suggestion" data-ask="alice works_at">Ask a stored fact</button>
-                <button type="button" class="suggestion" data-ask="what is the domain of Zeus">Query Zeus domain</button>
-                <button type="button" class="suggestion" data-ask="/search Who won the Super Bowl in 2024?">Unverified web search</button>
-                <button type="button" class="suggestion" data-action="kin">Run Kin cycle</button>
-                <button type="button" class="suggestion" data-action="residual">Residual check</button>
+                <button type="button" class="suggestion" data-fill="Remember that Alice works at Acme.">
+                    <span>Remember that Alice works at Acme.</span>
+                    <span class="suggestion-hint">Saves a note you can ask about later.</span>
+                </button>
+                <button type="button" class="suggestion" data-fill="What is the domain of Zeus?">
+                    <span>What is the domain of Zeus?</span>
+                    <span class="suggestion-hint">Asks the store. It abstains if that row is missing.</span>
+                </button>
+                <button type="button" class="suggestion" data-fill="Who won the Super Bowl in 2024?" data-mode="search">
+                    <span>Who won the Super Bowl in 2024?</span>
+                    <span class="suggestion-hint">Searches the web. The answer stays unverified.</span>
+                </button>
+                <button type="button" class="suggestion" data-fill="I like quiet mornings.">
+                    <span>I like quiet mornings.</span>
+                    <span class="suggestion-hint">Saves a preference, not a stored world fact.</span>
+                </button>
             </div>
         </div>
     </div>
@@ -825,19 +857,32 @@
     <div class="input-wrap">
         <div class="input-box">
             <input type="file" id="file-input" hidden>
-            <button class="btn-icon" id="btn-file" type="button" title="Upload file">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-            </button>
-            <div id="file-chip" class="file-chip" hidden>
-                <span id="file-chip-name"></span>
-                <button type="button" id="file-chip-clear" aria-label="Remove file">×</button>
+            <div class="composer-bar" role="toolbar" aria-label="Message actions">
+                <button class="composer-action" id="btn-search" type="button" aria-pressed="false" title="Search the web. Results stay unverified.">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    Search the web
+                </button>
+                <button class="composer-action" id="btn-image" type="button" aria-pressed="false" title="Describe a picture. The reply says if none comes back.">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    Make an image
+                </button>
+                <button class="composer-action" id="btn-file" type="button" title="Attach a file" aria-label="Attach a file">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    Attach
+                </button>
             </div>
-            <textarea class="composer" id="input" rows="1" placeholder="Ask or teach a fact…" autocomplete="off"></textarea>
-            <button class="send" id="send" type="button" title="Send">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-            </button>
+            <div class="composer-row">
+                <div id="file-chip" class="file-chip" hidden>
+                    <span id="file-chip-name"></span>
+                    <button type="button" id="file-chip-clear" aria-label="Remove file">×</button>
+                </div>
+                <textarea class="composer" id="input" rows="1" placeholder="Ask in a sentence, or teach a fact…" autocomplete="off" aria-label="Message"></textarea>
+                <button class="send" id="send" type="button" title="Send" aria-label="Send message">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
         </div>
-        <p class="composer-hint">Enter to send · Shift+Enter for a new line</p>
+        <p class="composer-hint">Enter to send. Shift+Enter for a new line. Type / for shortcuts.</p>
     </div>
     </div>
     </div>
@@ -1160,7 +1205,7 @@
             try {
                 const r = await apiFetch(`${apiUrl()}/tools`, { headers: authHeaders() });
                 if (r.status === 401 || r.status === 403) {
-                    mount.replaceChildren(document.createTextNode('Add a valid API key in Connection to list tools.'));
+                    mount.replaceChildren(document.createTextNode('Sign in to list tools. The anonymous trial is counted on the server for this network.'));
                     return;
                 }
                 const d = await r.json();
@@ -2461,5 +2506,6 @@
             showPortal();
         }
     </script>
+    <script src="/assets/chat-ui.js"></script>
 </body>
 </html>

@@ -282,6 +282,12 @@ def _register_runtime_legions() -> None:
         register_studio_legions()
     except LegionError as exc:
         log.warning("studio legions not registered: %s", exc)
+    try:
+        from resileos.kin.dionysus import register_dionysus
+
+        register_dionysus()
+    except LegionError as exc:
+        log.warning("dionysus legion not registered: %s", exc)
 
 try:
     _register_runtime_legions()
@@ -734,10 +740,15 @@ def titanos_query(payload: QueryRequest):
             "value": ans.value, "confidence": float(ans.confidence), "status": ans.status, "mode": ans.mode, "loops": ans.loops,
             "reason": ans.reason, "gate_state": ans.gate_state, "child_name": ans.child_name, "recovery_loss": float(getattr(ans, "recovery_loss", 0.0)),
             "as_of": payload.as_of,
+            "candidate": getattr(ans, "candidate", None),
+            "evidence": list(getattr(ans, "evidence", []) or []),
+            "unverified": bool(getattr(ans, "unverified", False) or ans.status == "CANDIDATE"),
             "trace": [{"loop": h["loop"], "scar": float(h["scar_energy"]), "delta": float(h["delta"]), "mu": h["mu"], "deltas": float(h.get("DeltaS", 0.0)), "vol_ok": h["volume_ok"], "gate_state": h["gate_state"]} for h in ans.loop_history],
         }
         out["sector"] = sector
         out["frame"] = derive_frame(sector=sector, gate_state=str(getattr(ans, "gate_state", "") or ""), status=str(getattr(ans, "status", "") or ""), n_rows=1 if ans.value else 0)
+        if ans.status == "CANDIDATE":
+            out["verified"] = False
         
         _ = prefer_child(sector=sector, gate_state=str(getattr(ans, "gate_state", "") or ""), confidence=float(ans.confidence), gate_capacity_bits=float(getattr(g, "gate_capacity_bits", 0.0) if g is not None else 0.0))
         
@@ -753,6 +764,15 @@ def titanos_query(payload: QueryRequest):
                 text = backend.render(ctx)
             out["answer_text"] = text
             out["backend"] = backend.name
+        if ans.status == "CANDIDATE":
+            from resileos.ui.custom_mouth import phrase_candidate
+
+            out["answer_text"] = phrase_candidate(
+                getattr(ans, "candidate", None),
+                list(getattr(ans, "evidence", []) or []),
+            )
+            out["backend"] = "structured"
+            out["verified"] = False
         return with_scale(out, payload.subject, payload.relation)
     except HTTPException:
         raise
@@ -781,7 +801,17 @@ def titanos_chain(payload: ChainRequest):
         raise HTTPException(400, "relations must be non-empty")
     try:
         ans = titanos_singleton.chain(payload.start, payload.relations)
-        return {"value": ans.value, "confidence": float(ans.confidence), "status": ans.status, "mode": ans.mode, "path": ans.path, "reason": ans.reason}
+        return {
+            "value": ans.value,
+            "confidence": float(ans.confidence),
+            "status": ans.status,
+            "mode": ans.mode,
+            "path": ans.path,
+            "reason": ans.reason,
+            "candidate": getattr(ans, "candidate", None),
+            "evidence": list(getattr(ans, "evidence", []) or []),
+            "unverified": bool(getattr(ans, "unverified", False) or ans.status == "CANDIDATE"),
+        }
     except Exception as e:
         raise HTTPException(500, str(e))
 

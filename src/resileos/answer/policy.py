@@ -42,6 +42,8 @@ def derive_frame(
 
     if st == "NONE_CHANNEL":
         return FRAME_UNRESOLVED
+    if st == "CANDIDATE":
+        return "candidate"
     if st == "ABSTAINED":
         return FRAME_ABSTAINED
     if st in {"ANSWERED", "NO_ROWS", "ACCEPTED", ""}:
