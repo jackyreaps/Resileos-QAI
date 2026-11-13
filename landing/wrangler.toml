@@ -14,6 +14,7 @@ FREE_KEY_RATE_PER_HOUR = "5"
 MAGIC_LINK_TTL_SECONDS = "900"
 SESSION_TTL_SECONDS = "1209600"
 PASSWORD_PBKDF2_ITERATIONS = "100000"
+EMAIL_FROM = "Resileos <login@resileosai.fun>"
 
 [[kv_namespaces]]
 binding = "KEYS"
