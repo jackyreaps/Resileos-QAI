@@ -62,6 +62,8 @@ class VideoPacket(ControlPacket):
     keyframe_ids: List[int] = field(default_factory=list)
     provider_stage: str = "draft"
     scene_script_hash: Optional[str] = None
+    # Recorded check metrics (studio.clip_metrics). Not a verify gate.
+    check_metrics: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.provider_stage not in _PROVIDER_STAGES:
@@ -79,4 +81,5 @@ class VideoPacket(ControlPacket):
         data["keyframe_ids"] = list(self.keyframe_ids)
         data["provider_stage"] = self.provider_stage
         data["scene_script_hash"] = self.scene_script_hash
+        data["check_metrics"] = dict(self.check_metrics)
         return data

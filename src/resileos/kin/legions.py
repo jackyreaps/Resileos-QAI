@@ -179,7 +179,7 @@ def _wrap(kin: str, name: str, tool_fn: ToolFn, constraints: dict[str, Any]) -> 
             route = confidence_route({"probability": float(probability)})
             if route["route"] != "escalate_or_abstain":
                 raise LegionError(
-                    "ollama legion is reachable only when confidence_route says escalate"
+                    f"{name} is escalate-only: reachable only when confidence_route says escalate"
                 )
 
         if kin == "iris" and (kwargs.get("write_residual") or kwargs.get("learn_fn")):
