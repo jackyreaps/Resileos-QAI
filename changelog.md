@@ -6,7 +6,23 @@ are stable and never reused.
 ## [Unreleased]
 
 ### Added
-- `docs/outer-layer.md` — outer-layer flow: Hermes envelopes → Eat → Zeus
+- `src/resileos/ui/cascade_address.py` — Human Belt, pins, and
+  orientation scales on frames (3, 5, 9, 12). Belt means only the
+  5-mod Human Belt. `pin_address("local")` is belt 5, frame 5.
+  `orientation_scale("orion")` is scale_level 2, frame 9 (no belt
+  field). The former orientation name `local` is `edge`. `proportion`
+  is the shared core `PHI`; `phi_weight` is φ^{-scale_level}.
+  See `docs/200-core/cascade-address.md`.
+- `src/resileos/persona/promote.py` — one-step outward subject
+  for a verified, opted-in fact. Never re-verifies, never writes.
+  Draft mapping local=world / global=org was reversed to match
+  hub_train and the persona tiers: individual→user, local→org,
+  global→world. See `docs/320-titanos/tier-promotion.md`.
+- Optional `pin` and `address` fields on `ControlPacket`/`VideoPacket`
+  (default `None`, recorded only; verify gates unchanged).
+- `address_for_hub_subject` records the five-pin address for a hub namespace (user→individual, org→local, world→global).
+- `encode_sequence` records `kept` from the 1/64 keep floor; TEMPORAL_SIGMA and ACCEPT_ENERGY are unchanged.
+- `docs/320-titanos/outer-layer.md` — outer-layer flow: Hermes envelopes → Eat → Zeus
   reviewers → Titanos; Iris trace sensor; Hades lesson notes; clip check
   metrics. Lists renames from the drafts and what was left out.
 - `src/resileos/kin/eat_envelope.py` — temporal envelope check, attention
@@ -36,8 +52,17 @@ are stable and never reused.
 - `src/resileos/substrate/__init__.py` — substrate package.
 
 ### Changed
+- Loose docs at the `docs/` root moved into the existing folders:
+  `oscillator-depth.md` → `300-substrate/`, `outer-layer.md` and
+  `guild-merit.md` → `320-titanos/`. Cascade address docs now live at
+  `docs/200-core/cascade-address.md`; promotion at
+  `docs/320-titanos/tier-promotion.md`.
 - `docs/readme.md` — RES-600/601/602 added to reading order; 600-series added
-  to the categories table.
+  to the categories table. Index also lists cascade address and
+  cascade promotion.
+- `configs/harness_policy.yaml` — guide path
+  `docs/RES-100/architecture.md` updated to
+  `docs/100-foundations/architecture.md`.
 
 ### Notes
 ### Notes

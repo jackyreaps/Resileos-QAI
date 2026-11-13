@@ -10,3 +10,6 @@ def test_address_kinds():
     assert w["kind"] == "world"
     assert o["kind"] == "org"
     assert u["address"]["residual_bin"]
+    assert u["pin"] == "individual" and u["pin_address"]["frame"] == 5
+    assert o["pin"] == "local" and o["pin_address"]["frame"] == 5
+    assert w["pin"] == "global" and w["pin_address"]["frame"] == 9

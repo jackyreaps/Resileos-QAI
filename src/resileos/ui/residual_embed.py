@@ -9,6 +9,19 @@ The coordinate is a stable address:
   belt, frame, residual_bin, debt
 
 Later encoders replace the feature function. The address shape stays.
+
+An optional ``scale`` names an orientation scale (see
+``orientation_scale`` in ``resileos.ui.cascade_address``). That
+control sets the cascade frame (and records ``scale_level``). The
+cascade ``belt`` is the 5-mod Human Belt. It does not rebuild the
+pixel matrix, call learn, or write a scar.
+
+``suite_residual`` still receives the original ``belt`` argument, not
+the scale level. A scale level passed as belt would change
+``residual_bin`` (the placeholder label includes ``belt % 4``).
+Pixel features and ``residual_bin`` therefore stay the same as a
+no-scale call that used the same ``belt``. With ``scale`` omitted or
+empty, the returned dict is unchanged from the previous signature.
 """
 from __future__ import annotations
 
@@ -16,6 +29,7 @@ from typing import Any
 
 import numpy as np
 
+from resileos.ui.cascade_address import BELT, cascade_address, orientation_scale
 from resileos.ui.suite_residual import suite_residual
 
 
@@ -30,11 +44,28 @@ def residual_bin(mean_luma: float, edge_density: float) -> str:
     return "low_low"
 
 
-def embed_frame(arr: np.ndarray, *, belt: int = 0, frame: int = 0) -> dict[str, Any]:
+def embed_frame(
+    arr: np.ndarray,
+    *,
+    belt: int = 0,
+    frame: int = 0,
+    scale: str | None = None,
+) -> dict[str, Any]:
     """Embed one frame into a residual address.
 
     arr: HxW or HxWxC
+    scale: optional orientation-scale name. When set, the cascade
+    address uses the Human Belt and that control's frame. The
+    original ``belt`` argument is still passed to ``suite_residual``.
     """
+    bin_belt = int(belt)
+    address_belt = bin_belt
+    address_frame = int(frame)
+    control = None
+    if scale:
+        control = orientation_scale(scale)
+        address_belt = BELT
+        address_frame = int(control["frame"])
     if arr.ndim == 3:
         gray = arr[..., :3].astype(np.float32)
         if gray.max() > 1.5:
@@ -47,16 +78,26 @@ def embed_frame(arr: np.ndarray, *, belt: int = 0, frame: int = 0) -> dict[str, 
     gy, gx = np.gradient(gray)
     edge = float((np.hypot(gx, gy) > 0.08).mean())
     luma = float(gray.mean())
-    rbin = suite_residual(luma, edge, belt)
-    return {
-        "belt": int(belt),
-        "frame": int(frame),
+    rbin = suite_residual(luma, edge, bin_belt)
+    out: dict[str, Any] = {
+        "belt": address_belt,
+        "frame": address_frame,
         "residual_bin": rbin,
         "mean_luma": round(luma, 4),
         "edge_density": round(edge, 4),
         "debt": 1.0,
         "note": "Scaffold address. Replace residual_bin with suite residual when coded.",
     }
+    if control is not None:
+        path = cascade_address(address_belt, address_frame, rbin)
+        out["scale"] = control["scale"]
+        out["scale_level"] = control["scale_level"]
+        out["orientation"] = control["orientation"]
+        out["proportion"] = control["proportion"]
+        out["phi_weight"] = control["phi_weight"]
+        out["path"] = path["path"]
+        out["residual"] = path["residual"]
+    return out
 
 
 def address_triple(embed: dict[str, Any], subject: str = "frame") -> dict[str, str]:

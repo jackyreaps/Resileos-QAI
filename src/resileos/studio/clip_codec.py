@@ -35,6 +35,7 @@ from studio.codec import logical_bits, pack_packet  # noqa: E402
 from resileos.phi_compress import contract_depth, contract_rank
 from resileos.studio.residual_cascade import ACCEPT_ENERGY, LAYER_GAIN
 from resileos.ui.frame_codec import project_gray
+from resileos.ui.cascade_address import keep_packet
 from resileos.ui.residual_frame import (
     apply_residual,
     as_gray,
@@ -389,6 +390,8 @@ def encode_sequence(
         "frame_energy": energies,
         "energy": float(np.mean(energies)) if energies else 0.0,
         "energy_closed": bool(energies) and max(energies) <= ACCEPT_ENERGY,
+        # Recorded only. Does not replace TEMPORAL_SIGMA or ACCEPT_ENERGY.
+        "kept": keep_packet(float(np.mean(energies)) if energies else 0.0),
         "sigma": TEMPORAL_SIGMA,
         "temporal_delta": float(max(later) if later else 0.0),
         "keyframe_ids": keyframe_ids,
