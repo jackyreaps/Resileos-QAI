@@ -45,10 +45,13 @@ def scale_address(
     subject: str = "state",
     stored: list[dict[str, str]] | None = None,
     eat_accepted: bool = False,
+    step_core: bool = True,
 ) -> dict[str, Any]:
     """One address for a frame, a fact, or a world state.
 
     Returns the embed, the field phases, the gated triple, and the frame label.
+    ``step_core=False`` skips ``ResidualCore.step``. Studio and other visual
+    callers use that so a scale address does not update a scar matrix.
     """
     if arr is None:
         arr = np.zeros((8, 8, 3), dtype=np.uint8)
@@ -70,7 +73,16 @@ def scale_address(
     triple = address_triple(embed, subject=subject)
     gated = gate_candidate(triple, stored=stored or [], eat_accepted=eat_accepted)
     field_info = {"backend": backend, "theta": [round(t, 4) for t in theta]}
-    core = core_step_from_address(embed)
+    if step_core:
+        core = core_step_from_address(embed)
+    else:
+        core = {
+            "backend": "not_stepped",
+            "packet_hash": None,
+            "layers": 0,
+            "scar_matrix_updated": False,
+            "learned": False,
+        }
     search = search_from_field(field_info["theta"])
     return {
         "embed": embed,

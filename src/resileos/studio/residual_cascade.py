@@ -485,7 +485,7 @@ def _still_result(
         recon = np.asarray(evolved["recon"], dtype=np.float64)
         preview = np.clip(recon, 0.0, 1.0)
         rgb = np.repeat((preview * 255.0).astype(np.uint8)[..., None], 3, axis=2)
-        scale = scale_address(rgb, subject="studio-still")
+        scale = scale_address(rgb, subject="studio-still", step_core=False)
     candidate = None
     if register and judged["outcome"] != "rejected":
         candidate = _candidate(digest, f"CANDIDATE still {digest[:8]}")

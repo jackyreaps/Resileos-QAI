@@ -75,7 +75,14 @@ def generate_local(
     """Local generation using the scale address (residual + Kuramoto + gate)."""
     if arr is None:
         arr = np.zeros((8, 8, 3), dtype=np.uint8)
-    scaled = scale_address(arr, belt=belt, frame=frame, persona=persona, subject=subject)
+    scaled = scale_address(
+        arr,
+        belt=belt,
+        frame=frame,
+        persona=persona,
+        subject=subject,
+        step_core=False,
+    )
     pattern = local_pattern_from_theta(scaled["field"]["theta"])
     return {
         "embed": scaled["embed"],

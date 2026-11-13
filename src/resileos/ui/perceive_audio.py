@@ -38,7 +38,7 @@ def perceive_audio(
     if frame.shape[0] < 8:
         frame = np.resize(frame, (8, 1))
     frame = np.hstack([frame, frame])
-    addr = scale_address(frame, subject=subject)
+    addr = scale_address(frame, subject=subject, step_core=False)
     return {
         "subject": subject,
         "sample_rate": int(sample_rate),

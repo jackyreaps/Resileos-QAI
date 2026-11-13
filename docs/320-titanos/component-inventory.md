@@ -1,0 +1,166 @@
+---
+doc: RES-346
+title: Component inventory
+status: draft
+depends_on: [RES-200, RES-201, RES-334-kin, RES-338, RES-343, RES-345]
+referenced_by: [RES-000]
+---
+
+# Component inventory
+
+Read of Kin, demi-gods, Hermes paths, legions, swarms, and the studio / chat / mouth / oscillator / residual-cascade modules on this tree. Zeus is Core, not a Kin. Eat keeps the name Eat. Harmonia sits under Hermes, not as a Kin. Hephaestus is Forge patronage, not a Kin.
+
+This is a code reading. It does not claim a production video path, a photograph metric, or a comparison with another model. Digit-study PSNR in the studio research note is an 8×8 digits figure. It is not photo quality and it is not video quality.
+
+Base for the reading: `main` now includes squash-merged PR #25 at `b1220370`, PR #26 at `531595ca`, and PR #27 at `a640101`. `src/resileos/ui/residual_frame.py` is on this tree. The shell findings below are otherwise unchanged.
+
+## What this change wired
+
+Visual quantizers were calling `ResidualCore.step`, which updates that core's scar matrix `Lambda`, after the stack had already been factorized.
+
+- `encode_frame` / `encode_clip` (`src/resileos/ui/frame_codec.py`) now keep `_factorize_residual_stack` and hash that stack. They do not call `step` or `_scar_update`. `scar_matrix_updated` and `learned` are false. The hash is a digest of the factors and scales. It is not a RES-201 packet.
+- Studio stills, image / video / language / audio perception, the local pattern helper, video-codex recesses, `diagnose_with_scale`, the scale-wire helpers, and the query-response address call `scale_address(..., step_core=False)`. That address does not step a core. The still's quantizer remains the layer-scale studio codec in `scripts/studio/codec.py`.
+
+`step_core` stays true for addresses that are not a frame: Eat decisions, council, art titles, hub addresses, and the mouth's scale tag. Those still build a throwaway 4×4 core inside `core_step_from_address`. Chat `turn_residual` still calls `core_step_from_address` after language perception. `query_scale.with_scale` still calls `step_shared`, which steps a process-wide 4×4 core. Those two were left in place.
+
+Samples stay candidates. No visual path calls `learn`.
+
+## Left out, and why
+
+| Item | Why it stayed out |
+|---|---|
+| `suite_residual` label (`r{luma}{edge}_s{belt}`) | The function only receives two scalars and a belt. Replacing it with a core residual would invent a matrix. Eat, chat, and council addresses still use this label. The env hook `RESILEOS_RESIDUAL_IMPL` remains the override. |
+| `LearnedConvCodec` | `encode_matrix` and `decode` raise `CodecUnavailable`. Training a conv encoder is a separate model, not a fill-in from the current stack. |
+| Lachesis `measure` and Harmonia `route` on the live cycle | Both functions exist and are tested. Nothing in `src/` calls them. Chat reuses the control id `chat-turn`, and the kin bundle reuses `kin-bundle`, so a shared-step route keyed by that id would not see a second cycle. A gain-versus-cost number for `measure` is not defined on the cycle. Wiring a made-up gain would be a new policy. |
+| Nike on `apollo_cycle`, Themis inside `plan_test_debug` | `nike_check` fails when the lesson has no explicit criterion line. The plan loop's "themis" role is the existing mutate refusal (`verify_on_stop`), and the loop does not build a Hades lesson. Calling the checks without those inputs would fail closed for a reason the caller did not supply. |
+| Rheology coordinates and the canonical metric-bridge head | `NotImplementedError` by design until the coordinate system in RES-601 is derived. Not a studio shell. |
+| External samplers and video providers | Slots stay off. Unconfigured calls return unavailable and do not invent a URL. Higgsfield, Seedance, ComfyUI, OpenAI, Kapwing, vidful.ai, aifreevideo.com, and Stable Video Diffusion are not wired. Official SVD weights are research-licensed and are not a path for this product. |
+| A residual-gated video page | Documented under "Video surface" below. Not built. |
+| Clip-level temporal residual tracking | The next change after this inventory. See the last section. This pull request does not start it. |
+| PR #27 | Squash-merged to `main` at `a640101`. `src/resileos/ui/residual_frame.py` is on this tree. |
+
+## Residual core and packets
+
+| Piece | Path | What it does | Facts / Zeus | Native or wrapper | Next increment |
+|---|---|---|---|---|---|
+| Residual core | `src/resileos/core.py` `ResidualCore.step` | Deterministic bipolar low-rank stack on a matrix `W` the caller already has. Updates `Lambda`, emits a RES-201 `Packet` (layer 0 factors). Does not sample pixels and does not read a prompt. | The scar update is inside the core. It does not call Titanos `learn`. | Residual-native. Real. | Keep studio and perception off `step`, which this change does for those paths. |
+| RES-201 packet | `src/resileos/packet.py` | Layer-0 factors, scales-as-exponents, `Lambda`, hash. A packet alone cannot rebuild the matrix. | Carries the scar. It is not a store write. | Residual-native. Real. | Leave the schema frozen. |
+| Control packet | `src/resileos/harness/packet.py` `ControlPacket` | Harness overlay: confidence, risk, verified, evidence, scars, guides. | Holds evidence. A write still needs a learn path. | Residual-native harness. Real. | — |
+| Studio codec | `scripts/studio/codec.py` `encode` / `decode` | Same factorization family, one scale per layer or per component, packed as `studio-codec/1`. Decode is the sum of the layers. Does not call `step`. | No learn. No shared `Lambda`. | Residual-native. Real. | — |
+| `res201_layer0_product` | same file | Comparison helper. This one does call `step`, to show what the RES-201 packet omits. | Local core only. Not the studio encode path. | Measurement. Real. | Keep it out of request handlers. |
+| PCA codec | `src/resileos/studio/codecs.py` `PcaComponentCodec` | 8×8 digits bases, per-component scales. | `learned` false. No `step`. | Residual-native on a digits prior. Real, narrow. | Do not quote its PSNR as photo or video quality. |
+| Learned conv codec | same file `LearnedConvCodec` | Raises `CodecUnavailable`. | No. | Stub. | Leave until a conv model exists. Selecting it returns 409 from the studio route. |
+
+## Kin
+
+Zeus is Core. The Kin are Iris, Metis, Hermes, Hades, Apollo, Athena, Eat, Psyche, and Aphrodite.
+
+| Name | Path | What it does today | Writes facts or bypasses Zeus? | Native or wrapper | Next increment |
+|---|---|---|---|---|---|
+| Zeus | `src/resileos/titanos/zeus.py` | Agency child. Declines on a low field-R or a bad hop, otherwise `ask` / `chain`. Does not learn. Mode B carrier prose is off. | Cannot write. The learn gates are elsewhere (Eat route, separated apply, graphify commit). | Structured reader. Real, narrow. | One learn choke-point is a later change. This pass does not merge the gates. |
+| Iris | `src/resileos/kin/iris.py` | `observe` copies hits, misses, teaches, sessions, hit rate, and agency children into `IrisReport`. Handler returns `None`. | No store write. | Metrics observer. Real, narrow. | `wire_kin` passes `_metrics() -> {}`. The cycle route fills seed metrics only when `user_id` is set and that dict is empty. Chat passes `metrics_from_history`. Do not invent counts when both are empty. |
+| Metis | `src/resileos/kin/metis.py` | `organize` sets `prefer_structured`, `allow_mouth` (false until hit rate and hit count clear the bar), depth cap, and `disable_children`. Handler answers `sys:agency` policy/status only. | No world learn. Can mark an agency child inactive. | Policy. Real, narrow. | `hermes_depth_cap` is not read by the chat window. The window uses fixed depth 2 and 8 items. |
+| Hermes | `src/resileos/kin/hermes.py` | `navigate` ranks and truncates caller-supplied items. It does not invent triples. Handler returns `None`. | No. | Residual-map navigator. Real, narrow. The handler is a decline. | Chat history and lesson windows call `navigate`. `KinBundle.cycle` stores it and does not call it. |
+| Hades | `src/resileos/kin/hades.py` | File checkpoints under `data/hades/`. `save` does not check `verified`; the caller does. `restore_fresh` drops history, evidence, and scars, sets `verified` false, and appends the lesson. It also copies guides, budget, confidence, and risk class. The file itself still stores scars and an evidence gist. | No Titanos learn. | Residual-native checkpoint. Real. | A strict mode that refuses an unverified `save` would change Echo and any caller that saves first and verifies later. Not done here. |
+| Apollo | `src/resileos/kin/apollo.py` | Golden-ladder hops. `eat_fn` can reject a hop unless `art=True`. Healing constant is 39.5. `predict_next` proposes the following weight. In the kin bundle, Apollo is the `apollo_success` status dict, not this hopper. | Separated cycle can learn after reviewers. The hopper writes only if the caller passes a real `eat_fn`. | Ladder is residual-native. The bundle sensor is a status check. Real, two different jobs. | Do not treat the status dict as the hopper. |
+| Athena | `src/resileos/kin/athena.py` | Builds a short reading from perception addresses and drives, then `gate_candidate`. | In the separated perception path the reading can become a claim for Zeus. | Summarizer. Thin, real. | The studio plan loop calls `judge` once at the end on a pass/fail bin. |
+| Eat | `src/resileos/kin/eat.py` | Parses a triple, runs the verifier pipeline, returns accept / reject / abstain. `eat_and_learn` calls the injected `learn_fn` on accept. | `POST /api/v1/eat` calls `titan.learn` after verifiers. That route does not go through `zeus_head`. Preview does not learn. | Filter is residual-native. The HTTP learn path is a direct store write. Real. | Pointing this route at `zeus_head` would change who may write. Left as a documented difference. |
+| Psyche | `src/resileos/kin/psyche.py` | In-memory phase, belt, residual bin, persona, frames, drives. `hub_rows` shapes triples. | Those rows are not learned unless a caller submits them. | State holder. Real. | — |
+| Aphrodite | `src/resileos/kin/aphrodite.py` | Preferences, tutorial steps, and persona stage in `data/aphrodite/<hub>.json`. Fact handler declines. `writes_residual` is false. | No residual facts. Preferences are a side file. `advance` on the HTTP state route accepts the client's `verified` flag. | Preference store. Real for that job. The fact handler is a decline. | The client `verified` flag is an honesty gap on tutorial advance. Not changed here, and not a mouth-policy edit. |
+
+`KinBundle.cycle` (`src/resileos/kin/bundle.py`) runs guide load, budget guard, Iris, Metis, `residual_consistency`, `apollo_success`, `verify_on_stop`, and a Hades checkpoint when the turn is verified and `checkpoint_allowed` says the owned group is stopped. It imports `CascadeRouter` and does not call it. Confidence routing for stills lives in the studio cascade, not in this cycle.
+
+## Demi-gods
+
+Summon loads one capped guide into the caller's control packet. The Python check is the decision. Dismiss drops the guide. None of the checks call `learn`. `src/resileos/kin/demigods/`.
+
+| Name | Check | What it does | Facts / Zeus | Class | Next increment |
+|---|---|---|---|---|---|
+| Themis | `themis_check` | Passes when residual consistency, Apollo success, and a Hades lesson with `verified=true` agree, and evidence is present. | No. | Real. | Studio `gate_studio_packet` already calls it for component packets. The plan loop does not. |
+| Momus | `momus_review` | Blind to history and author notes. Checks explicit requirements and a 64-hex residual hash. No requirements yields `need_more`, which is not approval. | Approved Momus can reach `zeus_head` inside `maker_blind_verifier_cycle`. | Real. | The plan loop calls Momus only when `spec` and `residual_hash` are both passed. Otherwise the critique is a local pass/fail note. |
+| Hephaestus | `hephaestus_check` | Residual consistency, empty scars, budget guard, and an optional Hermes budget. Patron of Forge. Not a Kin. | No. | Real. | The studio cascade calls this on the still packet. |
+| Nike | `nike_check` | Explicit criteria, each backed by Apollo success or residual consistency. No criterion line fails. | No. | Real, and unused on the Apollo writer. | Call it only when the caller actually supplied criteria. |
+| Atlas | `atlas_check` | Declared loads against `check_capacity` / hopfield cap, mask stack, prime tower, primorial count, and `EVIDENCE_CAP`. Undeclared loads are not invented. | No. | Real. | The kin cycle does not put declared loads on the packet, so Atlas has nothing to hold unless the caller passes them. |
+
+`demigod_summon` / `dismiss` and `demigod_attempt` are real. A swarm name must already be a legion on the parent Kin (Themis and Nike under Apollo, Momus and Hephaestus under Hermes, Atlas under Iris) or a check-local helper. The mount is temporary. Clotho notes a process group; Atropos cuts it on dismiss. Hades still waits for a fully stopped group.
+
+## Hermes paths (Moirai)
+
+`src/resileos/kin/moirai.py`. Not a separate Kin.
+
+| Name | What it does | Called from production paths? | Facts / Zeus | Class | Next increment |
+|---|---|---|---|---|---|
+| Clotho | Registers a process group or a cancel callback. | Yes. `reserve_spawner`, `note_worker`, demigod swarm, and the kin-cycle stop path. | No. | Real. | — |
+| Lachesis | `measure` expands only when expected gain is greater than cost. `note` stores a cycle id, packet, and residual hash. | No. Tests only. | No. | Real function, unwired. | Needs a defined gain and a cycle id that is unique per attempt. |
+| Atropos | `cut` sends SIGTERM then SIGKILL to an owned group that is not the caller's group. `stop_requested` and `fully_stopped` differ. | Yes. `cut_owned`, `stop_owner`, swarm dismiss. | No. | Real. | — |
+| Harmonia | `route` shares a step when hash or packet-prefix overlap is at least 0.8. `certify` accepts that share only when residual consistency and `verify_on_stop` both hold. | No. Tests only. | No. | Real function, unwired. | Same id-collision note as Lachesis. |
+| `checkpoint_allowed` | Hades may record after a stop only when consistency holds and the group is fully stopped. | Yes, from `KinBundle.cycle`. | Gates a checkpoint. Does not learn. | Real. | — |
+
+## Legions
+
+`register_legion` (`src/resileos/kin/legions.py`) hangs one tool on one Kin. The wrapper runs `risk_classify`, the budget guard, and `evidence_attach`. It refuses `residual_core`, `bypass_zeus`, `bypass_hades`, and `bypass_mouth`. `learn_fn` is stripped unless the Kin is Eat and the risk class is `allow`.
+
+Registered when the app process starts (`app.py` `_register_runtime_legions`):
+
+| Legion | Kin | What it does | Facts / Zeus | Class | Next increment |
+|---|---|---|---|---|---|
+| `web_search` | Hermes | Posts the query to the DuckDuckGo HTML endpoint and parses result anchors. | No residual write. | Wrapper around that site. Real when the network call works. | Keep it off the residual store. Failures return `ERROR` and an empty result list. |
+| `forge_video` | Hermes | A matrix or residual packet is drafted and verified with the layer-scale codec, phi-compressed, and stepped with `KuramotoField` outward. `produces_video` stays false. A prompt with no residual input is `UNAVAILABLE` and `url` is null when no provider is configured. Upscale runs only after an inconclusive residual, and only if a provider slot is set. | The wrapper strips `learn_fn` and `bypass_zeus`. The cascade raises if those are passed. | Residual-native for a matrix. The prompt-only branch is an optional provider slot, off by default. | Do not point the empty slot at a hosted video product. |
+| `graphify` | Eat | Parses edges, runs `eat_filter`, and records a residual candidate hash. `commit` plus an allow risk can call `learn_fn`. | Writes only through the Eat legion gate. | Residual-native. Real. | — |
+| `plan_test_debug` | Hermes | Budgeted plan / test / debug. `write_file`, `apply_diff`, and `git_commit` stay refused until `verify_on_stop` passes and `allow_mutate` is set. The HTTP route does not execute them. | No learn. | Real loop. The role labels `themis: "law"` and `hades: "lessons"` do not call `themis_check` or `Hades.save` (`checkpoint` is null). | Leave the labels honest in this inventory rather than calling checks that lack a lesson. |
+| `calliope`, `ligeia`, `echo` | Aphrodite | Suggestion, cue, and an optional lesson. `writes_residual` is false. Echo can `Hades.save` a lesson with `verified` false when asked. | No residual facts. | Real, narrow. | — |
+
+`register_example_legions` returns nothing unless `enable=True`. The examples (`ollama_local`, `jsonl_trace`, `lesson_notes`, `action_placeholder`, `restore_fresh`) stay off. `ollama_local` runs only an injected function, and only when confidence routing says escalate. `action_placeholder` does not execute code.
+
+Importing the library registers nothing until `register_*` runs.
+
+## Swarms and SeparatedCycle
+
+| Piece | Path | What it does | Facts / Zeus | Class |
+|---|---|---|---|---|
+| Verifier pipeline | `src/resileos/kin/verifiers.py` `run_verifiers` | Nine deterministic checks. `eat_filter` uses it by default. | Accept / reject / abstain only. | Real. The name `use_swarm` is this pipeline, not the demigod swarm. |
+| Demigod swarm | `src/resileos/kin/demigods/swarm.py` | One summon, temporary legion names, Clotho on spawn, Atropos on stop. | Refuses `learn_fn`, Zeus, and bypass flags. | Real. |
+| SeparatedCycle | `src/resileos/harness/separated.py` | Writer gets a capture shim, not `learn`. Reviewers are verifiers, council, and optional Athena. `zeus_head` calls `learn_fn` only when every reviewer approves. | This is the Zeus write gate. | Real. |
+| `maker_blind_verifier_cycle` | same file | Maker, then Momus on a separate packet, then Zeus. `need_more` does not approve. One supplement round. | Learn only on Momus approval. | Real. |
+| Cascade router | `src/resileos/harness/cascade.py` | Fans a multiple-choice question out over residual rows already on the packet, then `confidence_route` and `verify_on_stop`. The default residual abstains when those rows are missing. | No learn. | Real policy. Constructed in tests. The kin cycle does not call it. |
+
+`confidence_route` (`src/resileos/harness/tools.py`): at or above 0.99 the route is residual or Apollo; at or above 0.7 it is cascade; otherwise escalate. The studio still judge uses the same helper. High confidence does not invent a row.
+
+## Studio, chat, mouth, oscillator
+
+| Module | Path | What it does | Facts / Zeus / scars | Class | Next increment |
+|---|---|---|---|---|---|
+| Residual cascade | `src/resileos/studio/residual_cascade.py` | Layer-scale codec, outward Kuramoto order, Hephaestus, residual consistency, confidence route, Apollo status. Accepts, rejects, or leaves the still inconclusive. `produces_video` is false. Energy is relative residual energy, not digit PSNR. | `_refuse_bypass` on `learn` and `bypass_zeus`. `remember_accepted` is a 256-entry RAM index, not Titanos. Scale address no longer steps a core. | Real for a still candidate. | Clip residuals are the next PR. |
+| Candidates | `src/resileos/studio/candidates.py` | In-memory id. `learn` arguments are ignored. | No. | Thin, real. | A restart drops the id. Persistence would be a new store. |
+| Gate | `src/resileos/studio/gate.py` | Hephaestus, consistency, and Themis on a component packet. | `scar_matrix_updated` false. | Real. | — |
+| Routes and service | `src/resileos/studio/routes.py`, `service.py` | Round trip, toy prior, gate, forge, graphify. Graphify `commit` can learn. External sampler returns 403 when off. | Codec paths do not learn. | Real. | — |
+| External sampler | `src/resileos/studio/external_sampler.py` | Default off (`DisabledExternalSampler`). `fake` builds a local packet. `minimax_api` needs a key and a base URL; a returned image is re-encoded. No URL is fetched from the response. | No learn. | Off by default. | Leave the slot off. |
+| Panel | `src/resileos/studio/panel.py`, `ui_studio.py` → `src/resileos/ui/studio_app.py` | Streamlit studio. The codec panel shows the round trip and says the 8×8 figure is not a photograph. | Perception does not learn. | Real UI over the codec. | A video surface would be a sibling of this panel. See below. |
+| Oscillator | `src/resileos/substrate/oscillator.py` `KuramotoField` | CPU Kuramoto step, outward depth. The cascade takes one outward step and reads `depth_order`. | No learn. | Real numerics. Thin use on a still. | — |
+| Frame perception | `perceive_image.py`, `perceive_video.py`, `perceive_language.py`, `perceive_audio.py`, `frame_codec.py` | Image and video project and quantize without `step`, and bin relative error as `rcore_low` / `rcore_mid` / `rcore_high`. Language and audio build a small frame and take a scale address with `step_core=False`. The gate inside `scale_address` still sees the luma/edge label from `embed_frame`. | No learn. No scar update on these paths. | Real quantizer on image and video. Language and audio are addresses only. | Replacing the embed label is the `suite_residual` item left out above. |
+| `suite_residual` / `embed_frame` | `src/resileos/ui/suite_residual.py`, `residual_embed.py` | Coarse label from luma, edge, and belt. Docstring still calls it a placeholder. | No. | Stub label. Real only as a stable string. | Leave the label. Image perception already overwrites the returned bin with `rcore_*`. |
+| `local_gen` | `src/resileos/ui/local_gen.py` | Tints a random field from three phases. | No learn. Scale address does not step. | Thin scaffold. The cascade note says this is not the codec. | — |
+| `fluid_gen` / `media_gen` / `video_gen` | `src/resileos/ui/` | Stills can call a public image URL helper. Video returns unavailable unless `RESILEOS_VIDEO_PROVIDER` is set, and then only if a function or executable exists. No URL is invented. | No residual write. | Wrapper, off for video by default. | Do not treat a configured executable as the core. |
+| Chat cycle | `src/resileos/chat/turn_cycle.py` | Hermes-budgeted history, Iris→Metis cycle, Aphrodite, Hades lesson on a verified learn. `zeus_learn` uses reviewers then `zeus_head`. | Learn only through Zeus after review. `turn_residual` still calls `core_step_from_address` on a throwaway core. | Real chat integration. | That throwaway step is outside the visual fix. |
+| Mouth | `src/resileos/kin/mouth_policy.py`, `src/resileos/chat/persona_mouth.py` | `should_render_prose` defaults `require_verified=True`. The persona mouth passes that default and `run_cycle=False`, because the turn already cycled. Factual lines require the turn's `verified` flag. A soft line can open when the gate returns true. With no Metis policy stored, `default_if_no_policy=True` makes that gate true. | No residual write. `remember_verified_learn` saves a Hades lesson and does not call `learn`. | Real template mouth. Not an external chatbot. | Policy was not changed. The 2026-11-12 measurement note already counts mouth-policy leaks. This inventory does not re-score that bench. |
+| `custom_mouth` | `src/resileos/ui/custom_mouth.py` | Speaks from rows. Optional external model only if one is configured, still constrained to those rows. | No learn. | Real structured mouth. | Do not add a chatbot as the mouth. |
+
+`landing/public/_redirects` is not in the tree. This change does not add a `/chat` → `/chat.html` rewrite.
+
+## Video surface (not built)
+
+A later page can sit beside the Streamlit studio panel (`ui_studio.py`, `src/resileos/studio/panel.py`) or as its own FastAPI route plus a small frontend. It would take a prompt, an image, or a packet, and show a preview, a residual badge, stage status, and candidates. It would call `forge_video` and the studio codec that already exist. Candidates stay candidates. The residual core stays the quantizer. Provider slots stay off and keep returning `UNAVAILABLE` with no URL when nothing is configured.
+
+This inventory does not build that page, and it does not copy another product's layout or name.
+
+## Open work and the next change
+
+PR #27 is on `main` at `a640101`. It treats inter-frame motion as a residual phase step (`src/resileos/ui/residual_frame.py`). This branch includes that commit.
+
+The change after this inventory is still clip-level temporal residual tracking, not another pass over the shells above:
+
+- Frame 0 is a base packet.
+- Each later frame is the residual of that frame against the previous reconstruction.
+- Iris and Hades gain a JSONL record of that residual path.
+
+That work is a later pull request. This one does not add it.
