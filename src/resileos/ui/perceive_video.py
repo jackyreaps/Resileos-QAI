@@ -41,7 +41,7 @@ def perceive_video(
         motion = float(np.mean(diffs))
     else:
         motion = 0.0
-    addr = scale_address(f[0], subject=subject)
+    addr = scale_address(f[0], subject=subject, step_core=False)
     clip = encode_clip(f)
     embed = dict(addr["embed"])
     embed["residual_bin"] = clip["residual_bin"]

@@ -159,7 +159,7 @@ learn  user:alice prefers exact_answers → ACCEPTED on ask
 | Studio / image-video generation from the residual core | Compression ships; sampling new frames from a prompt is in research |
 | Suite residual / private residual bin | Scale address note historically said to replace residual_bin when coded |
 | Quantum backend | Speculative / gated (README) |
-| Candidate synthesis tier | README: roadmap, no `CANDIDATE` on query path |
+| Open-ended candidate synthesis | A near miss can be `CANDIDATE` with a null value. That is not open-ended generation. |
 | Guild seats / world asset product | Routes unmounted; pricing gating table |
 | Shared public demo namespace | Not in API |
 | Persona-on-hub depth / kin-native hub UX | Sidebar persona exists; deeper hub-native cycle still “next” |

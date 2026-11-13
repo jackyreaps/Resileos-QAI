@@ -29,6 +29,7 @@ def recess_from_codex(
             belt=belt,
             frame=i,
             subject=world_id,
+            step_core=False,
         )
         recesses.append({
             "frame": i,

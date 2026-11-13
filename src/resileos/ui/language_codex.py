@@ -13,8 +13,15 @@ from resileos.ui.perceive_language import perceive_language
 
 # ── speak ──────────────────────────────────────────────────────────────
 
-def speak(rows, question="", *, model_fn=None):
-    return answer(rows, question, model_fn=model_fn)
+def speak(rows, question="", *, model_fn=None, status="", reason="", candidate=None):
+    return answer(
+        rows,
+        question,
+        model_fn=model_fn,
+        status=status,
+        reason=reason,
+        candidate=candidate,
+    )
 
 
 def summarise(rows, *, limit=5):
@@ -45,16 +52,23 @@ def etymology(term, roots=None):
     return {"term": term, "found": bool(hits), "roots": hits}
 
 
-def codex(rows, *, question="", target=None, roots=None, model_fn=None, psyche=None):
+def codex(rows, *, question="", target=None, roots=None, model_fn=None, psyche=None, status="", reason="", candidate=None):
     """Speak, grammar, address, detect. Optional translate, roots, and kin."""
-    spoken = speak(rows, question, model_fn=model_fn)
+    spoken = speak(
+        rows,
+        question,
+        model_fn=model_fn,
+        status=status,
+        reason=reason,
+        candidate=candidate,
+    )
     perc = perceive_language(spoken["text"], subject="utterance")
     out = {
         "speak": spoken,
         "grammar": grammar_of(rows),
         "address": perc.get("address"),
         "detect": detect_language(spoken["text"]),
-        "epistemic": epistemic_label(rows),
+        "epistemic": spoken.get("epistemic", epistemic_label(rows, status=status)),
     }
     if target:
         out["translate"] = to_language(spoken["text"], target)

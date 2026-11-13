@@ -95,6 +95,7 @@ Harness and current product surface (code on main; some numbered docs above stil
 - [External samplers and the MiniMax-H3-Image license](studio/external-samplers.md) — STUDIO-002
 - [Exact memory bench](benchmarks/memory-vs-llm.md), [chain composition](benchmarks/compositional-generalization.md), [invention bench](benchmarks/invention-without-hallucination.md) — 2026-11-10 runs; no model key was set
 - [Measurement sample, 2026-11-12](benchmarks/measurement-2026-11-12.md) — exact recall, abstention, composition, equal budget, temporal conflict, in-process latency, mouth-policy leak count. No model was called. Chain p95 on that VM was above 500 ms.
+- [Component inventory](320-titanos/component-inventory.md) — RES-346. What Kin, demi-gods, legions, swarms, and studio modules do on this tree, and which shells were left alone.
 
 Reference:
 52. [Glossary](900-reference/glossary.md) — RES-900
