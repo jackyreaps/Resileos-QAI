@@ -388,11 +388,11 @@ curl -sS -X POST "$BASE/learn" \
       </details>
       <details>
         <summary>Do I need Docker to try it?</summary>
-        <p>No. Open <a href="/chat">/chat</a>. The shared demo key is filled in and rate-limited, about 100 usernames. Choose a username before a thread is saved. Docker is for developers self-hosting.</p>
+        <p>No. Open <a href="/chat">/chat</a>. Signed-out use is a short per-network daily trial. Choose a username before a thread is saved. Docker is for developers self-hosting.</p>
       </details>
       <details>
         <summary>How do free keys work?</summary>
-        <p>The form on <a href="/pricing#start">Pricing</a> calls the billing free-key API, or run <code>scripts/issue_free_key.py</code> and put the hash in the API key file. The shared demo key in chat is separate, and intentional.</p>
+        <p>Sign in, then create one free key from <a href="/account">Account</a>. The key stays on the server. Developers can reveal it once after an email confirmation. <code>scripts/issue_free_key.py</code> still prints a key for a self-hosted file.</p>
       </details>
     </section>
   </main>
@@ -400,7 +400,7 @@ curl -sS -X POST "$BASE/learn" \
   <div class="footer-cta">
     <div>
       <h2>Try it on a username</h2>
-      <p>Chat needs a username before a thread is saved. The shared demo key is already filled in.</p>
+      <p>Chat needs a username before a thread is saved. Sign in from Account to use your own monthly quota.</p>
     </div>
     <div class="cta-row">
       <a class="btn btn-primary" href="/chat">Open chat</a>

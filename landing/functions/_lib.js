@@ -48,7 +48,7 @@ export function siteUrl(env) {
 }
 
 export function apiBase(env) {
-  return env.RESILEOS_API_BASE_URL || "https://api.yourdomain.dev/api/v1";
+  return env.RESILEOS_API_BASE_URL || "https://api.resileosai.fun/api/v1";
 }
 
 export function priceEnvName(plan) {

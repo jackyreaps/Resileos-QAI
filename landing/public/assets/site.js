@@ -32,7 +32,8 @@
 
   function api(path, opts) {
     const url = (billingBase || "") + path;
-    return fetch(url, opts);
+    const options = Object.assign({ credentials: "same-origin" }, opts || {});
+    return fetch(url, options);
   }
 
   // Load public config (payment links, etc.)
@@ -63,78 +64,10 @@
     })
     .catch(() => {});
 
-  // Free key form
   const form = document.getElementById("free-key-form");
-  const msg = document.getElementById("free-key-msg");
-  const reveal = document.getElementById("key-reveal");
-  form?.addEventListener("submit", async (e) => {
+  form?.addEventListener("submit", (e) => {
     e.preventDefault();
-    msg.textContent = "Minting…";
-    msg.className = "msg";
-    reveal.classList.remove("show");
-    const email = document.getElementById("email").value.trim();
-    const name = document.getElementById("name").value.trim() || "free";
-    try {
-      const res = await api("/api/free-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email || null, name }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        msg.textContent = data.detail || "Could not issue key.";
-        msg.className = "msg err";
-        return;
-      }
-      msg.textContent = "Key issued. Copy it now — shown once.";
-      msg.className = "msg ok";
-      reveal.classList.add("show");
-      reveal.replaceChildren();
-      const keyLabel = document.createElement("div");
-      const keyStrong = document.createElement("strong");
-      keyStrong.textContent = "X-API-Key";
-      keyLabel.appendChild(keyStrong);
-      const keyLine = document.createElement("div");
-      keyLine.textContent = data.api_key || "";
-      const baseLabel = document.createElement("div");
-      baseLabel.style.marginTop = "8px";
-      const baseStrong = document.createElement("strong");
-      baseStrong.textContent = "Base URL";
-      baseLabel.appendChild(baseStrong);
-      const baseLine = document.createElement("div");
-      baseLine.textContent = data.base_url || "";
-      const note = document.createElement("div");
-      note.style.marginTop = "8px";
-      note.style.color = "#8b97b0";
-      note.textContent = data.note || "";
-      const demo = document.createElement("div");
-      demo.style.marginTop = "8px";
-      demo.style.color = "#f0b429";
-      demo.textContent = "demo_namespace: " + (data.demo_namespace || "coming_soon");
-      const open = document.createElement("a");
-      open.href = "/chat";
-      open.className = "btn btn-primary";
-      open.style.marginTop = "12px";
-      open.textContent = "Open chat";
-      reveal.append(keyLabel, keyLine, baseLabel, baseLine, note, demo, open);
-      try {
-        if (data.api_key) localStorage.setItem("resileos_api_key", data.api_key);
-        if (data.base_url) localStorage.setItem("resileos_api_url", data.base_url);
-      } catch (err) { /* the key is still on the page once */ }
-      // Prefer server-provided curls if present
-      if (data.quickstart) {
-        const learn = document.getElementById("code-learn");
-        const query = document.getElementById("code-query");
-        const chain = document.getElementById("code-chain");
-        if (data.quickstart.learn && learn) learn.textContent = data.quickstart.learn;
-        if (data.quickstart.query && query) query.textContent = data.quickstart.query;
-        if (data.quickstart.chain && chain) chain.textContent = data.quickstart.chain;
-      }
-    } catch (err) {
-      msg.textContent =
-        "Billing API unreachable. Start api/server.py or set window.RESILEOS_BILLING.";
-      msg.className = "msg err";
-    }
+    window.location.href = "/login?next=/account";
   });
 
   // Stripe checkout buttons
@@ -147,6 +80,7 @@
       try {
         const res = await api("/api/create-checkout-session", {
           method: "POST",
+          credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ plan }),
         });
@@ -185,32 +119,20 @@
     const sid = params.get("session_id");
     const box = document.getElementById("checkout-msg");
     if (sid && box) {
-      box.textContent = "Retrieving your key…";
+      box.textContent = "Checking the plan…";
       api("/api/claim/" + encodeURIComponent(sid))
         .then(async (r) => {
           const data = await r.json().catch(() => ({}));
           if (!r.ok) {
-            box.textContent = data.detail || "Key not ready — refresh shortly.";
+            box.textContent = data.detail || "Plan not ready — refresh shortly.";
             box.className = "msg err";
             return;
           }
-          try {
-            if (data.api_key) localStorage.setItem("resileos_api_key", data.api_key);
-            if (data.base_url) localStorage.setItem("resileos_api_url", data.base_url);
-          } catch (err) {
-            box.className = "msg err";
-            box.replaceChildren();
-            const line = document.createElement("div");
-            line.textContent = "This browser could not store the paid key. Copy it, then open chat.";
-            const code = document.createElement("code");
-            code.textContent = data.api_key || "";
-            const open = document.createElement("a");
-            open.href = "/chat";
-            open.textContent = "Open chat";
-            box.append(line, document.createElement("br"), code, document.createElement("br"), open);
-            return;
-          }
-          window.location.assign("/chat");
+          box.textContent = data.attached
+            ? "Plan attached. Opening account."
+            : "Checkout recorded. Sign in with the same email.";
+          box.className = "msg ok";
+          window.location.assign(data.attached ? "/account" : "/login?next=/account");
         })
         .catch(() => {
           box.textContent = "Claim failed — webhook may still be processing.";
@@ -231,6 +153,14 @@
   toggle?.addEventListener("click", () => {
     setMenu(toggle.getAttribute("aria-expanded") !== "true");
   });
+  if (menu && !menu.querySelector('a[href="/login"]') && !menu.querySelector('a[href="/account"]')) {
+    const signIn = document.createElement("a");
+    signIn.href = "/login";
+    signIn.textContent = "Sign in";
+    const cta = menu.querySelector(".nav-cta");
+    if (cta) menu.insertBefore(signIn, cta);
+    else menu.appendChild(signIn);
+  }
   menu?.querySelectorAll("a").forEach((a) => {
     a.addEventListener("click", () => setMenu(false));
   });

@@ -1,73 +1,29 @@
-import {
-  TIER_QUOTA,
-  apiBase,
-  clientIp,
-  detail,
-  json,
-  mintPlaintext,
-  sha256Hex,
-} from "../_lib.js";
+import { clientIp, detail, json } from "../_lib.js";
+import { createFreeKey, csrfOk, originAllowed, readSession } from "../_auth.js";
 
 export async function onRequestPost({ request, env }) {
-  let body = {};
-  try {
-    body = await request.json();
-  } catch {
-    body = {};
-  }
-  const email = typeof body.email === "string" && body.email.includes("@") ? body.email.trim() : null;
-  const name = String(body.name || "free").slice(0, 64);
+  if (!originAllowed(request, env)) return detail("Cross-site request blocked.", 403);
   const kv = env.KEYS;
   if (!kv) return detail("Key storage is not bound.", 503);
+  const session = await readSession({ kv, env, request, now: Date.now() });
+  if (!session) return detail("Sign in to create a free key.", 401);
+  if (!csrfOk(request, session.record)) return detail("CSRF check failed.", 403);
 
   const ip = clientIp(request);
   const rateKey = `rate:${ip}`;
   const hits = Number((await kv.get(rateKey)) || "0");
   const limit = Number(env.FREE_KEY_RATE_PER_HOUR || "5");
-  if (hits >= limit) {
-    return detail("Too many free keys from this network. Try again later.", 429);
-  }
+  if (hits >= limit) return detail("Too many free keys from this network. Try again later.", 429);
+
+  const created = await createFreeKey({ kv, env, email: session.email, now: Date.now() });
+  if (!created.ok) return detail(created.detail, created.status);
   await kv.put(rateKey, String(hits + 1), { expirationTtl: 3600 });
-
-  if (email) {
-    const emailCount = Number((await kv.get(`email:${email.toLowerCase()}`)) || "0");
-    if (emailCount >= 2) {
-      return detail("This email already has free keys. Upgrade or contact support.", 429);
-    }
-  }
-
-  const plaintext = mintPlaintext();
-  const digest = await sha256Hex(plaintext);
-  const quota = TIER_QUOTA.free;
-  const record = {
-    name,
-    tier: quota.tier,
-    quota: quota.quota,
-    plan: "free",
-    email,
-    stripe_customer_id: null,
-    created_at: new Date().toISOString(),
-  };
-  await kv.put(`key:${digest}`, JSON.stringify(record));
-  if (email) {
-    const emailCount = Number((await kv.get(`email:${email.toLowerCase()}`)) || "0");
-    await kv.put(`email:${email.toLowerCase()}`, String(emailCount + 1));
-  }
-
-  const base = apiBase(env);
   return json({
-    api_key: plaintext,
-    tier: record.tier,
-    quota: record.quota,
-    plan: record.plan,
-    base_url: base,
+    prefix: created.prefix,
+    tier: created.tier,
+    quota: created.quota,
+    plan: created.plan,
     header: "X-API-Key",
-    note: "Store this key now — it is shown once. Send it as the X-API-Key header on every request. Optional mouth (LLM render) is off by default.",
-    demo_namespace: "coming_soon",
-    quickstart: {
-      learn: `curl -sS -X POST ${base}/learn -H 'Content-Type: application/json' -H 'X-API-Key: ${plaintext}' -d '{"subject":"alice","relation":"parent_of","obj":"bob"}'`,
-      query: `curl -sS -X POST ${base}/query -H 'Content-Type: application/json' -H 'X-API-Key: ${plaintext}' -d '{"subject":"alice","relation":"parent_of"}'`,
-      chain: `curl -sS -X POST ${base}/chain -H 'Content-Type: application/json' -H 'X-API-Key: ${plaintext}' -d '{"start":"alice","relations":["parent_of","parent_of"]}'`,
-    },
+    note: "The key stays on the account. Chat uses it automatically. Reveal it once from Account after an email confirmation if a server needs it directly.",
   });
 }

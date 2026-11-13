@@ -11,9 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_chat_html_has_no_hardcoded_api_key():
     html = (ROOT / "landing" / "public" / "chat.html").read_text(encoding="utf-8")
     assert "const API_KEY" not in html
+    assert "X-API-Key" not in html
+    assert "https://api.resileosai.fun" not in html
+    assert "/api/session/v1" in html
     assert "localStorage.getItem(" in html
     assert "resileos_api_key" in html
-    assert "https://api.resileosai.fun/api/v1" in html
     assert "fonts.css" in html
 
 
@@ -44,12 +46,12 @@ def test_chat_page_signs_in_and_posts_studio_tools():
     assert "superintelligence" not in html.lower()
     assert "RES-309" not in html
     assert 'href="/chat.html"' not in html
-    sign_out = html.split("async function signOut()", 1)[1].split("['settings-url'", 1)[0]
+    sign_out = html.split("async function signOut()", 1)[1].split("['settings-hub'", 1)[0]
     assert "resileos_username" in sign_out
     assert "resileos_api_key" not in sign_out
     assert "localStorage.clear" not in sign_out
-    optional = html.split("function applyOptionalKey", 1)[1].split("function showApp", 1)[0]
-    assert "if (!key) return;" in optional
+    assert "function applyOptionalKey" not in html
+    assert 'id="settings-key"' not in html
 
 
 def test_chat_accepts_message_alias(client, monkeypatch):

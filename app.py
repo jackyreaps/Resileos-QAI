@@ -18,7 +18,7 @@ from typing import Optional
 
 import numpy as np
 import torch
-from fastapi import Depends, FastAPI, HTTPException, Query, UploadFile, File, Form
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, UploadFile, File, Form
 from PIL import Image
 import io
 
@@ -129,29 +129,9 @@ def _hash_key(value: str) -> str:
 
 
 def _load_hashed_keys() -> dict[str, dict]:
-    merged: dict[str, dict] = {}
-    if _KEYS_PATH.exists():
-        try:
-            merged.update(json.loads(_KEYS_PATH.read_text(encoding="utf-8")))
-        except Exception as e:
-            log.warning("API key file unreadable (%s): %s", _KEYS_PATH, e)
-    raw_env = os.getenv("RESILEOS_API_KEYS", "").strip()
-    if raw_env:
-        try:
-            for key, record in json.loads(raw_env).items():
-                is_hex = len(key) == 64 and all(
-                    c in "0123456789abcdef" for c in key.lower()
-                )
-                merged[key if is_hex else _hash_key(key)] = record
-        except Exception as e:
-            log.warning("RESILEOS_API_KEYS is not valid JSON: %s", e)
-    legacy = os.getenv("RESILEOS_API_KEY", "").strip()
-    if legacy:
-        merged.setdefault(
-            _hash_key(legacy),
-            {"name": "legacy", "tier": "enterprise", "quota": 0},
-        )
-    return merged
+    from middleware.keyring import load_static_keys
+
+    return load_static_keys()
 
 
 def _configured_key_count() -> int:
@@ -159,23 +139,19 @@ def _configured_key_count() -> int:
 
 
 async def verify_api_key(
+    request: Request,
     api_key: str | None = Depends(_api_key_header),
 ) -> None:
     if _AUTH_BYPASS:
-        return
-    keys = _load_hashed_keys()
-    if not keys:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "No API keys configured. Set API_KEYS_PATH, RESILEOS_API_KEYS, "
-                "or RESILEOS_API_KEY. Local dev only: RESILEOS_AUTH_BYPASS=1."
-            ),
-        )
-    if api_key is None:
-        raise HTTPException(status_code=401, detail="missing X-API-Key header")
-    if keys.get(_hash_key(api_key.strip())) is None:
-        raise HTTPException(status_code=403, detail="invalid API key")
+        return None
+    if getattr(request.state, "resileos_decision", None) is not None:
+        return None
+    from middleware.keyring import AuthError, authenticate
+
+    try:
+        authenticate(request.headers, increment=False)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
     return None
 
 
@@ -1145,13 +1121,55 @@ def hub_ledger_delete(
     return ledger
 
 
+@app.get("/api/v1/usage")
+async def key_usage(
+    request: Request,
+    api_key: str | None = Depends(_api_key_header),
+) -> dict:
+    """This month's count for the presented key. Does not spend quota."""
+    if _AUTH_BYPASS:
+        return {
+            "count": 0,
+            "quota": 0,
+            "unlimited": True,
+            "tier": "bypass",
+            "plan": None,
+            "month": "",
+            "prefix": "",
+            "revoked": False,
+        }
+    raw = (api_key or "").strip()
+    if not raw:
+        auth = request.headers.get("authorization", "").strip()
+        if auth.lower().startswith("bearer "):
+            raw = auth[7:].strip()
+    from middleware.keyring import AuthError, describe_usage
+
+    try:
+        info = describe_usage(raw)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+    if info.get("revoked"):
+        raise HTTPException(status_code=403, detail="API key revoked")
+    return info
+
+
 async def conversation_key_id(
+    request: Request,
     api_key: str | None = Depends(_api_key_header),
 ) -> str:
     """Auth for conversation routes. Returns the key hash, never the key."""
-    await verify_api_key(api_key)
+    await verify_api_key(request, api_key)
     if api_key and api_key.strip():
         return _hash_key(api_key.strip())
+    decision = getattr(request.state, "resileos_decision", None)
+    if decision is not None:
+        return decision.key_id
+    from middleware.keyring import trial_key_id
+
+    tid = trial_key_id(request.headers)
+    if tid:
+        return tid
     if _AUTH_BYPASS:
         return "auth-bypass"
     raise HTTPException(status_code=401, detail="missing X-API-Key header")

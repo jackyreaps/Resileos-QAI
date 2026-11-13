@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .env
 .env.live
+.dev.vars
+.wrangler/
 data/
 *.tmp
 .DS_Store

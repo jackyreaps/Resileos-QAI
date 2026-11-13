@@ -1,4 +1,5 @@
 import { detail, json, priceEnvName, siteUrl } from "../_lib.js";
+import { readSession } from "../_auth.js";
 
 function requestOrigin(request, env) {
   const fallback = siteUrl(env).replace(/\/$/, "") || "https://resileosai.fun";
@@ -71,9 +72,12 @@ export async function onRequestPost({ request, env }) {
   params.set("cancel_url", cancel);
   params.set("metadata[plan]", plan);
   params.set("allow_promotion_codes", "true");
-  if (typeof body.email === "string" && body.email.includes("@")) {
-    params.set("customer_email", body.email.trim());
-  }
+  const signedIn = env.KEYS ? await readSession({ kv: env.KEYS, env, request, now: Date.now() }) : null;
+  const accountEmail = signedIn && signedIn.email;
+  const postedEmail = typeof body.email === "string" && body.email.includes("@") ? body.email.trim() : "";
+  const customerEmail = accountEmail || postedEmail;
+  if (customerEmail) params.set("customer_email", customerEmail);
+  if (accountEmail) params.set("metadata[account_email]", accountEmail);
 
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",

@@ -4,13 +4,16 @@ compatibility_date = "2026-11-10"
 
 [vars]
 RESILEOS_SITE_URL = "https://resileosai.fun"
-RESILEOS_API_BASE_URL = "https://api.yourdomain.dev/api/v1"
+RESILEOS_API_BASE_URL = "https://api.resileosai.fun/api/v1"
 STRIPE_PRICE_BUILDER = "price_1UZeKQCMvavgRUK45arwnfuN"
 STRIPE_PRICE_FOUNDING_BUILDER = "price_1UZeKQCMvavgRUK4byZxp5Vw"
 STRIPE_PRICE_TEAM = "price_1UZeKRCMvavgRUK4WOU9PT9u"
 STRIPE_SUCCESS_URL = "https://resileosai.fun/chat?checkout=success"
 STRIPE_CANCEL_URL = "https://resileosai.fun/#pricing"
 FREE_KEY_RATE_PER_HOUR = "5"
+MAGIC_LINK_TTL_SECONDS = "900"
+SESSION_TTL_SECONDS = "1209600"
+PASSWORD_PBKDF2_ITERATIONS = "100000"
 
 [[kv_namespaces]]
 binding = "KEYS"

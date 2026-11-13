@@ -620,23 +620,19 @@
             </div>
             <p class="eyebrow">Stores · Derives · Abstains</p>
             <h1>Remembers exactly</h1>
-            <p class="lede">A username opens your saved conversations. No password. The shared demo key is rate-limited, about 100 usernames.</p>
+            <p class="lede">A username saves threads on this hub. Chat without an account uses a short per-network daily trial. Sign in with email for your own monthly quota.</p>
             <form id="portal-form">
                 <label>Username
                     <input id="portal-username" type="text" required maxlength="32" autocomplete="username" spellcheck="false" placeholder="ada" />
                 </label>
-                <label>API key <span>optional</span>
-                    <input id="portal-key" type="password" autocomplete="off" spellcheck="false" placeholder="Leave blank for the shared demo key" />
-                </label>
                 <label>Hub id <span>optional</span>
                     <input id="portal-hub" type="text" maxlength="64" autocomplete="off" spellcheck="false" placeholder="anon" />
                 </label>
-                <p class="settings-hint" id="portal-note">Shared demo key, rate-limited. About 100 usernames. Leave the key blank to keep a key already saved in this browser, including a paid key from checkout.</p>
-                <p class="settings-hint" id="portal-key-state"></p>
+                <p class="settings-hint" id="portal-note">The trial is counted on the server for this network. Sign in when it runs out. A paid checkout attaches to the account you are signed in to.</p>
                 <p class="portal-error" id="portal-error" role="alert"></p>
                 <button class="portal-go" type="submit">Enter chat</button>
             </form>
-            <p class="portal-links"><a href="/">Landing</a></p>
+            <p class="portal-links"><a href="/login">Sign in</a> · <a href="/account">Account</a> · <a href="/">Landing</a></p>
         </div>
     </div>
 
@@ -648,6 +644,8 @@
             <span class="user-pill" id="user-pill" hidden></span>
         </div>
         <div class="header-actions">
+            <a class="btn-text" id="login-link" href="/login">Sign in</a>
+            <a class="btn-text" id="account-link" href="/account" hidden>Account</a>
             <button class="btn-text js-signout" id="btn-signout-header" type="button">Switch user</button>
             <button class="btn-icon" id="btn-history" type="button" onclick="toggleHistory()" title="Conversations" aria-pressed="false" aria-expanded="false" aria-controls="history-panel">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="15" y2="18"></line></svg>
@@ -694,7 +692,7 @@
                 <button type="button" class="btn-text js-signout" id="btn-signout">Switch user</button>
             </div>
         </form>
-        <p class="settings-hint" id="history-note">Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.</p>
+        <p class="settings-hint" id="history-note">Choose a username before conversations are saved.</p>
         <div id="history-list" class="history-list"></div>
     </aside>
     <button type="button" class="history-scrim" id="history-scrim" hidden aria-label="Close conversations"></button>
@@ -787,12 +785,6 @@
     </div>
     <div id="settings-panel" class="panel">
         <div class="settings-grid">
-            <label>API URL
-                <input id="settings-url" type="text" autocomplete="off" spellcheck="false" />
-            </label>
-            <label>API key
-                <input id="settings-key" type="password" autocomplete="off" spellcheck="false" />
-            </label>
             <label>Hub id
                 <input id="settings-hub" type="text" autocomplete="off" spellcheck="false" />
             </label>
@@ -809,7 +801,7 @@
             </label>
             <label class="check"><input id="settings-debug" type="checkbox" /> Show source, tools, and timing on the reply</label>
             <p class="settings-hint" id="key-mode"></p>
-            <p class="settings-hint"><strong>Shared demo key, rate-limited</strong>. About 100 usernames. Leave the field as-is to use it, or paste your own key. An override stays in this browser only and is sent as <code>X-API-Key</code>. Choose a username before a conversation is saved. Clearing a paid key here is explicit. Switch user does not remove it.</p>
+            <p class="settings-hint">Requests go through this site. A signed-in account uses its own key on the server. A signed-out browser uses the per-network daily trial. Choose a username before a conversation is saved.</p>
         </div>
     </div>
 
@@ -852,8 +844,6 @@
     </div>
 
     <script>
-        const DEFAULT_API_URL = "https://api.resileosai.fun/api/v1";
-        const DEMO_API_KEY = "No4dymPJ4tfRn0BZFuNL07kTnMyCeu5xHw2mpsWmjwk";
         const SAMPLE_IMAGE = [[0, 1], [1, 0]];
         const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/;
         const HUB_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
@@ -874,12 +864,14 @@
         let lastToolEmpty = false;
         let toolsLoaded = false;
         let kinExtrasLoaded = false;
+        let csrfToken = '';
+        let sessionState = { signed_in: false };
+        try {
+            localStorage.removeItem('resileos_api_key');
+            localStorage.removeItem('resileos_api_url');
+        } catch (err) { /* storage is optional */ }
 
-        function apiUrl() {
-            return (localStorage.getItem('resileos_api_url') || DEFAULT_API_URL).replace(/\/$/, '');
-        }
-        function apiKey() { return localStorage.getItem('resileos_api_key') || DEMO_API_KEY; }
-        function usingDemoKey() { return apiKey() === DEMO_API_KEY; }
+        function apiUrl() { return '/api/session/v1'; }
         function hubId() { return localStorage.getItem('resileos_hub_id') || 'anon'; }
         function currentPersona() {
             const saved = localStorage.getItem('resileos_persona') || 'honest';
@@ -889,16 +881,23 @@
         function currentUsername() { return (localStorage.getItem('resileos_username') || '').trim(); }
         function validUsername(name) { return USERNAME_RE.test(name || ''); }
         function onlineLabel() {
-            const base = usingDemoKey() ? 'Online · demo key' : 'Online';
+            const base = sessionState.signed_in ? 'Online · signed in' : 'Online · trial';
             const name = currentUsername();
             return name ? base + ' · ' + name : base;
         }
 
         function updateDemoLabel() {
             const el = document.getElementById('key-mode');
-            if (el) el.textContent = usingDemoKey()
-                ? 'Shared demo key, rate-limited. About 100 usernames.'
-                : 'Using your own key stored in this browser.';
+            const login = document.getElementById('login-link');
+            const account = document.getElementById('account-link');
+            if (login) login.hidden = Boolean(sessionState.signed_in);
+            if (account) account.hidden = !sessionState.signed_in;
+            if (!el) return;
+            if (sessionState.signed_in) {
+                el.textContent = 'Signed in as ' + sessionState.email + (sessionState.prefix ? ' · ' + sessionState.prefix : ' · no key yet');
+            } else {
+                el.textContent = 'Not signed in. This network has a short daily trial.';
+            }
         }
         function syncUsernameFields(name) {
             const value = name === undefined ? currentUsername() : name;
@@ -915,8 +914,6 @@
             }
         }
         function fillSettings() {
-            document.getElementById('settings-url').value = apiUrl();
-            document.getElementById('settings-key').value = apiKey();
             document.getElementById('settings-hub').value = hubId();
             const personaField = document.getElementById('settings-persona');
             if (personaField) personaField.value = currentPersona();
@@ -926,30 +923,16 @@
             updateDemoLabel();
         }
         function fillPortal() {
-            const key = document.getElementById('portal-key');
             const hub = document.getElementById('portal-hub');
-            const state = document.getElementById('portal-key-state');
-            if (key && document.activeElement !== key) key.value = '';
             if (hub && document.activeElement !== hub) {
                 const storedHub = localStorage.getItem('resileos_hub_id') || '';
                 hub.value = storedHub && storedHub !== 'anon' ? storedHub : '';
             }
             syncUsernameFields();
-            if (state) {
-                state.textContent = localStorage.getItem('resileos_api_key')
-                    ? 'A key is already saved in this browser. Leave the field blank to keep it.'
-                    : 'No personal key is saved. Blank uses the shared demo key.';
-            }
         }
         function setPortalNote(text) {
             const note = document.getElementById('portal-note');
             if (note && text) note.textContent = text;
-        }
-        function applyOptionalKey(raw) {
-            const key = (raw || '').trim();
-            if (!key) return;
-            if (key === DEMO_API_KEY) localStorage.removeItem('resileos_api_key');
-            else localStorage.setItem('resileos_api_key', key);
         }
         function showApp() {
             document.documentElement.classList.add('signed-in');
@@ -973,7 +956,7 @@
             if (!name) {
                 localStorage.removeItem('resileos_username');
                 syncUsernameFields('');
-                setHistoryNote('Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.');
+                setHistoryNote('Choose a username before conversations are saved.');
                 refreshHistory();
                 showPortal();
                 return false;
@@ -994,13 +977,8 @@
             return true;
         }
         function saveSettings() {
-            const url = document.getElementById('settings-url').value.trim() || DEFAULT_API_URL;
-            const key = document.getElementById('settings-key').value.trim();
             const hub = document.getElementById('settings-hub').value.trim() || 'anon';
             const prevHub = hubId();
-            localStorage.setItem('resileos_api_url', url);
-            if (!key || key === DEMO_API_KEY) localStorage.removeItem('resileos_api_key');
-            else localStorage.setItem('resileos_api_key', key);
             localStorage.setItem('resileos_hub_id', hub);
             if (hub !== prevHub) currentConversationId = null;
             const settingsName = document.getElementById('settings-username');
@@ -1019,7 +997,6 @@
         function submitPortal(event) {
             event.preventDefault();
             const name = document.getElementById('portal-username').value;
-            const key = document.getElementById('portal-key').value;
             const hub = document.getElementById('portal-hub').value.trim();
             const err = document.getElementById('portal-error');
             if (err) err.textContent = '';
@@ -1031,7 +1008,6 @@
                 if (err) err.textContent = 'Hub id must be 1–64 characters: letters, digits, and _ . : -';
                 return;
             }
-            applyOptionalKey(key);
             const prevHub = hubId();
             if (hub) localStorage.setItem('resileos_hub_id', hub);
             if (hub && hub !== prevHub) currentConversationId = null;
@@ -1053,11 +1029,11 @@
             closePanels();
             showPortal();
             renderThread([]);
-            setPortalNote('Signed out. Saved threads stay with that username. A paid key in this browser was left in place.');
-            setHistoryNote('Choose a username before conversations are saved. The shared demo key is rate-limited, about 100 users.');
+            setPortalNote('Signed out of this username. The account session, if any, stays until you log out from Account.');
+            setHistoryNote('Choose a username before conversations are saved.');
             if (statusDot.classList.contains('online')) setStatus('online', onlineLabel());
         }
-        ['settings-url', 'settings-key', 'settings-hub', 'settings-username', 'settings-persona', 'settings-debug'].forEach(id => {
+        ['settings-hub', 'settings-username', 'settings-persona', 'settings-debug'].forEach(id => {
             const node = document.getElementById(id);
             if (node) node.addEventListener('change', saveSettings);
         });
@@ -1072,22 +1048,37 @@
             statusLabel.textContent = label;
         }
 
+        const nativeFetch = window.fetch.bind(window);
+        function apiFetch(url, opts) {
+            const options = opts ? Object.assign({}, opts) : {};
+            const headers = new Headers(options.headers || {});
+            if (csrfToken && !headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', csrfToken);
+            options.headers = headers;
+            options.credentials = 'same-origin';
+            return nativeFetch(url, options);
+        }
         function authHeaders(json) {
             const headers = {};
             if (json) headers['Content-Type'] = 'application/json';
-            const key = apiKey();
-            if (key) headers['X-API-Key'] = key;
+            if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
             return headers;
+        }
+        function loadSession() {
+            return apiFetch('/api/session/me').then(r => r.json()).then(data => {
+                sessionState = data && data.signed_in ? data : { signed_in: false };
+                csrfToken = (data && data.csrf) || '';
+                updateDemoLabel();
+            }).catch(() => { sessionState = { signed_in: false }; });
         }
 
         function checkReady() {
             setStatus('connecting', 'Connecting');
-            fetch(`${apiUrl()}/ready`).then(r => {
+            apiFetch(`${apiUrl()}/ready`).then(r => {
                 if (r.ok) setStatus('online', onlineLabel());
                 else setStatus('offline', 'API not ready');
             }).catch(() => setStatus('offline', 'Unreachable'));
         }
-        checkReady();
+        loadSession().then(checkReady);
 
         function inferKin(name) {
             if (/observe|flag|iris/i.test(name)) return 'Iris';
@@ -1167,7 +1158,7 @@
         async function loadTools() {
             const mount = document.getElementById('tools-list') || toolsPanel;
             try {
-                const r = await fetch(`${apiUrl()}/tools`, { headers: authHeaders() });
+                const r = await apiFetch(`${apiUrl()}/tools`, { headers: authHeaders() });
                 if (r.status === 401 || r.status === 403) {
                     mount.replaceChildren(document.createTextNode('Add a valid API key in Connection to list tools.'));
                     return;
@@ -1235,7 +1226,7 @@
             if (!mount) return;
             mount.replaceChildren();
             try {
-                const r = await fetch(`${apiUrl()}/kin/legions`, { headers: authHeaders() });
+                const r = await apiFetch(`${apiUrl()}/kin/legions`, { headers: authHeaders() });
                 const d = await r.json().catch(() => ({}));
                 if (!r.ok) {
                     mount.appendChild(card('List legions', 'GET /kin/legions is not on this host yet. It lands with this update.', {}, () => {
@@ -1424,7 +1415,7 @@
 
         async function refreshCompanion() {
             try {
-                const r = await fetch(`${apiUrl()}/aphrodite/${encodeURIComponent(hubId())}/state`, { headers: authHeaders() });
+                const r = await apiFetch(`${apiUrl()}/aphrodite/${encodeURIComponent(hubId())}/state`, { headers: authHeaders() });
                 if (!r.ok) return;
                 applyCompanion(await r.json());
             } catch (err) { /* panel stays on the last local copy */ }
@@ -1432,7 +1423,7 @@
 
         async function postTutorialStep(step) {
             try {
-                const r = await fetch(`${apiUrl()}/aphrodite/${encodeURIComponent(hubId())}/state`, {
+                const r = await apiFetch(`${apiUrl()}/aphrodite/${encodeURIComponent(hubId())}/state`, {
                     method: 'POST',
                     headers: authHeaders(true),
                     body: JSON.stringify({ step: step, verified: true })
@@ -1894,7 +1885,7 @@
             try {
                 const opts = { method, headers: authHeaders(body !== undefined) };
                 if (body !== undefined) opts.body = JSON.stringify(body);
-                const r = await fetch(`${apiUrl()}${path}`, opts);
+                const r = await apiFetch(`${apiUrl()}${path}`, opts);
                 const d = await r.json().catch(() => ({}));
                 const ms = performance.now() - started;
                 if (!r.ok) {
@@ -1921,7 +1912,7 @@
             const started = performance.now();
             const options = extra || {};
             try {
-                const response = await fetch(apiUrl() + path, {
+                const response = await apiFetch(apiUrl() + path, {
                     method: 'POST',
                     headers: authHeaders(true),
                     body: JSON.stringify(body)
@@ -1952,7 +1943,7 @@
             setTyping(bubble);
             const started = performance.now();
             try {
-                const r = await fetch(`${apiUrl()}/kin/cycle`, {
+                const r = await apiFetch(`${apiUrl()}/kin/cycle`, {
                     method: 'POST',
                     headers: authHeaders(true),
                     body: JSON.stringify({ apply_policy: true })
@@ -1974,7 +1965,7 @@
             const bubble = addMsg('bot');
             setTyping(bubble);
             try {
-                const r = await fetch(`${apiUrl()}/kin/hades/list`, { headers: authHeaders() });
+                const r = await apiFetch(`${apiUrl()}/kin/hades/list`, { headers: authHeaders() });
                 const d = await r.json();
                 if (!r.ok) {
                     renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
@@ -2019,7 +2010,7 @@
             const bubble = addMsg('bot');
             setTyping(bubble);
             try {
-                const r = await fetch(`${apiUrl()}/kin/hades/restore`, {
+                const r = await apiFetch(`${apiUrl()}/kin/hades/restore`, {
                     method: 'POST',
                     headers: authHeaders(true),
                     body: JSON.stringify({ checkpoint_id: id, fresh: true })
@@ -2040,7 +2031,7 @@
             const started = performance.now();
             try {
                 const payload = name === 'web_search' ? { query: input.value.trim() || 'resileos' } : {};
-                const r = await fetch(`${apiUrl()}/tools/${encodeURIComponent(name)}`, {
+                const r = await apiFetch(`${apiUrl()}/tools/${encodeURIComponent(name)}`, {
                     method: 'POST',
                     headers: authHeaders(true),
                     body: JSON.stringify(payload)
@@ -2056,9 +2047,13 @@
         }
 
         function formatError(r, d) {
+            if (d && d.code === 'trial_exhausted') {
+                setStatus('needs-key', 'Trial used');
+                return 'Daily trial is used up on this network. Sign in to continue.';
+            }
             if (r.status === 401 || r.status === 403) {
-                setStatus('needs-key', 'API key required');
-                return 'This host needs a valid API key. Open Connection if the demo key was overridden.';
+                setStatus('needs-key', 'Sign in');
+                return 'Sign in to continue. The anonymous trial is counted on the server for this network.';
             }
             if (d && d.detail) {
                 return typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
@@ -2158,14 +2153,14 @@
                     ? '/conversations/' + encodeURIComponent(currentConversationId)
                     : '/conversations';
                 const method = currentConversationId ? 'PUT' : 'POST';
-                let response = await fetch(apiUrl() + path, {
+                let response = await apiFetch(apiUrl() + path, {
                     method: method,
                     headers: authHeaders(true),
                     body: JSON.stringify(body)
                 });
                 if (response.status === 404 && currentConversationId) {
                     currentConversationId = null;
-                    response = await fetch(apiUrl() + '/conversations', {
+                    response = await apiFetch(apiUrl() + '/conversations', {
                         method: 'POST',
                         headers: authHeaders(true),
                         body: JSON.stringify(body)
@@ -2237,7 +2232,7 @@
                 .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
             renderHistoryItems(cachedItems);
             try {
-                const response = await fetch(
+                const response = await apiFetch(
                     apiUrl() + '/conversations?username=' + encodeURIComponent(username) + '&hub_id=' + encodeURIComponent(hubId()),
                     { headers: authHeaders() }
                 );
@@ -2288,7 +2283,7 @@
             const cached = readCache().conversations[id];
             if (cached && cached.messages && cached.messages.length) renderThread(cached.messages);
             try {
-                const response = await fetch(
+                const response = await apiFetch(
                     apiUrl() + '/conversations/' + encodeURIComponent(id)
                         + '?username=' + encodeURIComponent(username)
                         + '&hub_id=' + encodeURIComponent(hubId()),
@@ -2363,31 +2358,32 @@
             if (!/^(cs_test_|cs_live_)[A-Za-z0-9]+$/.test(sessionId)) return;
             setStatus('connecting', 'Retrieving paid key');
             try {
-                const response = await fetch('/api/claim/' + encodeURIComponent(sessionId));
+                const response = await apiFetch('/api/claim/' + encodeURIComponent(sessionId));
                 const data = await response.json().catch(() => ({}));
-                if (!response.ok || !data.api_key) {
-                    setStatus('needs-key', 'Key not ready');
-                    setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Paid key is not ready yet. Refresh in a few seconds.');
-                    setPortalNote(typeof data.detail === 'string' ? data.detail : 'Paid key is not ready yet. Refresh in a few seconds.');
+                if (!response.ok) {
+                    setStatus('needs-key', 'Plan not ready');
+                    setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Paid plan is not ready yet. Refresh in a few seconds.');
+                    setPortalNote(typeof data.detail === 'string' ? data.detail : 'Paid plan is not ready yet. Refresh in a few seconds.');
                     return;
                 }
-                localStorage.setItem('resileos_api_key', data.api_key);
-                if (data.base_url) localStorage.setItem('resileos_api_url', String(data.base_url).replace(/\/$/, ''));
                 fillSettings();
                 fillPortal();
                 const url = new URL(location.href);
                 url.searchParams.delete('checkout');
                 url.searchParams.delete('session_id');
                 history.replaceState({}, '', url.pathname + url.search + url.hash);
+                const note = data.attached
+                    ? 'Plan attached to this account.'
+                    : 'Checkout recorded. Sign in with the same email to use the plan.';
                 if (validUsername(currentUsername())) {
                     showApp();
                     openHistory();
-                    setHistoryNote('Paid key saved in this browser.');
+                    setHistoryNote(note);
                 } else {
                     showPortal();
-                    setPortalNote('Paid key saved in this browser. Enter a username. Leave the key field blank to keep it.');
+                    setPortalNote(note);
                 }
-                checkReady();
+                loadSession().then(checkReady);
             } catch (err) {
                 setStatus('offline', 'Could not claim key');
             }
@@ -2425,7 +2421,7 @@
                             prose: true
                         })
                       };
-                const r = await fetch(`${apiUrl()}${endpoint}`, fetchOptions);
+                const r = await apiFetch(`${apiUrl()}${endpoint}`, fetchOptions);
                 const d = await r.json();
                 const ms = performance.now() - started;
                 clearFile();
@@ -2459,7 +2455,7 @@
         sendBtn.addEventListener('click', sendMsg);
         claimPaidKey();
         if (validUsername(currentUsername())) {
-            setHistoryNote('Conversations for ' + currentUsername() + ' on hub ' + hubId() + '. The shared demo key is rate-limited, about 100 users.');
+            setHistoryNote('Conversations for ' + currentUsername() + ' on hub ' + hubId() + '.');
             showApp();
         } else {
             showPortal();

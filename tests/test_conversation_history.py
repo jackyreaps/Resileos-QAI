@@ -293,8 +293,9 @@ def test_public_site_links_chat_and_history_panel():
     assert 'href="/chat.html"' not in index
     assert 'id="history-panel"' in chat
     assert 'id="history-username"' in chat
-    assert "Shared demo key, rate-limited" in chat
-    assert "const DEMO_API_KEY" in chat
+    assert "DEMO_API_KEY" not in chat
+    assert "/api/session/v1" in chat
+    assert "X-API-Key" not in chat
     assert "/chat?checkout=success" in checkout
     assert "/chat?checkout=success" in wrangler
     assert "Eat stays Eat" in kin
