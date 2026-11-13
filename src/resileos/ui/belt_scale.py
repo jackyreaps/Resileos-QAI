@@ -1,10 +1,13 @@
 """Belt scale: matrix control for the visual path.
 
-The same pentagram figure is used at every scale, with phi as the
-proportion. Only the frame changes. This module never builds an image,
-never calls learn, and never writes a scar.
+Each named scale selects a frame and an orientation. The proportion is
+``resileos.substrate.suite_constants.PHI``, the same φ the oscillator,
+Titanos ingest, and the inter-frame motion scale (MAGNETIC_PHASE / PHI)
+already use. At belt index L the address weight is φ^{-L}, the same
+ladder KuramotoField and ingest use for a level. This module never
+builds an image, never calls learn, and never writes a scar.
 
-Scales, outward, with their frame and orientation:
+Scales, outward:
 
     scale            frame  orientation   belt (index)
     local            3      edge          0
@@ -35,11 +38,18 @@ _SCALE_SPEC: dict[str, dict[str, Any]] = {
 }
 
 
+def phi_level_weight(level: int) -> float:
+    """φ^{-level}, the existing outward address weight for a cascade level."""
+    return float(PHI ** (-int(level)))
+
+
 def matrix_control(scale: str) -> dict[str, Any]:
     """Return the matrix control for one belt scale.
 
     The returned ``belt`` is this scale's index (0..3), distinct from
-    the 5-mod belt in ``five_pin``. Unknown scales raise ``ValueError``.
+    the 5-mod belt in ``five_pin``. ``proportion`` is the shared core
+    ``PHI``. ``phi_weight`` is ``PHI ** (-belt)``. Unknown scales
+    raise ``ValueError``.
     """
     try:
         index = SCALES.index(scale)
@@ -52,4 +62,5 @@ def matrix_control(scale: str) -> dict[str, Any]:
         "frame": int(spec["frame"]),
         "orientation": str(spec["orientation"]),
         "proportion": float(PHI),
+        "phi_weight": phi_level_weight(index),
     }

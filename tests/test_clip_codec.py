@@ -142,3 +142,12 @@ def test_a_wide_frame_is_projected_before_it_is_coded():
     encoded = encode_sequence([wide, wide])
     assert encoded["shape"] == [8, 8]
     assert encoded["bits_per_frame"]["frames"] == 2
+
+
+def test_sequence_records_keep_floor_without_changing_the_gate():
+    from resileos.ui.five_pin import keep_packet
+
+    encoded = encode_sequence(_edge())
+    assert encoded["kept"] is keep_packet(encoded["energy"])
+    assert encoded["sigma"] == TEMPORAL_SIGMA
+

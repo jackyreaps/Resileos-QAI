@@ -173,9 +173,4 @@ def promote(
         ),
         "writes": False,
         "learned": False,
-        "residual": None,
-        "residual_note": (
-            "persona store records a residual against the tier above; "
-            "Titanos learn stores a full fact at the new subject"
-        ),
     }

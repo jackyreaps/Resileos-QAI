@@ -2,8 +2,9 @@
 import numpy as np
 import pytest
 
+from resileos.substrate.oscillator import PHI as OSC_PHI
 from resileos.substrate.suite_constants import PHI
-from resileos.ui.belt_scale import SCALES, matrix_control
+from resileos.ui.belt_scale import SCALES, matrix_control, phi_level_weight
 from resileos.ui.cascade_address import cascade_address
 from resileos.ui.residual_embed import address_triple, embed_frame
 
@@ -22,7 +23,10 @@ def test_matrix_control_all_four_scales():
         assert ctrl["belt"] == belt
         assert ctrl["frame"] == frame
         assert ctrl["orientation"] == orientation
-        assert ctrl["proportion"] == pytest.approx(PHI)
+        assert ctrl["proportion"] == PHI
+        assert ctrl["proportion"] == OSC_PHI
+        assert ctrl["phi_weight"] == pytest.approx(PHI ** (-belt))
+        assert ctrl["phi_weight"] == pytest.approx(phi_level_weight(belt))
 
 
 def test_matrix_control_orion_is_belt_2_frame_9():

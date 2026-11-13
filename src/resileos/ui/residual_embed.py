@@ -95,6 +95,7 @@ def embed_frame(
         out["scale"] = control["scale"]
         out["orientation"] = control["orientation"]
         out["proportion"] = control["proportion"]
+        out["phi_weight"] = control["phi_weight"]
         out["path"] = path["path"]
         out["residual"] = path["residual"]
     return out

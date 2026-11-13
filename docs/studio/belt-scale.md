@@ -1,20 +1,27 @@
 # Belt scale (visual matrix control)
 
 The belt scale is matrix control for the visual path, implemented in
-`src/resileos/ui/belt_scale.py`. The same pentagram figure is used at
-every scale, with phi as the proportion. Only the frame changes. This
-module does not build images, call learn, or write a scar.
+`src/resileos/ui/belt_scale.py`. Each named scale selects a frame and
+an orientation. This module does not build images, call learn, or
+write a scar.
+
+The proportion is `resileos.substrate.suite_constants.PHI`, the same
+φ already used by the oscillator, Titanos ingest (`φ^{-level}`), and
+the inter-frame motion scale (`MAGNETIC_PHASE / PHI` in
+`residual_frame.motion_scale`). At belt index L the address weight is
+`φ^{-L}`. That existing motion formula is not changed.
 
 ## Scales
 
-| Scale          | Frame | Orientation | Belt (index) |
-| -------------- | ----- | ----------- | ------------ |
-| local          | 3     | edge        | 0            |
-| sun_earth_moon | 5     | near triad  | 1            |
-| orion          | 9     | outer mark  | 2            |
-| north_star     | 12    | pole        | 3            |
+| Scale          | Frame | Orientation | Belt (index) | φ weight |
+| -------------- | ----- | ----------- | ------------ | -------- |
+| local          | 3     | edge        | 0            | φ^{0}    |
+| sun_earth_moon | 5     | near triad  | 1            | φ^{-1}   |
+| orion          | 9     | outer mark  | 2            | φ^{-2}   |
+| north_star     | 12    | pole        | 3            | φ^{-3}   |
 
-`matrix_control("orion")` returns belt 2, frame 9.
+`matrix_control("orion")` returns belt 2, frame 9, and
+`proportion` equal to the shared `PHI`.
 
 ## The word "belt" here
 

@@ -6,12 +6,14 @@ are stable and never reused.
 ## [Unreleased]
 
 ### Added
-- `src/resileos/ui/belt_scale.py` — visual matrix control. Same
-  pentagram at every scale, phi as the proportion. `matrix_control`
-  belt is the scale index (orion → belt 2, frame 9), not the 5-mod
-  Human Belt. `embed_frame(..., scale=...)` sets the cascade address;
+- `src/resileos/ui/belt_scale.py` — visual matrix control. Each scale
+  selects a frame and orientation. `matrix_control` belt is the scale
+  index (orion → belt 2, frame 9), not the 5-mod Human Belt.
+  `embed_frame(..., scale=...)` sets the cascade address;
   `suite_residual` still gets the original belt so `residual_bin` is
-  unchanged. No image is built. See `docs/studio/belt-scale.md`.
+  unchanged. No image is built. `proportion` is the shared core `PHI`;
+  `phi_weight` is φ^{-belt}, the same ladder as the oscillator and
+  Titanos ingest. See `docs/studio/belt-scale.md`.
 - `src/resileos/answer/cascade_learn.py` — one-step outward subject
   for a verified, opted-in fact. Never re-verifies, never writes.
   Draft mapping local=world / global=org was reversed to match
@@ -26,6 +28,8 @@ are stable and never reused.
   Latent→global with no promotion. See `docs/200-core/five-pin.md`.
 - Optional `pin` and `address` fields on `ControlPacket`/`VideoPacket`
   (default `None`, recorded only; verify gates unchanged).
+- `address_for_hub_subject` records the five-pin address for a hub namespace (user→individual, org→local, world→global).
+- `encode_sequence` records `kept` from the 1/64 keep floor; TEMPORAL_SIGMA and ACCEPT_ENERGY are unchanged.
 - `docs/320-titanos/outer-layer.md` — outer-layer flow: Hermes envelopes → Eat → Zeus
   reviewers → Titanos; Iris trace sensor; Hades lesson notes; clip check
   metrics. Lists renames from the drafts and what was left out.

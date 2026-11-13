@@ -7,15 +7,30 @@ from __future__ import annotations
 
 from typing import Any
 
+from resileos.answer.cascade_learn import scale_of_subject
+from resileos.ui.five_pin import address
 from resileos.ui.scale_address import scale_address
 
 
 def address_for_hub_subject(subject: str) -> dict[str, Any]:
-    """Scale address for a hub subject. Kind from the prefix."""
+    """Scale address for a hub subject. Kind from the prefix.
+
+    Also records the five-pin address for that namespace (user →
+    individual, org → local, world → global). This does not promote
+    a fact and does not call learn.
+    """
     kind = "user"
     if subject.startswith("world:"):
         kind = "world"
     elif subject.startswith("org:"):
         kind = "org"
     addr = scale_address(subject=subject)
-    return {"subject": subject, "kind": kind, "address": addr["embed"], "field": addr["field"]}
+    pin = scale_of_subject(subject)
+    return {
+        "subject": subject,
+        "kind": kind,
+        "address": addr["embed"],
+        "field": addr["field"],
+        "pin": pin,
+        "pin_address": address(pin) if pin else None,
+    }
