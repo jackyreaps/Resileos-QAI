@@ -153,9 +153,11 @@ def forge_video(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
 
     A matrix, frame list, or residual packet is drafted and verified by the
     layer-scale codec. Two frames are a residual phase step: only the
-    residual packet travels. A provider is used only for an inconclusive
-    upscale of that residual. A prompt with no residual input stays the
-    video request: a configured provider, or UNAVAILABLE with no invented URL.
+    residual packet travels. ``clip=True`` compresses a supplied sequence
+    as one base packet plus delta packets and checks that sequence. It does
+    not generate video. A provider is used only for an inconclusive upscale
+    of a residual delta. A prompt with no residual input stays the video
+    request: a configured provider, or UNAVAILABLE with no invented URL.
     """
     del seen
     prompt = str(kwargs.get("prompt") or "")[:2000]
@@ -173,6 +175,26 @@ def forge_video(seen: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         refused = _unavailable(prompt, stage, "Unknown forge stage.")
         refused["status"] = "refused"
         return refused
+    if bool(kwargs.get("clip")) or isinstance(kwargs.get("sequence"), dict):
+        from resileos.studio.sequence_stage import run_sequence_stage
+
+        produced = run_sequence_stage(
+            stage=stage,
+            prompt=prompt,
+            frames=kwargs.get("frames"),
+            sequence=kwargs.get("sequence") if isinstance(kwargs.get("sequence"), dict) else None,
+            context=kwargs.get("context"),
+            control=kwargs.get("control"),
+            provider_fn=kwargs.get("provider_fn"),
+            learn=kwargs.get("learn"),
+            bypass_zeus=bool(kwargs.get("bypass_zeus")),
+            zeus=kwargs.get("zeus"),
+            history=kwargs.get("clip_history"),
+        )
+        if not produced.get("hades_checkpoint"):
+            produced["checkpoint"] = None
+            produced["hades_checkpoint"] = False
+        return produced
     if _has_residual_input(kwargs):
         from resileos.studio.residual_cascade import run_visual_stage
 
@@ -592,40 +614,42 @@ def _studio_ready() -> bool:
 
 
 def register_studio_legions() -> list[str]:
-    """Register the three Studio legions once. Idempotent."""
-    if _studio_ready():
-        return list(_STUDIO)
-    register_legion(
-        "hermes",
-        forge_video,
-        name="forge_video",
-        constraints={
-            "action": "draft video",
-            "writes_residual": False,
-            "executes": True,
-            "spawns_processes": True,
-        },
-    )
-    register_legion(
-        "eat",
-        graphify,
-        name="graphify",
-        constraints={
-            "action": "ingest graph",
-            "writes_residual": True,
-            "executes": True,
-        },
-    )
-    register_legion(
-        "hermes",
-        plan_test_debug,
-        name="plan_test_debug",
-        constraints={
-            "action": "inspect cycle",
-            "writes_residual": False,
-            "executes": True,
-        },
-    )
+    """Register the Studio legions once. Idempotent."""
+    if not _studio_ready():
+        register_legion(
+            "hermes",
+            forge_video,
+            name="forge_video",
+            constraints={
+                "action": "draft video",
+                "writes_residual": False,
+                "executes": True,
+                "spawns_processes": True,
+            },
+        )
+        register_legion(
+            "eat",
+            graphify,
+            name="graphify",
+            constraints={
+                "action": "ingest graph",
+                "writes_residual": True,
+                "executes": True,
+            },
+        )
+        register_legion(
+            "hermes",
+            plan_test_debug,
+            name="plan_test_debug",
+            constraints={
+                "action": "inspect cycle",
+                "writes_residual": False,
+                "executes": True,
+            },
+        )
+    from resileos.kin.scene_legions import register_scene_legions
+
+    register_scene_legions()
     return list(_STUDIO)
 
 
@@ -659,6 +683,10 @@ def run_forge_video(
     keyframe: Any = None,
     draft: Any = None,
     prediction: str = "previous",
+    clip: bool = False,
+    sequence: dict[str, Any] | None = None,
+    context: list[Any] | None = None,
+    clip_history: list[Any] | None = None,
 ) -> dict[str, Any]:
     """Invoke the Forge legion and register any worker on the packet owner."""
     from resileos.kin.demigods.swarm import swarm_meta
@@ -687,14 +715,19 @@ def run_forge_video(
         keyframe=keyframe,
         draft=draft,
         prediction=prediction,
+        clip=clip,
+        sequence=sequence,
+        context=context,
+        clip_history=clip_history,
     )
     meta = swarm_meta(host)
     owner = str(meta["attempt_id"]) if meta else str(host.get("id") or "forge")
     if meta is None:
         note_worker(owner, "forge_video", result)
     result["clotho_owner"] = owner
-    result["checkpoint"] = None
-    result["hades_checkpoint"] = False
+    if not result.get("hades_checkpoint"):
+        result["checkpoint"] = None
+        result["hades_checkpoint"] = False
     return result
 
 
