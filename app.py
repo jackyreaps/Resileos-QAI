@@ -1084,7 +1084,9 @@ from resileos.chat.ledger import (  # noqa: E402
     edit_user_triple,
     list_user_ledger,
 )
+from resileos.chat.assist import register_assist_routes  # noqa: E402
 from resileos.chat.conversations import register_conversation_routes  # noqa: E402
+from resileos.chat.files import register_file_routes  # noqa: E402
 from resileos.studio.routes import register_studio_routes  # noqa: E402
 from resileos.ui.routes import register_ui_routes  # noqa: E402
 
@@ -1222,6 +1224,13 @@ def _mount_surfaces() -> None:
         save=_save_titanos,
     )
     register_conversation_routes(app, conversation_key_id)
+    register_file_routes(app, conversation_key_id)
+    register_assist_routes(
+        app,
+        verify_api_key,
+        get_titanos=lambda: titanos_singleton,
+        save=_save_titanos,
+    )
 
 
 _mount_surfaces()

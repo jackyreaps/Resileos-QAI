@@ -15,6 +15,7 @@
   var signedIn = false;
   var frames = null;
   var playTimer = null;
+  var handoffPrompt = "";
 
   function $(id) { return document.getElementById(id); }
   function picked(name) {
@@ -31,22 +32,22 @@
     var type = picked("type");
     var source = picked("source");
     var clip = type === "clip";
-    // Pictures start from a description. Photos become a clip.
-    $("source-choice").hidden = !clip;
-    if (!clip && source === "upload") {
-      document.querySelector('input[name="source"][value="describe"]').checked = true;
-      source = "describe";
-    }
-    var upload = clip && source === "upload";
-    $("source-legend").textContent = clip ? "Describe it, or use your photos" : "Describe it";
+    var upload = source === "upload";
+    $("source-legend").textContent = clip ? "Describe it, or use your photos" : "Describe it, or start from a photo";
+    $("upload-title").textContent = clip ? "Choose photos or a short video" : "Choose a photo";
+    $("upload-desc").textContent = clip
+      ? "Pick 2 to 12 photos in order, or one short video. They stay in your browser until you press Make it."
+      : "Studio makes a variation of it. It stays in your browser until you press Make it.";
     $("describe-wrap").hidden = upload;
     $("upload-wrap").hidden = !upload;
+    $("upload").multiple = clip;
+    $("upload").accept = clip ? "image/*,video/*" : "image/*";
     $("style-motion").hidden = !clip || upload;
     $("style-length").hidden = !clip;
     document.querySelectorAll('input[name="color"]').forEach(function (el) { el.disabled = upload; });
     if (upload) document.querySelector('input[name="color"][value="bw"]').checked = true;
     $("style-note").textContent = upload
-      ? "Clips from your photos come out in black and white. Length sets how long the clip plays."
+      ? (clip ? "Clips from your photos come out in black and white. Length sets how long the clip plays." : "Variations start from a black-and-white copy of your photo.")
       : "";
     $("prompt").placeholder = clip ? "Waves rolling onto a beach at dusk" : "A red fox in fresh snow at sunrise";
     $("generate").textContent = clip ? "Make the clip" : "Make the picture";
@@ -64,85 +65,18 @@
     return style.length ? text + ". Style: " + style.join(", ") + "." : text;
   }
 
-  // ---- reading photos and videos into small grayscale frames ----
-  function loadImage(file) {
-    return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function () { resolve({ source: img, url: url, w: img.naturalWidth, h: img.naturalHeight }); };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("That photo could not be opened.")); };
-      img.src = url;
-    });
-  }
-  function frameSize(w, h) {
-    var scale = MAX_SIDE / Math.max(w, h, 1);
-    return { w: Math.max(8, Math.round(w * scale)), h: Math.max(8, Math.round(h * scale)) };
-  }
-  function grayFrame(source, sw, sh, size) {
-    var canvas = document.createElement("canvas");
-    canvas.width = size.w;
-    canvas.height = size.h;
-    var ctx = canvas.getContext("2d", { willReadFrequently: true });
-    // Cover-crop so every frame has the same shape.
-    var target = size.w / size.h;
-    var cw = sw, ch = sh;
-    if (sw / sh > target) cw = sh * target; else ch = sw / target;
-    ctx.drawImage(source, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, size.w, size.h);
-    var data = ctx.getImageData(0, 0, size.w, size.h).data;
-    var rows = [];
-    for (var y = 0; y < size.h; y++) {
-      var row = [];
-      for (var x = 0; x < size.w; x++) {
-        var i = (y * size.w + x) * 4;
-        row.push(Math.round(((0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255) * 1000) / 1000);
-      }
-      rows.push(row);
-    }
-    return rows;
-  }
-  function videoFrames(file) {
-    return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file);
-      var video = document.createElement("video");
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = "auto";
-      var out = [];
-      var times = [];
-      var size = null;
-      function fail() { URL.revokeObjectURL(url); reject(new Error("That video could not be read in this browser.")); }
-      function next() {
-        if (!times.length) { URL.revokeObjectURL(url); resolve(out); return; }
-        video.currentTime = times.shift();
-      }
-      video.addEventListener("error", fail);
-      video.addEventListener("loadedmetadata", function () {
-        var duration = isFinite(video.duration) ? video.duration : 0;
-        if (!duration || !video.videoWidth) { fail(); return; }
-        size = frameSize(video.videoWidth, video.videoHeight);
-        var count = Math.min(MAX_FRAMES, Math.max(2, Math.round(duration * 3)));
-        for (var i = 0; i < count; i++) times.push((duration * (i + 0.5)) / count);
-        next();
-      });
-      video.addEventListener("seeked", function () {
-        out.push(grayFrame(video, video.videoWidth, video.videoHeight, size));
-        next();
-      });
-      video.src = url;
-    });
-  }
+  // ---- reading uploads: the same reader chat uses (assets/media.js) ----
   async function readUpload(files) {
     var list = Array.prototype.slice.call(files || []);
     if (!list.length) return null;
+    var M = window.ResileosMedia;
     var video = list.find(function (f) { return /^video\//.test(f.type); });
-    if (video) return videoFrames(video);
+    if (video) return (await M.readVideo(video, MAX_SIDE)).gray;
     var images = list.filter(function (f) { return /^image\//.test(f.type); }).slice(0, MAX_FRAMES);
-    if (images.length < 2) throw new Error("Pick at least 2 photos, or one short video.");
-    var loaded = [];
-    for (var i = 0; i < images.length; i++) loaded.push(await loadImage(images[i]));
-    var size = frameSize(loaded[0].w, loaded[0].h);
-    var out = loaded.map(function (item) { return grayFrame(item.source, item.w, item.h, size); });
-    loaded.forEach(function (item) { URL.revokeObjectURL(item.url); });
+    if (!images.length) throw new Error("Pick photos or a short video.");
+    var first = await M.readImage(images[0], MAX_SIDE);
+    var out = [first.gray];
+    for (var i = 1; i < images.length; i++) out.push((await M.readImage(images[i], MAX_SIDE, first.dims)).gray);
     return out;
   }
 
@@ -309,7 +243,8 @@
     var d = data || {};
     var noun = kind === "clip" ? "clip" : "picture";
     var url = typeof d.url === "string" && /^https?:\/\//.test(d.url) ? d.url : "";
-    var unavailable = String(d.status || "").toUpperCase() === "UNAVAILABLE";
+    // No generator: the API says UNAVAILABLE, or that this path produces no media.
+    var unavailable = String(d.status || "").toUpperCase() === "UNAVAILABLE" || d.produces_video === false;
 
     if (url) {
       title.textContent = "Your " + noun + " is ready";
@@ -364,7 +299,7 @@
     title.textContent = "Nothing was made";
     if (unavailable) {
       text.textContent = kind === "clip"
-        ? "This site doesn't have a video maker connected yet, so Studio won't pretend to make one. You can still turn your own photos into a clip: choose \u201cUse my photos\u201d."
+        ? "This site doesn't have a video maker connected yet, so Studio won't pretend to make one. You can still turn your own photos into a clip: choose \u201cStart from my photos\u201d."
         : "This site doesn't have a picture maker connected yet, so Studio won't pretend to make one. Please try again later.";
     } else {
       text.textContent = "Studio couldn't make this " + noun + ". Try a different description or other photos.";
@@ -378,13 +313,21 @@
     var path = type === "clip" ? "/studio/video" : "/studio/forge/video";
     var body = { stage: "draft" };
     var sent = {};
-    if (upload) {
+    if (upload && type === "image") {
+      if (!frames || !frames.length) {
+        setMsg("Choose a photo first.", "err");
+        $("upload").focus();
+        return;
+      }
+      body.prompt = (describedPrompt() || "A variation of my photo").slice(0, 2000);
+      body.matrix = frames[0];
+    } else if (upload) {
       if (!frames || frames.length < 2) {
         setMsg("Choose 2 to 12 photos, or one short video, first.", "err");
         $("upload").focus();
         return;
       }
-      body.prompt = "Clip from my photos";
+      body.prompt = handoffPrompt || "Clip from my photos";
       body.frames = frames;
       sent.frames = frames.length;
     } else {
@@ -437,8 +380,9 @@
     summary.textContent = "Reading…";
     try {
       frames = await readUpload($("upload").files);
-      summary.textContent = frames && frames.length >= 2
-        ? frames.length + " frames ready."
+      var needed = picked("type") === "clip" ? 2 : 1;
+      summary.textContent = frames && frames.length >= needed
+        ? (needed === 1 ? "Photo ready." : frames.length + " frames ready.")
         : "Pick at least 2 photos, or one short video.";
     } catch (err) {
       frames = null;
@@ -461,6 +405,30 @@
       el.addEventListener("change", sync);
     });
     $("upload").addEventListener("change", onUpload);
+    // From chat ("make a clip / variation from this") or from Files.
+    var handed = params.get("from") === "chat" && window.ResileosMedia ? window.ResileosMedia.takeHandoff() : null;
+    if (handed && Array.isArray(handed.frames) && handed.frames.length) {
+      var kind = handed.type === "clip" ? "clip" : "image";
+      document.querySelector('input[name="type"][value="' + kind + '"]').checked = true;
+      document.querySelector('input[name="source"][value="upload"]').checked = true;
+      frames = handed.frames;
+      handoffPrompt = String(handed.prompt || "").slice(0, 500);
+      if (handoffPrompt) $("prompt").value = handoffPrompt;
+      $("upload-summary").textContent = "From chat: " + (handed.name || "your attachment") + (frames.length > 1 ? " (" + frames.length + " frames)" : "") + ".";
+    }
+    var savedId = params.get("file");
+    if (savedId && /^[a-f0-9]{32}$/.test(savedId) && window.ResileosMedia) {
+      $("upload-summary").textContent = "Opening your file…";
+      window.ResileosMedia.fromSavedFile(savedId, params.get("name") || "file").then(async function (file) {
+        var isClip = /^video\//.test(file.type) || type === "clip";
+        document.querySelector('input[name="type"][value="' + (isClip ? "clip" : "image") + '"]').checked = true;
+        document.querySelector('input[name="source"][value="upload"]').checked = true;
+        sync();
+        frames = await readUpload([file]);
+        $("upload-summary").textContent = "From your files: " + file.name + ".";
+        if (isClip && frames.length < 2) $("upload-summary").textContent += " Add another photo to make a clip.";
+      }).catch(function () { $("upload-summary").textContent = "That file couldn't be opened."; });
+    }
     $("studio-form").addEventListener("submit", generate);
     sync();
     var me = window.ResileosNav ? window.ResileosNav.session() : fetch("/api/session/me", { credentials: "same-origin" }).then(function (r) { return r.json(); });

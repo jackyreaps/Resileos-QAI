@@ -995,7 +995,7 @@ export async function handleProxy({ request, env, params, fetchImpl, now }) {
   if (method !== "GET" && method !== "HEAD") init.body = request.body;
   const upstream = await fetchFn(target, init);
   const out = new Headers();
-  for (const name of ["content-type", "x-usage-count", "x-usage-quota", "x-ratelimit-remaining", "x-trial-remaining", "retry-after"]) {
+  for (const name of ["content-type", "content-disposition", "cache-control", "x-content-type-options", "x-usage-count", "x-usage-quota", "x-ratelimit-remaining", "x-trial-remaining", "retry-after"]) {
     const value = upstream.headers.get(name);
     if (value) out.set(name, value);
   }

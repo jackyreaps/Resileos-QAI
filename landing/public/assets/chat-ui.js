@@ -242,18 +242,23 @@
         last.textContent = text;
     }
 
+    var MODE_LABELS = { search: 'Also searching the web', image: 'Will make a picture', clip: 'Will make a short clip' };
     function syncMode() {
         var box = document.querySelector('.input-box');
-        var input = $('input');
-        var search = $('btn-search');
         var chip = $('mode-chip');
+        var label = $('mode-chip-label');
         if (box) box.dataset.mode = mode;
-        if (search) search.setAttribute('aria-pressed', mode === 'search' ? 'true' : 'false');
-        if (chip) chip.hidden = mode !== 'search';
-        if (!input) return;
-        if (mode === 'search') input.placeholder = 'What should I look up?';
-        else input.placeholder = 'Ask anything, or tell me something to remember…';
+        [['btn-search', 'search'], ['btn-image', 'image'], ['btn-clip', 'clip']].forEach(function (pair) {
+            var b = $(pair[0]);
+            if (b) b.setAttribute('aria-pressed', mode === pair[1] ? 'true' : 'false');
+        });
+        if (chip) chip.hidden = !mode;
+        if (label && mode) label.textContent = MODE_LABELS[mode] || '';
     }
+    // Optional hints for the next message. The server picks steps on its own too.
+    window.ResileosHints = function () {
+        return { search: mode === 'search', create: mode === 'image' || mode === 'clip' ? mode : null };
+    };
 
     function forceMode(next) {
         mode = next || '';
@@ -378,13 +383,15 @@
     }
 
     function selectedFileActive() {
-        var chip = $('file-chip');
-        return chip && !chip.hidden;
+        var row = $('attach-row');
+        return row && !row.hidden;
     }
 
     function armStep(text) {
         var trimmed = String(text || '').trim().toLowerCase();
-        if (mode === 'search' || trimmed.indexOf('/search') === 0) pendingStep = 'Searching the web...';
+        if (selectedFileActive()) pendingStep = 'Looking at your attachments...';
+        else if (mode === 'search' || trimmed.indexOf('/search') === 0) pendingStep = 'Searching the web...';
+        else if (mode === 'image' || mode === 'clip') pendingStep = 'Working on it...';
         else if (/^remember\b/.test(trimmed)) pendingStep = 'Saving that...';
         else pendingStep = 'Thinking...';
     }
@@ -433,23 +440,14 @@
             }, true);
         }
 
-        var search = $('btn-search');
-        if (search) search.addEventListener('click', function () { toggleMode('search'); });
+        [['btn-search', 'search'], ['btn-image', 'image'], ['btn-clip', 'clip']].forEach(function (pair) {
+            var b = $(pair[0]);
+            if (b) b.addEventListener('click', function () { toggleMode(pair[1]); });
+        });
         var clear = $('mode-chip-clear');
         if (clear) clear.addEventListener('click', function () { toggleMode(''); });
-        // "Make a picture" and "Make a short clip" open Studio and carry what was typed.
-        ['btn-image', 'btn-clip'].forEach(function (id) {
-            var link = $(id);
-            if (!link) return;
-            link.addEventListener('click', function () {
-                var text = input ? input.value.trim() : '';
-                if (!text || text.charAt(0) === '/') return;
-                var url = new URL(link.getAttribute('href'), location.origin);
-                url.searchParams.set('prompt', text.slice(0, 500));
-                link.setAttribute('href', url.pathname + url.search);
-            });
-        });
         syncMode();
+        var attachMenu = bindMenu($('btn-attach'), $('attach-menu'));
 
         var menu = bindMenu($('btn-tools-menu'), $('tools-menu'));
         document.addEventListener('keydown', function (event) {
@@ -462,6 +460,10 @@
             }
             if (menu.isOpen()) {
                 menu.close(true);
+                event.stopPropagation();
+            }
+            if (attachMenu.isOpen()) {
+                attachMenu.close(true);
                 event.stopPropagation();
             }
         }, true);
@@ -513,14 +515,9 @@
                 var raw = field ? field.value : '';
                 var trimmed = raw.trim();
                 if (!trimmed && !selectedFileActive()) return previousSend();
-                if (mode === 'search' && trimmed && !selectedFileActive() && trimmed.charAt(0) !== '/') {
-                    field.value = '/search ' + trimmed;
-                }
                 var wire = field ? field.value.trim() : trimmed;
                 armStep(wire);
                 var sent = previousSend();
-                var searchText = wire.match(/^\/search\s+([\s\S]+)$/i);
-                if (searchText && searchText[1].trim()) relabelLastUser(searchText[1].trim(), wire);
                 forceMode('');
                 pendingStep = '';
                 return sent;

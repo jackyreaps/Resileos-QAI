@@ -42,8 +42,10 @@ def test_chat_page_signs_in_and_posts_studio_tools():
     public = ROOT / "landing" / "public"
     studio_js = (public / "assets" / "studio.js").read_text(encoding="utf-8")
     admin_js = (public / "assets" / "admin.js").read_text(encoding="utf-8")
-    assert 'href="/studio?type=image"' in html
-    assert 'href="/studio?type=clip"' in html
+    # Chat uploads hand off to Studio with the same perception (media.js).
+    assert "location.href = '/studio?from=chat'" in html
+    assert "/assets/media.js" in html
+    assert "ResileosMedia.takeHandoff" in studio_js
     assert '"/studio/forge/video"' in studio_js
     assert '"/studio/video"' in studio_js
     assert "UNAVAILABLE" in studio_js

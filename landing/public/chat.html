@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="/assets/site-nav.css" />
     <script src="/assets/auth.js"></script>
     <script src="/assets/nav.js" defer></script>
+    <script src="/assets/media.js"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -643,6 +644,7 @@
             <p class="settings-hint" id="history-who">Not signed in. Chats stay in this browser.</p>
             <div class="history-actions">
                 <a class="history-save" id="history-signin" href="/login?next=/chat">Sign in</a>
+                <a class="btn-text js-signed-in" id="history-files" href="/files" hidden>My files</a>
                 <button type="button" class="btn-text js-signout" id="btn-signout" hidden>Sign out</button>
             </div>
         </div>
@@ -688,47 +690,58 @@
 
     <div class="input-wrap">
         <div class="input-box">
-            <input type="file" id="file-input" hidden>
+            <input type="file" id="file-input" multiple accept="image/*,video/*,.txt,.md,.csv,.json,.py,.lean,text/plain" hidden>
+            <div class="attach-row" id="attach-row" hidden aria-label="Attachments"></div>
             <div class="composer-bar">
                 <div class="tools-wrap">
-                    <button class="composer-action" id="btn-tools-menu" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="Tools">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        Tools
+                    <button class="composer-action" id="btn-attach" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="attach-menu" title="Attach pictures, clips or files">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                        Attach
                     </button>
-                    <div id="tools-menu" class="more-menu tools-menu" role="menu" hidden aria-label="Tools">
-                        <p class="tools-group" role="presentation">Ask &amp; research</p>
-                        <button class="menu-item" id="btn-search" type="button" role="menuitem" aria-pressed="false">
-                            <span class="menu-copy"><span class="menu-label">Search the web</span><span class="menu-desc">Look something up online. Web answers show where they came from and are marked unverified.</span></span>
-                        </button>
-                        <p class="tools-group" role="presentation">Create</p>
-                        <a class="menu-item" id="btn-image" role="menuitem" href="/studio?type=image">
-                            <span class="menu-copy"><span class="menu-label">Make a picture</span><span class="menu-desc">Opens Studio with what you've typed as the description.</span></span>
-                        </a>
-                        <a class="menu-item" id="btn-clip" role="menuitem" href="/studio?type=clip">
-                            <span class="menu-copy"><span class="menu-label">Make a short clip</span><span class="menu-desc">Opens Studio. Describe a clip, or turn your own photos into one.</span></span>
-                        </a>
-                        <p class="tools-group" role="presentation">Files</p>
+                    <div id="attach-menu" class="more-menu tools-menu" role="menu" hidden aria-label="Attach">
                         <button class="menu-item" id="btn-file" type="button" role="menuitem">
-                            <span class="menu-copy"><span class="menu-label">Attach a file</span><span class="menu-desc">Add a picture or document, then ask about it.</span></span>
+                            <span class="menu-copy"><span class="menu-label">Upload from this device</span><span class="menu-desc">Pictures, short videos, text or Lean files. Pick as many as you like.</span></span>
+                        </button>
+                        <button class="menu-item" id="btn-myfiles" type="button" role="menuitem" hidden>
+                            <span class="menu-copy"><span class="menu-label">Choose from my Files</span><span class="menu-desc">Reuse something you saved before.</span></span>
+                        </button>
+                    </div>
+                    <div id="files-picker" class="more-menu tools-menu files-picker" hidden aria-label="My files">
+                        <p class="tools-group">My files</p>
+                        <div id="files-picker-list"></div>
+                        <a class="menu-item" href="/files"><span class="menu-copy"><span class="menu-label">Manage my files</span></span></a>
+                    </div>
+                </div>
+                <div class="tools-wrap">
+                    <button class="composer-action subtle" id="btn-tools-menu" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="Optional hints">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="9" cy="6" r="2"></circle><circle cx="15" cy="12" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>
+                        Options
+                    </button>
+                    <div id="tools-menu" class="more-menu tools-menu" role="menu" hidden aria-label="Options">
+                        <p class="tools-group" role="presentation">Optional. I pick the right steps on my own.</p>
+                        <button class="menu-item" id="btn-search" type="button" role="menuitemcheckbox" aria-pressed="false">
+                            <span class="menu-copy"><span class="menu-label">Search the web</span><span class="menu-desc">Also look this up online and link the sources.</span></span>
+                        </button>
+                        <button class="menu-item" id="btn-image" type="button" role="menuitemcheckbox" aria-pressed="false">
+                            <span class="menu-copy"><span class="menu-label">Make a picture</span><span class="menu-desc">From your message, or a variation of an attached picture.</span></span>
+                        </button>
+                        <button class="menu-item" id="btn-clip" type="button" role="menuitemcheckbox" aria-pressed="false">
+                            <span class="menu-copy"><span class="menu-label">Make a short clip</span><span class="menu-desc">From your message, an attached clip, or several photos.</span></span>
                         </button>
                     </div>
                 </div>
-                <span class="mode-chip" id="mode-chip" hidden>Searching the web
-                    <button type="button" id="mode-chip-clear" aria-label="Stop searching the web">×</button>
+                <span class="mode-chip" id="mode-chip" hidden><span id="mode-chip-label">Searching the web</span>
+                    <button type="button" id="mode-chip-clear" aria-label="Clear option">×</button>
                 </span>
             </div>
             <div class="composer-row">
-                <div id="file-chip" class="file-chip" hidden>
-                    <span id="file-chip-name"></span>
-                    <button type="button" id="file-chip-clear" aria-label="Remove file">×</button>
-                </div>
-                <textarea class="composer" id="input" rows="1" placeholder="Ask anything, or tell me something to remember…" autocomplete="off" aria-label="Message"></textarea>
+                <textarea class="composer" id="input" rows="1" placeholder="Ask anything, attach something, or paste a Lean proof…" autocomplete="off" aria-label="Message"></textarea>
                 <button class="send" id="send" type="button" title="Send" aria-label="Send message">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </button>
             </div>
         </div>
-        <p class="composer-hint">Enter to send · Shift+Enter for a new line · Tools has web search, pictures, clips and files</p>
+        <p class="composer-hint" id="composer-hint">Attach pictures, clips, text or Lean files, or drop them here. I look at them, search, check proofs, or make something, as needed.</p>
     </div>
     </div>
     </div>
@@ -743,7 +756,6 @@
         const statusDot = document.getElementById('status');
         const statusLabel = document.getElementById('status-label');
         let chatHistory = [];
-        let selectedFile = null;
         let lastToolEmpty = false;
         let csrfToken = '';
         let sessionState = { signed_in: false };
@@ -772,7 +784,9 @@
             const signedIn = Boolean(sessionState.signed_in);
             const login = document.getElementById('login-link');
             if (login) login.hidden = signedIn;
-            document.querySelectorAll('.js-signout').forEach(btn => { btn.hidden = !signedIn; });
+            const myFiles = document.getElementById('btn-myfiles');
+            if (myFiles) myFiles.hidden = !signedIn;
+            document.querySelectorAll('.js-signout, .js-signed-in').forEach(btn => { btn.hidden = !signedIn; });
             const historySignin = document.getElementById('history-signin');
             if (historySignin) historySignin.hidden = signedIn;
             const who = document.getElementById('history-who');
@@ -940,28 +954,107 @@
         input.addEventListener('keydown', handleEnter);
         input.addEventListener('input', growComposer);
 
+        let attachments = [];
         function clearFile() {
-            selectedFile = null;
+            attachments = [];
             const fileInput = document.getElementById('file-input');
-            const chip = document.getElementById('file-chip');
             if (fileInput) fileInput.value = '';
-            if (chip) chip.hidden = true;
-            const name = document.getElementById('file-chip-name');
-            if (name) name.textContent = '';
+            renderAttachments();
+        }
+        function renderAttachments() {
+            const row = document.getElementById('attach-row');
+            row.replaceChildren();
+            row.hidden = !attachments.length;
+            attachments.forEach((att, index) => {
+                const chip = document.createElement('div');
+                chip.className = 'attach-chip' + (att.error ? ' error' : '');
+                if (att.thumb) {
+                    const img = document.createElement('img');
+                    img.src = att.thumb;
+                    img.alt = '';
+                    chip.appendChild(img);
+                } else {
+                    const icon = document.createElement('span');
+                    icon.className = 'attach-icon';
+                    icon.textContent = att.kind === 'lean' ? 'λ' : att.kind === 'clip' ? '▶' : '¶';
+                    chip.appendChild(icon);
+                }
+                const name = document.createElement('span');
+                name.className = 'attach-name';
+                name.textContent = att.pending ? 'Reading ' + att.name + '…' : (att.error || att.name);
+                chip.appendChild(name);
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.setAttribute('aria-label', 'Remove ' + att.name);
+                remove.textContent = '×';
+                remove.addEventListener('click', () => { attachments.splice(index, 1); renderAttachments(); });
+                chip.appendChild(remove);
+                row.appendChild(chip);
+            });
+        }
+        async function addFiles(fileList) {
+            const files = Array.from(fileList || []).slice(0, 6 - attachments.length);
+            for (const file of files) {
+                const slot = { name: file.name, kind: window.ResileosMedia.kindOf(file), pending: true, file: file };
+                attachments.push(slot);
+                renderAttachments();
+                try {
+                    Object.assign(slot, await window.ResileosMedia.prepare(file));
+                } catch (err) {
+                    slot.error = (err && err.message) || ('Couldn\'t read ' + file.name);
+                }
+                slot.pending = false;
+                renderAttachments();
+            }
         }
         function handleFileUpload() {
             const fileInput = document.getElementById('file-input');
-            const chip = document.getElementById('file-chip');
-            const name = document.getElementById('file-chip-name');
-            if (fileInput.files.length > 0) {
-                selectedFile = fileInput.files[0];
-                chip.hidden = false;
-                name.textContent = selectedFile.name;
-            }
+            addFiles(fileInput.files).finally(() => { fileInput.value = ''; });
         }
         document.getElementById('btn-file').addEventListener('click', () => document.getElementById('file-input').click());
         document.getElementById('file-input').addEventListener('change', handleFileUpload);
-        document.getElementById('file-chip-clear').addEventListener('click', clearFile);
+        // Drop or paste pictures and files straight into the composer.
+        (function () {
+            const box = document.querySelector('.input-box');
+            box.addEventListener('dragover', (e) => { e.preventDefault(); box.classList.add('dropping'); });
+            box.addEventListener('dragleave', () => box.classList.remove('dropping'));
+            box.addEventListener('drop', (e) => { e.preventDefault(); box.classList.remove('dropping'); if (e.dataTransfer) addFiles(e.dataTransfer.files); });
+            input.addEventListener('paste', (e) => {
+                const files = Array.from((e.clipboardData && e.clipboardData.files) || []);
+                if (files.length) { e.preventDefault(); addFiles(files); }
+            });
+        })();
+        async function openFilesPicker() {
+            const picker = document.getElementById('files-picker');
+            const list = document.getElementById('files-picker-list');
+            document.getElementById('attach-menu').hidden = true;
+            picker.hidden = false;
+            list.replaceChildren(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: 'Loading…' }));
+            try {
+                const r = await apiFetch(`${apiUrl()}/files`, { headers: authHeaders() });
+                const d = await r.json().catch(() => ({}));
+                list.replaceChildren();
+                if (!r.ok) { list.appendChild(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: formatError(r, d) })); return; }
+                if (!(d.files || []).length) { list.appendChild(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: 'No saved files yet. Files you attach here are saved for you.' })); return; }
+                d.files.slice(0, 30).forEach(f => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'menu-item';
+                    b.textContent = f.name;
+                    b.addEventListener('click', async () => {
+                        picker.hidden = true;
+                        try { await addFiles([await window.ResileosMedia.fromSavedFile(f.id, f.name)]); attachments[attachments.length - 1].file_id = f.id; attachments[attachments.length - 1].saved = true; renderAttachments(); }
+                        catch (err) { setHistoryNote(err.message); }
+                    });
+                    list.appendChild(b);
+                });
+            } catch (err) { list.replaceChildren(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: 'Couldn\'t load your files.' })); }
+        }
+        document.getElementById('btn-myfiles').addEventListener('click', openFilesPicker);
+        document.addEventListener('click', (e) => {
+            const picker = document.getElementById('files-picker');
+            if (!picker.hidden && !picker.contains(e.target) && e.target.id !== 'btn-myfiles' && !e.target.closest('#btn-myfiles')) picker.hidden = true;
+        });
 
         function addMsg(sender) {
             const row = document.createElement('div');
@@ -1225,6 +1318,135 @@
             if (options.persist !== false) schedulePersist();
         }
 
+        // The chained steps for one turn, in plain words, with sources and anything made.
+        function renderAssist(bubble, assist, sent, text) {
+            if (!assist) return;
+            const trail = assist.trail || [];
+            if (trail.length) {
+                const list = document.createElement('ul');
+                list.className = 'trail';
+                list.setAttribute('aria-label', 'What I did');
+                trail.forEach(step => {
+                    const li = document.createElement('li');
+                    li.className = 'trail-step ' + (step.status || 'done');
+                    li.textContent = step.label;
+                    list.appendChild(li);
+                });
+                bubble.insertBefore(list, bubble.firstChild);
+            }
+            const lean = assist.lean;
+            if (lean && lean.status) {
+                const chip = document.createElement('span');
+                const ok = lean.status === 'CHECKED';
+                chip.className = 'chip lean-chip ' + (ok ? 'accepted' : (lean.status === 'FAILED' || lean.status === 'INCOMPLETE') ? 'conflict' : 'unverified');
+                chip.textContent = ok ? 'Proof checks' : lean.status === 'FAILED' ? (lean.line ? 'Fails at line ' + lean.line : 'Fails') : lean.status === 'INCOMPLETE' ? 'Not finished' : lean.status === 'DECLINED' ? 'Not run' : lean.status === 'TIMEOUT' ? 'Timed out' : 'Checker unavailable';
+                const reply = bubble.querySelector('.reply');
+                if (reply) reply.after(chip); else bubble.appendChild(chip);
+            }
+            const created = assist.created;
+            if (created && created.made) {
+                const box = document.createElement('div');
+                box.className = 'created';
+                let canvas = null;
+                if (created.url) {
+                    const media = /\.(png|jpe?g|webp|gif)(\?|$)/i.test(created.url) ? document.createElement('img') : document.createElement('video');
+                    media.src = created.url;
+                    if (media.tagName === 'VIDEO') { media.controls = true; media.loop = true; media.playsInline = true; }
+                    else media.alt = 'What I made';
+                    box.appendChild(media);
+                    const dl = document.createElement('a');
+                    dl.className = 'link-chip';
+                    dl.href = created.url;
+                    dl.target = '_blank';
+                    dl.rel = 'noopener noreferrer';
+                    dl.download = '';
+                    dl.textContent = 'Download';
+                    box.appendChild(dl);
+                } else if (Array.isArray(created.preview) && created.preview.length) {
+                    canvas = document.createElement('canvas');
+                    box.appendChild(canvas);
+                    playFrames(canvas, created.preview);
+                    const studio = document.createElement('button');
+                    studio.type = 'button';
+                    studio.className = 'link-chip';
+                    studio.textContent = 'Open in Studio to download';
+                    studio.addEventListener('click', () => {
+                        if (window.ResileosMedia.handoff({ name: 'clip', kind: 'clip', grayFrames: created.preview, prompt: text }, 'clip')) location.href = '/studio?from=chat';
+                    });
+                    box.appendChild(studio);
+                }
+                bubble.appendChild(box);
+            }
+            const sources = assist.sources || [];
+            if (sources.length) {
+                const wrap = document.createElement('div');
+                wrap.className = 'sources';
+                const head = document.createElement('p');
+                head.className = 'sources-head';
+                head.textContent = 'Sources';
+                wrap.appendChild(head);
+                const ol = document.createElement('ol');
+                sources.forEach(src => {
+                    if (!/^https?:\/\//.test(src.url || '')) return;
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = src.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.textContent = src.title || src.url;
+                    li.appendChild(a);
+                    ol.appendChild(li);
+                });
+                wrap.appendChild(ol);
+                bubble.appendChild(wrap);
+            }
+            const lines = [];
+            trail.forEach(step => { if (step.detail) lines.push(step.label + ': ' + step.detail); });
+            (assist.attachments || []).forEach(a => lines.push(a.name + ' (' + a.kind + '): ' + a.summary));
+            if (lean && lean.raw) lines.push('', 'Lean output:', lean.raw);
+            if (lean && lean.limits) lines.push('Limits: ' + lean.limits.timeout_s + ' s, ' + lean.limits.memory_mb + ' MB, network ' + (lean.network || 'isolated'));
+            if (created && created.detail) lines.push('Create: ' + created.status + ' — ' + created.detail);
+            if (lines.length) {
+                const fold = document.createElement('details');
+                fold.className = 'assist-details';
+                const summary = document.createElement('summary');
+                summary.textContent = 'Details';
+                const pre = document.createElement('pre');
+                pre.textContent = lines.join('\n');
+                fold.append(summary, pre);
+                bubble.appendChild(fold);
+            }
+            if (chat.contains(bubble)) chat.scrollTop = chat.scrollHeight;
+        }
+
+        function playFrames(canvas, frames) {
+            const h = frames[0].length, w = frames[0][0].length;
+            canvas.width = w * 6;
+            canvas.height = h * 6;
+            let lo = Infinity, hi = -Infinity;
+            frames.forEach(f => f.forEach(r => r.forEach(v => { v = Number(v); if (v < lo) lo = v; if (v > hi) hi = v; })));
+            const small = document.createElement('canvas');
+            small.width = w; small.height = h;
+            const sctx = small.getContext('2d');
+            const ctx = canvas.getContext('2d');
+            let i = 0;
+            function draw() {
+                if (!document.body.contains(canvas)) return;
+                const img = sctx.createImageData(w, h);
+                const f = frames[i % frames.length];
+                for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+                    const v = Math.round(((Number(f[y][x]) - lo) / ((hi - lo) || 1)) * 255);
+                    const k = (y * w + x) * 4;
+                    img.data[k] = img.data[k + 1] = img.data[k + 2] = v; img.data[k + 3] = 255;
+                }
+                sctx.putImageData(img, 0, 0);
+                ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
+                i += 1;
+                setTimeout(draw, 250);
+            }
+            draw();
+        }
+
         function renderStructured(target, data, opts) {
             const options = opts || {};
             const described = describeResult(data, options);
@@ -1342,7 +1564,7 @@
                 const bubble = row.querySelector('.bubble');
                 if (!bubble || bubble.querySelector('.typing')) return;
                 const reply = bubble.querySelector('.reply');
-                const link = bubble.querySelector('a');
+                const link = bubble.querySelector(':scope > a');
                 const text = ((reply ? reply.textContent : bubble.textContent) + (link ? '\n' + link.textContent : '')).trim();
                 if (!text) return;
                 messages.push({
@@ -1745,60 +1967,103 @@
             }
         }
 
+        function userBubble(text, sent) {
+            const bubble = addMsg('user');
+            if (text) {
+                const p = document.createElement('div');
+                p.className = 'user-text';
+                p.textContent = text;
+                bubble.appendChild(p);
+            }
+            if (sent.length) {
+                const strip = document.createElement('div');
+                strip.className = 'sent-attachments';
+                sent.forEach(att => {
+                    const item = document.createElement('figure');
+                    item.className = 'sent-attachment';
+                    if (att.thumb) {
+                        const img = document.createElement('img');
+                        img.src = att.thumb;
+                        img.alt = att.name;
+                        item.appendChild(img);
+                    }
+                    const cap = document.createElement('figcaption');
+                    cap.textContent = att.name;
+                    item.appendChild(cap);
+                    if (att.kind === 'image' || att.kind === 'clip') {
+                        const use = document.createElement('button');
+                        use.type = 'button';
+                        use.className = 'link-chip';
+                        use.textContent = att.kind === 'clip' ? 'Make a clip from this' : 'Make a variation in Studio';
+                        use.addEventListener('click', () => {
+                            att.prompt = text;
+                            if (window.ResileosMedia.handoff(att, att.kind === 'clip' ? 'clip' : 'image')) location.href = '/studio?from=chat';
+                        });
+                        item.appendChild(use);
+                    }
+                    strip.appendChild(item);
+                });
+                bubble.appendChild(strip);
+            }
+            return bubble;
+        }
+
         async function sendMsg() {
             const text = input.value.trim();
-            if (!text && !selectedFile) return;
+            if (attachments.some(a => a.pending)) { setHistoryNote('Still reading your attachments…'); return; }
+            const sent = attachments.filter(a => !a.error);
+            if (!text && !sent.length) return;
             hideSuggestions();
-            addMsg('user').textContent = text || ('[File: ' + selectedFile.name + ']');
+            userBubble(text, sent);
             input.value = '';
             growComposer();
+            clearFile();
             sendBtn.disabled = true;
             const bubble = addMsg('bot');
             setTyping(bubble);
             const started = performance.now();
+            const hints = (window.ResileosHints && window.ResileosHints()) || { search: false, create: null };
+            // Keep what you attach in your Files when you're signed in.
+            if (sessionState.signed_in) {
+                sent.filter(a => a.file && !a.saved).forEach(a => {
+                    window.ResileosMedia.saveToFiles(a.file, csrfToken).then(saved => { a.file_id = saved.id; }).catch(() => {});
+                });
+            }
             try {
-                const endpoint = selectedFile ? '/upload' : '/chat';
-                const fetchOptions = selectedFile
-                    ? {
-                        method: 'POST',
-                        headers: authHeaders(false),
-                        body: (() => { const fd = new FormData(); fd.append('message', text); fd.append('file', selectedFile); return fd; })()
-                      }
-                    : {
-                        method: 'POST',
-                        headers: authHeaders(true),
-                        body: JSON.stringify({
-                            message: text,
-                            text: text,
-                            history: chatHistory,
-                            hub_id: hubId(),
-                            last_tool_empty: lastToolEmpty,
-                            persona: currentPersona(),
-                            prose: true
-                        })
-                      };
-                const r = await apiFetch(`${apiUrl()}${endpoint}`, fetchOptions);
-                const d = await r.json();
+                const r = await apiFetch(`${apiUrl()}/assist`, {
+                    method: 'POST',
+                    headers: authHeaders(true),
+                    body: JSON.stringify({
+                        message: text,
+                        history: chatHistory,
+                        hub_id: hubId(),
+                        last_tool_empty: lastToolEmpty,
+                        persona: currentPersona(),
+                        prose: true,
+                        attachments: sent.map(a => window.ResileosMedia.wire(a)),
+                        hints: hints
+                    })
+                });
+                const d = await r.json().catch(() => ({}));
                 const ms = performance.now() - started;
-                clearFile();
                 if (!r.ok) {
                     renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
                     return;
                 }
                 renderReply(bubble, d, { ms: ms });
+                if (d.assist) renderAssist(bubble, d.assist, sent, text);
                 lastToolEmpty = ['NO_ROWS', 'ABSTAINED'].includes(d.status) || d.chip === 'no_rows' || d.chip === 'abstained';
-                if (text) {
-                    const taken = d.action_taken || {};
-                    chatHistory.push({ role: 'user', content: text });
-                    chatHistory.push({
-                        role: 'assistant',
-                        content: d.reply_text || d.value || '',
-                        subject: d.subject || taken.subject || '',
-                        relation: taken.relation || '',
-                        obj: (Array.isArray(d.rows) && d.rows.length) ? String(d.rows[0]) : ''
-                    });
-                    if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
-                }
+                const taken = d.action_taken || {};
+                chatHistory.push({ role: 'user', content: text || sent.map(a => a.name).join(', ') });
+                if (d.assist && d.assist.context) chatHistory.push({ role: 'assistant', content: 'Context: ' + d.assist.context.slice(0, 1500) });
+                chatHistory.push({
+                    role: 'assistant',
+                    content: d.reply_text || d.value || '',
+                    subject: d.subject || taken.subject || '',
+                    relation: taken.relation || '',
+                    obj: (Array.isArray(d.rows) && d.rows.length) ? String(d.rows[0]) : ''
+                });
+                if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
             } catch (e) {
                 renderReply(bubble, { status: 'ERROR', value: 'Network error.' });
                 setStatus('offline', 'Network error');
@@ -1809,6 +2074,19 @@
             }
         }
         sendBtn.addEventListener('click', sendMsg);
+        // /chat?file=<id>: attach one of your saved files (from My files).
+        (function () {
+            const params = new URLSearchParams(location.search);
+            const id = params.get('file');
+            if (!id || !/^[a-f0-9]{32}$/.test(id)) return;
+            window.ResileosMedia.fromSavedFile(id, params.get('name') || 'file')
+                .then(file => addFiles([file]).then(() => {
+                    const last = attachments[attachments.length - 1];
+                    if (last) { last.file_id = id; last.saved = true; }
+                }))
+                .catch(() => setHistoryNote("That file couldn't be opened. Sign in, or check My files."));
+            history.replaceState(null, '', '/chat');
+        })();
         claimPaidKey();
         showApp();
     </script>

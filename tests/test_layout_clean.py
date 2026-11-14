@@ -67,15 +67,19 @@ def test_nav_script_adds_admin_only_from_the_session():
         assert f'"{gone}"' not in js
 
 
-def test_chat_is_one_column_with_a_small_grouped_tools_menu():
+def test_chat_is_one_column_with_one_composer():
     html = read("chat.html")
     view = visible(html)
-    assert 'id="btn-tools-menu"' in html
-    assert 'id="tools-menu"' in html
-    for group in ("Ask &amp; research", "Create", "Files"):
-        assert group in view
-    for label in ("Search the web", "Make a picture", "Make a short clip", "Attach a file"):
-        assert label in view
+    # One composer: attach anything, the tool choice is automatic.
+    assert 'id="btn-attach"' in html and 'id="attach-menu"' in html
+    assert 'id="file-input"' in html and "multiple" in html.split('id="file-input"')[1].split(">")[0]
+    assert 'id="attach-row"' in html
+    assert 'id="btn-tools-menu"' in html and 'id="tools-menu"' in html
+    for label in ("Upload from this device", "Choose from my Files", "Options",
+                  "Search the web", "Make a picture", "Make a short clip",
+                  "Optional. I pick the right steps on my own."):
+        assert label in view, label
+    assert "${apiUrl()}/assist" in html
     for gone in ('id="more-menu"', 'id="btn-more"', 'id="tools-panel"', 'id="kin-panel"', 'id="studio-panel"',
                  'id="ui-panel"', 'id="ledger-panel"', 'id="companion-panel"', 'id="settings-panel"',
                  'id="settings-debug"', 'id="settings-hub"'):
@@ -109,7 +113,7 @@ def test_chat_details_fold_is_only_for_debug():
 def test_studio_is_a_four_step_flow():
     html = read("studio.html")
     view = visible(html)
-    for text in ("What do you want to make?", "Picture", "Short clip", "Describe it", "Use my photos",
+    for text in ("What do you want to make?", "Picture", "Short clip", "Describe it", "Start from my photos",
                  "Style", "Color", "Motion", "Length", "Make it", "Details"):
         assert text in view, text
     assert '<details class="details" id="result-details">' in html

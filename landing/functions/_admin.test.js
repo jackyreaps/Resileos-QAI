@@ -59,7 +59,8 @@ async function proxy(env, method, path, { session, body, fetchImpl } = {}) {
 
 test("publicApiAllowed lets through only what chat and Studio use", () => {
   const allowed = [
-    ["GET", "ready"], ["GET", "usage"], ["POST", "chat"], ["POST", "upload"],
+    ["GET", "ready"], ["GET", "usage"], ["POST", "chat"], ["POST", "assist"], ["POST", "verify/lean"],
+    ["GET", "files"], ["POST", "files"], ["GET", "files/0123456789abcdef0123456789abcdef"], ["DELETE", "files/0123456789abcdef0123456789abcdef"],
     ["GET", "conversations"], ["POST", "conversations"], ["GET", "conversations/abc123"], ["PUT", "conversations/abc123"],
     ["POST", "studio/forge/video"], ["POST", "studio/video"], ["POST", "generate/video"],
     ["GET", "aphrodite/anon/state"], ["HEAD", "ready"],
@@ -74,6 +75,7 @@ test("publicApiAllowed lets through only what chat and Studio use", () => {
     ["POST", "perceive/language"], ["POST", "studio/stop"], ["POST", "studio/plan-test-debug"], ["GET", "studio/codecs"],
     ["POST", "aphrodite/anon/preference"], ["POST", "aphrodite/anon/reset"], ["DELETE", "conversations/abc123"],
     ["POST", "ready"], ["GET", "conversations/../tools"], ["POST", "studio/video/restore"],
+    ["POST", "upload"], ["PUT", "files/abc"], ["POST", "verify_manifold"], ["POST", "learn"], ["POST", "persona/promote"],
   ];
   for (const [method, path] of denied) {
     assert.equal(publicApiAllowed(method, path.split("/")), false, `${method} ${path} should be admin-only`);
