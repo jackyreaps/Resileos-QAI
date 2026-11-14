@@ -50,6 +50,13 @@ PUBLIC_API: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("POST", ("studio", "variations")),
     ("POST", ("studio", "clip-from-picture")),
     ("POST", ("generate", "video")),
+    ("GET", ("studio-projects",)),
+    ("POST", ("studio-projects",)),
+    ("GET", ("studio-projects", "*")),
+    ("PUT", ("studio-projects", "*")),
+    ("DELETE", ("studio-projects", "*")),
+    ("POST", ("studio-projects", "*", "op", "*")),
+    ("POST", ("studio-projects", "*", "stream", "*")),
     ("GET", ("aphrodite", "*", "state")),
     ("POST", ("aphrodite", "*", "state")),
 )

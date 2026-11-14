@@ -471,6 +471,8 @@
     $("upload").addEventListener("change", onUpload);
     // From chat ("make a clip / variation from this") or from Files.
     var handed = params.get("from") === "chat" && window.ResileosMedia ? window.ResileosMedia.takeHandoff() : null;
+    // Signed-in: the Studio app turns the handoff into a project (studio-app.js).
+    if (handed) window.__studioHandoff = handed;
     if (handed && Array.isArray(handed.frames) && handed.frames.length) {
       var kind = handed.type === "clip" ? "clip" : "image";
       document.querySelector('input[name="type"][value="' + kind + '"]').checked = true;
