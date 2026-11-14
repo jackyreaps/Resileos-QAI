@@ -28,6 +28,25 @@ Iris side (read-only): `list_runs`, `read_run`, `replay` (plain words).
 Admin endpoints: `GET /api/v1/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/lessons`.
 All are admin-only. The UI is under Admin → Diagnostics → Runs and replay.
 
+## Coherence metrics
+These metrics guard the leveled harness (`docs/harness/CONSTRAINTS.md`).
+They are read-only and use real counts.
+
+- From the trace, `run_trace.coherence()` reports:
+  - residual consistency: the share of `consistency` checks that held
+  - verification rate: the share of decided runs that ended verified (reviewers approved, a verified checkpoint, or a stored lesson)
+  - budget efficiency: the share of budget checks that were within budget
+  - abstain rate
+- Whether holding back was *correct* needs labels, so that number comes only from the held-out suite.
+- The held-out suite is `harness_equal_budget.held_out(params)`: the same 40 Eat candidates plus 24 labelled routing cases. It is never used for tuning. It reports:
+  - residual consistency
+  - verification rate (right answers out of answered cases)
+  - correct abstention (should-not cases held back)
+  - budget efficiency (right outcomes per budget unit)
+
+  With the default thresholds the scores are 1.0, 0.846, 0.944 and 1.0. With `route_mid` lowered to 0.6, verification falls to 0.706 and correct abstention to 0.861. `guard_l2` reverts that change.
+- Endpoint: `GET /api/v1/coherence` (admin-only); add `?held_out=true` to also run the suite. Shown in Admin → Reports → Coherence.
+
 ## Lesson memory
 `kin/lesson_store.py`. It writes only after a verified cycle
 (`review_proof_verified`: every reviewer approved and verify passed), and

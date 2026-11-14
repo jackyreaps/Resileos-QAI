@@ -177,3 +177,99 @@ def test_morpheus_dream_stays_unverified_and_does_not_learn(monkeypatch):
     assert dreamed["candidates"][0]["verified"] is False
     report.add(proposal)
     assert calls["learn"] == 0
+
+
+# ── Leveled harness: L0 refused, L1 review only, L2 guarded ─────────────
+from resileos.persona.upgrade_report import (  # noqa: E402
+    L0,
+    L1,
+    L2,
+    LEVELS,
+    guard_l2,
+    level_of,
+)
+
+
+def test_level_registry_tags_existing_modules():
+    for name in ("resileos.core", "resileos.packet", "resileos.kin.hades", "resileos.abstention"):
+        assert level_of(name) == L0
+    assert level_of("resileos.harness.separated:zeus_head") == L0
+    assert level_of("resileos.harness.tools:residual_consistency") == L0
+    assert level_of("resileos.chat.router:NO_ROWS") == L0
+    assert level_of("src/resileos/kin/mouth_policy.py") == L0  # require_verified
+    assert level_of("resileos.harness.separated:SeparatedCycle") == L1
+    assert level_of("resileos.harness.tools:risk_classify") == L1
+    assert level_of("resileos.kin.demigods.morpheus") == L1
+    assert level_of("resileos.harness.cascade") == L1
+    assert level_of("resileos.harness.packet") == L1  # ControlPacket policy
+    assert level_of("resileos.harness.tools:confidence_route") == L2
+    assert level_of("src/resileos/kin/demigods/guides/atlas.md") == L2
+    assert level_of("resileos.run_trace") == L2
+    assert level_of("param.metric_thresholds") == L2
+    assert level_of("resileos.something_new") == L1  # unlisted: review
+    # A whole module that holds an L0 symbol counts as L0.
+    assert level_of("resileos.harness.separated") == L0
+    # Every registered module actually exists.
+    import importlib.util
+
+    for key in LEVELS:
+        if key.startswith(("param.", "landing.", "scripts.")):
+            continue
+        mod = key.split(":")[0]
+        assert importlib.util.find_spec(mod) is not None or (ROOT / "src" / mod.replace(".", "/")).exists(), key
+
+
+def test_a_proposal_touching_l0_is_refused():
+    report = UpgradeReport()
+    store = OperationalStore()
+    cand = {"verified": True, "fingerprint": "fp", "improvement": 0.4}
+    out = report.emit(cand, kind="tighter_method", target="tool_weights", value=0.5, store=store,
+                      paths=["src/resileos/packet.py"])
+    assert out["tier"] == "refused" and out["proposal_status"] == "refused" and out["level"] == L0
+    assert store.version == 0 and store.state["tool_weights"] == {}
+    assert report.approve(out["id"])["ok"] is False
+    assert report.proposals[-1]["proposal_status"] == "refused"
+    for path in ("resileos.harness.separated:zeus_head", "resileos.kin.hades", "resileos.core"):
+        assert classify("schema_change", "x", None, [path]) == "refused"
+
+
+def test_an_l1_proposal_can_never_auto_apply():
+    report = UpgradeReport()
+    store = OperationalStore()
+    cand = {"verified": True, "fingerprint": "fp", "improvement": 0.4}
+    # Allowlisted target, in bounds, verified, tuning kind: still review once L1 is touched.
+    for path in ("resileos.harness.cascade", "resileos.kin.demigods.morpheus",
+                 "resileos.harness.tools:risk_classify", "resileos.unknown_module"):
+        out = report.emit(cand, kind="tighter_method", target="tool_weights", value=0.5, store=store,
+                          paths=[path])
+        assert out["tier"] == "review" and out["proposal_status"] == "pending" and out["level"] == L1
+    assert store.version == 0 and report.auto_log == []
+    approved = report.approve(report.proposals[0]["id"])
+    assert approved["ok"] is True and approved["applied"] is False and store.version == 0
+
+
+def test_l2_auto_reverts_when_a_held_out_l0_or_l1_metric_drops():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import harness_equal_budget as suite
+
+    report = UpgradeReport()
+    store = OperationalStore()
+    before = suite.held_out(store.state)
+    cand = {"verified": True, "fingerprint": "route_mid", "improvement": 0.4}
+    # Lowering the routing threshold answers more (the gated metric rises) ...
+    out = report.emit(cand, kind="tighter_method", target="metric_thresholds", value=0.6, store=store,
+                      metric_name="coverage", metric_before=13 / 24, guard_before=before,
+                      paths=["resileos.harness.tools:confidence_route"])
+    assert out["proposal_status"] == "auto_applied" and out["level"] == L2
+    after = suite.held_out(store.state)
+    assert after["params"]["route_mid"] == 0.6
+    # ... but verification rate and correct abstention drop on the held-out suite.
+    check = guard_l2(before, after)
+    assert set(check["degraded"]) == {"verification_rate", "correct_abstention"}
+    result = store.evaluate(out["version"], 17 / 24, guard_after=after, report=report)
+    assert result["reverted"] is True and set(result["degraded"]) == set(check["degraded"])
+    assert "route_mid" not in store.state["metric_thresholds"]
+    # A change that degrades nothing guarded stays.
+    keep = store.apply(target="tool_weights", key="search", value=0.5, metric_name="coverage",
+                       metric_before=0.5, guard_before=before)
+    assert store.evaluate(keep["version"], 0.5, guard_after=before)["reverted"] is False

@@ -4,7 +4,10 @@ This store holds only tool-selection weights, search and crawl cache
 entries, source-quality ranks, and metric thresholds or tuning
 parameters. Values must stay inside the declared bounds. A change is
 versioned, gated on a named metric, and auto-reverted if that metric
-gets worse. Every apply and revert is logged on an upgrade report.
+gets worse, or if any L0 or L1 coherence metric on the held-out suite
+gets worse (``guard_before`` at apply, ``guard_after`` at evaluate).
+These targets are the L2 params of the harness level registry in
+``upgrade_report.LEVELS``; nothing at L0 or L1 lives here. Every apply and revert is logged on an upgrade report.
 
 This store never writes code or config files, never calls Eat or
 learn, never touches the scar matrix or Titanos, and never flips
@@ -20,7 +23,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 
-# Explicit auto allowlist. Anything else defaults to review.
+# Explicit auto allowlist: L2 params only. Anything else defaults to review.
 AUTO_TARGETS = frozenset(
     {
         "tool_weights",
@@ -76,6 +79,12 @@ def in_bounds(target: str, value: Any) -> bool:
     return float(limits["min"]) <= number <= float(limits["max"])
 
 
+def _numbers(metrics: dict[str, Any] | None) -> dict[str, float]:
+    """Keep only the numeric metrics of a held-out result (drops labels, counts)."""
+    return {k: float(v) for k, v in (metrics or {}).items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool)}
+
+
 class OperationalStore:
     """Versioned, metric-gated operational state. Not a code or config editor."""
 
@@ -97,6 +106,7 @@ class OperationalStore:
         metric_name: str,
         metric_before: float,
         report: Any | None = None,
+        guard_before: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         """Apply one in-bounds auto change and record a version.
 
@@ -135,6 +145,7 @@ class OperationalStore:
             "applied_at": _now(),
             "status": "applied_pending_metric",
             "reverted": False,
+            "guard_before": _numbers(guard_before),
         }
         self.history.append(record)
         self._pending[self.version] = {"previous": previous, "before": before, **record}
@@ -148,8 +159,14 @@ class OperationalStore:
         metric_after: float,
         *,
         report: Any | None = None,
+        guard_after: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Keep the change if the gated metric did not get worse."""
+        """Keep the change only if nothing it guards got worse.
+
+        Reverts when the gated metric dropped, or when any L0/L1
+        coherence metric recorded in ``guard_before`` is lower in
+        ``guard_after`` (a missing after-value counts as worse).
+        """
         pending = self._pending.get(int(version))
         if pending is None:
             return {"ok": False, "reason": "no pending change at that version"}
@@ -157,7 +174,16 @@ class OperationalStore:
         after = float(metric_after)
         record = dict(pending)
         record["metric_after"] = after
-        if after < before:
+        guard_before = pending.get("guard_before") or {}
+        degraded = []
+        if guard_before:
+            from resileos.persona.upgrade_report import guard_l2
+
+            check = guard_l2(guard_before, guard_after or {})
+            degraded = check["degraded"]
+            record["guard_after"] = _numbers(guard_after)
+            record["degraded"] = degraded
+        if after < before or degraded:
             target = pending["target"]
             key = pending["key"]
             self.state.setdefault(target, {})

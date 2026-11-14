@@ -101,6 +101,10 @@ export function decideProposal(report, { id, action, email, now, applyFn }) {
   if (!status) return { ok: false, status: 400, detail: "Unknown action." };
   const proposal = (report.proposals || []).find((item) => item && item.id === id);
   if (!proposal) return { ok: false, status: 404, detail: "Unknown proposal." };
+  // L0 (protected substrate) proposals are refused outright: never approvable.
+  if (proposal.tier === "refused" || proposal.proposal_status === "refused" || proposal.level === 0) {
+    return { ok: false, status: 409, detail: "This change touches the protected core and is refused. It can't be approved." };
+  }
   // Review-tier approval (and every other approve) only marks status.
   // Nothing is applied: no code, no config, no Eat, no learn, no Titanos.
   if (typeof applyFn === "function") {

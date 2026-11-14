@@ -112,3 +112,48 @@ def test_runs_endpoints_are_admin_only(client, monkeypatch):
     assert ok.status_code == 200 and ok.json()["runs"][0]["run"] == rid
     one = client.get(f"/api/v1/runs/{rid}", headers={"X-API-Key": "user-key", **admin_headers("GET", f"/runs/{rid}")})
     assert one.status_code == 200 and one.json()["steps"][0]["text"] == "Started api"
+
+
+def test_coherence_is_read_from_the_trace_with_real_counts(paths):
+    assert RT.coherence()["runs"] == 0 and RT.coherence()["residual_consistency"] is None
+    with RT.start_run("a"):
+        residual_consistency({"scars": [], "evidence": []})
+        residual_consistency({"scars": ["s1"], "evidence": []})
+        confidence_route({"probability": 0.2})
+        confidence_route({"probability": 0.995})
+    with RT.start_run("b"):
+        pkt = ControlPacket(id="p2", verified=True)
+        Hades(paths / "hades").save(pkt, residual_packet_hash="cd" * 32, lesson="x")
+    out = RT.coherence()
+    assert out["runs"] == 2
+    assert out["residual_consistency"] == 0.5 and out["counts"]["consistency"] == 2
+    assert out["abstain_rate"] == 0.5
+    assert out["verification_rate"] == 1.0 and out["counts"]["decided_runs"] == 1
+    assert out["correct_abstention"] is None  # needs labels: held-out suite
+
+
+def test_held_out_suite_reports_guarded_metrics():
+    import harness_equal_budget as hb
+    from resileos.persona.upgrade_report import COHERENCE_METRICS
+
+    out = hb.held_out()
+    for name in COHERENCE_METRICS:
+        assert 0.0 <= out[name] <= 1.0, name
+    assert out["residual_consistency"] == 1.0 and out["counts"]["eat_held_back"] == 24
+    assert out["counts"]["answered"] == 13 and out["counts"]["right_answered"] == 11
+
+
+def test_coherence_endpoint_is_admin_only(client, monkeypatch):
+    import app as app_module
+    from test_proxy_identity import admin_headers
+
+    monkeypatch.setattr(app_module, "_AUTH_BYPASS", False)
+    monkeypatch.setenv("RESILEOS_PROXY_SECRET", "proxy-secret-value")
+    monkeypatch.setenv("RESILEOS_API_KEYS", '{"user-key":{"name":"ada","tier":"free","quota":500}}')
+    assert client.get("/api/v1/coherence", headers={"X-API-Key": "user-key"}).status_code == 403
+    ok = client.get("/api/v1/coherence?held_out=true",
+                    headers={"X-API-Key": "user-key", **admin_headers("GET", "/coherence")})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert "trace" in body and body["held_out"]["suite"].startswith("held-out")
+    assert body["guarded"]["residual_consistency"].startswith("L0")

@@ -220,6 +220,24 @@ def register_kin_routes(
             raise HTTPException(404, "Run not found.")
         return out
 
+    @app.get("/api/v1/coherence", dependencies=deps)
+    def api_coherence(held_out: bool = False) -> dict:
+        """Coherence of recent runs (read-only), plus the held-out suite on request.
+
+        The held-out suite scores the default L2 params; nothing is tuned
+        or written from here.
+        """
+        from resileos.persona.upgrade_report import COHERENCE_METRICS, LEVEL_NAMES
+        from resileos.run_trace import coherence
+
+        out: dict = {"trace": coherence(),
+                     "guarded": {k: LEVEL_NAMES[v] for k, v in COHERENCE_METRICS.items()}}
+        if held_out:
+            import harness_equal_budget
+
+            out["held_out"] = harness_equal_budget.held_out()
+        return out
+
     @app.get("/api/v1/lessons", dependencies=deps)
     def api_lessons(q: str = "", k: int = 5) -> dict:
         from resileos.kin.lesson_store import LessonStore

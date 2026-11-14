@@ -225,3 +225,11 @@ test("decideProposal never invokes applyFn", () => {
   assert.equal(called, false);
   assert.equal(report.proposals[0].proposal_status, "approved");
 });
+
+test("a refused L0 proposal cannot be approved", () => {
+  const report = { proposals: [{ id: "p-l0", tier: "refused", level: 0, proposal_status: "refused" }] };
+  const out = decideProposal(report, { id: "p-l0", action: "approve", email: "a@b.c", now: NOW });
+  assert.equal(out.ok, false);
+  assert.equal(out.status, 409);
+  assert.equal(report.proposals[0].proposal_status, "refused");
+});
