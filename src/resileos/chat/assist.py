@@ -254,6 +254,39 @@ async def guarded_fetch(
     return {"status": "ERROR", "content": ""}
 
 
+def _guarded_sync(url: str) -> dict[str, Any]:
+    from resileos.kin.outer_legions import _resolve
+
+    return _resolve(guarded_fetch(url))
+
+
+async def native_chat_search(query: str) -> dict[str, Any]:
+    """Search our own index. The third-party fallback runs only when
+    ``RESILEOS_SEARCH_FALLBACK`` turns it on, and its rows say so."""
+    from resileos.kin import hermes_crawl
+
+    found = hermes_crawl.native_search(
+        query, index=hermes_crawl.shared_index(), fallback=hermes_crawl.fallback_from_env(), max_results=6
+    )
+    rows = [
+        {"title": p["title"] or p["url"], "url": p["url"], "snippet": p["snippet"], "origin": p["origin_label"],
+         "domain": p["domain"], "retrieved_at": p["retrieved_at"]}
+        for p in found["packets"]
+    ]
+    text = ("Search results (not checked against saved facts):\n" + "\n".join(f"- {r['title']} ({r['url']})" for r in rows)
+            if rows else "Our search index has nothing on that yet. That is not a stored fact.")
+    return {
+        "status": "ACCEPTED" if rows else "NO_ROWS",
+        "value": text,
+        "reply_text": text,
+        "verified": False,
+        "source": "web_search",
+        "message_kind": "search",
+        "search": {"query": query, "status": "SUCCESS" if rows else "EMPTY", "results": rows,
+                   "fallback_used": found.get("fallback_used")},
+    }
+
+
 def crawl_pages(urls: list[str], fetch_fn: Callable[..., Any] | None = None) -> list[dict[str, Any]]:
     from resileos.kin.outer_legions import crawl_envelope
 
@@ -320,7 +353,7 @@ async def run_assist(
     factor_pool: Any | None = None,
     crawl_top: int = 2,
 ) -> dict[str, Any]:
-    from resileos.answer.agent_loop import _maybe_search, run_agent_chat
+    from resileos.answer.agent_loop import run_agent_chat
     from resileos.answer.user_profile import PERSONA_PACKS
     from resileos.kin.studio_tools import run_forge_video
     from resileos.ui.query_scale import to_jsonable
@@ -328,7 +361,7 @@ async def run_assist(
     from resileos.chat import cascade_tools as cascade
 
     chat_fn = chat_fn or run_agent_chat
-    search_fn = search_fn or _maybe_search
+    search_fn = search_fn or native_chat_search
     forge_fn = forge_fn or run_forge_video
     lean_fn = lean_fn or check_lean
     persona = body.persona if body.persona in PERSONA_PACKS else "honest"
@@ -413,15 +446,21 @@ async def run_assist(
             for env in ranked["envelopes"]:
                 sources.append({"title": env["title"], "url": env["source"], "snippet": env["snippet"], "address": env["address"]["path"], "score": env["score"]})
             kept = len(ranked["envelopes"])
-            label = f"Searched {len(results)} source{'s' if len(results) != 1 else ''}" if results else "Searched the web: nothing found"
+            label = f"Searched {len(results)} source{'s' if len(results) != 1 else ''}" if results else "Searched our index: nothing found"
             if results and kept < len(results):
                 label += f", kept {kept}"
-            trail.append({"step": "search", "label": label, "status": "done", "detail": query})
-            # Crawl the best-ranked results (guarded fetch), then re-rank with page text.
+            search_step = {"step": "search", "label": label, "status": "done", "detail": query}
+            trail.append(search_step)
+            # Follow the best-ranked results to their pages (guarded fetch,
+            # pinned IP), then check what they say. Chat never saves facts.
             if crawl_top and ranked["envelopes"]:
+                from resileos.kin import hermes_crawl
+
                 targets = [env["source"] for env in ranked["envelopes"][:crawl_top] if env["source"] not in urls]
-                pages = crawl_pages(targets, fetch_fn) if targets else []
-                read = [p for p in pages if p["status"] == "OK"]
+                fan = hermes_crawl.ichnaea_fanout(
+                    [{"url": t} for t in targets], max_follow=len(targets), fetch_fn=fetch_fn or _guarded_sync
+                ) if targets else {"pages": [], "candidates": []}
+                read = fan["pages"]
                 for page in read:
                     best = _best_sentence(page["text"], query)
                     for src in sources:
@@ -430,13 +469,30 @@ async def run_assist(
                             if best:
                                 src["excerpt"] = best
                     context_lines.append(f"Page {page['url']}: {page['text'][:CONTEXT_CHARS]}")
-                if targets:
-                    trail.append({
-                        "step": "crawl",
-                        "label": f"Read {len(read)} of the top results" if read else "Couldn't open the top results",
-                        "status": "done" if read else "error",
-                        "detail": ", ".join(targets),
-                    })
+                checked = hermes_crawl.eat_bridge(fan["candidates"])
+                facts = [r for r in checked["results"] if r.get("action") == "accept"]
+                if read:
+                    n = len(facts)
+                    search_step["label"] = (
+                        f"Searched {len(results)} source{'s' if len(results) != 1 else ''}, "
+                        f"followed {len(read)} to the original page{'s' if len(read) != 1 else ''}, "
+                        f"kept {n} fact{'s' if n != 1 else ''}"
+                    )
+                    lines = [f"{f['subject']} · {f['relation']} · {f['obj']}"
+                             + (f" ({f.get('valid_from') or '…'} to {f.get('valid_to') or '…'})" if f.get("valid_from") or f.get("valid_to") else "")
+                             + f" — {f.get('source')}" for f in facts[:6]]
+                    held = checked["held_back"]
+                    search_step["detail"] = "; ".join(
+                        [query] + lines + ([f"held back {held} (not clear facts)"] if held else [])
+                        + ["not saved: chat doesn't write memory"]
+                    )
+                    search_step["facts"] = [
+                        {k: f.get(k) for k in ("subject", "relation", "obj", "valid_from", "valid_to", "source", "as_of")}
+                        for f in facts[:6]
+                    ]
+                elif targets:
+                    trail.append({"step": "crawl", "label": "Couldn't open the top results", "status": "error",
+                                  "detail": ", ".join(targets)})
 
     # 5. answer
     history = list(body.history or [])[-10:]
@@ -449,7 +505,7 @@ async def run_assist(
         reply = dict(search_body)
         found = [src for src in sources if src.get("snippet") is not None]
         if found:
-            lines = ["Here's what I found on the web. I haven't checked these against what's saved:"]
+            lines = ["Here's what I found. I haven't checked these against what's saved:"]
             for row in found[:5]:
                 lines.append(f"- {row['title']}: {row.get('excerpt') or row['snippet']}".rstrip(": "))
             reply["value"] = reply["reply_text"] = "\n".join(lines)

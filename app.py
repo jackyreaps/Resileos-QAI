@@ -269,10 +269,12 @@ except Exception as e:
     log.warning("Persona store routes not wired: %s", e)
 
 def _register_runtime_legions() -> None:
-    """Hermes web_search is the host's default legion. Examples stay off."""
-    import asyncio
+    """Hermes web_search is the host's default legion. Examples stay off.
 
-    from resileos.harness.legions.search import web_search
+    It searches our own index; a third-party backend runs only as the
+    labelled fallback when ``RESILEOS_SEARCH_FALLBACK`` turns it on.
+    """
+    from resileos.kin.hermes_crawl import search_results
     from resileos.kin.aphrodite import register_aphrodite_legions
     from resileos.kin.legions import LegionError, register_legion
 
@@ -280,7 +282,7 @@ def _register_runtime_legions() -> None:
         del seen
         query = str(kwargs.get("query") or kwargs.get("q") or "")
         max_results = int(kwargs.get("max_results") or 3)
-        return asyncio.run(web_search(query, max_results=max_results))
+        return search_results(query, max_results=max_results)
 
     try:
         register_legion(

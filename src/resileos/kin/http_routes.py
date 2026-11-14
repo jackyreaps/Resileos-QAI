@@ -168,6 +168,62 @@ def register_kin_routes(
     def api_eat_preview(body: EatRequest) -> dict:
         return eat_filter(body.claim, allow_sys=body.allow_sys).to_dict()
 
+    # Admin → Knowledge → Add facts. Admin-only on the proxy and the API
+    # (neither path is in PUBLIC_API). Preview writes nothing; commit goes
+    # through eat_commit_envelopes, so Eat and the reviewers decide.
+    from resileos.kin import knowledge_intake
+
+    class KnowledgeItem(BaseModel):
+        name: str = Field(default="pasted.txt", max_length=200)
+        text: str = Field(default="", max_length=1_000_000)
+
+    class KnowledgePreview(BaseModel):
+        items: list[KnowledgeItem] = Field(default_factory=list, max_length=knowledge_intake.MAX_ITEMS)
+
+    class KnowledgeCommit(BaseModel):
+        facts: list[dict] = Field(default_factory=list, max_length=knowledge_intake.MAX_FACTS)
+        confirm: bool = False
+
+    @app.post("/api/v1/knowledge/preview", dependencies=deps)
+    def api_knowledge_preview(body: KnowledgePreview) -> dict:
+        return knowledge_intake.preview_items([i.model_dump() for i in body.items], titanos=get_titanos())
+
+    @app.post("/api/v1/knowledge/commit", dependencies=deps)
+    def api_knowledge_commit(body: KnowledgeCommit) -> dict:
+        if not body.confirm:
+            raise HTTPException(400, "Confirm before saving.")
+        titan = get_titanos()
+        return knowledge_intake.commit_facts(body.facts, titanos=titan, ask_fn=_ask_fn(titan))
+
+    class CrawlRequest(BaseModel):
+        query: str = Field(default="", max_length=300)
+        urls: list[str] = Field(default_factory=list, max_length=12)
+        depth: int = Field(default=1, ge=1, le=4)
+
+    @app.post("/api/v1/hermes/crawl", dependencies=deps)
+    def api_hermes_crawl(body: CrawlRequest) -> dict:
+        """Read pages into our own search index and preview their facts.
+
+        Nothing is saved to memory here; facts go through Add facts.
+        """
+        from resileos.kin import hermes_crawl
+
+        index = hermes_crawl.shared_index()
+        seeded = hermes_crawl.ichnaea_fanout([{"url": u} for u in body.urls], max_follow=len(body.urls), index=index)
+        out: dict = {"seeded": len(seeded["followed"]), "not_opened": seeded["not_opened"], "index_size": len(index)}
+        if body.query.strip():
+            report = hermes_crawl.run_waves(body.query, index=index, depth=body.depth,
+                                            fallback=hermes_crawl.fallback_from_env(),
+                                            audit_path=hermes_crawl.trace_path())
+            out.update({k: report[k] for k in ("summary", "searched", "followed", "kept", "held_back", "results", "routing_hints", "fallback_used")})
+        else:
+            checked = hermes_crawl.eat_bridge(seeded["candidates"])
+            n = len(seeded["followed"])
+            out.update({"summary": f"Read {n} page{'s' if n != 1 else ''} into our index, kept {checked['kept']} fact{'s' if checked['kept'] != 1 else ''}",
+                        "kept": checked["kept"], "held_back": checked["held_back"], "results": checked["results"]})
+        out["index_size"] = len(index)
+        return out
+
     class CouncilRequest(BaseModel):
         subject: str
         relation: str
