@@ -1,18 +1,18 @@
 /* Presentational chat UI. Does not set API keys or change request bodies except
-   optional /search and /tool shortcuts the server already accepts. */
+   the optional /search shortcut the server already accepts. Pictures and clips
+   live in /studio; admin tools live in /admin. */
 (function () {
     var COMMANDS = [
-        { name: '/search', insert: '/search ', description: 'Search the web. Results stay unverified.' },
-        { name: '/tool', insert: '/tool ', description: 'Run a named tool. Optional shortcut.' }
+        { name: '/search', insert: '/search ', description: 'Look it up online. Web answers are marked unverified.' }
     ];
     var TOOL_STEPS = {
         web_search: 'Searching the web',
-        residual_consistency: 'Checking consistency',
-        video_generate: 'Making an image',
-        forge_video: 'Making an image',
-        resileos_ask: 'Checking stored facts',
-        resileos_answer: 'Checking stored facts',
-        resileos_chain: 'Checking stored facts'
+        residual_consistency: 'Checking for conflicts',
+        video_generate: 'Making a picture',
+        forge_video: 'Making a picture',
+        resileos_ask: 'Checking saved facts',
+        resileos_answer: 'Checking saved facts',
+        resileos_chain: 'Checking saved facts'
     };
     var pendingStep = '';
     var mode = '';
@@ -20,6 +20,9 @@
     var slashItems = [];
 
     function $(id) { return document.getElementById(id); }
+    function debugOn() {
+        try { return localStorage.getItem('resileos_debug') === '1'; } catch (err) { return false; }
+    }
 
     function plainToolStep(name) {
         if (TOOL_STEPS[name]) return TOOL_STEPS[name];
@@ -37,16 +40,16 @@
         var tools = ((data && data.tool_calls) || []).map(function (t) { return t.tool || t.name; }).filter(Boolean);
         var search = kind === 'search' || source === 'web_search' || tools.indexOf('web_search') !== -1;
         if (search) steps.push('Searching the web');
-        else if (source === 'kin') steps.push('Running a learning cycle');
-        else if (data && (data.patron || data.clotho_owner || data.stage)) steps.push('Making an image');
+        else if (source === 'kin') steps.push('Thinking it through');
+        else if (data && (data.patron || data.clotho_owner || data.stage)) steps.push('Making a picture');
         else if (tools.length) tools.forEach(function (name) { steps.push(plainToolStep(name)); });
-        else if (kind === 'residual' || source === 'memory' || (data && data.memory_chip)) steps.push('Checking stored facts');
-        else if (kind === 'abstain' || status === 'abstained' || status === 'abstain' || status === 'no_rows') steps.push('Checking stored facts');
+        else if (kind === 'residual' || source === 'memory' || (data && data.memory_chip)) steps.push('Checking saved facts');
+        else if (kind === 'abstain' || status === 'abstained' || status === 'abstain' || status === 'no_rows') steps.push('Checking saved facts');
         else if (status || kind) steps.push('Checking facts');
-        if (status === 'abstained' || status === 'abstain' || status === 'no_rows' || status === 'mouth_closed' || kind === 'abstain') steps.push('Abstained');
+        if (status === 'abstained' || status === 'abstain' || status === 'no_rows' || status === 'mouth_closed' || kind === 'abstain') steps.push("Doesn't know");
         else if (status === 'unavailable') steps.push('Unavailable');
-        else if (status === 'conflict' || status === 'reject' || status === 'rejected') steps.push('Conflict');
-        else if (status === 'refused') steps.push('Refused');
+        else if (status === 'conflict' || status === 'reject' || status === 'rejected') steps.push('Conflicting info');
+        else if (status === 'refused') steps.push('Declined');
         else if (status === 'error') steps.push('Could not finish');
         else if (steps.length) steps.push('Done');
         return steps.filter(function (step, i) { return i === 0 || step !== steps[i - 1]; });
@@ -58,11 +61,11 @@
         var kind = data.message_kind || '';
         if (!status && data.verified == null && !kind) return null;
         if (['abstained', 'abstain', 'no_rows', 'mouth_closed'].indexOf(status) !== -1 || kind === 'abstain') {
-            return { text: 'Abstained', kind: 'abstained' };
+            return { text: "Doesn't know", kind: 'abstained' };
         }
-        if (['conflict', 'reject', 'rejected'].indexOf(status) !== -1) return { text: 'Conflict', kind: 'conflict' };
+        if (['conflict', 'reject', 'rejected'].indexOf(status) !== -1) return { text: 'Conflicting info', kind: 'conflict' };
         if (status === 'unavailable') return { text: 'Unavailable', kind: 'unavailable' };
-        if (status === 'refused') return { text: 'Refused', kind: 'refused' };
+        if (status === 'refused') return { text: 'Declined', kind: 'refused' };
         if (status === 'error') return { text: 'Error', kind: 'error' };
         if (status === 'fully_stopped') return { text: 'Stopped', kind: 'accepted' };
         if (status === 'stop_requested') return { text: 'Stop requested', kind: 'abstained' };
@@ -75,7 +78,6 @@
         if (['accepted', 'answered', 'submitted'].indexOf(status) !== -1) {
             return { text: 'Unverified', kind: 'unverified' };
         }
-        if (status) return { text: data.status, kind: '' };
         return null;
     }
 
@@ -207,6 +209,8 @@
             }
             bubble.insertBefore(bar, bubble.firstChild);
         }
+        // Technical details are an admin aid, switched on from /admin/diagnostics.
+        if (!debugOn()) return;
         var detailLines = technicalDetails(data, opts, notes);
         if (!detailLines.length) return;
         var details = bubble.querySelector('.trace-fold, .raw-fold');
@@ -238,19 +242,23 @@
         last.textContent = text;
     }
 
+    var MODE_LABELS = { search: 'Also searching the web', image: 'Will make a picture', clip: 'Will make a short clip' };
     function syncMode() {
         var box = document.querySelector('.input-box');
-        var input = $('input');
-        var search = $('btn-search');
-        var image = $('btn-image');
+        var chip = $('mode-chip');
+        var label = $('mode-chip-label');
         if (box) box.dataset.mode = mode;
-        if (search) search.setAttribute('aria-pressed', mode === 'search' ? 'true' : 'false');
-        if (image) image.setAttribute('aria-pressed', mode === 'image' ? 'true' : 'false');
-        if (!input) return;
-        if (mode === 'search') input.placeholder = 'What should I look up?';
-        else if (mode === 'image') input.placeholder = 'Describe the picture you want';
-        else input.placeholder = 'Ask in a sentence, or teach a fact…';
+        [['btn-search', 'search'], ['btn-image', 'image'], ['btn-clip', 'clip']].forEach(function (pair) {
+            var b = $(pair[0]);
+            if (b) b.setAttribute('aria-pressed', mode === pair[1] ? 'true' : 'false');
+        });
+        if (chip) chip.hidden = !mode;
+        if (label && mode) label.textContent = MODE_LABELS[mode] || '';
     }
+    // Optional hints for the next message. The server picks steps on its own too.
+    window.ResileosHints = function () {
+        return { search: mode === 'search', create: mode === 'image' || mode === 'clip' ? mode : null };
+    };
 
     function forceMode(next) {
         mode = next || '';
@@ -375,17 +383,17 @@
     }
 
     function selectedFileActive() {
-        var chip = $('file-chip');
-        return chip && !chip.hidden;
+        var row = $('attach-row');
+        return row && !row.hidden;
     }
 
     function armStep(text) {
         var trimmed = String(text || '').trim().toLowerCase();
-        if (mode === 'search' || trimmed.indexOf('/search') === 0) pendingStep = 'Searching the web...';
-        else if (mode === 'image') pendingStep = 'Making an image...';
-        else if (trimmed.indexOf('/tool') === 0) pendingStep = 'Running a tool...';
-        else if (/^remember\b/.test(trimmed)) pendingStep = 'Saving a fact...';
-        else pendingStep = 'Checking facts...';
+        if (selectedFileActive()) pendingStep = 'Looking at your attachments...';
+        else if (mode === 'search' || trimmed.indexOf('/search') === 0) pendingStep = 'Searching the web...';
+        else if (mode === 'image' || mode === 'clip') pendingStep = 'Working on it...';
+        else if (/^remember\b/.test(trimmed)) pendingStep = 'Saving that...';
+        else pendingStep = 'Thinking...';
     }
 
     function install() {
@@ -432,13 +440,16 @@
             }, true);
         }
 
-        var search = $('btn-search');
-        var image = $('btn-image');
-        if (search) search.addEventListener('click', function () { toggleMode('search'); });
-        if (image) image.addEventListener('click', function () { toggleMode('image'); });
+        [['btn-search', 'search'], ['btn-image', 'image'], ['btn-clip', 'clip']].forEach(function (pair) {
+            var b = $(pair[0]);
+            if (b) b.addEventListener('click', function () { toggleMode(pair[1]); });
+        });
+        var clear = $('mode-chip-clear');
+        if (clear) clear.addEventListener('click', function () { toggleMode(''); });
         syncMode();
+        var attachMenu = bindMenu($('btn-attach'), $('attach-menu'));
 
-        var menu = bindMenu($('btn-more'), $('more-menu'));
+        var menu = bindMenu($('btn-tools-menu'), $('tools-menu'));
         document.addEventListener('keydown', function (event) {
             if (event.key !== 'Escape') return;
             if (pop && !pop.hidden) {
@@ -449,6 +460,10 @@
             }
             if (menu.isOpen()) {
                 menu.close(true);
+                event.stopPropagation();
+            }
+            if (attachMenu.isOpen()) {
+                attachMenu.close(true);
                 event.stopPropagation();
             }
         }, true);
@@ -500,32 +515,9 @@
                 var raw = field ? field.value : '';
                 var trimmed = raw.trim();
                 if (!trimmed && !selectedFileActive()) return previousSend();
-                if (mode === 'image' && trimmed && !selectedFileActive() && trimmed.charAt(0) !== '/') {
-                    field.value = '';
-                    if (typeof window.growComposer === 'function') window.growComposer();
-                    forceMode('');
-                    pendingStep = 'Making an image...';
-                    var forge = $('forge-prompt');
-                    if (forge) forge.value = trimmed;
-                    var send = $('send');
-                    if (send) send.disabled = true;
-                    var job = window.runStudio('Make an image', '/studio/forge/video', { prompt: trimmed, stage: 'draft' }, $('forge-result'));
-                    relabelLastUser(trimmed, 'Make an image');
-                    pendingStep = '';
-                    Promise.resolve(job).finally(function () {
-                        if (send) send.disabled = false;
-                        if (field) field.focus();
-                    });
-                    return job;
-                }
-                if (mode === 'search' && trimmed && !selectedFileActive() && trimmed.charAt(0) !== '/') {
-                    field.value = '/search ' + trimmed;
-                }
                 var wire = field ? field.value.trim() : trimmed;
                 armStep(wire);
                 var sent = previousSend();
-                var searchText = wire.match(/^\/search\s+([\s\S]+)$/i);
-                if (searchText && searchText[1].trim()) relabelLastUser(searchText[1].trim(), wire);
                 forceMode('');
                 pendingStep = '';
                 return sent;
@@ -535,36 +527,6 @@
                 sendBtn.removeEventListener('click', previousSend);
                 sendBtn.addEventListener('click', window.sendMsg);
             }
-        }
-        if (typeof window.runKinCycle === 'function') {
-            var previousCycle = window.runKinCycle;
-            window.runKinCycle = function () {
-                pendingStep = 'Running a learning cycle...';
-                var result = previousCycle.apply(this, arguments);
-                relabelLastUser('Run a learning cycle', 'Running Kin cycle…');
-                pendingStep = '';
-                return result;
-            };
-        }
-        if (typeof window.listCheckpoints === 'function') {
-            var previousList = window.listCheckpoints;
-            window.listCheckpoints = function () {
-                pendingStep = 'Checking saved checkpoints...';
-                var result = previousList.apply(this, arguments);
-                relabelLastUser('Saved checkpoints', 'Listing Hades checkpoints…');
-                pendingStep = '';
-                return result;
-            };
-        }
-        if (typeof window.runResidualCheck === 'function') {
-            var previousResidual = window.runResidualCheck;
-            window.runResidualCheck = function () {
-                pendingStep = 'Checking consistency...';
-                var result = previousResidual.apply(this, arguments);
-                relabelLastUser('Check consistency', 'Calling tool residual_consistency…');
-                pendingStep = '';
-                return result;
-            };
         }
     }
 

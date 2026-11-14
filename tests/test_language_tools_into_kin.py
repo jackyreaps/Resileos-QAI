@@ -21,10 +21,13 @@ def test_live_panels_post_language_perceive():
     ui = (ROOT / "ui.py").read_text(encoding="utf-8")
     assert 'st.button("Perceive language", key="run_lang")' in ui
     assert '"/perceive/language"' in ui
+    # The raw perception tools moved out of chat into the admin Diagnostics tab.
+    admin = (ROOT / "landing" / "public" / "assets" / "admin.js").read_text(encoding="utf-8")
+    assert "Perceive language" in admin
+    assert '"/perceive/language"' in admin
+    assert "commit: false" in admin
     chat = (ROOT / "landing" / "public" / "chat.html").read_text(encoding="utf-8")
-    assert "Perceive language" in chat
-    assert "'/perceive/language'" in chat
-    assert "commit: false" in chat
+    assert "/perceive/language" not in chat
 
 
 def test_hand_perception_reaches_the_same_psyche_without_learning():

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Files — Resileos</title>
+  <meta name="description" content="Your uploaded files: download, delete, or reuse them in chat and Studio." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+  <link rel="stylesheet" href="/assets/studio.css" />
+  <link rel="stylesheet" href="/assets/files.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a class="nav-cta" href="/chat">Chat</a>
+        <a href="/studio">Studio</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/login">Sign in</a>
+      </div>
+    </div>
+  </nav>
+
+    <main id="main" class="studio-main">
+    <header class="studio-head">
+      <h1>My files</h1>
+      <p class="lede">Things you've uploaded. Only you can see them. Reuse one in chat or Studio, download it, or delete it.</p>
+    </header>
+    <div class="files-bar">
+      <label class="btn btn-primary" for="files-upload">Upload a file</label>
+      <input id="files-upload" type="file" multiple accept="image/*,video/*,.txt,.md,.csv,.json,.py,.lean,text/plain" hidden />
+      <p class="micro" id="files-usage"></p>
+    </div>
+    <p class="msg" id="files-msg" role="status" aria-live="polite"></p>
+    <ul class="files-list" id="files-list" aria-label="Your files"></ul>
+    <p class="micro files-note">Pictures, short videos, and text, CSV, JSON, Python or Lean files. Up to 10 MB each and 100 MB in total. Your files stay private to your account: nothing is learned from them or shared.</p>
+  </main>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/kin">Kin</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/chat">Chat</a>
+      <a href="/studio">Studio</a>
+      <a href="/credits">Credits</a>
+    </nav>
+    <div>Resileos · Nothing is faked: if a result can't be made, Studio says so.</div>
+  </footer>
+
+  <script src="/assets/auth.js"></script>
+  <script src="/assets/site.js"></script>
+  <script src="/assets/nav.js"></script>
+  <script src="/assets/files.js"></script>
+</body>
+</html>

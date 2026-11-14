@@ -38,21 +38,27 @@ def test_chat_page_signs_in_and_posts_studio_tools():
     assert "shiftKey" in html
     assert "Remembers exactly" in html
     assert "Stores · Derives · Abstains" in html
-    assert "/studio/forge/video" in html
-    assert "/studio/graphify" in html
-    assert "/studio/plan-test-debug" in html
-    assert "/studio/stop" in html
-    assert 'id="stop-run"' in html
-    assert "eat_filter" in html
-    assert "verify_on_stop" in html
-    assert "UNAVAILABLE" in html
+    # Pictures and clips live on /studio; studio internals live in admin.
+    public = ROOT / "landing" / "public"
+    studio_js = (public / "assets" / "studio.js").read_text(encoding="utf-8")
+    admin_js = (public / "assets" / "admin.js").read_text(encoding="utf-8")
+    # Chat uploads hand off to Studio with the same perception (media.js).
+    assert "location.href = '/studio?from=chat'" in html
+    assert "/assets/media.js" in html
+    assert "ResileosMedia.takeHandoff" in studio_js
+    assert '"/studio/forge/video"' in studio_js
+    assert '"/studio/video"' in studio_js
+    assert "UNAVAILABLE" in studio_js
+    for path in ("/studio/graphify", "/studio/plan-test-debug", "/studio/stop"):
+        assert path in admin_js
+        assert path not in html
     assert "schedulePersist" in html
     assert "async function persistThread" in html
     assert "fonts.googleapis.com" not in html
     assert "superintelligence" not in html.lower()
     assert "RES-309" not in html
     assert 'href="/chat.html"' not in html
-    sign_out = html.split("async function signOut()", 1)[1].split("['settings-hub'", 1)[0]
+    sign_out = html.split("async function signOut()", 1)[1].split("['settings-persona'", 1)[0]
     assert "ResileosAuth.logout" in sign_out
     assert "resileos_api_key" not in sign_out
     assert "localStorage.clear" not in sign_out

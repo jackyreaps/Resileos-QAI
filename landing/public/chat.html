@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resileos Studio</title>
+    <title>Chat — Resileos</title>
     <link rel="icon" href="/assets/gods/hermes.webp" />
     <script>
         (function () {
@@ -19,8 +19,9 @@
     </script>
     <link rel="stylesheet" href="/assets/fonts/fonts.css" />
     <link rel="stylesheet" href="/assets/site-nav.css" />
-    <script src="/assets/site-nav.js" defer></script>
     <script src="/assets/auth.js"></script>
+    <script src="/assets/nav.js" defer></script>
+    <script src="/assets/media.js"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -617,13 +618,12 @@
     <div class="app-shell">
     <div class="header">
         <div class="header-title">
-            <a class="brand" href="/">Resileos<span>Studio</span></a>
+            <a class="brand" href="/chat">Chat</a>
             <div class="status"><div class="dot connecting" id="status"></div><span id="status-label">Connecting</span></div>
             <span class="user-pill" id="user-pill" hidden></span>
         </div>
         <div class="header-actions">
             <a class="btn-text" id="login-link" href="/login?next=/chat">Sign in</a>
-            <a class="btn-text" id="account-link" href="/account" hidden>Account</a>
             <button class="btn-icon btn-label" id="btn-history" type="button" onclick="toggleHistory()" title="Conversations" aria-label="Conversations" aria-pressed="false" aria-expanded="false" aria-controls="history-panel">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="15" y2="18"></line></svg>
                 <span>Conversations</span>
@@ -631,46 +631,6 @@
             <button class="btn-icon" id="btn-theme" type="button" onclick="toggleTheme()" title="Theme. Switch light or dark." aria-label="Theme">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
-            <div class="more-wrap">
-                <button class="btn-icon btn-label" id="btn-more" type="button" title="More actions" aria-label="More" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    <span>More</span>
-                </button>
-                <div id="more-menu" class="more-menu" role="menu" hidden aria-label="More actions">
-                    <button class="menu-item" id="btn-tools" type="button" role="menuitem" onclick="toggleTools()" title="Run a tool" aria-pressed="false">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                        <span class="menu-copy"><span class="menu-label">Run a tool</span><span class="menu-desc">Open the tool list and run one</span></span>
-                    </button>
-                    <button class="menu-item" id="btn-kin" type="button" role="menuitem" onclick="toggleKin()" title="Learning cycle" aria-pressed="false">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                        <span class="menu-copy"><span class="menu-label">Learning cycle</span><span class="menu-desc">Run a cycle, preview a claim, or restore a checkpoint</span></span>
-                    </button>
-                    <button class="menu-item" id="btn-studio" type="button" role="menuitem" onclick="toggleStudio()" title="Studio" aria-pressed="false">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                        <span class="menu-copy"><span class="menu-label">Studio</span><span class="menu-desc">Make a video, add source text, or plan a task</span></span>
-                    </button>
-                    <button class="menu-item" id="btn-ui" type="button" role="menuitem" onclick="toggleUi()" title="See and speak" aria-pressed="false">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        <span class="menu-copy"><span class="menu-label">See and speak</span><span class="menu-desc">Perception, language, and agent tasks</span></span>
-                    </button>
-                    <button class="menu-item" id="btn-companion" type="button" role="menuitem" onclick="toggleCompanion()" title="Companion" aria-pressed="false">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                        <span class="menu-copy"><span class="menu-label">Companion</span><span class="menu-desc">Meet the companion for this hub</span></span>
-                    </button>
-                    <button class="menu-item" id="btn-ledger" type="button" role="menuitem" onclick="toggleLedger()" title="Memory" aria-pressed="false">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                        <span class="menu-copy"><span class="menu-label">Memory</span><span class="menu-desc">Read or edit saved memory</span></span>
-                    </button>
-                    <button class="menu-item" id="btn-settings" type="button" role="menuitem" onclick="toggleSettings()" title="Connection" aria-pressed="false">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                        <span class="menu-copy"><span class="menu-label">Connection</span><span class="menu-desc">Hub and persona</span></span>
-                    </button>
-                    <button class="menu-item js-signout" id="btn-signout-header" type="button" role="menuitem" title="Sign out" hidden>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                        <span class="menu-copy"><span class="menu-label">Sign out</span><span class="menu-desc">Sign out of your account on this browser</span></span>
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -684,124 +644,28 @@
             <p class="settings-hint" id="history-who">Not signed in. Chats stay in this browser.</p>
             <div class="history-actions">
                 <a class="history-save" id="history-signin" href="/login?next=/chat">Sign in</a>
+                <a class="btn-text js-signed-in" id="history-files" href="/files" hidden>My files</a>
                 <button type="button" class="btn-text js-signout" id="btn-signout" hidden>Sign out</button>
             </div>
         </div>
         <p class="settings-hint" id="history-note">Sign in to keep conversations on your account.</p>
         <div id="history-list" class="history-list"></div>
+        <label class="history-style">Reply style
+            <select id="settings-persona">
+                <option value="honest">Plain and direct</option>
+                <option value="guide">Friendly guide</option>
+                <option value="builder">Practical, step by step</option>
+                <option value="mythic">Storyteller</option>
+            </select>
+        </label>
     </aside>
     <button type="button" class="history-scrim" id="history-scrim" hidden aria-label="Close conversations"></button>
     <div class="chat-column">
-    <div id="tools-panel" class="panel">
-        <p class="panel-intro">Run a tool from the list. You can edit the request. The raw response stays folded under Details.</p>
-        <div id="tools-list" class="panel-grid"></div>
-    </div>
-    <div id="kin-panel" class="panel">
-        <p class="panel-intro">Run a learning cycle, preview a claim, or restore a checkpoint. The forms below are the advanced controls.</p>
-        <div class="group-row">
-            <span class="group-label">Actions</span>
-            <button type="button" class="tool-chip" onclick="runKinCycle()">Run a learning cycle</button>
-            <button type="button" class="tool-chip" onclick="listCheckpoints()">Saved checkpoints</button>
-            <button type="button" class="tool-chip" onclick="runResidualCheck()">Check consistency</button>
-        </div>
-        <div id="kin-forms" class="panel-grid"></div>
-        <div id="legion-list" class="panel-grid"></div>
-    </div>
-    <div id="studio-panel" class="panel">
-        <p class="panel-intro" id="studio-intro">Make a video, add source text, or plan a task. Stop ends one running job.</p>
-        <div id="studio-tools" class="panel-grid">
-            <form class="action-card" id="forge-form">
-                <h4>Make a video</h4>
-                <p>forge_video on Hermes. If the API returns UNAVAILABLE, no video URL is shown.</p>
-                <label>Prompt
-                    <textarea id="forge-prompt" spellcheck="true" placeholder="A quiet hill at dusk"></textarea>
-                </label>
-                <label>Stage
-                    <select id="forge-stage">
-                        <option value="draft">draft</option>
-                        <option value="verify">verify</option>
-                        <option value="upscale">upscale</option>
-                    </select>
-                </label>
-                <button type="submit" class="run" id="forge-run">Forge</button>
-                <div class="studio-result" id="forge-result"></div>
-            </form>
-            <form class="action-card" id="graphify-form">
-                <h4>Add source text</h4>
-                <p>graphify on Eat. Candidates go through eat_filter. Learn runs only for an accept when commit is set. Reject and abstain do not write.</p>
-                <label>Source
-                    <textarea id="graphify-source" spellcheck="false" placeholder="Zeus domain sky"></textarea>
-                </label>
-                <label class="check"><input id="graphify-commit" type="checkbox" /> Commit accepted triples</label>
-                <button type="submit" class="run" id="graphify-run">Ingest</button>
-                <div class="studio-result" id="graphify-result"></div>
-            </form>
-            <form class="action-card" id="plan-form">
-                <h4>Plan a task</h4>
-                <p>plan_test_debug on Hermes. write_file, apply_diff, and git_commit stay refused until verify_on_stop. This page does not execute them.</p>
-                <label>Goal
-                    <input id="plan-goal" type="text" spellcheck="true" placeholder="Check the joint" />
-                </label>
-                <label>Steps, one tool name per line. Optional.
-                    <textarea id="plan-steps" spellcheck="false" placeholder="Leave blank for plan, test, and debug"></textarea>
-                </label>
-                <button type="submit" class="run" id="plan-run">Run loop</button>
-                <div class="studio-result" id="plan-result"></div>
-            </form>
-            <form class="action-card" id="stop-form">
-                <h4>Stop a job</h4>
-                <p>Stop one running job. A video run can fill the owner name. Ask Atropos to cut one Clotho owner.</p>
-                <label>Clotho owner
-                    <input id="stop-owner" type="text" spellcheck="false" autocomplete="off" placeholder="forge-owner" />
-                </label>
-                <button type="submit" class="run stop" id="stop-run">Stop</button>
-                <div class="studio-result" id="stop-result"></div>
-            </form>
-        </div>
-        <details class="more-fold">
-            <summary>Advanced studio tools</summary>
-            <div id="studio-forms" class="panel-grid"></div>
-        </details>
-    </div>
-    <div id="ui-panel" class="panel">
-        <p class="panel-intro">See, translate, explain, or remember. Perception defaults to commit: false and does not save on its own. Language uses the same Eat path. Mutating agent steps are refused server-side.</p>
-        <div id="ui-forms" class="panel-grid"></div>
-    </div>
-    <div id="ledger-panel" class="panel">
-        <p class="panel-intro">Saved memory for this hub. Load reads it. Edit and delete write to that hub.</p>
-        <div id="ledger-forms" class="panel-grid"></div>
-    </div>
-    <div id="companion-panel" class="panel">
-        <p class="panel-intro">Meet the companion. It remembers exact rows, grows with this hub, and does not make things up.</p>
-        <div id="companion-persona" class="panel-intro"></div>
-        <div id="companion-fragment" class="panel-intro"></div>
-        <div id="companion-steps" class="panel-grid"></div>
-        <div id="companion-forms" class="panel-grid"></div>
-    </div>
-    <div id="settings-panel" class="panel">
-        <div class="settings-grid">
-            <label>Hub id
-                <input id="settings-hub" type="text" autocomplete="off" spellcheck="false" />
-            </label>
-            <label>Persona
-                <select id="settings-persona">
-                    <option value="honest">Honest</option>
-                    <option value="guide">Guide</option>
-                    <option value="builder">Builder</option>
-                    <option value="mythic">Mythic</option>
-                </select>
-            </label>
-            <label class="check"><input id="settings-debug" type="checkbox" /> Show technical details on each reply</label>
-            <p class="settings-hint" id="key-mode"></p>
-            <p class="settings-hint">Requests go through this site. A signed-in account uses its own key on the server. A signed-out browser uses the per-network daily trial and keeps its chats only in this browser. Sign in to save them to your account.</p>
-        </div>
-    </div>
-
     <div id="chat">
         <div class="empty" id="empty-state">
             <p class="eyebrow">Stores · Derives · Abstains</p>
             <h2>Remembers exactly</h2>
-            <p class="lede">Sign in to keep your conversations on your account. Ask in a normal sentence, or try an example. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented.</p>
+            <p class="lede">Sign in to keep your conversations on your account. Ask a question, or tell me something to remember. I answer from what you've saved and say so when I don't know.</p>
             <p class="companion-line" id="returning-companion" hidden></p>
             <div class="suggestions" id="suggestions">
                 <button type="button" class="suggestion" data-fill="Remember that Alice works at Acme.">
@@ -810,15 +674,15 @@
                 </button>
                 <button type="button" class="suggestion" data-fill="What is the domain of Zeus?">
                     <span>What is the domain of Zeus?</span>
-                    <span class="suggestion-hint">Asks the store. It abstains if that row is missing.</span>
+                    <span class="suggestion-hint">Answers from what's saved, or says it doesn't know.</span>
                 </button>
                 <button type="button" class="suggestion" data-fill="Who won the Super Bowl in 2024?" data-mode="search">
                     <span>Who won the Super Bowl in 2024?</span>
-                    <span class="suggestion-hint">Searches the web. The answer stays unverified.</span>
+                    <span class="suggestion-hint">Looks it up online. Web answers are marked unverified.</span>
                 </button>
                 <button type="button" class="suggestion" data-fill="I like quiet mornings.">
                     <span>I like quiet mornings.</span>
-                    <span class="suggestion-hint">Saves a preference, not a stored world fact.</span>
+                    <span class="suggestion-hint">Remembers something about you.</span>
                 </button>
             </div>
         </div>
@@ -826,40 +690,64 @@
 
     <div class="input-wrap">
         <div class="input-box">
-            <input type="file" id="file-input" hidden>
-            <div class="composer-bar" role="toolbar" aria-label="Message actions">
-                <button class="composer-action" id="btn-search" type="button" aria-pressed="false" title="Search the web. Results stay unverified.">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    Search the web
-                </button>
-                <button class="composer-action" id="btn-image" type="button" aria-pressed="false" title="Describe a picture. The reply says if none comes back.">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                    Make an image
-                </button>
-                <button class="composer-action" id="btn-file" type="button" title="Attach a file" aria-label="Attach a file">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                    Attach
-                </button>
+            <input type="file" id="file-input" multiple accept="image/*,video/*,.txt,.md,.csv,.json,.py,.lean,text/plain" hidden>
+            <div class="attach-row" id="attach-row" hidden aria-label="Attachments"></div>
+            <div class="composer-bar">
+                <div class="tools-wrap">
+                    <button class="composer-action" id="btn-attach" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="attach-menu" title="Attach pictures, clips or files">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                        Attach
+                    </button>
+                    <div id="attach-menu" class="more-menu tools-menu" role="menu" hidden aria-label="Attach">
+                        <button class="menu-item" id="btn-file" type="button" role="menuitem">
+                            <span class="menu-copy"><span class="menu-label">Upload from this device</span><span class="menu-desc">Pictures, short videos, text or Lean files. Pick as many as you like.</span></span>
+                        </button>
+                        <button class="menu-item" id="btn-myfiles" type="button" role="menuitem" hidden>
+                            <span class="menu-copy"><span class="menu-label">Choose from my Files</span><span class="menu-desc">Reuse something you saved before.</span></span>
+                        </button>
+                    </div>
+                    <div id="files-picker" class="more-menu tools-menu files-picker" hidden aria-label="My files">
+                        <p class="tools-group">My files</p>
+                        <div id="files-picker-list"></div>
+                        <a class="menu-item" href="/files"><span class="menu-copy"><span class="menu-label">Manage my files</span></span></a>
+                    </div>
+                </div>
+                <div class="tools-wrap">
+                    <button class="composer-action subtle" id="btn-tools-menu" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tools-menu" title="Optional hints">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="9" cy="6" r="2"></circle><circle cx="15" cy="12" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>
+                        Options
+                    </button>
+                    <div id="tools-menu" class="more-menu tools-menu" role="menu" hidden aria-label="Options">
+                        <p class="tools-group" role="presentation">Optional. I pick the right steps on my own.</p>
+                        <button class="menu-item" id="btn-search" type="button" role="menuitemcheckbox" aria-pressed="false">
+                            <span class="menu-copy"><span class="menu-label">Search the web</span><span class="menu-desc">Also look this up online and link the sources.</span></span>
+                        </button>
+                        <button class="menu-item" id="btn-image" type="button" role="menuitemcheckbox" aria-pressed="false">
+                            <span class="menu-copy"><span class="menu-label">Make a picture</span><span class="menu-desc">From your message, or a variation of an attached picture.</span></span>
+                        </button>
+                        <button class="menu-item" id="btn-clip" type="button" role="menuitemcheckbox" aria-pressed="false">
+                            <span class="menu-copy"><span class="menu-label">Make a short clip</span><span class="menu-desc">From your message, an attached clip, or several photos.</span></span>
+                        </button>
+                    </div>
+                </div>
+                <span class="mode-chip" id="mode-chip" hidden><span id="mode-chip-label">Searching the web</span>
+                    <button type="button" id="mode-chip-clear" aria-label="Clear option">×</button>
+                </span>
             </div>
             <div class="composer-row">
-                <div id="file-chip" class="file-chip" hidden>
-                    <span id="file-chip-name"></span>
-                    <button type="button" id="file-chip-clear" aria-label="Remove file">×</button>
-                </div>
-                <textarea class="composer" id="input" rows="1" placeholder="Ask in a sentence, or teach a fact…" autocomplete="off" aria-label="Message"></textarea>
+                <textarea class="composer" id="input" rows="1" placeholder="Ask anything, attach something, or paste a Lean proof…" autocomplete="off" aria-label="Message"></textarea>
                 <button class="send" id="send" type="button" title="Send" aria-label="Send message">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </button>
             </div>
         </div>
-        <p class="composer-hint">Enter to send. Shift+Enter for a new line. Type / for shortcuts.</p>
+        <p class="composer-hint" id="composer-hint">Attach pictures, clips, text or Lean files, or drop them here. I look at them, search, check proofs, or make something, as needed.</p>
     </div>
     </div>
     </div>
     </div>
 
     <script>
-        const SAMPLE_IMAGE = [[0, 1], [1, 0]];
         const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/;
         const HUB_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
         const chat = document.getElementById('chat');
@@ -867,18 +755,8 @@
         const sendBtn = document.getElementById('send');
         const statusDot = document.getElementById('status');
         const statusLabel = document.getElementById('status-label');
-        const toolsPanel = document.getElementById('tools-panel');
-        const kinPanel = document.getElementById('kin-panel');
-        const studioPanel = document.getElementById('studio-panel');
-        const uiPanel = document.getElementById('ui-panel');
-        const ledgerPanel = document.getElementById('ledger-panel');
-        const companionPanel = document.getElementById('companion-panel');
-        const settingsPanel = document.getElementById('settings-panel');
         let chatHistory = [];
-        let selectedFile = null;
         let lastToolEmpty = false;
-        let toolsLoaded = false;
-        let kinExtrasLoaded = false;
         let csrfToken = '';
         let sessionState = { signed_in: false };
         try {
@@ -903,13 +781,12 @@
         }
 
         function updateDemoLabel() {
-            const el = document.getElementById('key-mode');
             const signedIn = Boolean(sessionState.signed_in);
             const login = document.getElementById('login-link');
-            const account = document.getElementById('account-link');
             if (login) login.hidden = signedIn;
-            if (account) account.hidden = !signedIn;
-            document.querySelectorAll('.js-signout').forEach(btn => { btn.hidden = !signedIn; });
+            const myFiles = document.getElementById('btn-myfiles');
+            if (myFiles) myFiles.hidden = !signedIn;
+            document.querySelectorAll('.js-signout, .js-signed-in').forEach(btn => { btn.hidden = !signedIn; });
             const historySignin = document.getElementById('history-signin');
             if (historySignin) historySignin.hidden = signedIn;
             const who = document.getElementById('history-who');
@@ -928,25 +805,16 @@
                 lede.textContent = (signedIn
                     ? 'Your conversations save to your account. '
                     : 'Sign in to keep your conversations on your account. ')
-                    + 'Ask in a normal sentence, or try an example. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented.';
+                    + "Ask a question, or tell me something to remember. I answer from what you've saved and say so when I don't know.";
             }
             const note = document.getElementById('history-note');
             const signInNote = 'Sign in to keep conversations on your account.';
             if (note && signedIn && note.textContent === signInNote) note.textContent = '';
             if (note && !signedIn && !note.textContent) note.textContent = signInNote;
-            if (!el) return;
-            if (signedIn) {
-                el.textContent = 'Signed in as ' + sessionState.email + (sessionState.prefix ? ' · ' + sessionState.prefix : ' · key is set up on first message');
-            } else {
-                el.textContent = 'Not signed in. This network has a short daily trial.';
-            }
         }
         function fillSettings() {
-            document.getElementById('settings-hub').value = hubId();
             const personaField = document.getElementById('settings-persona');
             if (personaField) personaField.value = currentPersona();
-            const debugField = document.getElementById('settings-debug');
-            if (debugField) debugField.checked = debugReplies();
             updateDemoLabel();
         }
         function showApp() {
@@ -956,19 +824,10 @@
             refreshHistory();
         }
         function saveSettings() {
-            const hub = document.getElementById('settings-hub').value.trim() || 'anon';
-            const prevHub = hubId();
-            localStorage.setItem('resileos_hub_id', hub);
-            if (hub !== prevHub) currentConversationId = null;
             const personaField = document.getElementById('settings-persona');
             if (personaField && ['honest', 'guide', 'builder', 'mythic'].indexOf(personaField.value) !== -1) {
                 localStorage.setItem('resileos_persona', personaField.value);
             }
-            const debugField = document.getElementById('settings-debug');
-            if (debugField) localStorage.setItem('resileos_debug', debugField.checked ? '1' : '0');
-            updateDemoLabel();
-            checkReady();
-            refreshHistory();
         }
         async function signOut() {
             clearTimeout(persistTimer);
@@ -985,7 +844,7 @@
             refreshHistory();
             checkReady();
         }
-        ['settings-hub', 'settings-persona', 'settings-debug'].forEach(id => {
+        ['settings-persona'].forEach(id => {
             const node = document.getElementById(id);
             if (node) node.addEventListener('change', saveSettings);
         });
@@ -1034,337 +893,11 @@
             if (sessionState.signed_in) migrateSavedChats();
         });
 
-        function inferKin(name) {
-            if (/observe|flag|iris/i.test(name)) return 'Iris';
-            if (/policy|risk|guide|metis/i.test(name)) return 'Metis';
-            if (/cycle|navigate|review|hermes|separated|web_search/i.test(name)) return 'Hermes';
-            if (/hades|checkpoint|save|restore/i.test(name)) return 'Hades';
-            if (/apollo|verify|residual|success/i.test(name)) return 'Apollo';
-            if (/resileos_/i.test(name)) return 'Oracle';
-            return 'Other';
-        }
-
-        const DEFAULT_BODIES = {
-            resileos_ask: { subject: 'Zeus', relation: 'domain' },
-            resileos_chain: { subject: 'Zeus', hops: ['domain'] },
-            resileos_sparql: { query: 'SELECT ?o WHERE Zeus --domain--> ?o' },
-            resileos_abstain: { reason: 'studio test' },
-            resileos_answer: { question: 'what is the domain of Zeus', subject: 'Zeus', relation: 'domain' },
-            web_search: { query: 'resileos residual memory' },
-            residual_consistency: {},
-            video_generate: {}
-        };
-
-        function defaultBody(name, schema) {
-            if (DEFAULT_BODIES[name]) return DEFAULT_BODIES[name];
-            const props = schema && schema.parameters && schema.parameters.properties;
-            if (!props) return {};
-            const out = {};
-            Object.keys(props).forEach(key => {
-                const spec = props[key] || {};
-                if (spec.default !== undefined) out[key] = spec.default;
-                else if (spec.type === 'boolean') out[key] = false;
-                else if (spec.type === 'array') out[key] = [];
-                else if (spec.type === 'number' || spec.type === 'integer') out[key] = 0;
-                else out[key] = '';
-            });
-            return out;
-        }
-
-        function card(title, hint, body, onRun) {
-            const wrap = document.createElement('div');
-            wrap.className = 'action-card';
-            const h = document.createElement('h4');
-            h.textContent = title;
-            const p = document.createElement('p');
-            p.textContent = hint || '';
-            wrap.append(h, p);
-            let field = null;
-            if (body !== null) {
-                field = document.createElement('textarea');
-                field.spellcheck = false;
-                field.value = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-                wrap.appendChild(field);
-            }
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'run';
-            btn.textContent = 'Run';
-            btn.addEventListener('click', () => {
-                let parsed = undefined;
-                if (field) {
-                    const raw = field.value.trim();
-                    if (raw) {
-                        try { parsed = JSON.parse(raw); }
-                        catch (err) {
-                            addMsg('user').textContent = title;
-                            renderReply(addMsg('bot'), { status: 'ERROR', value: 'JSON could not be parsed: ' + err.message });
-                            return;
-                        }
-                    } else parsed = {};
-                }
-                onRun(parsed);
-            });
-            wrap.appendChild(btn);
-            return wrap;
-        }
-
-        async function loadTools() {
-            const mount = document.getElementById('tools-list') || toolsPanel;
-            try {
-                const r = await apiFetch(`${apiUrl()}/tools`, { headers: authHeaders() });
-                if (r.status === 401 || r.status === 403) {
-                    mount.replaceChildren(document.createTextNode('Sign in to list tools. The anonymous trial is counted on the server for this network.'));
-                    return;
-                }
-                const d = await r.json();
-                const raw = [].concat(d.tools || [], d.harness || []);
-                const seen = new Set();
-                const groups = { Oracle: [], Iris: [], Metis: [], Hermes: [], Hades: [], Apollo: [], Other: [] };
-                raw.forEach(t => {
-                    const name = typeof t === 'string' ? t : t.name;
-                    if (!name || seen.has(name)) return;
-                    seen.add(name);
-                    const kin = (typeof t === 'object' && t.kin) || inferKin(name);
-                    const schema = typeof t === 'object' ? t : { name };
-                    (groups[kin] || groups.Other).push({ name, schema, legion: !!(typeof t === 'object' && t.legion) });
-                });
-                if (!seen.has('web_search')) groups.Hermes.push({ name: 'web_search', schema: { name: 'web_search' }, legion: true });
-                mount.replaceChildren();
-                Object.entries(groups).filter(([, arr]) => arr.length).forEach(([kin, arr]) => {
-                    const label = document.createElement('div');
-                    label.className = 'group-row';
-                    const span = document.createElement('span');
-                    span.className = 'group-label';
-                    span.textContent = kin;
-                    label.appendChild(span);
-                    mount.appendChild(label);
-                    arr.forEach(t => {
-                        const desc = (t.schema && t.schema.description) || (t.legion ? 'Legion tool' : 'Tool');
-                        mount.appendChild(card(t.name, desc, defaultBody(t.name, t.schema), (body) => {
-                            runEndpoint('POST /tools/' + t.name, 'POST', '/tools/' + encodeURIComponent(t.name), body || {});
-                        }));
-                    });
-                });
-                toolsLoaded = true;
-            } catch (e) {
-                mount.replaceChildren(document.createTextNode('Could not load tools.'));
-            }
-        }
-
-        function fillKinForms() {
-            const mount = document.getElementById('kin-forms');
-            if (!mount || mount.dataset.filled) return;
-            mount.dataset.filled = '1';
-            mount.appendChild(card('Kin cycle', 'POST /kin/cycle', { apply_policy: true, user_id: 'anon' }, (body) => {
-                const payload = body || {};
-                if (!payload.user_id) payload.user_id = hubId();
-                runEndpoint('POST /kin/cycle', 'POST', '/kin/cycle', payload);
-            }));
-            mount.appendChild(card('Separated cycle', 'POST /kin/separated_cycle', { writer: 'apollo', subject: 'world:apollo', facts: [], art: false, use_council: true, use_athena: false, profile: 'personal' }, (body) => {
-                runEndpoint('POST /kin/separated_cycle', 'POST', '/kin/separated_cycle', body);
-            }));
-            mount.appendChild(card('Eat preview', 'POST /eat/preview — does not write', { claim: { subject: 'Zeus', relation: 'domain', obj: 'sky' }, allow_sys: false }, (body) => {
-                runEndpoint('POST /eat/preview', 'POST', '/eat/preview', body);
-            }));
-            mount.appendChild(card('Council query', 'POST /council/query', { subject: 'Zeus', relation: 'domain', profile: 'personal' }, (body) => {
-                runEndpoint('POST /council/query', 'POST', '/council/query', body);
-            }));
-            mount.appendChild(card('Hades restore', 'POST /kin/hades/restore', { checkpoint_id: '', fresh: true }, (body) => {
-                runEndpoint('POST /kin/hades/restore', 'POST', '/kin/hades/restore', body);
-            }));
-        }
-
-        async function loadLegions() {
-            const mount = document.getElementById('legion-list');
-            if (!mount) return;
-            mount.replaceChildren();
-            try {
-                const r = await apiFetch(`${apiUrl()}/kin/legions`, { headers: authHeaders() });
-                const d = await r.json().catch(() => ({}));
-                if (!r.ok) {
-                    mount.appendChild(card('List legions', 'GET /kin/legions is not on this host yet. It lands with this update.', {}, () => {
-                        runEndpoint('GET /kin/legions', 'GET', '/kin/legions');
-                    }));
-                    return;
-                }
-                const catalog = d.legions || {};
-                const kins = d.kins || Object.keys(catalog);
-                kins.forEach(kin => {
-                    const items = catalog[kin] || [];
-                    const label = document.createElement('div');
-                    label.className = 'group-row';
-                    const span = document.createElement('span');
-                    span.className = 'group-label';
-                    span.textContent = 'Legion · ' + kin;
-                    label.appendChild(span);
-                    mount.appendChild(label);
-                    if (!items.length) {
-                        const empty = document.createElement('p');
-                        empty.className = 'panel-intro';
-                        empty.textContent = 'No legion registered on ' + kin + '.';
-                        mount.appendChild(empty);
-                        return;
-                    }
-                    items.forEach(item => {
-                        const name = item.name || item;
-                        const hint = item.description || ('POST /kin/legions/' + kin + '/' + name);
-                        const body = name === 'web_search' ? { query: 'resileos residual memory' }
-                            : name === 'calliope' ? { hub_id: hubId(), residual_hash: '' }
-                            : name === 'ligeia' ? { hub_id: hubId(), topic: '' }
-                            : name === 'echo' ? { hub_id: hubId(), probe: '' }
-                            : {};
-                        mount.appendChild(card(kin + ' / ' + name, hint, body, (payload) => {
-                            runEndpoint('POST /kin/legions/' + kin + '/' + name, 'POST', '/kin/legions/' + encodeURIComponent(kin) + '/' + encodeURIComponent(name), payload || {});
-                        }));
-                    });
-                });
-            } catch (e) {
-                mount.replaceChildren(document.createTextNode('Could not load legions.'));
-            }
-        }
-
-        function fillStudioForms() {
-            const mount = document.getElementById('studio-forms');
-            if (!mount || mount.dataset.filled) return;
-            mount.dataset.filled = '1';
-            [
-                ['List codecs', 'GET /studio/codecs', 'GET', '/studio/codecs', null],
-                ['Prior report', 'GET /studio/service/prior', 'GET', '/studio/service/prior', null],
-                ['Studio panel', 'GET /studio/panel', 'GET', '/studio/panel', null],
-                ['Sampler status', 'GET /studio/external-sampler', 'GET', '/studio/external-sampler', null],
-                ['Project codec', 'POST /studio/codecs/project', 'POST', '/studio/codecs/project', { image: SAMPLE_IMAGE, m: 4, n: 4 }],
-                ['Register candidate', 'POST /studio/candidates — does not learn', 'POST', '/studio/candidates', { kind: 'image', path: 'candidate://studio-demo', title: 'Studio demo', world_id: 'studio', note: '' }],
-                ['Round-trip', 'POST /studio/service/round-trip', 'POST', '/studio/service/round-trip', { image: SAMPLE_IMAGE, codec_name: 'pca_component' }],
-                ['Sample prior', 'POST /studio/service/sample', 'POST', '/studio/service/sample', { label: 0, seed: 0, register: false }],
-                ['Studio gate', 'POST /studio/gate', 'POST', '/studio/gate', { packet: { id: 'studio-demo', budget_remaining: {} } }],
-                ['Propose sampler', 'POST /studio/external-sampler — refused unless enabled', 'POST', '/studio/external-sampler', { condition: { prompt: 'demo' }, register: false }]
-            ].forEach(([title, hint, method, path, body]) => {
-                mount.appendChild(card(title, hint, body, (parsed) => {
-                    runEndpoint(method + ' ' + path, method, path, method === 'GET' ? undefined : (parsed || {}));
-                }));
-            });
-        }
-
-        function stepsFromLines(raw) {
-            const steps = [];
-            String(raw || '').split('\n').forEach(line => {
-                const tool = line.trim().split(/\s+/)[0];
-                if (!tool) return;
-                steps.push({ tool: tool.slice(0, 64), args: {} });
-            });
-            return steps.length ? steps.slice(0, 12) : null;
-        }
-
-        function bindStudioTools() {
-            document.getElementById('forge-form').addEventListener('submit', (event) => {
-                event.preventDefault();
-                const prompt = document.getElementById('forge-prompt').value.trim();
-                const stage = document.getElementById('forge-stage').value || 'draft';
-                runStudio('Forge video', '/studio/forge/video', { prompt: prompt, stage: stage }, document.getElementById('forge-result'));
-            });
-            document.getElementById('graphify-form').addEventListener('submit', (event) => {
-                event.preventDefault();
-                const source = document.getElementById('graphify-source').value.trim();
-                const commit = document.getElementById('graphify-commit').checked;
-                if (!source) {
-                    renderReply(addMsg('bot'), { status: 'ERROR', value: 'Graphify needs a source. Eat does not invent triples.' });
-                    return;
-                }
-                runStudio('Graphify', '/studio/graphify', { source: source, commit: commit }, document.getElementById('graphify-result'), { commit: commit });
-            });
-            document.getElementById('plan-form').addEventListener('submit', (event) => {
-                event.preventDefault();
-                const goal = document.getElementById('plan-goal').value.trim();
-                if (!goal) {
-                    renderReply(addMsg('bot'), { status: 'ERROR', value: 'Plan / test / debug needs a goal.' });
-                    return;
-                }
-                const steps = stepsFromLines(document.getElementById('plan-steps').value);
-                const body = steps ? { goal: goal, steps: steps } : { goal: goal };
-                runStudio('Plan / test / debug', '/studio/plan-test-debug', body, document.getElementById('plan-result'));
-            });
-            document.getElementById('stop-form').addEventListener('submit', (event) => {
-                event.preventDefault();
-                const owner = document.getElementById('stop-owner').value.trim();
-                if (!owner) {
-                    renderReply(addMsg('bot'), { status: 'ERROR', value: 'Stop needs a Clotho owner. Forge can fill one after it runs.' });
-                    return;
-                }
-                runStudio('Stop ' + owner, '/studio/stop', { owner: owner }, document.getElementById('stop-result'));
-            });
-        }
-
-        function fillUiForms() {
-            const mount = document.getElementById('ui-forms');
-            if (!mount || mount.dataset.filled) return;
-            mount.dataset.filled = '1';
-            [
-                ['Perceive image', 'POST /perceive/image — commit false', 'POST', '/perceive/image', { image: SAMPLE_IMAGE, subject: 'image:studio-demo', commit: false }],
-                ['Perceive art', 'POST /perceive/art — commit false', 'POST', '/perceive/art', { title: 'Demo', description: 'studio panel', world_id: 'world:art', commit: false }],
-                ['Perceive frame', 'POST /perceive/frame — commit false', 'POST', '/perceive/frame', { image: SAMPLE_IMAGE, subject: 'frame:studio-demo', commit: false }],
-                ['Perceive language', 'POST /perceive/language — commit false', 'POST', '/perceive/language', { text: 'hello from the studio', subject: 'text', commit: false }],
-                ['Generate fluid', 'POST /generate/fluid', 'POST', '/generate/fluid', { belt: 0, frame: 0, persona: 'honest', subject: 'frame' }],
-                ['Generate local', 'POST /generate/local', 'POST', '/generate/local', { belt: 0, frame: 0, persona: 'honest', subject: 'frame' }],
-                ['Detect language', 'POST /language/detect', 'POST', '/language/detect', { text: 'hello from the studio' }],
-                ['Translate', 'POST /language/translate', 'POST', '/language/translate', { text: 'hello', target: 'en', source: null }],
-                ['Agent task (read)', 'POST /agent/task', 'POST', '/agent/task', { goal: 'status', steps: [{ tool: 'git_status', args: {} }] }],
-                ['Agent task (mutate, should refuse)', 'POST /agent/task — write_file is refused', 'POST', '/agent/task', { goal: 'do not write', steps: [{ tool: 'write_file', args: { rel: 'nope.txt', content: 'x' } }] }],
-                ['Custom mouth', 'POST /mouth/custom', 'POST', '/mouth/custom', { rows: [{ subject: 'Zeus', relation: 'domain', obj: 'sky' }], question: '' }],
-                ['Explain', 'POST /explain', 'POST', '/explain', { query: 'domain', hub_rows: ['sky'] }],
-                ['Remember line', 'POST /remember — formats a fact line, does not learn', 'POST', '/remember', { subject: 'demo', relation: 'note', obj: 'ui' }]
-            ].forEach(([title, hint, method, path, body]) => {
-                mount.appendChild(card(title, hint, body, (parsed) => {
-                    runEndpoint(method + ' ' + path, method, path, parsed || {});
-                }));
-            });
-        }
-
-        function fillLedgerForms() {
-            const mount = document.getElementById('ledger-forms');
-            if (!mount || mount.dataset.filled) return;
-            mount.dataset.filled = '1';
-            mount.appendChild(card('Load ledger', 'GET /hub/{id}/ledger', null, () => {
-                runEndpoint('GET /hub/' + hubId() + '/ledger', 'GET', '/hub/' + encodeURIComponent(hubId()) + '/ledger');
-            }));
-            mount.appendChild(card('Edit ledger row', 'PUT /hub/{id}/ledger', { relation: 'prefers', obj: '', new_obj: '' }, (body) => {
-                runEndpoint('PUT /hub/' + hubId() + '/ledger', 'PUT', '/hub/' + encodeURIComponent(hubId()) + '/ledger', body || {});
-            }));
-            mount.appendChild(card('Delete ledger row', 'DELETE /hub/{id}/ledger?relation=&obj=', { relation: 'prefers', obj: '' }, (body) => {
-                const rel = encodeURIComponent((body && body.relation) || '');
-                const obj = encodeURIComponent((body && body.obj) || '');
-                runEndpoint('DELETE /hub/' + hubId() + '/ledger', 'DELETE', '/hub/' + encodeURIComponent(hubId()) + '/ledger?relation=' + rel + '&obj=' + obj);
-            }));
-        }
 
         function applyCompanion(state) {
             if (!state) return;
             try { localStorage.setItem('resileos_companion', JSON.stringify(state)); } catch (err) { /* ignore */ }
-            const persona = state.persona || {};
-            const who = document.getElementById('companion-persona');
-            if (who) {
-                const chapters = (persona.unlocked_chapters || []).join(', ');
-                who.textContent = (persona.name || 'Companion')
-                    + ' · ' + (persona.tone || 'neutral')
-                    + ' · ' + (persona.sigil || 'circle')
-                    + (chapters ? ' · ' + chapters : '');
-            }
-            if (state.last_fragment || state.tutorial_fragment) {
-                const slot = document.getElementById('companion-fragment');
-                if (slot) slot.textContent = state.tutorial_fragment || state.last_fragment || '';
-            }
             paintReturningCompanion();
-            const steps = document.getElementById('companion-steps');
-            if (!steps) return;
-            steps.replaceChildren();
-            (state.steps || []).forEach(step => {
-                const row = document.createElement('div');
-                row.className = 'action-card';
-                const title = document.createElement('h4');
-                title.textContent = (step.done ? 'Done · ' : '') + (step.label || step.id);
-                row.appendChild(title);
-                steps.appendChild(row);
-            });
         }
 
         async function refreshCompanion() {
@@ -1375,49 +908,6 @@
             } catch (err) { /* panel stays on the last local copy */ }
         }
 
-        async function postTutorialStep(step) {
-            try {
-                const r = await apiFetch(`${apiUrl()}/aphrodite/${encodeURIComponent(hubId())}/state`, {
-                    method: 'POST',
-                    headers: authHeaders(true),
-                    body: JSON.stringify({ step: step, verified: true })
-                });
-                if (!r.ok) return;
-                applyCompanion(await r.json());
-            } catch (err) { /* the server still records a verified chat step */ }
-        }
-
-        function tutorialStepFor(method, path, data) {
-            if (method === 'POST' && path.indexOf('/tools/') === 0) return 'run_tool';
-            if (method === 'POST' && path.indexOf('/kin/legions/') === 0) return 'try_legion';
-            if (method === 'POST' && path === '/kin/cycle') {
-                return data && data.harness && data.harness.verified ? 'kin_cycle' : null;
-            }
-            if ((method === 'PUT' || method === 'DELETE') && path.indexOf('/ledger') !== -1) return 'edit_ledger';
-            return null;
-        }
-
-        function fillCompanionForms() {
-            const mount = document.getElementById('companion-forms');
-            if (!mount || mount.dataset.filled) return;
-            mount.dataset.filled = '1';
-            mount.appendChild(card('Like', 'POST /aphrodite/{hub}/preference', { topic: 'tea', like: true, care: 1 }, (body) => {
-                runEndpoint('POST /aphrodite/preference', 'POST', '/aphrodite/' + encodeURIComponent(hubId()) + '/preference', body || {});
-            }));
-            mount.appendChild(card('Dislike', 'POST /aphrodite/{hub}/preference', { topic: 'noise', like: false, care: 1 }, (body) => {
-                runEndpoint('POST /aphrodite/preference', 'POST', '/aphrodite/' + encodeURIComponent(hubId()) + '/preference', body || {});
-            }));
-            mount.appendChild(card('Reset companion', 'POST /aphrodite/{hub}/reset', null, () => {
-                runEndpoint('POST /aphrodite/reset', 'POST', '/aphrodite/' + encodeURIComponent(hubId()) + '/reset', {});
-            }));
-        }
-
-        fillKinForms();
-        fillStudioForms();
-        bindStudioTools();
-        fillUiForms();
-        fillLedgerForms();
-        fillCompanionForms();
         try {
             const cached = localStorage.getItem('resileos_companion');
             if (cached) applyCompanion(JSON.parse(cached));
@@ -1425,39 +915,11 @@
         } catch (err) { /* ignore a bad local copy */ }
 
         function closePanels() {
-            [toolsPanel, kinPanel, studioPanel, uiPanel, ledgerPanel, companionPanel, settingsPanel].forEach(p => p && p.classList.remove('open'));
-            ['btn-tools', 'btn-kin', 'btn-studio', 'btn-ui', 'btn-ledger', 'btn-companion', 'btn-settings'].forEach(id => {
-                const btn = document.getElementById(id);
-                if (btn) btn.setAttribute('aria-pressed', 'false');
-            });
+            const menu = document.getElementById('tools-menu');
+            const btn = document.getElementById('btn-tools-menu');
+            if (menu) menu.hidden = true;
+            if (btn) btn.setAttribute('aria-expanded', 'false');
         }
-        function togglePanel(panel, btn) {
-            const open = !panel.classList.contains('open');
-            closePanels();
-            if (open) {
-                panel.classList.add('open');
-                btn.setAttribute('aria-pressed', 'true');
-            }
-        }
-        function toggleTools() {
-            const willOpen = !toolsPanel.classList.contains('open');
-            togglePanel(toolsPanel, document.getElementById('btn-tools'));
-            if (willOpen && !toolsLoaded) loadTools();
-        }
-        function toggleKin() {
-            const willOpen = !kinPanel.classList.contains('open');
-            togglePanel(kinPanel, document.getElementById('btn-kin'));
-            if (willOpen && !kinExtrasLoaded) { loadLegions(); kinExtrasLoaded = true; }
-        }
-        function toggleStudio() { togglePanel(studioPanel, document.getElementById('btn-studio')); }
-        function toggleUi() { togglePanel(uiPanel, document.getElementById('btn-ui')); }
-        function toggleLedger() { togglePanel(ledgerPanel, document.getElementById('btn-ledger')); }
-        function toggleCompanion() {
-            const willOpen = !companionPanel.classList.contains('open');
-            togglePanel(companionPanel, document.getElementById('btn-companion'));
-            if (willOpen) refreshCompanion();
-        }
-        function toggleSettings() { togglePanel(settingsPanel, document.getElementById('btn-settings')); }
         function toggleTheme() {
             const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', next);
@@ -1476,9 +938,7 @@
         document.getElementById('suggestions').addEventListener('click', (ev) => {
             const item = ev.target.closest('.suggestion');
             if (!item) return;
-            if (item.dataset.action === 'kin') runKinCycle();
-            else if (item.dataset.action === 'residual') runResidualCheck();
-            else if (item.dataset.ask) quickAsk(item.dataset.ask);
+            if (item.dataset.ask) quickAsk(item.dataset.ask);
         });
 
         function quickAsk(text) { input.value = text; growComposer(); sendMsg(); }
@@ -1494,28 +954,107 @@
         input.addEventListener('keydown', handleEnter);
         input.addEventListener('input', growComposer);
 
+        let attachments = [];
         function clearFile() {
-            selectedFile = null;
+            attachments = [];
             const fileInput = document.getElementById('file-input');
-            const chip = document.getElementById('file-chip');
             if (fileInput) fileInput.value = '';
-            if (chip) chip.hidden = true;
-            const name = document.getElementById('file-chip-name');
-            if (name) name.textContent = '';
+            renderAttachments();
+        }
+        function renderAttachments() {
+            const row = document.getElementById('attach-row');
+            row.replaceChildren();
+            row.hidden = !attachments.length;
+            attachments.forEach((att, index) => {
+                const chip = document.createElement('div');
+                chip.className = 'attach-chip' + (att.error ? ' error' : '');
+                if (att.thumb) {
+                    const img = document.createElement('img');
+                    img.src = att.thumb;
+                    img.alt = '';
+                    chip.appendChild(img);
+                } else {
+                    const icon = document.createElement('span');
+                    icon.className = 'attach-icon';
+                    icon.textContent = att.kind === 'lean' ? 'λ' : att.kind === 'clip' ? '▶' : '¶';
+                    chip.appendChild(icon);
+                }
+                const name = document.createElement('span');
+                name.className = 'attach-name';
+                name.textContent = att.pending ? 'Reading ' + att.name + '…' : (att.error || att.name);
+                chip.appendChild(name);
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.setAttribute('aria-label', 'Remove ' + att.name);
+                remove.textContent = '×';
+                remove.addEventListener('click', () => { attachments.splice(index, 1); renderAttachments(); });
+                chip.appendChild(remove);
+                row.appendChild(chip);
+            });
+        }
+        async function addFiles(fileList) {
+            const files = Array.from(fileList || []).slice(0, 6 - attachments.length);
+            for (const file of files) {
+                const slot = { name: file.name, kind: window.ResileosMedia.kindOf(file), pending: true, file: file };
+                attachments.push(slot);
+                renderAttachments();
+                try {
+                    Object.assign(slot, await window.ResileosMedia.prepare(file));
+                } catch (err) {
+                    slot.error = (err && err.message) || ('Couldn\'t read ' + file.name);
+                }
+                slot.pending = false;
+                renderAttachments();
+            }
         }
         function handleFileUpload() {
             const fileInput = document.getElementById('file-input');
-            const chip = document.getElementById('file-chip');
-            const name = document.getElementById('file-chip-name');
-            if (fileInput.files.length > 0) {
-                selectedFile = fileInput.files[0];
-                chip.hidden = false;
-                name.textContent = selectedFile.name;
-            }
+            addFiles(fileInput.files).finally(() => { fileInput.value = ''; });
         }
         document.getElementById('btn-file').addEventListener('click', () => document.getElementById('file-input').click());
         document.getElementById('file-input').addEventListener('change', handleFileUpload);
-        document.getElementById('file-chip-clear').addEventListener('click', clearFile);
+        // Drop or paste pictures and files straight into the composer.
+        (function () {
+            const box = document.querySelector('.input-box');
+            box.addEventListener('dragover', (e) => { e.preventDefault(); box.classList.add('dropping'); });
+            box.addEventListener('dragleave', () => box.classList.remove('dropping'));
+            box.addEventListener('drop', (e) => { e.preventDefault(); box.classList.remove('dropping'); if (e.dataTransfer) addFiles(e.dataTransfer.files); });
+            input.addEventListener('paste', (e) => {
+                const files = Array.from((e.clipboardData && e.clipboardData.files) || []);
+                if (files.length) { e.preventDefault(); addFiles(files); }
+            });
+        })();
+        async function openFilesPicker() {
+            const picker = document.getElementById('files-picker');
+            const list = document.getElementById('files-picker-list');
+            document.getElementById('attach-menu').hidden = true;
+            picker.hidden = false;
+            list.replaceChildren(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: 'Loading…' }));
+            try {
+                const r = await apiFetch(`${apiUrl()}/files`, { headers: authHeaders() });
+                const d = await r.json().catch(() => ({}));
+                list.replaceChildren();
+                if (!r.ok) { list.appendChild(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: formatError(r, d) })); return; }
+                if (!(d.files || []).length) { list.appendChild(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: 'No saved files yet. Files you attach here are saved for you.' })); return; }
+                d.files.slice(0, 30).forEach(f => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'menu-item';
+                    b.textContent = f.name;
+                    b.addEventListener('click', async () => {
+                        picker.hidden = true;
+                        try { await addFiles([await window.ResileosMedia.fromSavedFile(f.id, f.name)]); attachments[attachments.length - 1].file_id = f.id; attachments[attachments.length - 1].saved = true; renderAttachments(); }
+                        catch (err) { setHistoryNote(err.message); }
+                    });
+                    list.appendChild(b);
+                });
+            } catch (err) { list.replaceChildren(Object.assign(document.createElement('p'), { className: 'menu-desc picker-note', textContent: 'Couldn\'t load your files.' })); }
+        }
+        document.getElementById('btn-myfiles').addEventListener('click', openFilesPicker);
+        document.addEventListener('click', (e) => {
+            const picker = document.getElementById('files-picker');
+            if (!picker.hidden && !picker.contains(e.target) && e.target.id !== 'btn-myfiles' && !e.target.closest('#btn-myfiles')) picker.hidden = true;
+        });
 
         function addMsg(sender) {
             const row = document.createElement('div');
@@ -1650,7 +1189,7 @@
                 status = 'UNAVAILABLE';
             } else if (Array.isArray(data.decisions)) {
                 const learned = Number(data.learned || 0);
-                lines.push('Eat reviewed ' + data.decisions.length + ' candidate' + (data.decisions.length === 1 ? '' : 's') + '. Learned ' + learned + '.');
+                lines.push('Checked ' + data.decisions.length + ' possible fact' + (data.decisions.length === 1 ? '' : 's') + '. Saved ' + learned + '.');
                 if (opts && opts.commit === false) lines.push('Commit is off. Learn did not run. Reject and abstain do not write.');
                 else if (!learned) lines.push('Nothing was written.');
                 data.decisions.slice(0, 12).forEach(row => {
@@ -1736,7 +1275,7 @@
             const tutorial = d && typeof d.tutorial_fragment === 'string' ? d.tutorial_fragment : '';
             const reply = document.createElement('div');
             reply.className = 'reply';
-            reply.textContent = text || companion || 'No matching residual fact.';
+            reply.textContent = text || companion || "I don't have that saved yet.";
             bubble.appendChild(reply);
             const meta = document.createElement('div');
             meta.className = 'meta';
@@ -1759,10 +1298,10 @@
             if (typeof options.ms === 'number') notes.push(Math.round(options.ms) + ' ms');
             if (debugReplies() && notes.length) meta.appendChild(document.createTextNode(notes.join(' · ')));
             if (meta.childNodes.length) bubble.appendChild(meta);
-            if (notes.length) {
+            // Technical notes are for admins: Diagnostics turns them on for this browser.
+            if (debugReplies() && notes.length) {
                 const fold = document.createElement('details');
                 fold.className = 'trace-fold';
-                if (debugReplies()) fold.open = true;
                 const summary = document.createElement('summary');
                 summary.textContent = 'Details';
                 const pre = document.createElement('pre');
@@ -1773,12 +1312,139 @@
             if (text && companion) extraLine(bubble, companion, 'companion');
             if (tutorial) {
                 extraLine(bubble, tutorial, 'tutorial');
-                const slot = document.getElementById('companion-fragment');
-                if (slot) slot.textContent = tutorial;
                 refreshCompanion();
             }
             if (chat.contains(bubble)) chat.scrollTop = chat.scrollHeight;
             if (options.persist !== false) schedulePersist();
+        }
+
+        // The chained steps for one turn, in plain words, with sources and anything made.
+        function renderAssist(bubble, assist, sent, text) {
+            if (!assist) return;
+            const trail = assist.trail || [];
+            if (trail.length) {
+                const list = document.createElement('ul');
+                list.className = 'trail';
+                list.setAttribute('aria-label', 'What I did');
+                trail.forEach(step => {
+                    const li = document.createElement('li');
+                    li.className = 'trail-step ' + (step.status || 'done');
+                    li.textContent = step.label;
+                    list.appendChild(li);
+                });
+                bubble.insertBefore(list, bubble.firstChild);
+            }
+            const lean = assist.lean;
+            if (lean && lean.status) {
+                const chip = document.createElement('span');
+                const ok = lean.status === 'CHECKED';
+                chip.className = 'chip lean-chip ' + (ok ? 'accepted' : (lean.status === 'FAILED' || lean.status === 'INCOMPLETE') ? 'conflict' : 'unverified');
+                chip.textContent = ok ? 'Proof checks' : lean.status === 'FAILED' ? (lean.line ? 'Fails at line ' + lean.line : 'Fails') : lean.status === 'INCOMPLETE' ? 'Not finished' : lean.status === 'DECLINED' ? 'Not run' : lean.status === 'TIMEOUT' ? 'Timed out' : 'Checker unavailable';
+                const reply = bubble.querySelector('.reply');
+                if (reply) reply.after(chip); else bubble.appendChild(chip);
+            }
+            const created = assist.created;
+            if (created && created.made) {
+                const box = document.createElement('div');
+                box.className = 'created';
+                let canvas = null;
+                if (created.url) {
+                    const media = /\.(png|jpe?g|webp|gif)(\?|$)/i.test(created.url) ? document.createElement('img') : document.createElement('video');
+                    media.src = created.url;
+                    if (media.tagName === 'VIDEO') { media.controls = true; media.loop = true; media.playsInline = true; }
+                    else media.alt = 'What I made';
+                    box.appendChild(media);
+                    const dl = document.createElement('a');
+                    dl.className = 'link-chip';
+                    dl.href = created.url;
+                    dl.target = '_blank';
+                    dl.rel = 'noopener noreferrer';
+                    dl.download = '';
+                    dl.textContent = 'Download';
+                    box.appendChild(dl);
+                } else if (Array.isArray(created.preview) && created.preview.length) {
+                    canvas = document.createElement('canvas');
+                    box.appendChild(canvas);
+                    playFrames(canvas, created.preview);
+                    const studio = document.createElement('button');
+                    studio.type = 'button';
+                    studio.className = 'link-chip';
+                    studio.textContent = 'Open in Studio to download';
+                    studio.addEventListener('click', () => {
+                        if (window.ResileosMedia.handoff({ name: 'clip', kind: 'clip', grayFrames: created.preview, prompt: text }, 'clip')) location.href = '/studio?from=chat';
+                    });
+                    box.appendChild(studio);
+                }
+                bubble.appendChild(box);
+            }
+            const sources = assist.sources || [];
+            if (sources.length) {
+                const wrap = document.createElement('div');
+                wrap.className = 'sources';
+                const head = document.createElement('p');
+                head.className = 'sources-head';
+                head.textContent = 'Sources';
+                wrap.appendChild(head);
+                const ol = document.createElement('ol');
+                sources.forEach(src => {
+                    if (!/^https?:\/\//.test(src.url || '')) return;
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = src.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.textContent = src.title || src.url;
+                    li.appendChild(a);
+                    ol.appendChild(li);
+                });
+                wrap.appendChild(ol);
+                bubble.appendChild(wrap);
+            }
+            const lines = [];
+            trail.forEach(step => { if (step.detail) lines.push(step.label + ': ' + step.detail); });
+            (assist.attachments || []).forEach(a => lines.push(a.name + ' (' + a.kind + '): ' + a.summary));
+            if (lean && lean.raw) lines.push('', 'Lean output:', lean.raw);
+            if (lean && lean.limits) lines.push('Limits: ' + lean.limits.timeout_s + ' s, ' + lean.limits.memory_mb + ' MB, network ' + (lean.network || 'isolated'));
+            if (created && created.detail) lines.push('Create: ' + created.status + ' — ' + created.detail);
+            if (lines.length) {
+                const fold = document.createElement('details');
+                fold.className = 'assist-details';
+                const summary = document.createElement('summary');
+                summary.textContent = 'Details';
+                const pre = document.createElement('pre');
+                pre.textContent = lines.join('\n');
+                fold.append(summary, pre);
+                bubble.appendChild(fold);
+            }
+            if (chat.contains(bubble)) chat.scrollTop = chat.scrollHeight;
+        }
+
+        function playFrames(canvas, frames) {
+            const h = frames[0].length, w = frames[0][0].length;
+            canvas.width = w * 6;
+            canvas.height = h * 6;
+            let lo = Infinity, hi = -Infinity;
+            frames.forEach(f => f.forEach(r => r.forEach(v => { v = Number(v); if (v < lo) lo = v; if (v > hi) hi = v; })));
+            const small = document.createElement('canvas');
+            small.width = w; small.height = h;
+            const sctx = small.getContext('2d');
+            const ctx = canvas.getContext('2d');
+            let i = 0;
+            function draw() {
+                if (!document.body.contains(canvas)) return;
+                const img = sctx.createImageData(w, h);
+                const f = frames[i % frames.length];
+                for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+                    const v = Math.round(((Number(f[y][x]) - lo) / ((hi - lo) || 1)) * 255);
+                    const k = (y * w + x) * 4;
+                    img.data[k] = img.data[k + 1] = img.data[k + 2] = v; img.data[k + 3] = 255;
+                }
+                sctx.putImageData(img, 0, 0);
+                ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
+                i += 1;
+                setTimeout(draw, 250);
+            }
+            draw();
         }
 
         function renderStructured(target, data, opts) {
@@ -1802,17 +1468,15 @@
             if (described.status) meta.appendChild(chipEl(badgeLabel(described.status), statusKind(described.status)));
             if (typeof options.ms === 'number') meta.appendChild(document.createTextNode(Math.round(options.ms) + ' ms'));
             if (meta.childNodes.length) target.appendChild(meta);
-            const fold = document.createElement('details');
-            fold.className = 'raw-fold';
-            const summary = document.createElement('summary');
-            summary.textContent = 'Raw payload';
-            const pre = document.createElement('pre');
-            pre.textContent = JSON.stringify(data, null, 2);
-            fold.append(summary, pre);
-            target.appendChild(fold);
-            if (data && data.clotho_owner) {
-                const owner = document.getElementById('stop-owner');
-                if (owner && !owner.value.trim()) owner.value = String(data.clotho_owner);
+            if (debugReplies()) {
+                const fold = document.createElement('details');
+                fold.className = 'raw-fold';
+                const summary = document.createElement('summary');
+                summary.textContent = 'Details';
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data, null, 2);
+                fold.append(summary, pre);
+                target.appendChild(fold);
             }
             if (options.persist !== false) schedulePersist();
         }
@@ -1830,175 +1494,6 @@
             else renderStructured(target, data, opts);
         }
 
-        async function runEndpoint(label, method, path, body) {
-            hideSuggestions();
-            addMsg('user').textContent = label;
-            const bubble = addMsg('bot');
-            setTyping(bubble);
-            const started = performance.now();
-            try {
-                const opts = { method, headers: authHeaders(body !== undefined) };
-                if (body !== undefined) opts.body = JSON.stringify(body);
-                const r = await apiFetch(`${apiUrl()}${path}`, opts);
-                const d = await r.json().catch(() => ({}));
-                const ms = performance.now() - started;
-                if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
-                    return d;
-                }
-                renderOutcome(bubble, d, { ms: ms });
-                if (d && d.persona && d.steps) applyCompanion(d);
-                const step = tutorialStepFor(method, path, d);
-                if (step) postTutorialStep(step);
-                return d;
-            } catch (e) {
-                renderReply(bubble, { status: 'ERROR', value: label + ' failed.' });
-                return null;
-            }
-        }
-
-        async function runStudio(label, path, body, slot, extra) {
-            hideSuggestions();
-            addMsg('user').textContent = label;
-            const bubble = addMsg('bot');
-            setTyping(bubble);
-            if (slot) slot.textContent = 'Running…';
-            const started = performance.now();
-            const options = extra || {};
-            try {
-                const response = await apiFetch(apiUrl() + path, {
-                    method: 'POST',
-                    headers: authHeaders(true),
-                    body: JSON.stringify(body)
-                });
-                const data = await response.json().catch(() => ({}));
-                const ms = performance.now() - started;
-                options.ms = ms;
-                if (!response.ok) {
-                    const payload = { status: 'ERROR', value: formatError(response, data) };
-                    renderReply(bubble, payload, { ms: ms });
-                    if (slot) renderReply(slot, payload, { ms: ms, persist: false });
-                    return data;
-                }
-                renderOutcome(bubble, data, options);
-                if (slot) renderOutcome(slot, data, Object.assign({}, options, { persist: false }));
-                return data;
-            } catch (err) {
-                renderReply(bubble, { status: 'ERROR', value: label + ' failed.' });
-                if (slot) slot.textContent = label + ' failed.';
-                return null;
-            }
-        }
-
-        async function runKinCycle() {
-            hideSuggestions();
-            addMsg('user').textContent = 'Running Kin cycle…';
-            const bubble = addMsg('bot');
-            setTyping(bubble);
-            const started = performance.now();
-            try {
-                const r = await apiFetch(`${apiUrl()}/kin/cycle`, {
-                    method: 'POST',
-                    headers: authHeaders(true),
-                    body: JSON.stringify({ apply_policy: true })
-                });
-                const d = await r.json();
-                const ms = performance.now() - started;
-                if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
-                    return;
-                }
-                const lesson = (d.harness && d.harness.lesson) || (d.report && d.report.lesson) || d.lesson || '—';
-                renderReply(bubble, { status: 'ACCEPTED', value: 'Kin cycle complete. Lesson: ' + lesson, source: 'kin', verified: !!(d.harness && d.harness.verified) }, { ms: ms });
-            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Kin cycle error: ' + e.message }); }
-        }
-
-        async function listCheckpoints() {
-            hideSuggestions();
-            addMsg('user').textContent = 'Listing Hades checkpoints…';
-            const bubble = addMsg('bot');
-            setTyping(bubble);
-            try {
-                const r = await apiFetch(`${apiUrl()}/kin/hades/list`, { headers: authHeaders() });
-                const d = await r.json();
-                if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
-                    return;
-                }
-                const cps = d.checkpoints || [];
-                if (!cps.length) {
-                    renderReply(bubble, { status: 'NO_ROWS', value: 'No checkpoints yet. A verified Kin cycle writes one.' });
-                    return;
-                }
-                bubble.replaceChildren();
-                const reply = document.createElement('div');
-                reply.className = 'reply';
-                reply.textContent = cps.length + ' checkpoint' + (cps.length === 1 ? '' : 's') + '.';
-                bubble.appendChild(reply);
-                cps.forEach(cp => {
-                    const row = document.createElement('div');
-                    row.style.margin = '6px 0';
-                    const code = document.createElement('code');
-                    code.textContent = cp.id || cp.name;
-                    const btn = document.createElement('button');
-                    btn.className = 'tool-chip';
-                    btn.style.marginLeft = '8px';
-                    btn.type = 'button';
-                    btn.textContent = 'Restore';
-                    btn.addEventListener('click', () => restoreCheckpoint(cp.id || cp.name));
-                    row.append(code, btn);
-                    if (cp.name && cp.name !== cp.id) {
-                        const note = document.createElement('div');
-                        note.className = 'meta';
-                        note.textContent = cp.name;
-                        row.appendChild(note);
-                    }
-                    bubble.appendChild(row);
-                });
-                schedulePersist();
-            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'No checkpoints endpoint.' }); }
-        }
-
-        async function restoreCheckpoint(id) {
-            addMsg('user').textContent = 'Restoring checkpoint ' + id + '…';
-            const bubble = addMsg('bot');
-            setTyping(bubble);
-            try {
-                const r = await apiFetch(`${apiUrl()}/kin/hades/restore`, {
-                    method: 'POST',
-                    headers: authHeaders(true),
-                    body: JSON.stringify({ checkpoint_id: id, fresh: true })
-                });
-                const d = await r.json().catch(() => ({}));
-                if (r.ok) renderReply(bubble, { status: 'ACCEPTED', value: d.lesson ? ('Restored. Lesson: ' + d.lesson) : 'Restored.', source: 'hades', verified: false });
-                else renderReply(bubble, { status: 'ERROR', value: formatError(r, d) });
-            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Restore failed.' }); }
-        }
-
-        async function runResidualCheck() { return runTool('residual_consistency'); }
-
-        async function runTool(name) {
-            hideSuggestions();
-            addMsg('user').textContent = 'Calling tool ' + name + '…';
-            const bubble = addMsg('bot');
-            setTyping(bubble);
-            const started = performance.now();
-            try {
-                const payload = name === 'web_search' ? { query: input.value.trim() || 'resileos' } : {};
-                const r = await apiFetch(`${apiUrl()}/tools/${encodeURIComponent(name)}`, {
-                    method: 'POST',
-                    headers: authHeaders(true),
-                    body: JSON.stringify(payload)
-                });
-                const d = await r.json();
-                const ms = performance.now() - started;
-                if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
-                    return;
-                }
-                renderOutcome(bubble, d, { ms: ms });
-            } catch (e) { renderReply(bubble, { status: 'ERROR', value: 'Tool ' + name + ' failed.' }); }
-        }
 
         function formatError(r, d) {
             if (d && d.code === 'trial_exhausted') {
@@ -2069,8 +1564,15 @@
                 const bubble = row.querySelector('.bubble');
                 if (!bubble || bubble.querySelector('.typing')) return;
                 const reply = bubble.querySelector('.reply');
-                const link = bubble.querySelector('a');
-                const text = ((reply ? reply.textContent : bubble.textContent) + (link ? '\n' + link.textContent : '')).trim();
+                const link = bubble.querySelector(':scope > a');
+                const userText = bubble.querySelector('.user-text');
+                const sentNames = Array.from(bubble.querySelectorAll('.sent-attachment figcaption')).map(el => el.textContent);
+                let text;
+                if (row.classList.contains('user') && (userText || sentNames.length)) {
+                    text = ((userText ? userText.textContent : '') + (sentNames.length ? (userText ? '\n' : '') + '[attached: ' + sentNames.join(', ') + ']' : '')).trim();
+                } else {
+                    text = ((reply ? reply.textContent : bubble.textContent) + (link ? '\n' + link.textContent : '')).trim();
+                }
                 if (!text) return;
                 messages.push({
                     role: row.classList.contains('user') ? 'user' : 'assistant',
@@ -2472,60 +1974,103 @@
             }
         }
 
+        function userBubble(text, sent) {
+            const bubble = addMsg('user');
+            if (text) {
+                const p = document.createElement('div');
+                p.className = 'user-text';
+                p.textContent = text;
+                bubble.appendChild(p);
+            }
+            if (sent.length) {
+                const strip = document.createElement('div');
+                strip.className = 'sent-attachments';
+                sent.forEach(att => {
+                    const item = document.createElement('figure');
+                    item.className = 'sent-attachment';
+                    if (att.thumb) {
+                        const img = document.createElement('img');
+                        img.src = att.thumb;
+                        img.alt = att.name;
+                        item.appendChild(img);
+                    }
+                    const cap = document.createElement('figcaption');
+                    cap.textContent = att.name;
+                    item.appendChild(cap);
+                    if (att.kind === 'image' || att.kind === 'clip') {
+                        const use = document.createElement('button');
+                        use.type = 'button';
+                        use.className = 'link-chip';
+                        use.textContent = att.kind === 'clip' ? 'Make a clip from this' : 'Make a variation in Studio';
+                        use.addEventListener('click', () => {
+                            att.prompt = text;
+                            if (window.ResileosMedia.handoff(att, att.kind === 'clip' ? 'clip' : 'image')) location.href = '/studio?from=chat';
+                        });
+                        item.appendChild(use);
+                    }
+                    strip.appendChild(item);
+                });
+                bubble.appendChild(strip);
+            }
+            return bubble;
+        }
+
         async function sendMsg() {
             const text = input.value.trim();
-            if (!text && !selectedFile) return;
+            if (attachments.some(a => a.pending)) { setHistoryNote('Still reading your attachments…'); return; }
+            const sent = attachments.filter(a => !a.error);
+            if (!text && !sent.length) return;
             hideSuggestions();
-            addMsg('user').textContent = text || ('[File: ' + selectedFile.name + ']');
+            userBubble(text, sent);
             input.value = '';
             growComposer();
+            clearFile();
             sendBtn.disabled = true;
             const bubble = addMsg('bot');
             setTyping(bubble);
             const started = performance.now();
+            const hints = (window.ResileosHints && window.ResileosHints()) || { search: false, create: null };
+            // Keep what you attach in your Files when you're signed in.
+            if (sessionState.signed_in) {
+                sent.filter(a => a.file && !a.saved).forEach(a => {
+                    window.ResileosMedia.saveToFiles(a.file, csrfToken).then(saved => { a.file_id = saved.id; }).catch(() => {});
+                });
+            }
             try {
-                const endpoint = selectedFile ? '/upload' : '/chat';
-                const fetchOptions = selectedFile
-                    ? {
-                        method: 'POST',
-                        headers: authHeaders(false),
-                        body: (() => { const fd = new FormData(); fd.append('message', text); fd.append('file', selectedFile); return fd; })()
-                      }
-                    : {
-                        method: 'POST',
-                        headers: authHeaders(true),
-                        body: JSON.stringify({
-                            message: text,
-                            text: text,
-                            history: chatHistory,
-                            hub_id: hubId(),
-                            last_tool_empty: lastToolEmpty,
-                            persona: currentPersona(),
-                            prose: true
-                        })
-                      };
-                const r = await apiFetch(`${apiUrl()}${endpoint}`, fetchOptions);
-                const d = await r.json();
+                const r = await apiFetch(`${apiUrl()}/assist`, {
+                    method: 'POST',
+                    headers: authHeaders(true),
+                    body: JSON.stringify({
+                        message: text,
+                        history: chatHistory,
+                        hub_id: hubId(),
+                        last_tool_empty: lastToolEmpty,
+                        persona: currentPersona(),
+                        prose: true,
+                        attachments: sent.map(a => window.ResileosMedia.wire(a)),
+                        hints: hints
+                    })
+                });
+                const d = await r.json().catch(() => ({}));
                 const ms = performance.now() - started;
-                clearFile();
                 if (!r.ok) {
                     renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
                     return;
                 }
                 renderReply(bubble, d, { ms: ms });
+                if (d.assist) renderAssist(bubble, d.assist, sent, text);
                 lastToolEmpty = ['NO_ROWS', 'ABSTAINED'].includes(d.status) || d.chip === 'no_rows' || d.chip === 'abstained';
-                if (text) {
-                    const taken = d.action_taken || {};
-                    chatHistory.push({ role: 'user', content: text });
-                    chatHistory.push({
-                        role: 'assistant',
-                        content: d.reply_text || d.value || '',
-                        subject: d.subject || taken.subject || '',
-                        relation: taken.relation || '',
-                        obj: (Array.isArray(d.rows) && d.rows.length) ? String(d.rows[0]) : ''
-                    });
-                    if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
-                }
+                const taken = d.action_taken || {};
+                chatHistory.push({ role: 'user', content: text || sent.map(a => a.name).join(', ') });
+                if (d.assist && d.assist.context) chatHistory.push({ role: 'assistant', content: 'Context: ' + d.assist.context.slice(0, 1500) });
+                chatHistory.push({
+                    role: 'assistant',
+                    content: d.reply_text || d.value || '',
+                    subject: d.subject || taken.subject || '',
+                    relation: taken.relation || '',
+                    obj: (Array.isArray(d.rows) && d.rows.length) ? String(d.rows[0]) : ''
+                });
+                if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
             } catch (e) {
                 renderReply(bubble, { status: 'ERROR', value: 'Network error.' });
                 setStatus('offline', 'Network error');
@@ -2536,6 +2081,19 @@
             }
         }
         sendBtn.addEventListener('click', sendMsg);
+        // /chat?file=<id>: attach one of your saved files (from My files).
+        (function () {
+            const params = new URLSearchParams(location.search);
+            const id = params.get('file');
+            if (!id || !/^[a-f0-9]{32}$/.test(id)) return;
+            window.ResileosMedia.fromSavedFile(id, params.get('name') || 'file')
+                .then(file => addFiles([file]).then(() => {
+                    const last = attachments[attachments.length - 1];
+                    if (last) { last.file_id = id; last.saved = true; }
+                }))
+                .catch(() => setHistoryNote("That file couldn't be opened. Sign in, or check My files."));
+            history.replaceState(null, '', '/chat');
+        })();
         claimPaidKey();
         showApp();
     </script>

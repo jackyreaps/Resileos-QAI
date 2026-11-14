@@ -15,7 +15,14 @@ def test_pages_session_module():
     if not node:
         pytest.skip("node is required for the Pages session tests")
     proc = subprocess.run(
-        [node, "--test", "landing/functions/_auth.test.js"],
+        [
+            node,
+            "--test",
+            "landing/functions/_auth.test.js",
+            "landing/functions/_admin.test.js",
+            "landing/functions/_reports.test.js",
+            "landing/functions/_wiring.test.js",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,

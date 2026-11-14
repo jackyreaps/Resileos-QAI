@@ -7,7 +7,8 @@ so nothing is exposed until an operator sets it. Review-tier approval
 only marks a proposal approved for a later PR; it never applies code.
 */
 import { detail, json } from "./_lib.js";
-import { csrfOk, normalizeEmail, originAllowed, readSession } from "./_auth.js";
+import { csrfOk, originAllowed, readSession } from "./_auth.js";
+import { adminEmails, isAdminEmail } from "./_admin.js";
 
 export const REPORT_KEY = "reports:upgrade";
 
@@ -20,24 +21,7 @@ function noStore(response) {
   return response;
 }
 
-export function adminEmails(env) {
-  const raw = String((env && env.ADMIN_EMAILS) || "");
-  const out = [];
-  const seen = new Set();
-  for (const part of raw.split(/[,;\s]+/)) {
-    const email = normalizeEmail(part);
-    if (!email || seen.has(email)) continue;
-    seen.add(email);
-    out.push(email);
-  }
-  return out;
-}
-
-export function isAdminEmail(email, env) {
-  const want = normalizeEmail(email);
-  if (!want) return false;
-  return adminEmails(env).includes(want);
-}
+export { adminEmails, isAdminEmail };
 
 export function emptyReport() {
   return {

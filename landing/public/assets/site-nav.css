@@ -9,7 +9,7 @@
   backdrop-filter: blur(14px);
   color: #eef2fb;
 }
-html.signed-in .site-strip { display: none; }
+
 html:not(.signed-in) body:has(.site-strip) #portal {
   min-height: calc(100dvh - 64px);
 }

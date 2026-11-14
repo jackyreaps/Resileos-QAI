@@ -1,0 +1,22 @@
+.files-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 10px; }
+.files-bar .btn { cursor: pointer; }
+.files-list { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.file-row {
+  display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card);
+}
+.file-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: #1a2740; color: var(--accent); font-weight: 700; }
+.file-name { font-weight: 600; overflow-wrap: anywhere; }
+.file-meta { color: var(--muted); font-size: 0.82rem; }
+.file-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.file-actions a, .file-actions button {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 4px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-size: 0.84rem; cursor: pointer; text-decoration: none;
+}
+.file-actions .danger { color: var(--danger); }
+.files-empty { color: var(--muted); }
+.files-note { margin-top: 14px; }
+@media (max-width: 560px) {
+  .file-row { grid-template-columns: 40px 1fr; }
+  .file-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
