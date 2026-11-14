@@ -33,7 +33,7 @@ def test_levels_are_frame_grids_at_the_phi_address_not_a_halving_pyramid():
     assert [b["frame"] for b in levels["bands"]] == list(CASCADE_FRAMES)
     for b in levels["bands"]:
         assert b["control"] == frame_control(b["frame"])
-        assert b["weight"] == round(frame_weight(b["frame"]), 6)
+        assert b["address"] == round(frame_weight(b["frame"]), 6)
     assert core.grid(PIC, 3).shape[:2] == (3, 3) and core.grid(PIC, 5).shape[:2] == (5, 5)
     assert core.grid(PIC, 9).shape[:2] == (9, 9) and core.grid(PIC, 12).shape[:2] == (12, 12)
     # Lossless with the detail band; frame 5 is the pentagram orientation.
@@ -56,16 +56,21 @@ def test_one_core_serves_image_video_and_world():
     assert "scene" in [n["kind"] for n in core.world_at(project, 9)["nodes"]]
 
 
-def test_overlays_contract_by_phi_address_and_stop_at_floor_and_waist():
-    deep = core.Overlay("a", children=[core.Overlay("b", children=[core.Overlay("c", children=[core.Overlay("d")])])])
+def test_sub_instances_reach_frame_12_at_full_strength():
+    deep = core.Overlay("a", children=[core.Overlay("b", children=[core.Overlay("c", children=[core.Overlay("d", children=[core.Overlay("e")])])])])
     out = core.instances(deep)
-    scales = [i["scale"] for i in out["instances"]]
-    assert scales[1] == pytest.approx(phi_address(5) / phi_address(3), abs=1e-6)
-    assert scales[2] == pytest.approx(phi_address(9) / phi_address(3), abs=1e-6)
-    # Current behaviour (user decision pending): the 12-frame sits under 1/64.
-    assert out["stopped"]["floor"] == 1 and len(out["instances"]) == 3
-    wide = core.Overlay("root", children=[core.Overlay(f"c{i}") for i in range(60)])
-    assert len(core.instances(wide)["instances"]) == 36
+    got = out["instances"]
+    assert [i["frame"] for i in got] == [3, 5, 9, 12]
+    assert [i["address"] for i in got] == [round(phi_address(f) / phi_address(3), 6) for f in (3, 5, 9, 12)]
+    assert all(i["strength"] == 1.0 for i in got)  # the address places, it never dims
+    assert out["stopped"] == {"floor": 0, "waist": 0, "depth": 1, "span": 0}
+    # What shrinks outward is the waist span: 12 at frame 3, 4 at 9, 3 at 12; 5 has none.
+    assert [i["span"] for i in got] == [12, None, 4, 3]
+    wide = core.instances(core.Overlay("root", children=[core.Overlay(f"c{i}") for i in range(60)]))
+    assert len(wide["instances"]) == 13 and wide["stopped"]["span"] == 48
+    # The 1/64 floor is on a sub-instance's own residual energy only.
+    quiet = core.instances(core.Overlay("a", children=[core.Overlay("b", energy=0.01), core.Overlay("c", energy=0.02)]))
+    assert [i["name"] for i in quiet["instances"]] == ["a", "c"] and quiet["stopped"]["floor"] == 1
     base = np.zeros((4, 4, 3))
     top = np.ones((4, 4, 3))
     weak, strong = core.Overlay("w", strength=1, alpha=1.0, payload=top * 0.2), core.Overlay("s", strength=2, alpha=0.5, payload=top)

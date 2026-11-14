@@ -50,7 +50,9 @@ def test_rank_sources_cascade_floor_and_waist():
     urls = [e["source"] for e in out["envelopes"]]
     assert "https://s1.example" not in urls  # relevance 0 is below 1/64
     assert len(out["envelopes"]) <= 12  # outer frame stays 12
-    assert all(e["score"] >= EPSILON for e in out["envelopes"])
+    # The floor is on energy, not the address: frame-12 results stay.
+    assert all(e["energy"] >= EPSILON for e in out["envelopes"])
+    assert 12 in [e["address"]["frame"] for e in out["envelopes"]]
     assert [e["address"]["frame"] for e in out["envelopes"][:3]] == [3, 3, 5]
     scores = [e["score"] for e in out["envelopes"]]
     assert scores == sorted(scores, reverse=True)

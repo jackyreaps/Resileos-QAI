@@ -187,16 +187,52 @@ def test_cascade_search_ranks_by_phi_address():
     assert by_level[0] == round(frame_weight(3), 6)
     assert by_level[1] == round(frame_weight(5), 6)
     assert by_level[2] == round(frame_weight(9), 6)
-    # φ^{-9} sits under the 1/64 floor, so the 12-frame ranks drop.
-    assert 3 not in by_level
+    # Frame 12 is kept: its address φ^-9 is under 1/64, but the floor is
+    # on energy (relevance), never on the address.
+    assert by_level[3] == round(frame_weight(12), 6)
+    assert len(out["envelopes"]) == 12 and out["dropped"] == 0
+    # Still ordered by address, frame 3 first and frame 12 last.
+    levels = [env["level"] for env in out["envelopes"]]
+    assert levels == sorted(levels)
 
 
-def test_chroma_scales_use_the_phi_address():
+def test_cascade_search_drops_only_on_energy():
+    from resileos.chat.cascade_tools import rank_sources
+
+    rows = [{"url": f"https://ex.org/{i}", "title": "acme" if i != 11 else "unrelated", "snippet": ""} for i in range(12)]
+    out = rank_sources(rows, "acme widget gadget sprocket cog bolt nut " + " ".join(f"w{i}" for i in range(60)))
+    # Relevance 1/67 < 1/64 at every frame -> dropped; an unrelated row (0) too.
+    assert out["envelopes"] == [] and out["dropped"] == 12
+    out = rank_sources(rows, "acme")
+    assert {e["level"] for e in out["envelopes"]} == {0, 1, 2, 3} and out["dropped"] == 1
+
+
+def test_chroma_is_full_strength_at_every_frame():
     from resileos.ui.chroma import expand_variations
 
-    code = {"chroma": [1, 1, 1, 1, 1], "hue_step": 0, "orientation": "orion"}
-    pal = expand_variations(code)[0]
-    assert max(pal["weights"]) <= frame_weight(9) + 1e-9
+    by_scale = {}
+    for scale in ORIENTATION_SCALES:
+        code = {"chroma": [0.2, 0.9, 0.8, 0.6, 0.7], "hue_step": 0, "orientation": scale}
+        by_scale[scale] = [p["weights"] for p in expand_variations(code)]
+    # No fading at frames 9 (orion) and 12 (north_star): same strength as frame 3.
+    assert by_scale["orion"] == by_scale["edge"] == by_scale["north_star"]
+    assert max(max(w) for w in by_scale["north_star"]) == pytest.approx(0.9)
+
+
+def test_studio_variations_do_not_fade_at_far_scales():
+    import numpy as np
+    from resileos.chat.cascade_tools import variations_from_code, code_from_picture
+    from resileos.ui.chroma import pack_code
+
+    pic = np.random.default_rng(2).random((12, 16, 3))
+    sat = {}
+    for scale in ("edge", "orion", "north_star"):
+        code = pack_code({**code_from_picture(pic), "orientation": scale}).hex()
+        out = np.asarray(variations_from_code(pic, n=3, code=code)["variations"][0]["matrix"])
+        sat[scale] = float((out.max(axis=2) - out.min(axis=2)).mean())
+    assert sat["orion"] == pytest.approx(sat["edge"], rel=0.05)
+    assert sat["north_star"] == pytest.approx(sat["edge"], rel=0.05)
+    assert sat["north_star"] > 0.1
 
 
 def test_frame_motion_clip_carries_its_frame_control():

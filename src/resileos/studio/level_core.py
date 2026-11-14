@@ -12,10 +12,13 @@ the waist of 36.
 
 *Overlays* control recursive sub-instances. An overlay is a layer with a
 strength order and an alpha ("over" composition for pixels, stronger
-opinion wins for structured data). A sub-instance references a parent
-one level up and is scaled by the ratio of the two frames' φ addresses,
-so each step is a contraction (≤ φ⁻²) and recursion stops at the
-1/64 floor (``keep_packet``) or the waist of 36 children.
+opinion wins for structured data). A sub-instance sits one frame out
+from its parent, at that frame's φ address (relative to frame 3 = 1).
+The address places it; it never dims it. What shrinks outward is the
+waist span (36/3 = 12, 36/9 = 4, 36/12 = 3 children; the 5-frame is
+the orientation, no span). Recursion runs through frame 12 and stops
+only past 12, past the waist of 36, or when a sub-instance's own
+residual energy is under 1/64 (``keep_packet``).
 
 The same three verbs serve all pillars:
 
@@ -29,7 +32,7 @@ This module never learns, never writes a scar, and never writes Titanos.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 import numpy as np
 
@@ -104,7 +107,7 @@ def level_down(matrix: Any) -> dict[str, Any]:
         here = spread(grid(arr, f), arr.shape)
         band = here - previous
         energy = float(np.mean(np.abs(band)))
-        bands.append({"frame": f, "control": frame_control(f), "weight": round(frame_weight(f), 6),
+        bands.append({"frame": f, "control": frame_control(f), "address": round(frame_weight(f), 6),
                       "energy": round(energy, 6), "kept": f == CASCADE_FRAMES[0] or keep_packet(energy),
                       "band": band})
         previous = here
@@ -206,6 +209,7 @@ class Overlay:
     alpha: float = 1.0
     payload: Any = None
     children: list["Overlay"] = field(default_factory=list)
+    energy: Optional[float] = None  # residual energy, if known; floored at 1/64
 
 
 def over(base: np.ndarray, top: np.ndarray, alpha: float) -> np.ndarray:
@@ -237,35 +241,38 @@ def merge(base: dict[str, Any], overlays: Iterable[Overlay]) -> dict[str, Any]:
 
 
 def instances(root: Overlay) -> dict[str, Any]:
-    """Flatten recursive sub-instances, leveling down the cascade.
+    """Flatten recursive sub-instances, leveling out the cascade.
 
-    Depth d runs at frame ``CASCADE_FRAMES[d]``; a child's scale is its
-    parent's times φ_address(child frame) / φ_address(parent frame), so
-    every step contracts. A sub-instance under the 1/64 floor, deeper
-    than the 12-frame, or past the waist of 36 is not expanded.
+    Depth d runs at frame ``CASCADE_FRAMES[d]`` and carries that frame's
+    φ address relative to frame 3 (an address, not a gain) and its waist
+    span. A node takes at most ``waist_span`` children at its frame (the
+    5-frame orientation has no span, so the waist of 36 caps it). Stops:
+    past the 12-frame, past 36 instances in all, or a sub-instance whose
+    own residual energy is under 1/64. The address never stops anything.
     """
     flat: list[dict[str, Any]] = []
-    stopped = {"floor": 0, "waist": 0, "depth": 0}
+    stopped = {"floor": 0, "waist": 0, "depth": 0, "span": 0}
 
-    def walk(node: Overlay, depth: int, scale: float, path: str) -> None:
+    def walk(node: Overlay, depth: int, path: str) -> None:
         if depth >= len(CASCADE_FRAMES):
             stopped["depth"] += 1
             return
-        if not keep_packet(scale):
+        if node.energy is not None and not keep_packet(node.energy):
             stopped["floor"] += 1
             return
         if len(flat) >= WAIST:
             stopped["waist"] += 1
             return
         f = CASCADE_FRAMES[depth]
-        flat.append({"name": node.name, "path": path, "depth": depth, "frame": f, "scale": round(scale, 6)})
+        ctrl = frame_control(f)
+        flat.append({"name": node.name, "path": path, "depth": depth, "frame": f,
+                     "address": round(frame_weight(f), 6), "span": ctrl["span"], "strength": 1.0})
+        room = ctrl["span"] if ctrl["span"] is not None else WAIST
         for i, child in enumerate(node.children):
-            nxt = depth + 1
-            if nxt < len(CASCADE_FRAMES):
-                ratio = phi_address(CASCADE_FRAMES[nxt]) / phi_address(f)
-            else:
-                ratio = 0.0
-            walk(child, nxt, scale * ratio, f"{path}/{i}")
+            if i >= room:
+                stopped["span"] += len(node.children) - room
+                break
+            walk(child, depth + 1, f"{path}/{i}")
 
-    walk(root, 0, 1.0, "0")
+    walk(root, 0, "0")
     return {"instances": flat, "stopped": stopped, "floor": EPSILON, "waist": WAIST}
