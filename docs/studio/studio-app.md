@@ -24,7 +24,7 @@ Every tool runs on one upper layer that mirrors the cascade:
 - **Overlays** control recursive sub-instances:
   - Layers composite in strength order: Porter–Duff "over" for pixels (`compose`), and the stronger opinion wins for structured data (`merge`).
   - A sub-instance sits one frame out from its parent, at that frame's φ address. The address places it and never dims it.
-  - `instances` stops only past the 12-frame, past 36 instances, or when a sub-instance's own residual energy is under 1/64. A node takes at most its frame's waist span of children.
+  - `instances` stops only at 36 copies in the sector, past the 12-frame, or when a sub-instance's own residual energy is under 1/64. Each copy carries its frame's span as block-size metadata.
 
 There is one core and no separate engines per pillar: `studio_ops` calls the same functions for pictures, clips, and worlds.
 
@@ -45,7 +45,7 @@ The operation names are `add_asset`, `edit`, `variations`, `clip`, `recolor_clip
 ## Research recommendations used (`/workspace/notes/studio-research.md`)
 
 - **#1 Leveled core:** used. `decode(level)` is shared by image, video, and world, with the ε band floor and the waist cap. Frames are φ-addressed grids, replacing the report's "standard dyadic pyramid" caveat.
-- **#3 Overlay with inheritance:** used, as a small subset: layers, strength order, "over", and recursive instances that are bounded by waist span, the energy floor, and 36.
+- **#3 Overlay with inheritance:** used, as a small subset: layers, strength order, "over", and recursive instances bounded only by the waist of 36, frame 12, and the energy floor.
 - **#5 Keyframe-to-clip:** partly used. Keyframes per level with blended in-betweens. Phase-based in-betweens are not done yet.
 - **#8 Temporal lore consistency:** partly used. Quintuple bounds with an Allen-style overlap and order check. Datalog rules are not done yet.
 - **Runners-up:** structured game rules with Lean invariants (§10), and the native edit operations (§11): tone, crop, mirror, and over.
@@ -56,5 +56,6 @@ The operation names are `add_asset`, `edit`, `variations`, `clip`, `recolor_clip
 - φ^-(f-3) is an **address** relative to frame 3, where it equals 1. `frame_weight` is used only to rank and to order levels.
 - Color and detail are at full strength at every frame. Palette, color, and Studio variation strength are never multiplied by the address. Outer frames place content; they don't dim it.
 - ε = 1/64 is a floor on residual energy only, never on the address. A packet, search result, wave result, band, or sub-instance at any frame is dropped only when its own energy is under ε.
-- What shrinks at outer frames is the waist span: 36/3 = 12, 36/9 = 4, 36/12 = 3. Frame 5 is the orientation, with no span.
-- Nested copies run through frame 12. `instances` gives each node at most its frame's span of children and stops only past 12, past 36 instances, or below the energy floor.
+- The waist of 36 is the only total limit.
+- The span 36/f is the block size at that frame (36/3 = 12, 36/9 = 4, 36/12 = 3), a structural block division. It is a label, not a per-parent child cap or fan-out. Frame 5 has no span: it is orientation only.
+- Nested copies run through frame 12. `instances` stops only at 36 copies in the sector, past frame 12, or when a copy's residual energy is under 1/64.

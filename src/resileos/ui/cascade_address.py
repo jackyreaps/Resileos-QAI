@@ -20,8 +20,10 @@ Two constructions sit on that cascade:
   Titanos ingest, and ``motion_scale`` (MAGNETIC_PHASE / PHI) already
   use. A frame's address is φ^{-(frame-3)} (frame 3 = 1): it places
   content and orders levels, it is never a gain on color or detail,
-  and the 1/64 floor never applies to it. What shrinks at outer frames
-  is the waist span (12, 4, 3; none at the 5-frame). The orientation
+  and the 1/64 floor never applies to it. ``waist_span`` (36/f: 12, 4,
+  3; none at the 5-frame, which is orientation only) is the block size
+  at that frame, a structural division, not a fan-out cap. The waist
+  of 36 is the only total limit. The orientation
   scale formerly called ``local`` is named ``edge`` (frame 3) so it
   does not clash with the ``local`` hub pin.
 
@@ -235,9 +237,11 @@ def phi_address(frame: int) -> float:
 
 
 def waist_span(frame: int) -> int | None:
-    """How many waist blocks the frame divides, if it divides.
+    """Block size of the waist at this frame: 36 // frame, if it divides.
 
-    3, 9, 12 divide 36. 5 does not. None means orientation, not span.
+    3, 9, 12 divide 36 (12, 4, 3). 5 does not: None means orientation
+    only, no span. This is a structural block division, a label; it is
+    not a per-parent child cap. The waist (36) is the only total limit.
     """
     if WAIST % frame == 0:
         return WAIST // frame
@@ -247,8 +251,8 @@ def waist_span(frame: int) -> int | None:
 def frame_control(frame: int) -> dict[str, Any]:
     """Control for a visual matrix at one cascade frame.
 
-    address is the φ-power. span is the waist division, or None
-    when the frame is an orientation (the 5).
+    address is the φ-power. span is the block size (36 // frame), a
+    label, not a child cap; None when the frame is the orientation (5).
     """
     return {
         "frame": int(frame),
@@ -266,9 +270,9 @@ def frame_weight(frame: int) -> float:
     This is an ADDRESS, not a gain. Use it only to rank and to order
     levels. Never multiply color, palette, or detail strength by it:
     outer frames place content, they don't dim it. Never compare it with
-    the 1/64 floor either; that floor is for residual energy only. What
-    shrinks at outer frames is the waist span (``waist_span``), not
-    amplitude.
+    the 1/64 floor either; that floor is for residual energy only.
+    ``waist_span`` is the block size at a frame, not a cap; the waist of
+    36 is the only total limit.
     """
     return phi_address(frame) / phi_address(CASCADE_FRAMES[0])
 
@@ -281,8 +285,8 @@ def orientation_scale(scale: str) -> dict[str, Any]:
     Belt on a cascade path. ``proportion`` is the shared core
     ``PHI``. ``phi_weight`` is the frame's φ address relative to frame 3
     (``frame_weight``): an address for ordering, never a gain on color.
-    ``frame_control`` carries the address, the waist span (what does
-    shrink outward), and whether the frame is the orientation (5). An
+    ``frame_control`` carries the address, the block-size span (a label,
+    not a cap), and whether the frame is the orientation (5). An
     unknown scale raises ``ValueError``.
     """
     try:

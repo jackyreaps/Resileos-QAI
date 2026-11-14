@@ -14,11 +14,13 @@ the waist of 36.
 strength order and an alpha ("over" composition for pixels, stronger
 opinion wins for structured data). A sub-instance sits one frame out
 from its parent, at that frame's φ address (relative to frame 3 = 1).
-The address places it; it never dims it. What shrinks outward is the
-waist span (36/3 = 12, 36/9 = 4, 36/12 = 3 children; the 5-frame is
-the orientation, no span). Recursion runs through frame 12 and stops
-only past 12, past the waist of 36, or when a sub-instance's own
-residual energy is under 1/64 (``keep_packet``).
+The address places it; it never dims it. Each instance carries its
+frame's span as a block-size label (36/3 = 12, 36/9 = 4, 36/12 = 3;
+the 5-frame is orientation only, no span). The span is a structural
+block division, not a cap on children. The waist of 36 is the only
+total limit: recursion runs through frame 12 and stops only at 36
+copies in the sector, past 12, or when a sub-instance's own residual
+energy is under 1/64 (``keep_packet``).
 
 The same three verbs serve all pillars:
 
@@ -244,14 +246,14 @@ def instances(root: Overlay) -> dict[str, Any]:
     """Flatten recursive sub-instances, leveling out the cascade.
 
     Depth d runs at frame ``CASCADE_FRAMES[d]`` and carries that frame's
-    φ address relative to frame 3 (an address, not a gain) and its waist
-    span. A node takes at most ``waist_span`` children at its frame (the
-    5-frame orientation has no span, so the waist of 36 caps it). Stops:
-    past the 12-frame, past 36 instances in all, or a sub-instance whose
-    own residual energy is under 1/64. The address never stops anything.
+    φ address relative to frame 3 (an address, not a gain) and its span
+    as block-size metadata (None at the 5-frame, orientation only). The
+    span never limits fan-out. Stops: 36 copies in the sector (the waist,
+    the only total limit), past the 12-frame, or a sub-instance whose own
+    residual energy is under 1/64. The address never stops anything.
     """
     flat: list[dict[str, Any]] = []
-    stopped = {"floor": 0, "waist": 0, "depth": 0, "span": 0}
+    stopped = {"floor": 0, "waist": 0, "depth": 0}
 
     def walk(node: Overlay, depth: int, path: str) -> None:
         if depth >= len(CASCADE_FRAMES):
@@ -267,11 +269,7 @@ def instances(root: Overlay) -> dict[str, Any]:
         ctrl = frame_control(f)
         flat.append({"name": node.name, "path": path, "depth": depth, "frame": f,
                      "address": round(frame_weight(f), 6), "span": ctrl["span"], "strength": 1.0})
-        room = ctrl["span"] if ctrl["span"] is not None else WAIST
         for i, child in enumerate(node.children):
-            if i >= room:
-                stopped["span"] += len(node.children) - room
-                break
             walk(child, depth + 1, f"{path}/{i}")
 
     walk(root, 0, "0")
