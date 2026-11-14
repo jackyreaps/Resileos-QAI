@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 from typing import Any, Dict, List, Optional
+from resileos.run_trace import traced as _traced
 
 
 def _residual_rows(packet: Optional[Dict]) -> list:
@@ -113,6 +114,7 @@ def decision_fanout(
     }
 
 
+@_traced("route", lambda r: {"route": r.get("route"), "probability": r.get("probability")})
 def confidence_route(
     result: Dict[str, Any],
     high: float = 0.99,
@@ -129,6 +131,7 @@ def confidence_route(
     return {"route": route, "probability": p, "original": result}
 
 
+@_traced("risk", lambda r: {"risk_class": r.get("risk_class"), "reason": r.get("reason")})
 def risk_classify(
     action: str,
     context: Optional[Dict] = None,
@@ -254,6 +257,7 @@ EVIDENCE_CAP = 50
 GUIDE_BODY_CAP = 4000
 
 
+@_traced("budget", lambda r: {"ok": r.get("ok"), "reason": r.get("reason")})
 def budget_and_stuck_guard(packet: Dict[str, Any]) -> Dict[str, Any]:
     """Budgeted loop + simple stuck detection."""
     budget = packet.get("budget_remaining", {})
@@ -367,6 +371,7 @@ def evidence_attach_raw(
     return evidence_attach(result, source, packet)
 
 
+@_traced("consistency", lambda r: {"ok": r.get("consistent"), "issues": len(r.get("scars") or [])})
 def residual_consistency(packet: Dict[str, Any]) -> Dict[str, Any]:
     """Check the control packet for signs of a broken residual trajectory."""
     scars = list(packet.get("scars", []) or [])

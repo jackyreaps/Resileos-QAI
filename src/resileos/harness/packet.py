@@ -30,6 +30,9 @@ class ControlPacket:
     def append(self, event: Dict[str, Any]) -> None:
         self.history.append({**event, "ts": datetime.utcnow().isoformat()})
         self.turn += 1
+        from resileos.run_trace import emit
+
+        emit("packet", event=event.get("event") or event.get("tool") or event.get("type"), turn=self.turn, packet_id=self.id)
 
     def to_dict(self) -> Dict[str, Any]:
         return {

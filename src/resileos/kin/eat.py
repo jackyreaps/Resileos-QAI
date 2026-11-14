@@ -21,6 +21,7 @@ from resileos.ui.scale_address import scale_address
 import re
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Optional
+from resileos.run_trace import traced as _traced
 
 _TRIPLE_LINE = re.compile(
     r"^\s*(\S+)\s+(\S+)\s+(.+?)\s*$",
@@ -86,6 +87,7 @@ def _parse_triple(text: str) -> Optional[tuple[str, str, str]]:
     return None
 
 
+@_traced("eat", lambda d: {"action": d.action, "reason": d.reason})
 def eat_filter(
     claim: str | dict[str, Any],
     *,

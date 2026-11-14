@@ -341,7 +341,18 @@ def _gray(frames: Any) -> list[list[list[float]]]:
     return [[[round(float(v), 3) for v in row] for row in frame] for frame in arr]
 
 
-async def run_assist(
+async def run_assist(body: "AssistBody", **kwargs: Any) -> dict[str, Any]:
+    """One chat turn inside one traced run (counts and classes only)."""
+    from resileos.run_trace import start_run
+
+    with start_run("chat turn") as run_id:
+        out = await _run_assist(body, **kwargs)
+    if isinstance(out.get("assist"), dict):
+        out["assist"]["run_id"] = run_id
+    return out
+
+
+async def _run_assist(
     body: AssistBody,
     *,
     titanos: Any,

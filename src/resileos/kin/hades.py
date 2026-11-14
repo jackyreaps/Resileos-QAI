@@ -146,6 +146,9 @@ class Hades:
         )
         self._cache[ckpt.id] = ckpt
         self._path(ckpt.id).write_text(json.dumps(ckpt.to_dict(), indent=2))
+        from resileos.run_trace import emit
+
+        emit("checkpoint", checkpoint_id=ckpt.id, verified=ckpt.verified, packet_hash=residual_packet_hash)
         return ckpt
 
     # ── load ────────────────────────────────────────────────────

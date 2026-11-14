@@ -49,7 +49,7 @@ def test_chat_page_signs_in_and_posts_studio_tools():
     assert '"/studio/forge/video"' in studio_js
     assert '"/studio/video"' in studio_js
     assert "UNAVAILABLE" in studio_js
-    for path in ("/studio/graphify", "/studio/plan-test-debug", "/studio/stop"):
+    for path in ("/knowledge/preview", "/knowledge/commit", "/studio/plan-test-debug", "/studio/stop"):
         assert path in admin_js
         assert path not in html
     assert "schedulePersist" in html

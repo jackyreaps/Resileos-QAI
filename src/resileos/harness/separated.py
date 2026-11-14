@@ -16,6 +16,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
+from resileos.run_trace import traced as _traced
 
 from resileos.harness.packet import ControlPacket
 from resileos.harness.tools import (
@@ -331,6 +332,7 @@ class SeparatedCycle:
         }
 
 
+@_traced("review", lambda h: {"applied": h.get("applied"), "reason": h.get("reason"), "reviewers": [v.get("reviewer") for v in h.get("verdicts", []) if isinstance(v, dict)]})
 def zeus_head(
     proposal: Proposal,
     reviewers: list[tuple[str, Callable[[Proposal], Verdict]]],

@@ -346,6 +346,7 @@ def eat_commit_envelopes(
     verifier_ctx: Optional[dict[str, Any]] = None,
     eat_kw: Optional[dict[str, Any]] = None,
     notes: Any = None,
+    lessons: Any = None,
 ) -> dict[str, Any]:
     """Eat a batch of envelopes and commit the survivors through Zeus.
 
@@ -370,6 +371,15 @@ def eat_commit_envelopes(
             check.action = "abstain"
             check.reason = "already_stored"
     _batch_conflicts(checks, titanos)
+    seen_keys: set[tuple] = set()
+    for check in checks:
+        if check.action != "accept":
+            continue
+        key = (check.subject, check.relation, check.obj, check.valid_from, check.valid_to)
+        if key in seen_keys:
+            check.action = "abstain"
+            check.reason = "duplicate_in_batch"
+        seen_keys.add(key)
 
     accepted = [check for check in checks if check.action == "accept"]
     head: dict[str, Any] = {"applied": False, "reason": "nothing accepted", "verdicts": []}
@@ -408,6 +418,15 @@ def eat_commit_envelopes(
             verifier_ctx=verifier_ctx,
         )
         head = zeus_head(proposal, reviewers, learn, cycle=sc)
+        if lessons is not None and head.get("applied"):
+            # Only the lesson and the packet hash cross into lesson memory.
+            import hashlib as _h
+            import json as _j
+
+            digest = _h.sha256(_j.dumps(
+                {"id": proposal.id, "rows": len(accepted), "bounds": bounds}, sort_keys=True, default=str
+            ).encode()).hexdigest()
+            lessons.record(f"eat batch committed {len(accepted)} reviewed fact(s); reviewers agreed", digest, review=head)
         if head.get("applied"):
             for check in accepted:
                 check.action = "committed"
