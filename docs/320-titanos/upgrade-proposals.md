@@ -6,6 +6,16 @@ system never modifies its own code or config files from this path.
 
 ## Tiers
 
+Every proposal first gets a harness level from the registry (see
+`docs/harness/CONSTRAINTS.md`, "Harness levels"). A proposal may list
+the `paths` it touches; its level is the deepest level among its target
+and those paths.
+
+- Touching L0 means tier `refused`. It is never applied, and approve
+  returns an error, both in Python and in the Pages admin route.
+- Touching L1 means review, whatever the target.
+- Only L2 can be auto, and only under the rules below.
+
 Classification uses an explicit allowlist and defaults to review.
 
 Auto tier, only these bounded operational targets:
@@ -17,7 +27,9 @@ Auto tier, only these bounded operational targets:
 
 A change may apply automatically through `OperationalStore`. Each
 change is versioned and gated on a named metric, and is auto-reverted
-if that metric gets worse. Every change is logged on the report. Auto
+if that metric gets worse. It is also reverted if any L0 or L1
+coherence metric on the held-out suite gets worse: pass `guard_before`
+to `emit` or `apply`, and `guard_after` to `evaluate`. Every change is logged on the report. Auto
 tier still never touches code, config files, Eat, learn, scars,
 Titanos, `require_verified`, or the Metis allow_mouth defaults.
 Values outside the declared bounds are sent to review instead.
@@ -54,8 +66,10 @@ addresses set in the Pages environment (and read by the session
 functions). The list is empty by default, so the view stays closed
 until it is set. Do not commit addresses in the repository.
 
-The page lists pending review proposals and the auto-applied log, with
-approve and reject actions.
+The page lists pending review proposals (with their level), the
+auto-applied log, and approve and reject actions. A Coherence card shows
+the trace metrics. It can also run the held-out test set on demand
+(`GET /api/v1/coherence?held_out=true`, admin-only).
 
 A daily email digest of the same report is a future step, once email
 sending is configured. It is not built in this change.
