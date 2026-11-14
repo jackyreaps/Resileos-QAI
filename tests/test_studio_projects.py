@@ -63,11 +63,16 @@ def test_sub_instances_reach_frame_12_at_full_strength():
     assert [i["frame"] for i in got] == [3, 5, 9, 12]
     assert [i["address"] for i in got] == [round(phi_address(f) / phi_address(3), 6) for f in (3, 5, 9, 12)]
     assert all(i["strength"] == 1.0 for i in got)  # the address places, it never dims
-    assert out["stopped"] == {"floor": 0, "waist": 0, "depth": 1, "span": 0}
-    # What shrinks outward is the waist span: 12 at frame 3, 4 at 9, 3 at 12; 5 has none.
+    assert out["stopped"] == {"floor": 0, "waist": 0, "depth": 1}
+    # The span is block-size metadata: 12 at frame 3, 4 at 9, 3 at 12; frame 5 has none.
     assert [i["span"] for i in got] == [12, None, 4, 3]
+    assert core.frame_control(5)["span"] is None
+    # The waist of 36 is the only total limit; the span is not a fan-out cap.
     wide = core.instances(core.Overlay("root", children=[core.Overlay(f"c{i}") for i in range(60)]))
-    assert len(wide["instances"]) == 13 and wide["stopped"]["span"] == 48
+    assert len(wide["instances"]) == 36 and wide["stopped"]["waist"] == 25
+    assert wide["instances"][0]["span"] == 12 and all(i["span"] is None for i in wide["instances"][1:])
+    nine = core.instances(core.Overlay("a", children=[core.Overlay("b", children=[core.Overlay(f"c{i}") for i in range(10)])]))
+    assert len(nine["instances"]) == 12 and nine["instances"][-1]["span"] == 4  # 10 frame-9 copies, not capped at 4
     # The 1/64 floor is on a sub-instance's own residual energy only.
     quiet = core.instances(core.Overlay("a", children=[core.Overlay("b", energy=0.01), core.Overlay("c", energy=0.02)]))
     assert [i["name"] for i in quiet["instances"]] == ["a", "c"] and quiet["stopped"]["floor"] == 1
