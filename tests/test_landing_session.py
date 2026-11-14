@@ -21,6 +21,7 @@ def test_pages_session_module():
             "landing/functions/_auth.test.js",
             "landing/functions/_admin.test.js",
             "landing/functions/_reports.test.js",
+            "landing/functions/_wiring.test.js",
         ],
         cwd=ROOT,
         capture_output=True,
