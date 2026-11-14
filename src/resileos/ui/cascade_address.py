@@ -18,7 +18,10 @@ Two constructions sit on that cascade:
   orientation. ``orientation_scale`` returns that control. The
   proportion is ``suite_constants.PHI``, the same φ the oscillator,
   Titanos ingest, and ``motion_scale`` (MAGNETIC_PHASE / PHI) already
-  use. At scale level L the address weight is φ^{-L}. The orientation
+  use. A frame's address is φ^{-(frame-3)} (frame 3 = 1): it places
+  content and orders levels, it is never a gain on color or detail,
+  and the 1/64 floor never applies to it. What shrinks at outer frames
+  is the waist span (12, 4, 3; none at the 5-frame). The orientation
   scale formerly called ``local`` is named ``edge`` (frame 3) so it
   does not clash with the ``local`` hub pin.
 
@@ -258,11 +261,14 @@ def frame_control(frame: int) -> dict[str, Any]:
 
 
 def frame_weight(frame: int) -> float:
-    """A frame's φ address relative to the first frame: φ^{-(frame-3)}.
+    """A frame's φ address relative to frame 3: φ^{-(frame-3)}, so frame 3 is 1.
 
-    The ratio of two φ addresses, so the 3-frame carries full weight and
-    each outer frame sits at its φ-power below it. Consumers that need a
-    weight in [0, 1] (ranking, palette strength) use this, never a halving.
+    This is an ADDRESS, not a gain. Use it only to rank and to order
+    levels. Never multiply color, palette, or detail strength by it:
+    outer frames place content, they don't dim it. Never compare it with
+    the 1/64 floor either; that floor is for residual energy only. What
+    shrinks at outer frames is the waist span (``waist_span``), not
+    amplitude.
     """
     return phi_address(frame) / phi_address(CASCADE_FRAMES[0])
 
@@ -273,9 +279,10 @@ def orientation_scale(scale: str) -> dict[str, Any]:
     ``orientation_scale("orion")`` returns scale_level 2, frame 9.
     There is no ``belt`` field here; belt is only the 5-mod Human
     Belt on a cascade path. ``proportion`` is the shared core
-    ``PHI``. ``phi_weight`` is the frame's φ address relative to the
-    3-frame (``frame_weight``); ``frame_control`` carries the address,
-    the waist span, and whether the frame is the orientation (5). An
+    ``PHI``. ``phi_weight`` is the frame's φ address relative to frame 3
+    (``frame_weight``): an address for ordering, never a gain on color.
+    ``frame_control`` carries the address, the waist span (what does
+    shrink outward), and whether the frame is the orientation (5). An
     unknown scale raises ``ValueError``.
     """
     try:

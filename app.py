@@ -1354,6 +1354,9 @@ def _mount_surfaces() -> None:
     from resileos.chat.stream import register_stream_routes
 
     register_stream_routes(app, verify_api_key, owner_dep=conversation_key_id, get_titanos=lambda: titanos_singleton)
+    from resileos.studio.project_routes import register_project_routes
+
+    register_project_routes(app, conversation_key_id, get_titanos=lambda: titanos_singleton)
 
 
 _mount_surfaces()

@@ -4,15 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Studio — Resileos</title>
-  <meta name="description" content="Make a picture or a short clip. Describe it or upload your own photos." />
+  <meta name="description" content="Studio: build worlds, make clips, and create pictures from your own photos." />
   <meta name="theme-color" content="#06080e" />
   <link rel="icon" href="/assets/gods/hermes.webp" />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
   <link rel="stylesheet" href="/assets/site.css" />
   <link rel="stylesheet" href="/assets/studio.css" />
+  <link rel="stylesheet" href="/assets/studio-app.css" />
 </head>
-<body>
-  <div class="grain" aria-hidden="true"></div>
+<body class="studio-app">
   <a class="skip" href="#main">Skip to content</a>
   <nav class="nav" aria-label="Primary">
     <div class="nav-inner">
@@ -29,112 +29,340 @@
     </div>
   </nav>
 
-  <main id="main" class="studio-main">
-    <header class="studio-head">
-      <h1>Studio</h1>
-      <p class="lede">Make a picture or a short clip. Describe what you want, or turn your own photos into a clip.</p>
-    </header>
-
-    <form class="studio-flow" id="studio-form" novalidate>
-      <fieldset class="studio-step" id="step-type">
-        <legend><span class="step-n">1</span> What do you want to make?</legend>
-        <div class="choice-row" role="radiogroup" aria-label="What to make">
-          <label class="choice"><input type="radio" name="type" value="image" checked />
-            <span class="choice-title">Picture</span>
-            <span class="choice-desc">One still image.</span></label>
-          <label class="choice"><input type="radio" name="type" value="clip" />
-            <span class="choice-title">Short clip</span>
-            <span class="choice-desc">A few seconds of motion.</span></label>
-        </div>
-      </fieldset>
-
-      <fieldset class="studio-step" id="step-source">
-        <legend><span class="step-n">2</span> <span id="source-legend">Describe it</span></legend>
-        <div class="choice-row compact" role="radiogroup" aria-label="How to start" id="source-choice">
-          <label class="choice"><input type="radio" name="source" value="describe" checked />
-            <span class="choice-title">Describe it</span></label>
-          <label class="choice"><input type="radio" name="source" value="upload" />
-            <span class="choice-title">Start from my photos</span></label>
-        </div>
-        <div id="describe-wrap">
-          <label class="field-label" for="prompt">Description</label>
-          <textarea id="prompt" rows="3" maxlength="1500" placeholder="A red fox in fresh snow at sunrise"></textarea>
-        </div>
-        <div id="upload-wrap" hidden>
-          <label class="drop" for="upload">
-            <input id="upload" type="file" accept="image/*,video/*" multiple />
-            <span class="drop-title" id="upload-title">Choose photos or a short video</span>
-            <span class="drop-desc" id="upload-desc">Pick 2 to 12 photos in order, or one short video. They stay in your browser until you press Make it.</span>
-          </label>
-          <p class="micro" id="upload-summary" role="status"></p>
-        </div>
-      </fieldset>
-
-      <fieldset class="studio-step" id="step-style">
-        <legend><span class="step-n">3</span> Style <span class="optional">optional</span></legend>
-        <div class="style-grid">
-          <div class="style-item" id="style-color">
-            <span class="field-label">Color</span>
-            <div class="seg" role="radiogroup" aria-label="Color">
-              <label><input type="radio" name="color" value="color" checked /><span>Full color</span></label>
-              <label><input type="radio" name="color" value="bw" /><span>Black &amp; white</span></label>
-            </div>
-          </div>
-          <div class="style-item" id="style-motion" hidden>
-            <span class="field-label">Motion</span>
-            <div class="seg" role="radiogroup" aria-label="Motion">
-              <label><input type="radio" name="motion" value="still" /><span>Still</span></label>
-              <label><input type="radio" name="motion" value="gentle" checked /><span>Gentle</span></label>
-              <label><input type="radio" name="motion" value="lively" /><span>Lively</span></label>
-            </div>
-          </div>
-          <div class="style-item" id="style-length" hidden>
-            <span class="field-label">Length</span>
-            <div class="seg" role="radiogroup" aria-label="Length">
-              <label><input type="radio" name="length" value="short" checked /><span>Short</span></label>
-              <label><input type="radio" name="length" value="medium" /><span>Medium</span></label>
-              <label><input type="radio" name="length" value="long" /><span>Long</span></label>
-            </div>
-          </div>
-        </div>
-        <p class="micro" id="style-note"></p>
-      </fieldset>
-
-      <div class="studio-step step-go">
-        <button class="btn btn-primary" id="generate" type="submit">Make it</button>
-        <p class="msg" id="studio-msg" role="status" aria-live="polite"></p>
+  <div class="sa-shell">
+    <aside class="sa-rail" aria-label="Studio">
+      <div class="sa-project" id="sa-project">
+        <span class="sa-project-label">Project</span>
+        <button class="sa-project-name" id="sa-project-name" type="button" data-go="projects">No project open</button>
       </div>
-    </form>
+      <nav class="sa-nav" id="sa-nav" aria-label="Studio sections">
+        <p class="sa-group">Worlds</p>
+        <a href="#projects" data-view="projects">Projects</a>
+        <a href="#world" data-view="world" data-needs-project>World</a>
+        <a href="#characters" data-view="characters" data-needs-project>Characters</a>
+        <a href="#scenes" data-view="scenes" data-needs-project>Scenes</a>
+        <a href="#game" data-view="game" data-needs-project>Game rules</a>
+        <p class="sa-group">Video</p>
+        <a href="#video" data-view="video" data-needs-project>Clips</a>
+        <p class="sa-group">Pictures</p>
+        <a href="#image" data-view="image" data-needs-project>Pictures</a>
+        <a href="#assets" data-view="assets" data-needs-project>All assets</a>
+        <p class="sa-group">Quick</p>
+        <a href="#make" data-view="make">Quick make</a>
+      </nav>
+    </aside>
 
-    <div class="result" id="result" hidden aria-live="polite">
-      <h2 id="result-title">Your result</h2>
-      <p class="result-text" id="result-text"></p>
-      <div class="result-media" id="result-media"></div>
-      <div class="cta-row" id="result-actions"></div>
-      <details class="details" id="result-details">
-        <summary>Details</summary>
-        <dl class="details-list" id="details-list"></dl>
-      </details>
-    </div>
-  </main>
+    <main id="main" class="sa-main">
+      <p class="sa-status" id="sa-status" role="status" aria-live="polite"></p>
 
-  <footer>
-    <nav class="footer-nav" aria-label="Footer">
-      <a href="/">Home</a>
-      <a href="/how-it-works">How it works</a>
-      <a href="/kin">Kin</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/chat">Chat</a>
-      <a href="/studio">Studio</a>
-      <a href="/credits">Credits</a>
-    </nav>
-    <div>Resileos · Nothing is faked: if a result can't be made, Studio says so.</div>
-  </footer>
+      <section class="sa-view" data-view="projects" aria-labelledby="h-projects">
+        <header class="sa-head">
+          <h1 id="h-projects">Studio</h1>
+          <p class="lede">Build a world, make clips, and create pictures. Everything in a project stays in your account.</p>
+        </header>
+        <form class="sa-card sa-new" id="new-project">
+          <label class="field-label" for="np-name">New project</label>
+          <div class="sa-row">
+            <input id="np-name" maxlength="120" placeholder="Name your world" required />
+            <button class="btn btn-primary" type="submit">Create</button>
+          </div>
+        </form>
+        <div class="sa-grid" id="project-list"></div>
+        <p class="micro" id="signin-note" hidden>Sign in to keep projects. <a href="/login?next=/studio">Sign in</a></p>
+      </section>
+
+      <section class="sa-view" data-view="world" hidden aria-labelledby="h-world">
+        <header class="sa-head">
+          <h1 id="h-world">World</h1>
+          <p class="lede">Lore, places, factions, and a timeline. Each timeline line has a start and an end, so the world stays consistent.</p>
+        </header>
+        <div class="sa-cols">
+          <div class="sa-card"><h2>Lore</h2><div class="sa-list" id="lore-list"></div>
+            <button class="btn btn-ghost sa-add" type="button" data-add="lore">Add lore</button></div>
+          <div class="sa-card"><h2>Places</h2><div class="sa-list" id="places-list"></div>
+            <button class="btn btn-ghost sa-add" type="button" data-add="places">Add place</button></div>
+          <div class="sa-card"><h2>Factions</h2><div class="sa-list" id="factions-list"></div>
+            <button class="btn btn-ghost sa-add" type="button" data-add="factions">Add faction</button></div>
+        </div>
+        <div class="sa-card">
+          <h2>Timeline</h2>
+          <p class="micro">Who or what, how, what, from when, until when. Leave a date empty if it's open.</p>
+          <div class="sa-table" id="timeline-list"></div>
+          <div class="sa-row">
+            <button class="btn btn-ghost" type="button" data-add="timeline">Add a line</button>
+            <button class="btn btn-primary" type="button" id="check-world">Check the world</button>
+          </div>
+          <div class="sa-result" id="world-check" aria-live="polite"></div>
+        </div>
+        <div class="sa-cols">
+          <div class="sa-card">
+            <h2>Zoom</h2>
+            <p class="micro">See the world at one depth: the whole world, places and factions, scenes, or every asset.</p>
+            <div class="seg" role="radiogroup" aria-label="Depth" id="world-depth">
+              <label><input type="radio" name="depth" value="3" checked /><span>World</span></label>
+              <label><input type="radio" name="depth" value="5" /><span>Places</span></label>
+              <label><input type="radio" name="depth" value="9" /><span>Scenes</span></label>
+              <label><input type="radio" name="depth" value="12" /><span>Assets</span></label>
+            </div>
+            <ul class="sa-tree" id="world-tree"></ul>
+          </div>
+          <div class="sa-card">
+            <h2>Dream</h2>
+            <p class="micro">Mixes your own places, factions, and characters into new ideas. They're ideas, not facts.</p>
+            <button class="btn btn-ghost" type="button" id="dream">Dream up ideas</button>
+            <ul class="sa-ideas" id="dream-list"></ul>
+          </div>
+          <div class="sa-card">
+            <h2>Share with the knowledge base</h2>
+            <p class="micro">Off by default. When it's on, you can offer timeline lines for review. Nothing is saved until an admin approves it.</p>
+            <label class="sa-switch"><input type="checkbox" id="opt-in" /> <span>Offer to shared knowledge</span></label>
+            <button class="btn btn-ghost" type="button" id="promote" disabled>Preview the review</button>
+            <div class="sa-result" id="promote-result"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sa-view" data-view="characters" hidden aria-labelledby="h-characters">
+        <header class="sa-head">
+          <h1 id="h-characters">Characters</h1>
+          <p class="lede">Who lives in this world. Characters are kept in your own personal tier and are never shared on their own.</p>
+        </header>
+        <div class="sa-grid" id="character-list"></div>
+        <button class="btn btn-ghost sa-add" type="button" data-add="characters">Add character</button>
+      </section>
+
+      <section class="sa-view" data-view="scenes" hidden aria-labelledby="h-scenes">
+        <header class="sa-head">
+          <h1 id="h-scenes">Scenes</h1>
+          <p class="lede">Scenes and storyboards. Add pictures as shots, then turn a storyboard into a clip.</p>
+        </header>
+        <div class="sa-stack" id="scene-list"></div>
+        <button class="btn btn-ghost sa-add" type="button" data-add="scenes">Add scene</button>
+      </section>
+
+      <section class="sa-view" data-view="game" hidden aria-labelledby="h-game">
+        <header class="sa-head">
+          <h1 id="h-game">Game rules</h1>
+          <p class="lede">Stats, things in the game, rules that change stats each round, and checks that must always hold.</p>
+        </header>
+        <div class="sa-cols">
+          <div class="sa-card"><h2>Stats</h2><div class="sa-table" id="stats-list"></div>
+            <button class="btn btn-ghost sa-add" type="button" data-add="stats">Add stat</button></div>
+          <div class="sa-card"><h2>Things in the game</h2><div class="sa-table" id="entities-list"></div>
+            <button class="btn btn-ghost sa-add" type="button" data-add="entities">Add thing</button></div>
+        </div>
+        <div class="sa-cols">
+          <div class="sa-card"><h2>Rules</h2><p class="micro">Each round, every rule changes one stat.</p><div class="sa-table" id="rules-list"></div>
+            <button class="btn btn-ghost sa-add" type="button" data-add="rules">Add rule</button></div>
+          <div class="sa-card"><h2>Must always hold</h2><div class="sa-table" id="invariants-list"></div>
+            <button class="btn btn-ghost sa-add" type="button" data-add="invariants">Add check</button></div>
+        </div>
+        <div class="sa-row">
+          <button class="btn btn-primary" type="button" id="run-rules">Play 12 rounds and check</button>
+          <button class="btn btn-ghost" type="button" id="lean-rules">Prove the starting values</button>
+        </div>
+        <div class="sa-result" id="game-check" aria-live="polite"></div>
+      </section>
+
+      <section class="sa-view" data-view="video" hidden aria-labelledby="h-video">
+        <header class="sa-head">
+          <h1 id="h-video">Clips</h1>
+          <p class="lede">Make clips from your pictures, recolor a clip, or turn a storyboard into a clip.</p>
+        </header>
+        <div class="sa-card">
+          <h2>Timeline</h2>
+          <div class="sa-timeline" id="video-timeline"></div>
+          <div class="sa-player"><canvas id="player" width="320" height="200" aria-label="Clip preview"></canvas>
+            <div class="sa-row"><button class="btn btn-ghost" type="button" id="play">Play</button>
+              <span class="micro" id="player-label">Pick a clip to play.</span></div></div>
+        </div>
+        <div class="sa-cols">
+          <div class="sa-card">
+            <h2>From pictures</h2>
+            <p class="micro">One picture makes a gentle color-and-motion clip. Several pictures become keyframes, blended in between.</p>
+            <div class="sa-pick" id="video-pictures"></div>
+            <button class="btn btn-primary" type="button" id="make-clip">Make clip</button>
+          </div>
+          <div class="sa-card">
+            <h2>Recolor a clip</h2>
+            <div class="sa-pick" id="video-clips"></div>
+            <button class="btn btn-ghost" type="button" id="recolor-clip">Recolor</button>
+          </div>
+          <div class="sa-card">
+            <h2>From a description</h2>
+            <p class="micro" id="provider-note">Needs a video provider.</p>
+            <textarea id="t2v" rows="2" maxlength="1500" placeholder="A lighthouse in a storm"></textarea>
+            <button class="btn btn-ghost" type="button" id="make-t2v">Make video</button>
+          </div>
+        </div>
+        <div class="sa-result" id="video-result" aria-live="polite"></div>
+      </section>
+
+      <section class="sa-view" data-view="image" hidden aria-labelledby="h-image">
+        <header class="sa-head">
+          <h1 id="h-image">Pictures</h1>
+          <p class="lede">Upload pictures, make color variations, edit in layers, and compare to pick the best.</p>
+        </header>
+        <div class="sa-card">
+          <label class="drop" for="sa-upload">
+            <input id="sa-upload" type="file" accept="image/*,video/*" multiple />
+            <span class="drop-title">Add pictures or short videos</span>
+            <span class="drop-desc">They're shrunk in your browser and saved to this project.</span>
+          </label>
+        </div>
+        <div class="sa-cols">
+          <div class="sa-card">
+            <h2>Variations</h2>
+            <div class="sa-pick" id="image-pictures"></div>
+            <div class="sa-row">
+              <label class="field-label" for="var-n">How many</label>
+              <select id="var-n"><option>2</option><option selected>4</option><option>6</option></select>
+              <label class="field-label" for="var-scale">Scale</label>
+              <select id="var-scale">
+                <option value="">Same as the picture</option>
+                <option value="edge">Close up</option>
+                <option value="sun_earth_moon">Near</option>
+                <option value="orion">Far</option>
+                <option value="north_star">Farthest</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" type="button" id="make-variations">Make variations</button>
+          </div>
+          <div class="sa-card">
+            <h2>Edit in layers</h2>
+            <p class="micro">Applies to every picture you've picked (a batch).</p>
+            <div class="sa-layers" id="layer-list"></div>
+            <div class="sa-row">
+              <select id="layer-kind" aria-label="Add an edit">
+                <option value="tone">Brightness and contrast</option>
+                <option value="recolor">Recolor</option>
+                <option value="orientation">Scale color</option>
+                <option value="level">Simplify</option>
+                <option value="flip">Mirror</option>
+                <option value="crop">Crop</option>
+                <option value="overlay">Lay another picture over</option>
+              </select>
+              <button class="btn btn-ghost" type="button" id="add-layer">Add</button>
+            </div>
+            <button class="btn btn-primary" type="button" id="apply-layers">Apply to picked</button>
+          </div>
+        </div>
+        <div class="sa-card">
+          <h2>Compare and pick</h2>
+          <p class="micro">Made pictures haven't been checked. Pick the one you like; it moves to the top.</p>
+          <div class="sa-compare" id="compare"></div>
+        </div>
+        <div class="sa-card">
+          <h2>Levels</h2>
+          <p class="micro">One picture from coarse to fine: 3, 5, 9, then 12 blocks across.</p>
+          <div class="sa-levels" id="levels"></div>
+        </div>
+        <div class="sa-result" id="image-result" aria-live="polite"></div>
+      </section>
+
+      <section class="sa-view" data-view="assets" hidden aria-labelledby="h-assets">
+        <header class="sa-head">
+          <h1 id="h-assets">All assets</h1>
+          <p class="lede">Every picture and clip in this project, shared by World, Clips, and Pictures.</p>
+        </header>
+        <div class="sa-board" id="asset-board"></div>
+      </section>
+
+      <section class="sa-view studio-main" data-view="make" hidden aria-labelledby="h-make">
+        <header class="studio-head">
+          <h1 id="h-make">Quick make</h1>
+          <p class="lede">Make a picture or a short clip. Describe what you want, or turn your own photos into a clip.</p>
+        </header>
+      <form class="studio-flow" id="studio-form" novalidate>
+        <fieldset class="studio-step" id="step-type">
+          <legend><span class="step-n">1</span> What do you want to make?</legend>
+          <div class="choice-row" role="radiogroup" aria-label="What to make">
+            <label class="choice"><input type="radio" name="type" value="image" checked />
+              <span class="choice-title">Picture</span>
+              <span class="choice-desc">One still image.</span></label>
+            <label class="choice"><input type="radio" name="type" value="clip" />
+              <span class="choice-title">Short clip</span>
+              <span class="choice-desc">A few seconds of motion.</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="studio-step" id="step-source">
+          <legend><span class="step-n">2</span> <span id="source-legend">Describe it</span></legend>
+          <div class="choice-row compact" role="radiogroup" aria-label="How to start" id="source-choice">
+            <label class="choice"><input type="radio" name="source" value="describe" checked />
+              <span class="choice-title">Describe it</span></label>
+            <label class="choice"><input type="radio" name="source" value="upload" />
+              <span class="choice-title">Start from my photos</span></label>
+          </div>
+          <div id="describe-wrap">
+            <label class="field-label" for="prompt">Description</label>
+            <textarea id="prompt" rows="3" maxlength="1500" placeholder="A red fox in fresh snow at sunrise"></textarea>
+          </div>
+          <div id="upload-wrap" hidden>
+            <label class="drop" for="upload">
+              <input id="upload" type="file" accept="image/*,video/*" multiple />
+              <span class="drop-title" id="upload-title">Choose photos or a short video</span>
+              <span class="drop-desc" id="upload-desc">Pick 2 to 12 photos in order, or one short video. They stay in your browser until you press Make it.</span>
+            </label>
+            <p class="micro" id="upload-summary" role="status"></p>
+          </div>
+        </fieldset>
+
+        <fieldset class="studio-step" id="step-style">
+          <legend><span class="step-n">3</span> Style <span class="optional">optional</span></legend>
+          <div class="style-grid">
+            <div class="style-item" id="style-color">
+              <span class="field-label">Color</span>
+              <div class="seg" role="radiogroup" aria-label="Color">
+                <label><input type="radio" name="color" value="color" checked /><span>Full color</span></label>
+                <label><input type="radio" name="color" value="bw" /><span>Black &amp; white</span></label>
+              </div>
+            </div>
+            <div class="style-item" id="style-motion" hidden>
+              <span class="field-label">Motion</span>
+              <div class="seg" role="radiogroup" aria-label="Motion">
+                <label><input type="radio" name="motion" value="still" /><span>Still</span></label>
+                <label><input type="radio" name="motion" value="gentle" checked /><span>Gentle</span></label>
+                <label><input type="radio" name="motion" value="lively" /><span>Lively</span></label>
+              </div>
+            </div>
+            <div class="style-item" id="style-length" hidden>
+              <span class="field-label">Length</span>
+              <div class="seg" role="radiogroup" aria-label="Length">
+                <label><input type="radio" name="length" value="short" checked /><span>Short</span></label>
+                <label><input type="radio" name="length" value="medium" /><span>Medium</span></label>
+                <label><input type="radio" name="length" value="long" /><span>Long</span></label>
+              </div>
+            </div>
+          </div>
+          <p class="micro" id="style-note"></p>
+        </fieldset>
+
+        <div class="studio-step step-go">
+          <button class="btn btn-primary" id="generate" type="submit">Make it</button>
+          <p class="msg" id="studio-msg" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+
+      <div class="result" id="result" hidden aria-live="polite">
+        <h2 id="result-title">Your result</h2>
+        <p class="result-text" id="result-text"></p>
+        <div class="result-media" id="result-media"></div>
+        <div class="cta-row" id="result-actions"></div>
+        <details class="details" id="result-details">
+          <summary>Details</summary>
+          <dl class="details-list" id="details-list"></dl>
+        </details>
+      </div>      </section>
+    </main>
+  </div>
 
   <script src="/assets/auth.js"></script>
   <script src="/assets/site.js"></script>
   <script src="/assets/nav.js"></script>
   <script src="/assets/media.js"></script>
+  <script src="/assets/stream-parts.js"></script>
   <script src="/assets/studio.js"></script>
+  <script src="/assets/studio-app.js"></script>
 </body>
 </html>

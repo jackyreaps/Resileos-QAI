@@ -214,11 +214,11 @@ def rank_sources(results: Iterable[dict[str, Any]], query: str, *, extra_terms: 
     """Index search/crawl envelopes on the cascade and rank them.
 
     Each result gets an address ``5/frame/qN`` (frame from its provider
-    rank on 3/5/9/12, N the belt bin of its query overlap 0..5) and a
-    score relevance · φ^{-(frame-3)} (the frame's φ address relative to
-    the 3-frame, ``frame_weight``; not a halving). Scores under 1/64 are
-    dropped, so the outer 12-frame falls below the floor; the kept list is
-    capped at the waist (36).
+    rank on 3/5/9/12, N the belt bin of its query overlap 0..5). It is
+    ordered by score = relevance · φ^-(frame-3), the frame's φ address
+    relative to frame 3 (``frame_weight``; an address, not a gain). A
+    result is dropped only when its energy (relevance) is under 1/64,
+    at any frame; the kept list is capped at the waist (36).
     """
     want = _tokens(query) | {t for term in extra_terms for t in _tokens(term)}
     kept: list[dict[str, Any]] = []
@@ -233,10 +233,12 @@ def rank_sources(results: Iterable[dict[str, Any]], query: str, *, extra_terms: 
         level, frame = spot
         have = _tokens(f"{row.get('title', '')} {row.get('snippet', '')} {row.get('text', '')[:2000] if row.get('text') else ''}")
         relevance = (len(want & have) / len(want)) if want else 0.5
-        score = relevance * frame_weight(frame)
-        if not keep_packet(score):
+        # The 1/64 floor is on the packet's energy (its relevance), never
+        # on the address: a frame-12 result with enough energy is kept.
+        if not keep_packet(relevance):
             dropped += 1
             continue
+        score = relevance * frame_weight(frame)  # address orders, it doesn't drop
         belt_bin = min(BELT, int(round(relevance * BELT)))
         envelope = {
             "producer": "hermes.search_envelope" if row.get("text") is None else "hermes.crawl_envelope",
@@ -246,6 +248,7 @@ def rank_sources(results: Iterable[dict[str, Any]], query: str, *, extra_terms: 
             "snippet": row.get("snippet") or "",
             "address": cascade_address(BELT, frame, f"q{belt_bin}"),
             "level": level,
+            "energy": round(relevance, 6),
             "score": round(score, 6),
         }
         kept.append(envelope)

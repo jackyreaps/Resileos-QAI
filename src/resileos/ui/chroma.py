@@ -118,7 +118,6 @@ def _palettes_from(code: dict[str, Any], *, include_scales: bool = False) -> lis
     palettes: list[dict[str, Any]] = []
     for orientation in levels:
         control = orientation_scale(orientation) if orientation in ORIENTATION_SCALES else orientation_scale("edge")
-        scale = float(control["phi_weight"])
         for rot in range(BELT):
             rotated = np.roll(base, rot)
             for perm in itertools.permutations(range(TRIADIC)):
@@ -126,7 +125,9 @@ def _palettes_from(code: dict[str, Any], *, include_scales: bool = False) -> lis
                     dyadic = rotated[:DYADIC]
                     triadic = rotated[DYADIC:][list(perm)]
                     triadic = _rotate_hue(triadic, start_step + hue)
-                    weights = np.concatenate([dyadic, triadic]) * scale
+                    # Full strength at every frame: the orientation's φ
+                    # address places the palette, it never dims it.
+                    weights = np.concatenate([dyadic, triadic])
                     weights = np.clip(weights, 0.0, 1.0)
                     palettes.append(
                         {

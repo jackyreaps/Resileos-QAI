@@ -155,13 +155,16 @@ def test_phi_rank_drops_under_epsilon_and_caps_at_waist():
     items.append({"url": "tiny", "relevance": 0.001, "wave": 1})
     out = hc.phi_rank(items)
     assert len(out["kept"]) == 36 and out["dropped"] == 15
-    assert all(k["weight"] >= 1 / 64 for k in out["kept"])
+    assert all(k["relevance"] >= 1 / 64 for k in out["kept"])
     deep = hc.phi_rank([{"url": "a", "relevance": 1, "wave": 1}, {"url": "b", "relevance": 1, "wave": 2}])
     # Wave 2 runs at frame 5: φ address relative to frame 3 is φ^-2, not 1/2.
     assert deep["kept"][1]["weight"] == pytest.approx(1.6180339887 ** -2, rel=1e-6)
-    four = hc.phi_rank([{"url": f"w{w}", "relevance": 1, "wave": w} for w in (1, 2, 3, 4)])
-    # Wave 4 is the 12-frame: φ^-9 sits under 1/64 and drops.
-    assert [k["url"] for k in four["kept"]] == ["w1", "w2", "w3"] and four["dropped"] == 1
+    four = hc.phi_rank([{"url": f"w{w}", "relevance": 1, "wave": w} for w in (4, 3, 2, 1)])
+    # Wave 4 is the 12-frame. Its address (φ^-9) orders it last but never
+    # drops it: the floor is on relevance (energy) only.
+    assert [k["url"] for k in four["kept"]] == ["w1", "w2", "w3", "w4"] and four["dropped"] == 0
+    weak = hc.phi_rank([{"url": "x", "relevance": 0.01, "wave": 4}, {"url": "y", "relevance": 0.02, "wave": 4}])
+    assert [k["url"] for k in weak["kept"]] == ["y"] and weak["dropped"] == 1
 
 
 def test_buzz_is_a_routing_hint_only():

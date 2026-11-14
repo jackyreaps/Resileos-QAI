@@ -30,7 +30,7 @@ reads only the claim fields and strips attention keys (likes, rank, views…).
 - Wave depth `d` runs frames `(3, 5, 9, 12)[:d]`. Wave *i* asks the index
   for up to that frame's count and follows up to that many origin pages.
   The next wave's query adds the top Pheme term (routing only).
-- PHI ranking: `score = relevance × φ^-(frame-3)` for the wave's frame (3/5/9/12; the frame's φ address from `cascade_address.phi_address`, not a halving), normalised to the best
+- PHI ranking: results are ordered by `relevance × φ^-(frame-3)` for the wave's frame (3/5/9/12; the frame's φ address relative to frame 3 = 1, an address, not a gain or a halving). Only a result whose own relevance is under 1/64 is dropped, at any wave, so wave-4 (frame 12) results stay. `weight` is the order key normalised to the best
   score. Anything under `EPSILON = 1/64` is dropped; at most `WAIST = 36` are kept.
 - Only structured claims (schema.org JSON-LD on the page) become
   quintuples. Sentences become prose claims and Eat abstains on them
