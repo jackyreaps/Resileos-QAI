@@ -22,8 +22,9 @@ Five pieces, all generators (no ``learn_fn``, ``writes_residual`` False):
 Quintuple = (subject, relation, object, valid_from, valid_to). A triple
 sits at cascade frame 3 (edge); a quintuple with at least one bound sits
 at frame 5 (belt). Wave depth d runs frames (3, 5, 9, 12)[:d]: wave i
-follows up to that frame's count of origin pages. Ranking is PHI-decayed
-by wave (score = relevance * PHI^-(wave-1), normalised to the best),
+follows up to that frame's count of origin pages. Ranking is by the wave's
+frame φ address (score = relevance * φ^-(frame-3), normalised to the best;
+not a halving step),
 anything under EPSILON = 1/64 is dropped, and at most WAIST = 36 are kept.
 
 The traffic/funding ``tier`` tag on a packet is for audit and routing
@@ -457,16 +458,19 @@ def ichnaea_fanout(packets: list[dict[str, Any]], *, max_follow: int, index: Opt
 
 # ── PHI ranking over waves ─────────────────────────────────────────────
 def phi_rank(items: list[dict[str, Any]]) -> dict[str, Any]:
-    """score = relevance * PHI^-(wave-1), normalised to the best.
+    """score = relevance * the wave's frame φ address, normalised to the best.
 
-    Drop anything under EPSILON (1/64); keep at most WAIST (36).
+    Wave i runs at frame (3, 5, 9, 12)[i-1]; its weight is
+    ``frame_weight(frame)`` = φ^{-(frame-3)}, a φ address, not a halving
+    step. Drop anything under EPSILON (1/64); keep at most WAIST (36).
     """
-    from resileos.ui.cascade_address import phi_level_weight
+    from resileos.ui.cascade_address import frame_weight
 
     scored = []
     for item in items:
         rel = max(0.0, float(item.get("relevance") or 0.0))
-        scored.append((rel * phi_level_weight(int(item.get("wave") or 1) - 1), item))
+        wave = max(1, min(int(item.get("wave") or 1), len(CASCADE_FRAMES)))
+        scored.append((rel * frame_weight(CASCADE_FRAMES[wave - 1]), item))
     best = max((s for s, _ in scored), default=0.0)
     kept, dropped = [], 0
     for score, item in sorted(scored, key=lambda p: (-p[0], str(p[1].get("url")))):
