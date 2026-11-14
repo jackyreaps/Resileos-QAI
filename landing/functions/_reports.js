@@ -84,15 +84,15 @@ async function requireAdmin({ request, env, now, mutating }) {
   if (!kv) return { response: detail("Key storage is not bound.", 503) };
   const clock = momentOf(now);
   const session = await readSession({ kv, env, request, now: clock });
-  if (!session) return { response: detail("Sign in required.", 401) };
+  if (!session) return { response: detail("You're signed out. Sign in again to continue.", 401) };
   if (mutating && !csrfOk(request, session.record)) {
-    return { response: detail("CSRF check failed.", 403) };
+    return { response: detail("This page is out of date. Refresh it and try again.", 403) };
   }
   if (!adminEmails(env).length) {
     return { response: detail("Admin access is not configured.", 403) };
   }
   if (!isAdminEmail(session.email, env)) {
-    return { response: detail("Not an admin.", 403) };
+    return { response: detail("This page is for site admins only. You're signed in with an address that isn't on the admin list.", 403) };
   }
   return { kv, session, now: clock };
 }

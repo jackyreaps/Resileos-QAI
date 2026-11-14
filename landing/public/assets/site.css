@@ -1061,3 +1061,10 @@ img.hero-motion:not([src]) { display: none; }
   }
   img.hero-motion { display: none !important; }
 }
+
+/* The hidden attribute always wins over display rules like .btn. */
+[hidden] { display: none !important; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: 0.88rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.auth-email { font-weight: 600; color: var(--text); word-break: break-all; }
+.auth-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.auth-or { text-align: center; font-size: 0.8rem; color: var(--faint); margin: 4px 0; }

@@ -82,7 +82,8 @@ def test_chat_page_renders_companion_and_message_kinds():
     assert "tutorial_fragment" in html
     assert 'id="returning-companion"' in html
     assert "Stores · Derives · Abstains" in html
-    assert "Sign in with a username" in html
+    assert "Sign in with a username" not in html
+    assert "Sign in to keep your conversations on your account" in html
     assert "shiftKey" in html
     assert "prose: true" in html
     assert "trace-fold" in html

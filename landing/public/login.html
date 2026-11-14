@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sign in — Resileos</title>
-  <meta name="description" content="Sign in to Resileos with an email link. A password is optional." />
+  <meta name="description" content="Sign in to Resileos with your email. Use a password or get a one-time link." />
   <meta name="theme-color" content="#06080e" />
   <link rel="icon" href="/assets/gods/hermes.webp" />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
@@ -33,33 +33,70 @@
   <main id="main">
     <header class="page-hero">
       <p class="eyebrow">Account</p>
-      <h1>Sign in with email</h1>
-      <p class="lede">A one-time link is the sign-in. A password is optional. Nothing on this page asks for an API key.</p>
+      <h1 id="title">Sign in</h1>
+      <p class="lede" id="lede">One sign-in for chat, your account, and admin. Enter your email, then use your password or get a one-time link.</p>
     </header>
     <section>
-      <div class="inner" style="max-width: 32rem;">
-        <div class="card">
-          <h2>Email me a link</h2>
-          <form class="form" id="magic-form">
-            <label for="magic-email">Email</label>
-            <input id="magic-email" name="email" type="email" autocomplete="email" required />
-            <button class="btn btn-primary" type="submit">Send sign-in link</button>
-            <p class="msg" id="magic-msg" role="status"></p>
+      <div class="inner" style="max-width: 30rem;">
+
+        <div class="card" id="step-signin">
+          <form class="form" id="signin-form" novalidate>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@example.com" required />
+            <button class="btn btn-primary" id="continue-btn" type="submit">Continue</button>
+
+            <div id="choose" hidden>
+              <div id="pw-block" class="form" hidden>
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" />
+                <button class="btn btn-primary" id="pw-btn" type="submit">Continue with password</button>
+              </div>
+              <button class="btn btn-ghost btn-block" id="show-pw-btn" type="button">Use my password</button>
+              <p class="auth-or">or</p>
+              <button class="btn btn-ghost btn-block" id="link-btn" type="button">Email me a link</button>
+              <div class="auth-row" style="margin-top: 10px;">
+                <button class="link-btn" id="forgot-btn" type="button">Forgot password?</button>
+                <button class="link-btn" id="change-email-btn" type="button">Use a different email</button>
+              </div>
+            </div>
+            <p class="msg" id="signin-msg" role="status" aria-live="polite"></p>
           </form>
         </div>
-        <div class="card" style="margin-top: 16px;">
-          <h2>Password</h2>
-          <p class="micro">Use this only after a password is saved on the account. Reset sends the same email link.</p>
-          <form class="form" id="password-form">
-            <label for="password-email">Email</label>
-            <input id="password-email" name="email" type="email" autocomplete="username" required />
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" required />
-            <button class="btn btn-ghost" type="submit">Sign in</button>
-            <button class="btn btn-ghost" id="reset-btn" type="button">Email a reset link</button>
-            <p class="msg" id="password-msg" role="status"></p>
+
+        <div class="card" id="step-sent" hidden>
+          <h2 id="sent-title">Check your email</h2>
+          <p>We sent a link to <span class="auth-email" id="sent-email"></span>. Open it on this device. It works once and expires in 15 minutes.</p>
+          <p class="micro" style="margin-top: 8px;">Not there after a minute? Check spam or junk.</p>
+          <div class="cta-row" style="margin-top: 14px;">
+            <button class="btn btn-ghost" id="resend-btn" type="button">Send it again</button>
+            <button class="btn btn-ghost" id="back-btn" type="button">Use a different email</button>
+          </div>
+          <p class="msg" id="sent-msg" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="card" id="step-password" hidden>
+          <form class="form" id="set-form">
+            <p id="set-intro"></p>
+            <!-- Lets password managers save the new password under the email, not a username. -->
+            <label for="set-email">Email</label>
+            <input id="set-email" name="email" type="email" autocomplete="username" readonly />
+            <label for="new-password">New password</label>
+            <input id="new-password" name="new-password" type="password" autocomplete="new-password" minlength="10" required />
+            <p class="micro">At least 10 characters.</p>
+            <button class="btn btn-primary" id="set-btn" type="submit">Save password</button>
+            <button class="btn btn-ghost" id="skip-btn" type="button">Skip for now</button>
+            <p class="msg" id="set-msg" role="status" aria-live="polite"></p>
           </form>
         </div>
+
+        <div class="card" id="step-signed-in" hidden>
+          <p>You're signed in as <span class="auth-email" id="who"></span>.</p>
+          <div class="cta-row" style="margin-top: 14px;">
+            <a class="btn btn-primary" id="go-btn" href="/account">Continue</a>
+            <button class="btn btn-ghost" id="signout-btn" type="button">Sign out</button>
+          </div>
+        </div>
+
       </div>
     </section>
   </main>
@@ -74,85 +111,217 @@
     <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
   </footer>
   <script src="/assets/site.js"></script>
+  <script src="/assets/auth.js"></script>
   <script>
-    function nextPath() {
-      const next = new URLSearchParams(location.search).get("next") || "/account";
-      if (!next.startsWith("/") || next.startsWith("//")) return "/account";
-      return next;
-    }
-    function setMsg(id, text, kind) {
-      const el = document.getElementById(id);
-      el.textContent = text;
-      el.className = "msg" + (kind ? " " + kind : "");
-    }
-    async function post(path, body) {
-      const res = await fetch(path, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+    (function () {
+      const Auth = window.ResileosAuth;
+      const params = new URLSearchParams(location.search);
+      const next = Auth.safeNext(params.get("next"), "/account");
+      const $ = (id) => document.getElementById(id);
+      const emailInput = $("email");
+      const passwordInput = $("password");
+      let session = { signed_in: false };
+      let lastSent = { email: "", purpose: "login" };
+
+      function setMsg(id, text, kind) {
+        const el = $(id);
+        el.textContent = text || "";
+        el.className = "msg" + (kind ? " " + kind : "");
+      }
+      function show(step) {
+        ["step-signin", "step-sent", "step-password", "step-signed-in"].forEach((id) => {
+          $(id).hidden = id !== step;
+        });
+      }
+      function heading(title, lede) {
+        $("title").textContent = title;
+        $("lede").textContent = lede;
+        document.title = title + " — Resileos";
+      }
+      function currentEmail() {
+        return Auth.normalize(emailInput.value);
+      }
+      function checkEmail() {
+        const raw = emailInput.value.trim();
+        if (!raw) {
+          setMsg("signin-msg", "Enter your email address.", "err");
+          emailInput.focus();
+          return false;
+        }
+        if (!Auth.looksLikeEmail(raw)) {
+          setMsg("signin-msg", "Enter the full email address for your account, like you@example.com. Usernames aren't used to sign in.", "err");
+          emailInput.focus();
+          return false;
+        }
+        return true;
+      }
+      function showPassword(on) {
+        $("pw-block").hidden = !on;
+        $("show-pw-btn").hidden = on;
+        $("link-btn").className = "btn btn-block " + (on ? "btn-ghost" : "btn-primary");
+        if (on) passwordInput.focus();
+      }
+      function openChoices() {
+        if (!checkEmail()) return;
+        setMsg("signin-msg", "");
+        $("continue-btn").hidden = true;
+        $("choose").hidden = false;
+        showPassword(Auth.hasPasswordHint(currentEmail()) || Boolean(passwordInput.value));
+        if ($("pw-block").hidden) $("link-btn").focus();
+      }
+      function resetChoices() {
+        $("continue-btn").hidden = false;
+        $("choose").hidden = true;
+        passwordInput.value = "";
+        setMsg("signin-msg", "");
+        show("step-signin");
+        heading("Sign in", "One sign-in for chat, your account, and admin. Enter your email, then use your password or get a one-time link.");
+        emailInput.focus();
+      }
+
+      async function passwordSignIn() {
+        if (!checkEmail()) return;
+        if (!passwordInput.value) {
+          setMsg("signin-msg", "Enter your password, or choose \u201cEmail me a link\u201d.", "err");
+          passwordInput.focus();
+          return;
+        }
+        setMsg("signin-msg", "Signing in\u2026");
+        $("pw-btn").disabled = true;
+        const { res, data } = await Auth.post("/api/session/login", {
+          email: currentEmail(),
+          password: passwordInput.value,
+        });
+        $("pw-btn").disabled = false;
+        if (!res.ok) {
+          setMsg("signin-msg", data.detail, "err");
+          if (res.status === 401) passwordInput.select();
+          return;
+        }
+        Auth.rememberSignedIn(currentEmail(), true);
+        location.assign(next);
+      }
+
+      async function sendLink(purpose, email, msgId) {
+        setMsg(msgId, "Sending\u2026");
+        const body = { email: email, purpose: purpose };
+        if (purpose === "login") body.next = next;
+        const { res, data } = await Auth.post("/api/session/magic-link", body);
+        if (!res.ok) {
+          setMsg(msgId, data.detail, "err");
+          return false;
+        }
+        lastSent = { email: email, purpose: purpose };
+        $("sent-email").textContent = email;
+        $("sent-title").textContent = purpose === "reset" ? "Check your email to reset your password" : "Check your email";
+        setMsg("sent-msg", "");
+        show("step-sent");
+        heading(purpose === "reset" ? "Reset your password" : "Sign in", purpose === "reset"
+          ? "Open the link in the email and you'll choose a new password."
+          : "Open the link in the email and you'll be signed in.");
+        return true;
+      }
+
+      $("signin-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        if ($("choose").hidden) {
+          openChoices();
+          return;
+        }
+        if (!$("pw-block").hidden) passwordSignIn();
+        else if (checkEmail()) sendLink("login", currentEmail(), "signin-msg");
       });
-      const data = await res.json().catch(() => ({}));
-      return { res, data };
-    }
-    document.getElementById("magic-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      setMsg("magic-msg", "Sending…");
-      try {
-        const { res, data } = await post("/api/session/magic-link", {
-          email: document.getElementById("magic-email").value,
-          purpose: "login",
-        });
-        if (res.status === 503) {
-          setMsg("magic-msg", "email not configured", "err");
-          return;
+      $("show-pw-btn").addEventListener("click", () => showPassword(true));
+      $("link-btn").addEventListener("click", () => {
+        if (checkEmail()) sendLink("login", currentEmail(), "signin-msg");
+      });
+      $("forgot-btn").addEventListener("click", () => {
+        if (checkEmail()) sendLink("reset", currentEmail(), "signin-msg");
+      });
+      $("change-email-btn").addEventListener("click", () => {
+        emailInput.value = "";
+        resetChoices();
+      });
+      emailInput.addEventListener("input", () => {
+        if (!$("choose").hidden && $("pw-block").hidden && Auth.hasPasswordHint(currentEmail())) showPassword(true);
+      });
+      $("resend-btn").addEventListener("click", () => sendLink(lastSent.purpose, lastSent.email, "sent-msg"));
+      $("back-btn").addEventListener("click", resetChoices);
+
+      function passwordStep(mode) {
+        const email = session.email || "";
+        $("set-email").value = email;
+        $("new-password").value = "";
+        setMsg("set-msg", "");
+        if (mode === "reset") {
+          heading("Choose a new password", "You opened a reset link, so you don't need your old password.");
+          $("set-intro").textContent = "Signed in as " + email + ". Pick a new password below.";
+          $("skip-btn").textContent = "Cancel";
+        } else {
+          heading("You're signed in", "Want a password for next time? It's optional. You can always sign in with an email link instead.");
+          $("set-intro").textContent = "Signed in as " + email + ". Set a password, or skip this.";
+          $("skip-btn").textContent = "Skip for now";
         }
-        if (!res.ok) {
-          setMsg("magic-msg", data.detail || "Could not send the link.", "err");
-          return;
-        }
-        setMsg("magic-msg", "Check that inbox for a sign-in link. It expires soon and works once.", "ok");
-      } catch {
-        setMsg("magic-msg", "Could not reach sign-in.", "err");
+        show("step-password");
+        $("new-password").focus();
       }
-    });
-    document.getElementById("password-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      setMsg("password-msg", "Checking…");
-      try {
-        const { res, data } = await post("/api/session/login", {
-          email: document.getElementById("password-email").value,
-          password: document.getElementById("password").value,
-        });
+      $("set-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const password = $("new-password").value;
+        if (password.length < 10) {
+          setMsg("set-msg", "Use at least 10 characters.", "err");
+          return;
+        }
+        setMsg("set-msg", "Saving\u2026");
+        const { res, data } = await Auth.post("/api/session/password", { password: password }, session.csrf);
         if (!res.ok) {
-          setMsg("password-msg", data.detail || "Could not sign in.", "err");
+          setMsg("set-msg", data.detail, "err");
           return;
         }
-        location.assign(nextPath());
-      } catch {
-        setMsg("password-msg", "Could not reach sign-in.", "err");
+        Auth.rememberSignedIn(session.email, true);
+        setMsg("set-msg", "Password saved. Next time, enter your email and use it to sign in.", "ok");
+        setTimeout(() => location.assign(next), 900);
+      });
+      $("skip-btn").addEventListener("click", () => location.assign(next));
+      $("signout-btn").addEventListener("click", async () => {
+        await Auth.logout(session.csrf);
+        session = { signed_in: false };
+        resetChoices();
+      });
+
+      async function start() {
+        session = await Auth.me();
+        const step = params.get("step");
+        if (session.signed_in) Auth.rememberSignedIn(session.email, session.has_password);
+        if (session.signed_in && step === "reset") {
+          if (session.reset_ready) return passwordStep("reset");
+          emailInput.value = session.email;
+          show("step-signin");
+          setMsg("signin-msg", "That reset link has expired or was already used. Choose \u201cForgot password?\u201d to get a new one.", "err");
+          openChoices();
+          return;
+        }
+        if (session.signed_in && step === "set-password" && !session.has_password) return passwordStep("set");
+        if (session.signed_in) {
+          if (step === "set-password") return location.replace(next);
+          $("who").textContent = session.email;
+          $("go-btn").href = next;
+          heading("Sign in", "You're already signed in.");
+          show("step-signed-in");
+          return;
+        }
+        show("step-signin");
+        emailInput.value = Auth.lastEmail();
+        if (emailInput.value) openChoices();
+        else emailInput.focus();
+        if (params.get("error") === "link") {
+          setMsg("signin-msg", "That link has expired or was already used. Enter your email to get a new one.", "err");
+        } else if (step === "reset" || step === "set-password") {
+          setMsg("signin-msg", "You're signed out. Sign in again to continue.", "err");
+        }
       }
-    });
-    document.getElementById("reset-btn").addEventListener("click", async () => {
-      setMsg("password-msg", "Sending…");
-      try {
-        const { res, data } = await post("/api/session/magic-link", {
-          email: document.getElementById("password-email").value,
-          purpose: "reset",
-        });
-        if (res.status === 503) {
-          setMsg("password-msg", "email not configured", "err");
-          return;
-        }
-        if (!res.ok) {
-          setMsg("password-msg", data.detail || "Could not send the reset link.", "err");
-          return;
-        }
-        setMsg("password-msg", "Check that inbox for a reset link.", "ok");
-      } catch {
-        setMsg("password-msg", "Could not reach sign-in.", "err");
-      }
-    });
+      start();
+    })();
   </script>
 </body>
 </html>

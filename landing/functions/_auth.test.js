@@ -13,6 +13,7 @@ import {
   handleLogout,
   handleMagicLink,
   handleMe,
+  handlePassword,
   handleProxy,
   handleReveal,
   handleRotate,
@@ -20,6 +21,7 @@ import {
   hashPassword,
   issueMagicLink,
   loadAccount,
+  loginFields,
   loginWithPassword,
   memoryKv,
   readSession,
@@ -173,7 +175,7 @@ test("verify sets the session cookie and the link cannot be reused", async () =>
     now: () => NOW,
   });
   assert.equal(verified.status, 302);
-  assert.equal(verified.headers.get("location"), "/account");
+  assert.equal(verified.headers.get("location"), "/login?step=set-password&next=%2Faccount");
   const cookie = verified.headers.get("set-cookie");
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /Secure/);
@@ -183,7 +185,9 @@ test("verify sets the session cookie and the link cannot be reused", async () =>
     env,
     now: () => NOW + 1,
   });
-  assert.equal(again.status, 400);
+  assert.equal(again.status, 302);
+  assert.equal(again.headers.get("location"), "/login?error=link");
+  assert.equal(again.headers.get("set-cookie"), null);
   const me = await handleMe({
     request: new Request("https://resileosai.fun/api/session/me", { headers: { cookie } }),
     env,
@@ -447,4 +451,207 @@ test("password login sets a session cookie", async () => {
   assert.match(res.headers.get("set-cookie"), /SameSite=Lax/);
   const body = await res.json();
   assert.equal(body.api_key, undefined);
+});
+
+// Regression: owner report "sign in doesn't work after I made it [a password]".
+// The full real flow, as the pages drive it: magic link -> set password with no
+// current-password field -> log out -> sign in with that password.
+async function signInByLink(env, email, { next } = {}) {
+  const sent = [];
+  const body = { email, purpose: "login" };
+  if (next) body.next = next;
+  const res = await handleMagicLink({
+    request: request("/api/session/magic-link", { method: "POST", body }),
+    env,
+    now: () => NOW,
+    send: async (message) => sent.push(message),
+  });
+  assert.equal(res.status, 200);
+  const link = sent[0].text.match(/https:\/\/\S+/)[0];
+  const verified = await handleVerify({ request: new Request(link), env, now: () => NOW });
+  assert.equal(verified.status, 302);
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+  const me = await (await handleMe({
+    request: new Request("https://resileosai.fun/api/session/me", { headers: { cookie } }),
+    env,
+    now: () => NOW,
+    fetchImpl: async () => new Response("{}", { status: 404 }),
+  })).json();
+  return { cookie, me, location: verified.headers.get("location") };
+}
+
+test("regression: a password set after a magic-link sign-in works for the next sign-in", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const first = await signInByLink(env, "James@ResileosAI.fun", { next: "/chat" });
+  assert.equal(first.me.has_password, false);
+  assert.equal(first.location, "/login?step=set-password&next=%2Fchat");
+
+  const saved = await handlePassword({
+    request: request("/api/session/password", {
+      method: "POST",
+      cookie: first.cookie,
+      headers: { "x-csrf-token": first.me.csrf },
+      body: { password: "a-good-password-1" },
+    }),
+    env,
+    now: () => NOW + 1,
+  });
+  assert.equal(saved.status, 200);
+  const out = await handleLogout({
+    request: request("/api/session/logout", {
+      method: "POST",
+      cookie: first.cookie,
+      headers: { "x-csrf-token": first.me.csrf },
+    }),
+    env,
+    now: () => NOW + 2,
+  });
+  assert.equal(out.status, 200);
+
+  for (const body of [
+    { email: "james@resileosai.fun", password: "a-good-password-1" },
+    { email: "  JAMES@resileosai.fun ", password: "a-good-password-1" },
+    { username: "james@resileosai.fun", password: "a-good-password-1" },
+  ]) {
+    const res = await handleLogin({
+      request: request("/api/session/login", { method: "POST", body }),
+      env,
+      now: () => NOW + 3,
+    });
+    assert.equal(res.status, 200, JSON.stringify(Object.keys(body)));
+    assert.match(res.headers.get("set-cookie"), /^resileos_session=.+; HttpOnly; Secure; SameSite=Lax; Path=\//);
+    const data = await res.json();
+    assert.equal(data.email, "james@resileosai.fun");
+  }
+  const account = await loadAccount(kv, "james@resileosai.fun");
+  assert.equal(account.password.iterations, 100000);
+  assert.equal(await kv.get("lock:james@resileosai.fun"), null);
+
+  const second = await signInByLink(env, "james@resileosai.fun");
+  assert.equal(second.location, "/account");
+  assert.equal(second.me.has_password, true);
+});
+
+test("regression: a chat username in the email box gets a plain 400, not a password failure", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  await setPassword({ kv, env, email: "ada@example.com", password: "correct horse", now: NOW, resetOk: true });
+  const res = await handleLogin({
+    request: request("/api/session/login", { method: "POST", body: { email: "ada", password: "correct horse" } }),
+    env,
+    now: () => NOW,
+  });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).detail, /full email address/);
+  assert.equal(await kv.get("lock:ada@example.com"), null);
+  const missing = await handleLogin({
+    request: request("/api/session/login", { method: "POST", body: { email: "ada@example.com" } }),
+    env,
+    now: () => NOW,
+  });
+  assert.equal(missing.status, 400);
+  assert.deepEqual(loginFields({ username: " Ada@Example.com " }).email, "ada@example.com");
+});
+
+test("changing a password needs the current one; setting the first one or a reset does not", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const email = "ada@example.com";
+  assert.equal((await setPassword({ kv, env, email, password: "first-password", now: NOW })).ok, true);
+  const blank = await setPassword({ kv, env, email, password: "second-password", now: NOW });
+  assert.equal(blank.status, 400);
+  const wrong = await setPassword({ kv, env, email, password: "second-password", current: "nope-nope-nope", now: NOW });
+  assert.equal(wrong.status, 401);
+  const right = await setPassword({ kv, env, email, password: "second-password", current: "first-password", now: NOW });
+  assert.equal(right.ok, true);
+  const reset = await setPassword({ kv, env, email, password: "third-password", now: NOW, resetOk: true });
+  assert.equal(reset.ok, true);
+  const ok = await loginWithPassword({ kv, env, email, password: "third-password", ip: "203.0.113.30", now: NOW });
+  assert.equal(ok.ok, true);
+});
+
+test("forgot password: a signed-out reset link signs in and allows a new password without the old one", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const email = "ada@example.com";
+  await setPassword({ kv, env, email, password: "forgotten-pass", now: NOW, resetOk: true });
+  const sent = [];
+  const res = await handleMagicLink({
+    request: request("/api/session/magic-link", { method: "POST", body: { email: "ADA@example.com", purpose: "reset" } }),
+    env,
+    now: () => NOW,
+    send: async (message) => sent.push(message),
+  });
+  assert.equal(res.status, 200);
+  assert.equal(sent[0].to, email);
+  assert.match(sent[0].subject, /Reset/);
+  const verified = await handleVerify({ request: new Request(sent[0].text.match(/https:\/\/\S+/)[0]), env, now: () => NOW });
+  assert.equal(verified.headers.get("location"), "/login?step=reset");
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+  const me = await (await handleMe({
+    request: new Request("https://resileosai.fun/api/session/me", { headers: { cookie } }),
+    env,
+    now: () => NOW,
+    fetchImpl: async () => new Response("{}", { status: 404 }),
+  })).json();
+  assert.equal(me.reset_ready, true);
+  const saved = await handlePassword({
+    request: request("/api/session/password", {
+      method: "POST",
+      cookie,
+      headers: { "x-csrf-token": me.csrf },
+      body: { password: "brand-new-pass" },
+    }),
+    env,
+    now: () => NOW + 1,
+  });
+  assert.equal(saved.status, 200);
+  const login = await loginWithPassword({ kv, env, email, password: "brand-new-pass", ip: "203.0.113.31", now: NOW + 2 });
+  assert.equal(login.ok, true);
+});
+
+test("magic link keeps a safe next path and drops unsafe ones", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const withNext = await signInByLink(env, "bea@example.com", { next: "/admin/reports" });
+  assert.equal(withNext.location, "/login?step=set-password&next=%2Fadmin%2Freports");
+  for (const bad of ["//evil.example", "https://evil.example", "/\\evil.example", "/api/session/logout"]) {
+    const res = await signInByLink(env, "cy@example.com", { next: bad });
+    assert.equal(res.location, "/login?step=set-password&next=%2Faccount", bad);
+  }
+});
+
+test("a signed-in chat with no key yet gets a free key on the server instead of an error", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const session = await createSession({ kv, env, email: "ada@example.com", now: NOW });
+  let seenKey = null;
+  const res = await handleProxy({
+    request: request("/api/session/v1/chat", {
+      method: "POST",
+      body: { message: "hi" },
+      cookie: `resileos_session=${session.id}`,
+      headers: { "x-csrf-token": session.csrf },
+    }),
+    env,
+    params: { path: ["chat"] },
+    fetchImpl: async (url, init) => {
+      seenKey = new Headers(init.headers).get("x-api-key");
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    },
+    now: () => NOW,
+  });
+  assert.equal(res.status, 200);
+  const account = await loadAccount(kv, "ada@example.com");
+  assert.equal(account.free_issued, true);
+  assert.equal(await sha256Hex(seenKey), account.key_digest);
+  assert.equal((await res.text()).includes(seenKey), false);
+});
+
+test("PBKDF2 stays at the 100000 iterations Workers support, whatever the env says", async () => {
+  const env = baseEnv(memoryKv(), { PASSWORD_PBKDF2_ITERATIONS: "600000" });
+  const stored = await hashPassword("correct horse", env);
+  assert.equal(stored.iterations, 100000);
+  assert.equal(await verifyPassword("correct horse", stored), true);
 });
