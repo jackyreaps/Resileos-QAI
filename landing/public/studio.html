@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Studio — Resileos</title>
+  <meta name="description" content="Make a picture or a short clip. Describe it or upload your own photos." />
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+  <link rel="stylesheet" href="/assets/studio.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a class="nav-cta" href="/chat">Chat</a>
+        <a href="/studio" aria-current="page">Studio</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/login">Sign in</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="studio-main">
+    <header class="studio-head">
+      <h1>Studio</h1>
+      <p class="lede">Make a picture or a short clip. Describe what you want, or turn your own photos into a clip.</p>
+    </header>
+
+    <form class="studio-flow" id="studio-form" novalidate>
+      <fieldset class="studio-step" id="step-type">
+        <legend><span class="step-n">1</span> What do you want to make?</legend>
+        <div class="choice-row" role="radiogroup" aria-label="What to make">
+          <label class="choice"><input type="radio" name="type" value="image" checked />
+            <span class="choice-title">Picture</span>
+            <span class="choice-desc">One still image.</span></label>
+          <label class="choice"><input type="radio" name="type" value="clip" />
+            <span class="choice-title">Short clip</span>
+            <span class="choice-desc">A few seconds of motion.</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="studio-step" id="step-source">
+        <legend><span class="step-n">2</span> <span id="source-legend">Describe it</span></legend>
+        <div class="choice-row compact" role="radiogroup" aria-label="How to start" id="source-choice">
+          <label class="choice"><input type="radio" name="source" value="describe" checked />
+            <span class="choice-title">Describe it</span></label>
+          <label class="choice"><input type="radio" name="source" value="upload" />
+            <span class="choice-title">Use my photos</span></label>
+        </div>
+        <div id="describe-wrap">
+          <label class="field-label" for="prompt">Description</label>
+          <textarea id="prompt" rows="3" maxlength="1500" placeholder="A red fox in fresh snow at sunrise"></textarea>
+        </div>
+        <div id="upload-wrap" hidden>
+          <label class="drop" for="upload">
+            <input id="upload" type="file" accept="image/*,video/*" multiple />
+            <span class="drop-title">Choose photos or a short video</span>
+            <span class="drop-desc">Pick 2 to 12 photos in order, or one short video. They stay in your browser until you press Make it.</span>
+          </label>
+          <p class="micro" id="upload-summary" role="status"></p>
+        </div>
+      </fieldset>
+
+      <fieldset class="studio-step" id="step-style">
+        <legend><span class="step-n">3</span> Style <span class="optional">optional</span></legend>
+        <div class="style-grid">
+          <div class="style-item" id="style-color">
+            <span class="field-label">Color</span>
+            <div class="seg" role="radiogroup" aria-label="Color">
+              <label><input type="radio" name="color" value="color" checked /><span>Full color</span></label>
+              <label><input type="radio" name="color" value="bw" /><span>Black &amp; white</span></label>
+            </div>
+          </div>
+          <div class="style-item" id="style-motion" hidden>
+            <span class="field-label">Motion</span>
+            <div class="seg" role="radiogroup" aria-label="Motion">
+              <label><input type="radio" name="motion" value="still" /><span>Still</span></label>
+              <label><input type="radio" name="motion" value="gentle" checked /><span>Gentle</span></label>
+              <label><input type="radio" name="motion" value="lively" /><span>Lively</span></label>
+            </div>
+          </div>
+          <div class="style-item" id="style-length" hidden>
+            <span class="field-label">Length</span>
+            <div class="seg" role="radiogroup" aria-label="Length">
+              <label><input type="radio" name="length" value="short" checked /><span>Short</span></label>
+              <label><input type="radio" name="length" value="medium" /><span>Medium</span></label>
+              <label><input type="radio" name="length" value="long" /><span>Long</span></label>
+            </div>
+          </div>
+        </div>
+        <p class="micro" id="style-note"></p>
+      </fieldset>
+
+      <div class="studio-step step-go">
+        <button class="btn btn-primary" id="generate" type="submit">Make it</button>
+        <p class="msg" id="studio-msg" role="status" aria-live="polite"></p>
+      </div>
+    </form>
+
+    <div class="result" id="result" hidden aria-live="polite">
+      <h2 id="result-title">Your result</h2>
+      <p class="result-text" id="result-text"></p>
+      <div class="result-media" id="result-media"></div>
+      <div class="cta-row" id="result-actions"></div>
+      <details class="details" id="result-details">
+        <summary>Details</summary>
+        <dl class="details-list" id="details-list"></dl>
+      </details>
+    </div>
+  </main>
+
+  <footer>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/how-it-works">How it works</a>
+      <a href="/kin">Kin</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/chat">Chat</a>
+      <a href="/studio">Studio</a>
+      <a href="/credits">Credits</a>
+    </nav>
+    <div>Resileos · Nothing is faked: if a result can't be made, Studio says so.</div>
+  </footer>
+
+  <script src="/assets/auth.js"></script>
+  <script src="/assets/site.js"></script>
+  <script src="/assets/nav.js"></script>
+  <script src="/assets/studio.js"></script>
+</body>
+</html>

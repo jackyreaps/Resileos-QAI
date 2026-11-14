@@ -153,16 +153,9 @@
   toggle?.addEventListener("click", () => {
     setMenu(toggle.getAttribute("aria-expanded") !== "true");
   });
-  if (menu && !menu.querySelector('a[href="/login"]') && !menu.querySelector('a[href="/account"]')) {
-    const signIn = document.createElement("a");
-    signIn.href = "/login";
-    signIn.textContent = "Sign in";
-    const cta = menu.querySelector(".nav-cta");
-    if (cta) menu.insertBefore(signIn, cta);
-    else menu.appendChild(signIn);
-  }
-  menu?.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => setMenu(false));
+  // Links are drawn by /assets/nav.js; close the mobile menu on any link click.
+  menu?.addEventListener("click", (e) => {
+    if (e.target.closest("a")) setMenu(false);
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") setMenu(false);

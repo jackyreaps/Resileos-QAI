@@ -9,8 +9,9 @@
   <link rel="icon" href="/assets/gods/hermes.webp" />
   <link rel="stylesheet" href="/assets/fonts/fonts.css" />
   <link rel="stylesheet" href="/assets/site.css" />
+  <link rel="stylesheet" href="/assets/admin.css" />
 </head>
-<body>
+<body data-admin-page="reports">
   <div class="grain" aria-hidden="true"></div>
   <a class="skip" href="#main">Skip to content</a>
   <nav class="nav" aria-label="Primary">
@@ -20,12 +21,10 @@
         <span></span><span></span><span></span>
       </button>
       <div class="nav-links" id="nav-menu">
-        <a href="/">Home</a>
-        <a href="/how-it-works">How it works</a>
-        <a href="/kin">Kin</a>
-        <a href="/pricing">Pricing</a>
-        <a href="/account">Account</a>
         <a class="nav-cta" href="/chat">Chat</a>
+        <a href="/studio">Studio</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/login">Sign in</a>
       </div>
     </div>
   </nav>
@@ -33,8 +32,9 @@
   <main id="main">
     <header class="page-hero">
       <p class="eyebrow">Admin</p>
-      <h1>Upgrade reports</h1>
-      <p class="lede">Pending review items and the auto-applied log. Approval marks a proposal for a later PR; it never changes code from this page. The key stays on the server.</p>
+      <h1>Reports</h1>
+      <p class="lede">Upgrade proposals waiting for review, and the auto-applied log. Approving only marks a proposal for a later PR; it never changes code from this page.</p>
+      <nav class="admin-tabs" id="admin-tabs" aria-label="Admin sections"></nav>
     </header>
     <section>
       <div class="inner" style="max-width: 48rem;">
@@ -55,6 +55,8 @@
     <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
   </footer>
   <script src="/assets/site.js"></script>
+  <script src="/assets/nav.js"></script>
+  <script src="/assets/admin.js"></script>
   <script>
     let csrf = "";
 

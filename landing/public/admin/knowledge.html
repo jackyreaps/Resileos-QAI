@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Knowledge — Resileos admin</title>
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+  <link rel="stylesheet" href="/assets/admin.css" />
+</head>
+<body data-admin-page="knowledge">
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a class="nav-cta" href="/chat">Chat</a>
+        <a href="/studio">Studio</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/login">Sign in</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="admin-main">
+    <p class="eyebrow">Admin</p>
+    <h1>Knowledge</h1>
+    <p class="lede">What the assistant knows, in plain terms. Add facts, check them, and fix what's saved. Every save goes through the same accuracy checks as chat.</p>
+    <nav class="admin-tabs" id="admin-tabs" aria-label="Admin sections"></nav>
+    <p class="admin-gate" id="admin-gate" hidden></p>
+    <div id="admin-content" hidden></div>
+  </main>
+
+  <script src="/assets/auth.js"></script>
+  <script src="/assets/site.js"></script>
+  <script src="/assets/nav.js"></script>
+  <script src="/assets/admin.js"></script>
+</body>
+</html>

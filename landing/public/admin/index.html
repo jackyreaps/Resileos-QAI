@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Admin — Resileos admin</title>
+  <meta name="theme-color" content="#06080e" />
+  <link rel="icon" href="/assets/gods/hermes.webp" />
+  <link rel="stylesheet" href="/assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="/assets/site.css" />
+  <link rel="stylesheet" href="/assets/admin.css" />
+</head>
+<body data-admin-page="home">
+  <div class="grain" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span> Resileos</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-menu">
+        <a class="nav-cta" href="/chat">Chat</a>
+        <a href="/studio">Studio</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/login">Sign in</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="admin-main">
+    <p class="eyebrow">Admin</p>
+    <h1>Admin</h1>
+    <p class="lede">Site tools for admins. Regular visitors never see these, and the server refuses them for anyone else.</p>
+    <nav class="admin-tabs" id="admin-tabs" aria-label="Admin sections"></nav>
+    <p class="admin-gate" id="admin-gate" hidden></p>
+    <div id="admin-content" hidden>
+      <div class="admin-links">
+        <a class="card" href="/admin/reports"><h3>Reports</h3><p>Upgrade proposals waiting for review, and what was applied automatically.</p></a>
+        <a class="card" href="/admin/knowledge"><h3>Knowledge</h3><p>Add facts from text, check a fact, look at or edit what's saved, run a learning cycle, and restore checkpoints.</p></a>
+        <a class="card" href="/admin/diagnostics"><h3>Diagnostics</h3><p>Service status, every raw tool and test endpoint, and technical-detail settings for this browser.</p></a>
+      </div>
+    </div>
+  </main>
+
+  <script src="/assets/auth.js"></script>
+  <script src="/assets/site.js"></script>
+  <script src="/assets/nav.js"></script>
+  <script src="/assets/admin.js"></script>
+</body>
+</html>

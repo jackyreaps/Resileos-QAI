@@ -235,3 +235,66 @@ button.tool-chip { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
     .more-menu, .slash-popover { transition: none; }
 }
+
+/* Tools menu: one "+" button, grouped by what you want to do. */
+.composer-bar { align-items: center; }
+.tools-wrap { position: relative; }
+.tools-menu {
+    right: auto;
+    left: 0;
+    top: auto;
+    bottom: calc(100% + 8px);
+}
+.tools-group {
+    margin: 6px 10px 2px;
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.tools-group:first-child { margin-top: 2px; }
+a.menu-item { text-decoration: none; }
+.mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 2px 4px 2px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--chip-bg);
+    color: var(--text);
+    font-size: 0.78rem;
+}
+.mode-chip[hidden] { display: none; }
+.mode-chip button {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+}
+.history-style {
+    display: grid;
+    gap: 6px;
+    margin: auto 14px 14px;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+.history-style select {
+    min-height: 36px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-elev);
+    color: var(--text);
+    font: inherit;
+}
+@media (max-width: 720px) {
+    .tools-menu { width: min(320px, calc(100vw - 32px)); }
+}

@@ -8,6 +8,7 @@ import {
   sha256Hex,
   siteUrl,
 } from "./_lib.js";
+import { isAdminEmail, publicApiAllowed } from "./_admin.js";
 
 const COOKIE = "resileos_session";
 const FAIL_LIMIT = 5;
@@ -835,6 +836,7 @@ export async function handleMe({ request, env, now, fetchImpl }) {
   const session = await readSession({ kv, env, request, now: clock });
   if (!session) return noStore(json({ signed_in: false }));
   const body = publicAccount(session, clock);
+  body.admin = isAdminEmail(session.email, env);
   if (session.account.key_digest && String(env.KEY_SEAL_SECRET || "").length >= 16) {
     try {
       const apiKey = await openSeal(await kv.get(`seal:${session.account.key_digest}`), env.KEY_SEAL_SECRET);
@@ -945,6 +947,10 @@ export async function handleProxy({ request, env, params, fetchImpl, now }) {
   }
   const clock = momentOf(now);
   const session = await readSession({ kv, env, request, now: clock });
+  if (method !== "OPTIONS" && !publicApiAllowed(method, parts)) {
+    if (!session) return detail("This tool is for site admins. Sign in with an admin account.", 401);
+    if (!isAdminEmail(session.email, env)) return detail("This tool is for site admins only.", 403);
+  }
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
