@@ -238,7 +238,7 @@ def _wrap(kin: str, name: str, tool_fn: ToolFn, constraints: dict[str, Any]) -> 
             result = dict(produced)
             result["risk"] = risk
 
-        if role["may_set_verified"]:
+        if role["may_set_verified"] and not constraints.get("evidence_only"):
             apollo = kwargs.get("apollo_result")
             if not isinstance(apollo, dict):
                 apollo = {"success": False}

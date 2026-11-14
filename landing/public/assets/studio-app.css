@@ -94,3 +94,7 @@ body.studio-app { min-height: 100vh; background: var(--bg); }
 .studio-app .btn-link { all: unset; cursor: pointer; color: var(--muted); font-size: .8rem; text-decoration: underline; text-underline-offset: 2px; }
 .studio-app .btn-link:hover { color: var(--text); }
 .studio-app .btn-link:focus-visible { outline: 2px solid var(--accent); border-radius: 3px; }
+
+.sa-map { display: block; width: 216px; max-width: 100%; height: auto; margin-top: 12px; border-radius: 10px; image-rendering: pixelated; }
+.sa-summary { margin: 8px 0 0; padding-left: 1.1rem; }
+.sa-summary li { margin: 2px 0; }
