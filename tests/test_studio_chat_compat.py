@@ -21,12 +21,18 @@ def test_chat_html_has_no_hardcoded_api_key():
 
 def test_chat_page_signs_in_and_posts_studio_tools():
     html = (ROOT / "landing" / "public" / "chat.html").read_text(encoding="utf-8")
-    assert 'id="portal"' in html
-    assert 'id="portal-username"' in html
+    # One sign-in: chat uses the account session, not a separate username gate.
+    assert 'id="portal"' not in html
+    assert 'id="portal-username"' not in html
+    assert 'autocomplete="username"' not in html
+    assert "/assets/auth.js" in html
+    assert 'href="/login?next=/chat"' in html
+    # Old username threads are migrated, not dropped.
     assert "resileos_username" in html
+    assert "async function migrateSavedChats" in html
     assert "resileos_theme" in html
     assert 'id="history-panel"' in html
-    assert 'id="history-username"' in html
+    assert 'id="history-username"' not in html
     assert 'id="input"' in html
     assert "<textarea" in html
     assert "shiftKey" in html
@@ -47,7 +53,7 @@ def test_chat_page_signs_in_and_posts_studio_tools():
     assert "RES-309" not in html
     assert 'href="/chat.html"' not in html
     sign_out = html.split("async function signOut()", 1)[1].split("['settings-hub'", 1)[0]
-    assert "resileos_username" in sign_out
+    assert "ResileosAuth.logout" in sign_out
     assert "resileos_api_key" not in sign_out
     assert "localStorage.clear" not in sign_out
     assert "function applyOptionalKey" not in html

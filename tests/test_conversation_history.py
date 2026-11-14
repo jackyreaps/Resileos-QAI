@@ -292,7 +292,8 @@ def test_public_site_links_chat_and_history_panel():
     assert 'href="/app"' not in index
     assert 'href="/chat.html"' not in index
     assert 'id="history-panel"' in chat
-    assert 'id="history-username"' in chat
+    assert 'id="history-username"' not in chat
+    assert "ACCOUNT_THREAD_USER" in chat
     assert "DEMO_API_KEY" not in chat
     assert "/api/session/v1" in chat
     assert "X-API-Key" not in chat

@@ -38,10 +38,24 @@ export function normalizeEmail(value) {
   return email;
 }
 
+export function safeNext(value, fallback = "/account") {
+  const next = typeof value === "string" ? value.trim() : "";
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
+  if (next.length > 200 || /[\r\n\0]/.test(next)) return fallback;
+  if (next.startsWith("/api/") || next.startsWith("/login")) return fallback;
+  return next;
+}
+
+export const LOGIN_MISMATCH = "That email and password don't match. Try again, or choose \u201cEmail me a link\u201d.";
+export const LOGIN_LOCKED = "Too many tries. Wait 15 minutes, or choose \u201cEmail me a link\u201d.";
+
+// Cloudflare Workers' WebCrypto rejects PBKDF2 above 100000 iterations, so a higher
+// setting would make every password save and sign-in fail on the live site.
+export const PBKDF2_ITERATIONS = 100000;
+
 export function passwordIterations(env) {
-  const raw = Number((env && env.PASSWORD_PBKDF2_ITERATIONS) || 100000);
-  if (!Number.isFinite(raw)) return 100000;
-  return Math.max(100000, Math.floor(raw));
+  void env;
+  return PBKDF2_ITERATIONS;
 }
 
 export function magicTtlMs(env) {
@@ -225,11 +239,11 @@ export async function issueMagicLink({ kv, email, purpose, ip, now, ttlMs, limit
   const hour = Math.floor(now / 3600000);
   const ipOk = await bump(kv, `rl:magic:ip:${ip}:${hour}`, limits.ip);
   if (!ipOk) {
-    return { ok: false, status: 429, detail: "Too many sign-in emails from this network. Try again later." };
+    return { ok: false, status: 429, detail: "Too many emails from this network. Wait an hour and try again." };
   }
   const emailOk = await bump(kv, `rl:magic:email:${email}:${hour}`, limits.email);
   if (!emailOk) {
-    return { ok: false, status: 429, detail: "Too many sign-in emails for this address. Try again later." };
+    return { ok: false, status: 429, detail: "We've sent several emails to this address already. Check your inbox and spam folder, or wait an hour." };
   }
   const token = randomToken(32);
   const digest = await sha256Hex(token);
@@ -468,10 +482,10 @@ async function readLock(kv, email) {
 export async function loginWithPassword({ kv, env, email, password, ip, now }) {
   const hour = Math.floor(now / 3600000);
   const ipOk = await bump(kv, `rl:login:ip:${ip}:${hour}`, intEnv(env, "LOGIN_IP_PER_HOUR", 30));
-  if (!ipOk) return { ok: false, status: 429, detail: "Too many sign-in attempts from this network." };
+  if (!ipOk) return { ok: false, status: 429, detail: "Too many sign-in attempts from this network. Try again in an hour, or choose \u201cEmail me a link\u201d." };
   const lock = await readLock(kv, email);
   if (lock.locked_until && lock.locked_until > now) {
-    return { ok: false, status: 429, detail: "Too many sign-in attempts. Try again later." };
+    return { ok: false, status: 429, detail: LOGIN_LOCKED };
   }
   const account = await loadAccount(kv, email);
   const stored = account && account.password ? account.password : await dummyStored(env);
@@ -482,10 +496,10 @@ export async function loginWithPassword({ kv, env, email, password, ip, now }) {
       const lockedUntil = fails >= FAIL_LIMIT ? now + LOCK_MS : 0;
       await kv.put(`lock:${email}`, JSON.stringify({ fails, locked_until: lockedUntil }), { expirationTtl: 3600 });
       if (fails >= FAIL_LIMIT) {
-        return { ok: false, status: 429, detail: "Too many sign-in attempts. Try again later." };
+        return { ok: false, status: 429, detail: LOGIN_LOCKED };
       }
     }
-    return { ok: false, status: 401, detail: "Invalid email or password." };
+    return { ok: false, status: 401, detail: LOGIN_MISMATCH };
   }
   await kv.delete(`lock:${email}`);
   return createSession({ kv, env, email, now });
@@ -493,12 +507,17 @@ export async function loginWithPassword({ kv, env, email, password, ip, now }) {
 
 export async function setPassword({ kv, env, email, password, current, now, resetOk }) {
   if (typeof password !== "string" || password.length < 10 || password.length > 200) {
-    return { ok: false, status: 400, detail: "Use a password of 10 to 200 characters." };
+    return { ok: false, status: 400, detail: "Use a password of at least 10 characters (200 at most)." };
   }
   const account = await ensureAccount(kv, email, now);
   if (account.password && !resetOk) {
-    const matches = await verifyPassword(current || "", account.password);
-    if (!matches) return { ok: false, status: 401, detail: "Current password does not match." };
+    if (!current) {
+      return { ok: false, status: 400, detail: "Enter your current password to change it, or use \u201cForgot password\u201d." };
+    }
+    const matches = await verifyPassword(current, account.password);
+    if (!matches) {
+      return { ok: false, status: 401, detail: "Your current password isn't right. Try again, or use \u201cForgot password\u201d." };
+    }
   }
   account.password = await hashPassword(password, env);
   await saveAccount(kv, account);
@@ -666,7 +685,8 @@ export async function handleMagicLink({ request, env, now, send }) {
   const session = await readSession({ kv, env, request, now: clock });
   let email = normalizeEmail(body.email);
   if ((purpose === "reset" || purpose === "reveal") && session) email = session.email;
-  if (!email) return detail("Enter a valid email address.", 400);
+  if (!email) return detail("Enter a full email address, like you@example.com.", 400);
+  if (!session && purpose === "reveal") return detail("Sign in first.", 401);
   const issued = await issueMagicLink({
     kv,
     email,
@@ -680,7 +700,9 @@ export async function handleMagicLink({ request, env, now, send }) {
     },
   });
   if (!issued.ok) return detail(issued.detail, issued.status);
-  const url = `${siteUrl(env).replace(/\/$/, "")}/api/session/verify?token=${encodeURIComponent(issued.token)}`;
+  let url = `${siteUrl(env).replace(/\/$/, "")}/api/session/verify?token=${encodeURIComponent(issued.token)}`;
+  const requestedNext = safeNext(body.next, "");
+  if (purpose === "login" && requestedNext) url += `&next=${encodeURIComponent(requestedNext)}`;
   const minutes = Math.round(magicTtlMs(env) / 60000);
   const subject = {
     login: "Your Resileos sign-in link",
@@ -701,7 +723,7 @@ export async function handleMagicLink({ request, env, now, send }) {
   } catch (err) {
     await kv.delete(`magic:${await sha256Hex(issued.token)}`);
     if (err && err.code === "email_not_configured") return detail("email not configured", 503);
-    return detail("Could not send email.", 502);
+    return detail("We couldn't send the email just now. Try again in a minute.", 502);
   }
   return noStore(json({ ok: true }));
 }
@@ -712,7 +734,12 @@ export async function handleVerify({ request, env, now }) {
   const clock = momentOf(now);
   const url = new URL(request.url);
   const consumed = await consumeMagicLink({ kv, token: url.searchParams.get("token") || "", now: clock });
-  if (!consumed.ok) return detail("This sign-in link is invalid or expired.", 400);
+  if (!consumed.ok) {
+    return new Response(null, {
+      status: 302,
+      headers: { Location: "/login?error=link", "Cache-Control": "no-store" },
+    });
+  }
   const extra = {};
   let next = "/account";
   if (consumed.purpose === "reveal") {
@@ -720,13 +747,18 @@ export async function handleVerify({ request, env, now }) {
     next = "/account?reveal=ready";
   } else if (consumed.purpose === "reset") {
     extra.reset_until = clock + magicTtlMs(env);
-    next = "/account?reset=1";
+    next = "/login?step=reset";
   } else {
-    const requested = url.searchParams.get("next") || "";
-    if (requested.startsWith("/") && !requested.startsWith("//") && !requested.startsWith("/\\")) next = requested;
+    next = safeNext(url.searchParams.get("next"), "/account");
   }
   const session = await createSession({ kv, env, email: consumed.email, now: clock, extra });
   if (!session.ok) return detail(session.detail, session.status);
+  if (consumed.purpose === "login") {
+    const account = await loadAccount(kv, consumed.email);
+    if (account && !account.password) {
+      next = `/login?step=set-password&next=${encodeURIComponent(next)}`;
+    }
+  }
   return new Response(null, {
     status: 302,
     headers: {
@@ -737,14 +769,25 @@ export async function handleVerify({ request, env, now }) {
   });
 }
 
+export function loginFields(body) {
+  const source = body && typeof body === "object" ? body : {};
+  const pick = (value) => (typeof value === "string" ? value : "");
+  // Older forms and password managers may post the address as "username".
+  const raw = pick(source.email).trim() ? pick(source.email) : pick(source.username);
+  return { raw: raw.trim(), email: normalizeEmail(raw), password: pick(source.password) };
+}
+
 export async function handleLogin({ request, env, now }) {
   if (!originAllowed(request, env)) return detail("Cross-site request blocked.", 403);
   const kv = env.KEYS;
   if (!kv) return detail("Key storage is not bound.", 503);
   const body = await readJson(request);
-  const email = normalizeEmail(body.email);
-  const password = typeof body.password === "string" ? body.password : "";
-  if (!email || !password) return detail("Invalid email or password.", 401);
+  const { raw, email, password } = loginFields(body);
+  if (!raw) return detail("Enter your email address.", 400);
+  if (!email) {
+    return detail("Enter the full email address for your account, like you@example.com. Usernames aren't used to sign in.", 400);
+  }
+  if (!password) return detail("Enter your password, or choose \u201cEmail me a link\u201d.", 400);
   const result = await loginWithPassword({
     kv,
     env,
@@ -754,7 +797,7 @@ export async function handleLogin({ request, env, now }) {
     now: momentOf(now),
   });
   if (!result.ok) return detail(result.detail, result.status);
-  return noStore(json({ ok: true, csrf: result.csrf }, 200, { "Set-Cookie": result.cookie }));
+  return noStore(json({ ok: true, csrf: result.csrf, email }, 200, { "Set-Cookie": result.cookie }));
 }
 
 export async function handleLogout({ request, env, now }) {
@@ -762,7 +805,7 @@ export async function handleLogout({ request, env, now }) {
   const kv = env.KEYS;
   if (!kv) return detail("Key storage is not bound.", 503);
   const session = await readSession({ kv, env, request, now: momentOf(now) });
-  if (session && !csrfOk(request, session.record)) return detail("CSRF check failed.", 403);
+  if (session && !csrfOk(request, session.record)) return detail("This page is out of date. Refresh it and try again.", 403);
   if (session) await kv.delete(`session:${session.storage}`);
   return noStore(json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie() }));
 }
@@ -825,8 +868,10 @@ async function requireUser({ request, env, now }) {
   if (!kv) return { response: detail("Key storage is not bound.", 503) };
   const clock = momentOf(now);
   const session = await readSession({ kv, env, request, now: clock });
-  if (!session) return { response: detail("Sign in required.", 401) };
-  if (!csrfOk(request, session.record)) return { response: detail("CSRF check failed.", 403) };
+  if (!session) return { response: detail("You're signed out. Sign in again to continue.", 401) };
+  if (!csrfOk(request, session.record)) {
+    return { response: detail("This page is out of date. Refresh it and try again.", 403) };
+  }
   return { kv, session, now: clock };
 }
 
@@ -906,10 +951,23 @@ export async function handleProxy({ request, env, params, fetchImpl, now }) {
   headers.set("accept", request.headers.get("accept") || "application/json");
   if (session) {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && !csrfOk(request, session.record)) {
-      return detail("CSRF check failed.", 403);
+      return detail("This page is out of date. Refresh it and try again.", 403);
+    }
+    if (!session.account.key_digest && !session.account.free_issued) {
+      // First chat after sign-in: give the account its one free key on the server,
+      // under the same per-network limit as /api/free-key.
+      const rateKey = `rate:${clientIp(request)}`;
+      const hits = Number((await kv.get(rateKey)) || "0");
+      if (hits < intEnv(env, "FREE_KEY_RATE_PER_HOUR", 5)) {
+        const created = await createFreeKey({ kv, env, email: session.email, now: clock });
+        if (created.ok) {
+          await kv.put(rateKey, String(hits + 1), { expirationTtl: 3600 });
+          session.account = (await loadAccount(kv, session.email)) || session.account;
+        }
+      }
     }
     if (!session.account.key_digest) {
-      return detail("No API key on this account yet. Create a free key from Account.", 409);
+      return detail("This account has no active key. Open Account to set one up.", 409);
     }
     let apiKey = "";
     try {

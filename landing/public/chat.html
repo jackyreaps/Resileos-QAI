@@ -10,18 +10,17 @@
             try {
                 var theme = localStorage.getItem('resileos_theme');
                 document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-                var name = (localStorage.getItem('resileos_username') || '').trim();
-                if (/^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/.test(name)) {
-                    document.documentElement.classList.add('signed-in');
-                }
+                document.documentElement.classList.add('app-open');
             } catch (err) {
                 document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.classList.add('app-open');
             }
         })();
     </script>
     <link rel="stylesheet" href="/assets/fonts/fonts.css" />
     <link rel="stylesheet" href="/assets/site-nav.css" />
     <script src="/assets/site-nav.js" defer></script>
+    <script src="/assets/auth.js"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -102,8 +101,8 @@
             background-image: url(/assets/grain.png);
             mix-blend-mode: overlay;
         }
-        html:not(.signed-in) body { overflow: auto; }
-        html.signed-in body { height: 100dvh; overflow: hidden; }
+        html:not(.app-open) body { overflow: auto; }
+        html.app-open body { height: 100dvh; overflow: hidden; }
         a { color: var(--accent); }
         a:hover { color: var(--accent-hover); }
         button, input, textarea, select { font: inherit; color: inherit; }
@@ -118,7 +117,7 @@
             place-items: center;
             padding: 32px 16px;
         }
-        html.signed-in #portal { display: none; }
+        html.app-open #portal { display: none; }
         .portal-card {
             width: min(460px, 100%);
             background: var(--panel);
@@ -203,7 +202,7 @@
             flex-direction: column;
             min-height: 0;
         }
-        html:not(.signed-in) .app-shell { display: none; }
+        html:not(.app-open) .app-shell { display: none; }
         .header {
             flex-shrink: 0;
             padding: 12px 16px;
@@ -300,8 +299,10 @@
             background: rgba(6, 4, 12, .5); cursor: pointer;
         }
         .history-scrim[hidden] { display: none; }
+        .history-actions [hidden], .header-actions [hidden], .menu-item[hidden] { display: none !important; }
+        a.history-save { text-decoration: none; display: inline-flex; align-items: center; }
         @media (min-width: 960px) {
-            html.signed-in .history {
+            html.app-open .history {
                 position: relative;
                 transform: none;
                 width: 300px;
@@ -309,13 +310,13 @@
                 box-shadow: none;
                 z-index: 1;
             }
-            html.signed-in .history:not(.open) {
+            html.app-open .history:not(.open) {
                 width: 0;
                 min-width: 0;
                 overflow: hidden;
                 border-right-width: 0;
             }
-            html.signed-in .history-scrim { display: none !important; }
+            html.app-open .history-scrim { display: none !important; }
         }
         .history-head {
             flex-shrink: 0;
@@ -613,32 +614,6 @@
     <link rel="stylesheet" href="/assets/chat-ui.css" />
 </head>
 <body>
-    <div id="portal">
-        <div class="portal-card">
-            <div class="portal-top">
-                <a class="brand" href="/">Resileos</a>
-                <button class="btn-icon" id="portal-theme" type="button" title="Theme" aria-label="Theme">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-                </button>
-            </div>
-            <p class="eyebrow">Stores · Derives · Abstains</p>
-            <h1>Remembers exactly</h1>
-            <p class="lede">A username saves threads on this hub. Chat without an account uses a short per-network daily trial. Sign in with email for your own monthly quota.</p>
-            <form id="portal-form">
-                <label>Username
-                    <input id="portal-username" type="text" required maxlength="32" autocomplete="username" spellcheck="false" placeholder="ada" />
-                </label>
-                <label>Hub id <span>optional</span>
-                    <input id="portal-hub" type="text" maxlength="64" autocomplete="off" spellcheck="false" placeholder="anon" />
-                </label>
-                <p class="settings-hint" id="portal-note">The trial is counted on the server for this network. Sign in when it runs out. A paid checkout attaches to the account you are signed in to.</p>
-                <p class="portal-error" id="portal-error" role="alert"></p>
-                <button class="portal-go" type="submit">Enter chat</button>
-            </form>
-            <p class="portal-links"><a href="/login">Sign in</a> · <a href="/account">Account</a> · <a href="/">Landing</a></p>
-        </div>
-    </div>
-
     <div class="app-shell">
     <div class="header">
         <div class="header-title">
@@ -647,7 +622,7 @@
             <span class="user-pill" id="user-pill" hidden></span>
         </div>
         <div class="header-actions">
-            <a class="btn-text" id="login-link" href="/login">Sign in</a>
+            <a class="btn-text" id="login-link" href="/login?next=/chat">Sign in</a>
             <a class="btn-text" id="account-link" href="/account" hidden>Account</a>
             <button class="btn-icon btn-label" id="btn-history" type="button" onclick="toggleHistory()" title="Conversations" aria-label="Conversations" aria-pressed="false" aria-expanded="false" aria-controls="history-panel">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="15" y2="18"></line></svg>
@@ -690,9 +665,9 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                         <span class="menu-copy"><span class="menu-label">Connection</span><span class="menu-desc">Hub and persona</span></span>
                     </button>
-                    <button class="menu-item js-signout" id="btn-signout-header" type="button" role="menuitem" title="Switch user">
+                    <button class="menu-item js-signout" id="btn-signout-header" type="button" role="menuitem" title="Sign out" hidden>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                        <span class="menu-copy"><span class="menu-label">Switch user</span><span class="menu-desc">Sign in with a different username</span></span>
+                        <span class="menu-copy"><span class="menu-label">Sign out</span><span class="menu-desc">Sign out of your account on this browser</span></span>
                     </button>
                 </div>
             </div>
@@ -705,16 +680,14 @@
             <h2>Conversations</h2>
             <button type="button" class="history-new" id="history-new">New</button>
         </div>
-        <form id="history-user-form" class="history-user">
-            <label>Signed in as
-                <input id="history-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="ada" />
-            </label>
+        <div class="history-user" id="history-account">
+            <p class="settings-hint" id="history-who">Not signed in. Chats stay in this browser.</p>
             <div class="history-actions">
-                <button type="submit" class="history-save">Update name</button>
-                <button type="button" class="btn-text js-signout" id="btn-signout">Switch user</button>
+                <a class="history-save" id="history-signin" href="/login?next=/chat">Sign in</a>
+                <button type="button" class="btn-text js-signout" id="btn-signout" hidden>Sign out</button>
             </div>
-        </form>
-        <p class="settings-hint" id="history-note">Choose a username before conversations are saved.</p>
+        </div>
+        <p class="settings-hint" id="history-note">Sign in to keep conversations on your account.</p>
         <div id="history-list" class="history-list"></div>
     </aside>
     <button type="button" class="history-scrim" id="history-scrim" hidden aria-label="Close conversations"></button>
@@ -810,9 +783,6 @@
             <label>Hub id
                 <input id="settings-hub" type="text" autocomplete="off" spellcheck="false" />
             </label>
-            <label>Username
-                <input id="settings-username" type="text" maxlength="32" autocomplete="username" spellcheck="false" placeholder="Required to save chats" />
-            </label>
             <label>Persona
                 <select id="settings-persona">
                     <option value="honest">Honest</option>
@@ -823,7 +793,7 @@
             </label>
             <label class="check"><input id="settings-debug" type="checkbox" /> Show technical details on each reply</label>
             <p class="settings-hint" id="key-mode"></p>
-            <p class="settings-hint">Requests go through this site. A signed-in account uses its own key on the server. A signed-out browser uses the per-network daily trial. Choose a username before a conversation is saved.</p>
+            <p class="settings-hint">Requests go through this site. A signed-in account uses its own key on the server. A signed-out browser uses the per-network daily trial and keeps its chats only in this browser. Sign in to save them to your account.</p>
         </div>
     </div>
 
@@ -831,7 +801,7 @@
         <div class="empty" id="empty-state">
             <p class="eyebrow">Stores · Derives · Abstains</p>
             <h2>Remembers exactly</h2>
-            <p class="lede">Sign in with a username to keep this thread. Ask in a normal sentence, or try an example. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented.</p>
+            <p class="lede">Sign in to keep your conversations on your account. Ask in a normal sentence, or try an example. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented.</p>
             <p class="companion-line" id="returning-companion" hidden></p>
             <div class="suggestions" id="suggestions">
                 <button type="button" class="suggestion" data-fill="Remember that Alice works at Acme.">
@@ -923,39 +893,52 @@
             return ['honest', 'guide', 'builder', 'mythic'].indexOf(saved) === -1 ? 'honest' : saved;
         }
         function debugReplies() { return localStorage.getItem('resileos_debug') === '1'; }
-        function currentUsername() { return (localStorage.getItem('resileos_username') || '').trim(); }
+        // Conversations belong to the signed-in account. The server already files them
+        // under the account's key, so one fixed thread owner name is enough.
+        const ACCOUNT_THREAD_USER = 'account';
+        function currentUsername() { return sessionState.signed_in ? ACCOUNT_THREAD_USER : ''; }
         function validUsername(name) { return USERNAME_RE.test(name || ''); }
         function onlineLabel() {
-            const base = sessionState.signed_in ? 'Online · signed in' : 'Online · trial';
-            const name = currentUsername();
-            return name ? base + ' · ' + name : base;
+            return sessionState.signed_in ? 'Online · signed in' : 'Online · trial';
         }
 
         function updateDemoLabel() {
             const el = document.getElementById('key-mode');
+            const signedIn = Boolean(sessionState.signed_in);
             const login = document.getElementById('login-link');
             const account = document.getElementById('account-link');
-            if (login) login.hidden = Boolean(sessionState.signed_in);
-            if (account) account.hidden = !sessionState.signed_in;
-            if (!el) return;
-            if (sessionState.signed_in) {
-                el.textContent = 'Signed in as ' + sessionState.email + (sessionState.prefix ? ' · ' + sessionState.prefix : ' · no key yet');
-            } else {
-                el.textContent = 'Not signed in. This network has a short daily trial.';
+            if (login) login.hidden = signedIn;
+            if (account) account.hidden = !signedIn;
+            document.querySelectorAll('.js-signout').forEach(btn => { btn.hidden = !signedIn; });
+            const historySignin = document.getElementById('history-signin');
+            if (historySignin) historySignin.hidden = signedIn;
+            const who = document.getElementById('history-who');
+            if (who) {
+                who.textContent = signedIn
+                    ? 'Signed in as ' + sessionState.email + '. Conversations save to your account.'
+                    : 'Not signed in. Chats stay in this browser until you sign in.';
             }
-        }
-        function syncUsernameFields(name) {
-            const value = name === undefined ? currentUsername() : name;
-            const historyName = document.getElementById('history-username');
-            const settingsName = document.getElementById('settings-username');
-            const portalName = document.getElementById('portal-username');
-            if (historyName && document.activeElement !== historyName) historyName.value = value;
-            if (settingsName && document.activeElement !== settingsName) settingsName.value = value;
-            if (portalName && document.activeElement !== portalName) portalName.value = value;
             const pill = document.getElementById('user-pill');
             if (pill) {
-                pill.textContent = value;
-                pill.hidden = !value;
+                pill.textContent = signedIn ? sessionState.email : '';
+                pill.hidden = !signedIn;
+            }
+            const lede = document.querySelector('#empty-state .lede');
+            if (lede) {
+                lede.textContent = (signedIn
+                    ? 'Your conversations save to your account. '
+                    : 'Sign in to keep your conversations on your account. ')
+                    + 'Ask in a normal sentence, or try an example. Stores · Derives · Abstains: exact rows are stored, an answer is derived only from those rows, and an unknown is abstained instead of invented.';
+            }
+            const note = document.getElementById('history-note');
+            const signInNote = 'Sign in to keep conversations on your account.';
+            if (note && signedIn && note.textContent === signInNote) note.textContent = '';
+            if (note && !signedIn && !note.textContent) note.textContent = signInNote;
+            if (!el) return;
+            if (signedIn) {
+                el.textContent = 'Signed in as ' + sessionState.email + (sessionState.prefix ? ' · ' + sessionState.prefix : ' · key is set up on first message');
+            } else {
+                el.textContent = 'Not signed in. This network has a short daily trial.';
             }
         }
         function fillSettings() {
@@ -964,70 +947,19 @@
             if (personaField) personaField.value = currentPersona();
             const debugField = document.getElementById('settings-debug');
             if (debugField) debugField.checked = debugReplies();
-            syncUsernameFields();
             updateDemoLabel();
         }
-        function fillPortal() {
-            const hub = document.getElementById('portal-hub');
-            if (hub && document.activeElement !== hub) {
-                const storedHub = localStorage.getItem('resileos_hub_id') || '';
-                hub.value = storedHub && storedHub !== 'anon' ? storedHub : '';
-            }
-            syncUsernameFields();
-        }
-        function setPortalNote(text) {
-            const note = document.getElementById('portal-note');
-            if (note && text) note.textContent = text;
-        }
         function showApp() {
-            document.documentElement.classList.add('signed-in');
-            syncUsernameFields();
+            document.documentElement.classList.add('app-open');
+            updateDemoLabel();
             applyHistoryDock();
             refreshHistory();
-        }
-        function showPortal() {
-            document.documentElement.classList.remove('signed-in');
-            closeHistory();
-            closePanels();
-            fillPortal();
-            const field = document.getElementById('portal-username');
-            if (field) {
-                field.value = currentUsername();
-                field.focus();
-            }
-        }
-        function storeUsername(raw) {
-            const name = (raw || '').trim();
-            if (!name) {
-                localStorage.removeItem('resileos_username');
-                syncUsernameFields('');
-                setHistoryNote('Choose a username before conversations are saved.');
-                refreshHistory();
-                showPortal();
-                return false;
-            }
-            if (!validUsername(name)) {
-                setHistoryNote('Use 2–32 letters, digits, underscores, or hyphens.');
-                return false;
-            }
-            const changed = name !== currentUsername();
-            localStorage.setItem('resileos_username', name);
-            syncUsernameFields(name);
-            setHistoryNote('Saving conversations for ' + name + ' on hub ' + hubId() + '.');
-            if (changed) currentConversationId = null;
-            if (snapshotThread().length) schedulePersist();
-            refreshHistory();
-            if (statusDot.classList.contains('online')) setStatus('online', onlineLabel());
-            showApp();
-            return true;
         }
         function saveSettings() {
             const hub = document.getElementById('settings-hub').value.trim() || 'anon';
             const prevHub = hubId();
             localStorage.setItem('resileos_hub_id', hub);
             if (hub !== prevHub) currentConversationId = null;
-            const settingsName = document.getElementById('settings-username');
-            if (settingsName) storeUsername(settingsName.value);
             const personaField = document.getElementById('settings-persona');
             if (personaField && ['honest', 'guide', 'builder', 'mythic'].indexOf(personaField.value) !== -1) {
                 localStorage.setItem('resileos_persona', personaField.value);
@@ -1035,58 +967,30 @@
             const debugField = document.getElementById('settings-debug');
             if (debugField) localStorage.setItem('resileos_debug', debugField.checked ? '1' : '0');
             updateDemoLabel();
-            fillPortal();
             checkReady();
             refreshHistory();
-        }
-        function submitPortal(event) {
-            event.preventDefault();
-            const name = document.getElementById('portal-username').value;
-            const hub = document.getElementById('portal-hub').value.trim();
-            const err = document.getElementById('portal-error');
-            if (err) err.textContent = '';
-            if (!validUsername(name.trim())) {
-                if (err) err.textContent = 'Use 2–32 letters, digits, underscores, or hyphens.';
-                return;
-            }
-            if (hub && !HUB_RE.test(hub)) {
-                if (err) err.textContent = 'Hub id must be 1–64 characters: letters, digits, and _ . : -';
-                return;
-            }
-            const prevHub = hubId();
-            if (hub) localStorage.setItem('resileos_hub_id', hub);
-            if (hub && hub !== prevHub) currentConversationId = null;
-            if (!storeUsername(name)) {
-                if (err) err.textContent = 'Use 2–32 letters, digits, underscores, or hyphens.';
-                return;
-            }
-            fillSettings();
-            checkReady();
-            input.focus();
         }
         async function signOut() {
             clearTimeout(persistTimer);
             try { await persistThread(); } catch (err) { /* the browser cache remains */ }
-            localStorage.removeItem('resileos_username');
+            try { await window.ResileosAuth.logout(csrfToken); } catch (err) { /* the cookie may already be gone */ }
+            sessionState = { signed_in: false };
+            csrfToken = '';
             currentConversationId = null;
             chatHistory = [];
-            syncUsernameFields('');
             closePanels();
-            showPortal();
             renderThread([]);
-            setPortalNote('Signed out of this username. The account session, if any, stays until you log out from Account.');
-            setHistoryNote('Choose a username before conversations are saved.');
-            if (statusDot.classList.contains('online')) setStatus('online', onlineLabel());
+            updateDemoLabel();
+            setHistoryNote('Signed out. New chats stay in this browser until you sign in.');
+            refreshHistory();
+            checkReady();
         }
-        ['settings-hub', 'settings-username', 'settings-persona', 'settings-debug'].forEach(id => {
+        ['settings-hub', 'settings-persona', 'settings-debug'].forEach(id => {
             const node = document.getElementById(id);
             if (node) node.addEventListener('change', saveSettings);
         });
-        document.getElementById('portal-form').addEventListener('submit', submitPortal);
-        document.getElementById('portal-theme').addEventListener('click', toggleTheme);
         document.querySelectorAll('.js-signout').forEach(btn => btn.addEventListener('click', signOut));
         fillSettings();
-        fillPortal();
 
         function setStatus(kind, label) {
             statusDot.className = 'dot ' + kind;
@@ -1109,11 +1013,12 @@
             return headers;
         }
         function loadSession() {
-            return apiFetch('/api/session/me').then(r => r.json()).then(data => {
+            return window.ResileosAuth.me().then(data => {
                 sessionState = data && data.signed_in ? data : { signed_in: false };
                 csrfToken = (data && data.csrf) || '';
+                if (sessionState.signed_in) window.ResileosAuth.rememberSignedIn(sessionState.email, sessionState.has_password);
                 updateDemoLabel();
-            }).catch(() => { sessionState = { signed_in: false }; });
+            });
         }
 
         function checkReady() {
@@ -1123,7 +1028,11 @@
                 else setStatus('offline', 'API not ready');
             }).catch(() => setStatus('offline', 'Unreachable'));
         }
-        loadSession().then(checkReady);
+        loadSession().then(() => {
+            checkReady();
+            refreshHistory();
+            if (sessionState.signed_in) migrateSavedChats();
+        });
 
         function inferKin(name) {
             if (/observe|flag|iris/i.test(name)) return 'Iris';
@@ -2119,10 +2028,13 @@
             const note = document.getElementById('history-note');
             if (note) note.textContent = text;
         }
+        // Signed in: a browser copy of the account's threads. Signed out: threads live
+        // only in this browser (guest) until sign-in moves them to the account.
         function cacheStorageKey() {
-            const name = currentUsername();
-            if (!validUsername(name)) return '';
-            return 'resileos_chat_cache:' + name + ':' + hubId();
+            if (sessionState.signed_in && sessionState.email) {
+                return 'resileos_chats_account:' + String(sessionState.email).toLowerCase() + '|' + hubId();
+            }
+            return 'resileos_chats_guest:' + hubId();
         }
         function readCache() {
             const key = cacheStorageKey();
@@ -2178,9 +2090,21 @@
         }
         async function persistThread() {
             const username = currentUsername();
-            if (!validUsername(username)) return;
             const messages = snapshotThread();
             if (!messages.length) return;
+            if (!validUsername(username)) {
+                if (!currentConversationId) currentConversationId = 'local-' + Date.now().toString(36);
+                rememberCache({
+                    id: currentConversationId,
+                    title: titleFrom(messages),
+                    updated_at: new Date().toISOString(),
+                    messages: messages
+                });
+                setHistoryNote('Saved in this browser. Sign in to keep it on your account.');
+                refreshHistory();
+                return;
+            }
+            if (currentConversationId && currentConversationId.indexOf('local-') === 0) currentConversationId = null;
             const body = {
                 username: username,
                 hub_id: hubId(),
@@ -2227,7 +2151,7 @@
                     delete cache.conversations.draft;
                     writeCache(cache);
                 }
-                setHistoryNote('Saved for ' + username + ' on hub ' + hubId() + '.');
+                setHistoryNote('Saved to your account' + (hubId() !== 'anon' ? ' on hub ' + hubId() : '') + '.');
                 refreshHistory();
             } catch (err) {
                 setHistoryNote('Saved in this browser. The server was unreachable.');
@@ -2235,17 +2159,12 @@
         }
         function renderHistoryItems(items) {
             historyList.replaceChildren();
-            if (!validUsername(currentUsername())) {
-                const empty = document.createElement('p');
-                empty.className = 'history-empty';
-                empty.textContent = 'Enter a username to list saved conversations. This tab keeps the current thread until you leave.';
-                historyList.appendChild(empty);
-                return;
-            }
             if (!items.length) {
                 const empty = document.createElement('p');
                 empty.className = 'history-empty';
-                empty.textContent = 'No saved conversations for this username yet.';
+                empty.textContent = sessionState.signed_in
+                    ? 'No saved conversations yet.'
+                    : 'No chats in this browser yet. Sign in to keep conversations on your account.';
                 historyList.appendChild(empty);
                 return;
             }
@@ -2267,15 +2186,12 @@
         }
         async function refreshHistory() {
             const username = currentUsername();
-            if (!validUsername(username)) {
-                renderHistoryItems([]);
-                return;
-            }
             const cache = readCache();
             const cachedItems = Object.values(cache.conversations)
                 .filter(item => item && item.id && item.id !== 'draft')
                 .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
             renderHistoryItems(cachedItems);
+            if (!validUsername(username)) return;
             try {
                 const response = await apiFetch(
                     apiUrl() + '/conversations?username=' + encodeURIComponent(username) + '&hub_id=' + encodeURIComponent(hubId()),
@@ -2323,10 +2239,14 @@
         }
         async function openConversation(id) {
             const username = currentUsername();
-            if (!validUsername(username) || !id) return;
+            if (!id) return;
             currentConversationId = id;
             const cached = readCache().conversations[id];
             if (cached && cached.messages && cached.messages.length) renderThread(cached.messages);
+            if (!validUsername(username) || id.indexOf('local-') === 0) {
+                if (!window.matchMedia('(min-width: 960px)').matches) closeHistory();
+                return;
+            }
             try {
                 const response = await apiFetch(
                     apiUrl() + '/conversations/' + encodeURIComponent(id)
@@ -2345,6 +2265,136 @@
                 if (!window.matchMedia('(min-width: 960px)').matches) closeHistory();
             } catch (err) {
                 setHistoryNote('Showing the copy saved in this browser.');
+            }
+        }
+        // One-time move of chats saved in this browser into the signed-in account:
+        // threads from the old username sign-in (resileos_chat_cache:<name>:<hub>),
+        // any still on the server under that username, and signed-out guest chats.
+        // Old copies are kept; a marker stops a thread from being copied twice.
+        const MIGRATED_KEY = 'resileos_chats_migrated';
+        let migrating = false;
+        function readJsonStorage(key, fallback) {
+            try {
+                const value = JSON.parse(localStorage.getItem(key) || 'null');
+                return value && typeof value === 'object' ? value : fallback;
+            } catch (err) { return fallback; }
+        }
+        function savedChatSources() {
+            const sources = [];
+            for (let i = 0; i < localStorage.length; i += 1) {
+                const key = localStorage.key(i) || '';
+                let name = '';
+                let hub = '';
+                if (key.indexOf('resileos_chat_cache:') === 0) {
+                    const rest = key.slice('resileos_chat_cache:'.length);
+                    const cut = rest.indexOf(':');
+                    if (cut < 1) continue;
+                    name = rest.slice(0, cut);
+                    hub = rest.slice(cut + 1) || 'anon';
+                } else if (key.indexOf('resileos_chats_guest:') === 0) {
+                    hub = key.slice('resileos_chats_guest:'.length) || 'anon';
+                } else {
+                    continue;
+                }
+                if (!HUB_RE.test(hub)) continue;
+                const data = readJsonStorage(key, null);
+                if (!data || !data.conversations) continue;
+                sources.push({ key: key, name: name, hub: hub, conversations: data.conversations });
+            }
+            const legacyName = (localStorage.getItem('resileos_username') || '').trim();
+            if (validUsername(legacyName) && !sources.some(src => src.name === legacyName)) {
+                sources.push({ key: 'resileos_chat_cache:' + legacyName + ':' + hubId(), name: legacyName, hub: hubId(), conversations: {} });
+            }
+            return sources;
+        }
+        async function fetchLegacyServerThreads(source) {
+            if (!validUsername(source.name) || source.name === ACCOUNT_THREAD_USER) return [];
+            const query = '?username=' + encodeURIComponent(source.name) + '&hub_id=' + encodeURIComponent(source.hub);
+            try {
+                const listed = await apiFetch(apiUrl() + '/conversations' + query, { headers: authHeaders() });
+                if (!listed.ok) return [];
+                const rows = (await listed.json()).conversations || [];
+                const out = [];
+                for (const row of rows) {
+                    if (!row || !row.id) continue;
+                    const local = source.conversations[row.id];
+                    if (local && local.messages && local.messages.length) continue;
+                    const full = await apiFetch(apiUrl() + '/conversations/' + encodeURIComponent(row.id) + query, { headers: authHeaders() });
+                    if (!full.ok) continue;
+                    const data = await full.json();
+                    out.push({ id: row.id, title: data.title, updated_at: data.updated_at, messages: data.messages || [] });
+                }
+                return out;
+            } catch (err) { return []; }
+        }
+        async function migrateSavedChats() {
+            if (migrating || !sessionState.signed_in || !sessionState.email) return;
+            migrating = true;
+            const email = String(sessionState.email).toLowerCase();
+            const done = readJsonStorage(MIGRATED_KEY, {});
+            let moved = 0;
+            let failed = false;
+            try {
+                for (const source of savedChatSources()) {
+                    const threads = Object.values(source.conversations)
+                        .filter(item => item && item.id && item.id !== 'draft' && Array.isArray(item.messages) && item.messages.length);
+                    const draft = source.conversations.draft;
+                    if (draft && Array.isArray(draft.messages) && draft.messages.length) threads.push(draft);
+                    (await fetchLegacyServerThreads(source)).forEach(item => threads.push(item));
+                    for (const item of threads) {
+                        const mark = email + '|' + source.key + '|' + item.id;
+                        if (done[mark]) continue;
+                        const messages = item.messages
+                            .filter(m => m && (m.role === 'user' || m.role === 'assistant') && String(m.text || '').trim())
+                            .slice(-200)
+                            .map(m => ({ role: m.role, text: String(m.text).slice(0, 8000) }));
+                        if (!messages.length) { done[mark] = 'empty'; continue; }
+                        const response = await apiFetch(apiUrl() + '/conversations', {
+                            method: 'POST',
+                            headers: authHeaders(true),
+                            body: JSON.stringify({
+                                username: ACCOUNT_THREAD_USER,
+                                hub_id: source.hub,
+                                title: item.title || titleFrom(messages),
+                                messages: messages
+                            })
+                        });
+                        if (!response.ok) { failed = true; break; }
+                        const saved = await response.json().catch(() => ({}));
+                        done[mark] = saved.id || 'saved';
+                        localStorage.setItem(MIGRATED_KEY, JSON.stringify(done));
+                        const accountKey = 'resileos_chats_account:' + email + '|' + source.hub;
+                        const cache = readJsonStorage(accountKey, { conversations: {} });
+                        if (!cache.conversations) cache.conversations = {};
+                        if (saved.id) {
+                            cache.conversations[saved.id] = {
+                                id: saved.id,
+                                title: saved.title || item.title || 'Conversation',
+                                updated_at: saved.updated_at || item.updated_at || '',
+                                message_count: messages.length,
+                                messages: messages
+                            };
+                            try { localStorage.setItem(accountKey, JSON.stringify(cache)); } catch (err) { /* cache is optional */ }
+                        }
+                        if (!source.name) {
+                            // A guest chat now lives on the account; drop the guest copy so it isn't shown twice.
+                            const guest = readJsonStorage(source.key, { conversations: {} });
+                            if (guest.conversations) delete guest.conversations[item.id];
+                            try { localStorage.setItem(source.key, JSON.stringify(guest)); } catch (err) { /* ignore */ }
+                            if (currentConversationId === item.id && saved.id) currentConversationId = saved.id;
+                        }
+                        moved += 1;
+                    }
+                    if (failed) break;
+                }
+            } finally {
+                migrating = false;
+            }
+            if (moved) {
+                setHistoryNote('Moved ' + moved + (moved === 1 ? ' saved chat' : ' saved chats') + ' from this browser into your account.');
+                refreshHistory();
+            } else if (failed) {
+                setHistoryNote('Some chats saved in this browser could not be moved to your account yet. They are still here; this will retry next time.');
             }
         }
         function startNewConversation() {
@@ -2375,7 +2425,7 @@
             else openHistory();
         }
         function applyHistoryDock() {
-            if (!document.documentElement.classList.contains('signed-in')) {
+            if (!document.documentElement.classList.contains('app-open')) {
                 closeHistory();
                 return;
             }
@@ -2384,11 +2434,6 @@
         }
         document.getElementById('history-new').addEventListener('click', startNewConversation);
         document.getElementById('history-scrim').addEventListener('click', closeHistory);
-        document.getElementById('history-user-form').addEventListener('submit', (event) => {
-            event.preventDefault();
-            const err = document.getElementById('portal-error');
-            if (storeUsername(document.getElementById('history-username').value) && err) err.textContent = '';
-        });
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
             if (historyOpen && !window.matchMedia('(min-width: 960px)').matches) { closeHistory(); return; }
@@ -2408,11 +2453,9 @@
                 if (!response.ok) {
                     setStatus('needs-key', 'Plan not ready');
                     setHistoryNote(typeof data.detail === 'string' ? data.detail : 'Paid plan is not ready yet. Refresh in a few seconds.');
-                    setPortalNote(typeof data.detail === 'string' ? data.detail : 'Paid plan is not ready yet. Refresh in a few seconds.');
                     return;
                 }
                 fillSettings();
-                fillPortal();
                 const url = new URL(location.href);
                 url.searchParams.delete('checkout');
                 url.searchParams.delete('session_id');
@@ -2420,14 +2463,9 @@
                 const note = data.attached
                     ? 'Plan attached to this account.'
                     : 'Checkout recorded. Sign in with the same email to use the plan.';
-                if (validUsername(currentUsername())) {
-                    showApp();
-                    openHistory();
-                    setHistoryNote(note);
-                } else {
-                    showPortal();
-                    setPortalNote(note);
-                }
+                showApp();
+                openHistory();
+                setHistoryNote(note);
                 loadSession().then(checkReady);
             } catch (err) {
                 setStatus('offline', 'Could not claim key');
@@ -2499,12 +2537,7 @@
         }
         sendBtn.addEventListener('click', sendMsg);
         claimPaidKey();
-        if (validUsername(currentUsername())) {
-            setHistoryNote('Conversations for ' + currentUsername() + ' on hub ' + hubId() + '.');
-            showApp();
-        } else {
-            showPortal();
-        }
+        showApp();
     </script>
     <script src="/assets/chat-ui.js"></script>
 </body>

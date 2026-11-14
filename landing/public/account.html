@@ -71,14 +71,20 @@
         </div>
 
         <div class="card" style="margin-top: 16px;" id="password-card">
-          <h2>Password</h2>
-          <p class="micro">Optional. Reset uses the email link. Stored as a PBKDF2-SHA256 hash.</p>
+          <h2 id="pw-title">Password</h2>
+          <p class="micro" id="pw-note">Optional. You can always sign in with an email link instead.</p>
           <form class="form" id="password-form">
-            <label for="current-password">Current password</label>
-            <input id="current-password" type="password" autocomplete="current-password" />
+            <!-- Lets password managers save the password under this email, not a username. -->
+            <input id="pw-username" name="email" type="email" autocomplete="username" readonly hidden />
+            <div class="form" id="current-wrap" hidden>
+              <label for="current-password">Current password</label>
+              <input id="current-password" type="password" autocomplete="current-password" />
+            </div>
             <label for="new-password">New password</label>
             <input id="new-password" type="password" autocomplete="new-password" minlength="10" required />
-            <button class="btn btn-ghost" type="submit">Save password</button>
+            <p class="micro">At least 10 characters.</p>
+            <button class="btn btn-ghost" id="pw-save" type="submit">Save password</button>
+            <button class="link-btn" id="forgot-btn" type="button" hidden>Forgot your current password? Email me a reset link</button>
             <p class="msg" id="password-msg" role="status"></p>
           </form>
         </div>
@@ -101,6 +107,7 @@
     <div>Resileos · Remembers exactly · Stores, derives, abstains</div>
   </footer>
   <script src="/assets/site.js"></script>
+  <script src="/assets/auth.js"></script>
   <script>
     let csrf = "";
     let account = null;
@@ -139,10 +146,24 @@
       const quota = data.usage && data.usage.unlimited ? "unlimited" : (data.quota ?? "—");
       document.getElementById("f-usage").textContent = count + " / " + quota;
       document.getElementById("free-btn").hidden = Boolean(data.has_key || data.free_issued);
-      const params = new URLSearchParams(location.search);
-      if (params.get("reset") === "1" || data.reset_ready) {
-        document.getElementById("current-password").disabled = true;
-        setMsg("password-msg", "Reset link accepted. Set a new password.");
+      renderPassword(data);
+    }
+
+    function renderPassword(data) {
+      window.ResileosAuth.rememberSignedIn(data.email, data.has_password);
+      document.getElementById("pw-username").value = data.email || "";
+      const changing = Boolean(data.has_password) && !data.reset_ready;
+      document.getElementById("current-wrap").hidden = !changing;
+      document.getElementById("forgot-btn").hidden = !changing;
+      if (data.reset_ready) {
+        document.getElementById("pw-title").textContent = "Choose a new password";
+        document.getElementById("pw-note").textContent = "You opened a reset link, so your old password isn't needed.";
+      } else if (changing) {
+        document.getElementById("pw-title").textContent = "Change password";
+        document.getElementById("pw-note").textContent = "Enter your current password, then the new one.";
+      } else {
+        document.getElementById("pw-title").textContent = "Set a password";
+        document.getElementById("pw-note").textContent = "Optional. With a password you can sign in without waiting for an email.";
       }
     }
 
@@ -150,8 +171,7 @@
       const res = await fetch("/api/session/me", { credentials: "same-origin" });
       const data = await res.json().catch(() => ({}));
       if (!data.signed_in) {
-        const next = encodeURIComponent(location.pathname + location.search);
-        location.replace("/login?next=" + next);
+        location.replace(window.ResileosAuth.loginUrl(location.pathname + location.search));
         return;
       }
       render(data);
@@ -219,7 +239,7 @@
       setMsg("key-msg", "Sending…");
       const { res, data } = await api("/api/session/magic-link", { purpose: "reveal" });
       if (res.status === 503) {
-        setMsg("key-msg", "email not configured", "err");
+        setMsg("key-msg", "Email isn't available right now. Try again later.", "err");
         return;
       }
       setMsg("key-msg", res.ok ? "Check your email and open the link on this browser." : (data.detail || "Could not send."), res.ok ? "ok" : "err");
@@ -237,12 +257,35 @@
     });
     document.getElementById("password-form").addEventListener("submit", async (event) => {
       event.preventDefault();
-      const { res, data } = await api("/api/session/password", {
-        password: document.getElementById("new-password").value,
-        current_password: document.getElementById("current-password").value,
-      });
-      setMsg("password-msg", res.ok ? "Password saved." : (data.detail || "Could not save the password."), res.ok ? "ok" : "err");
-      if (res.ok) document.getElementById("current-password").disabled = false;
+      const changing = !document.getElementById("current-wrap").hidden;
+      const current = document.getElementById("current-password").value;
+      const password = document.getElementById("new-password").value;
+      if (changing && !current) {
+        setMsg("password-msg", "Enter your current password, or use the reset link below.", "err");
+        return;
+      }
+      if (password.length < 10) {
+        setMsg("password-msg", "Use at least 10 characters.", "err");
+        return;
+      }
+      const body = { password: password };
+      if (changing) body.current_password = current;
+      const { res, data } = await api("/api/session/password", body);
+      if (!res.ok) {
+        setMsg("password-msg", data.detail || "Couldn't save the password. Try again.", "err");
+        return;
+      }
+      document.getElementById("current-password").value = "";
+      document.getElementById("new-password").value = "";
+      const again = await fetch("/api/session/me", { credentials: "same-origin" });
+      const fresh = await again.json().catch(() => ({}));
+      if (fresh.signed_in) render(fresh);
+      setMsg("password-msg", "Password saved. Next time, enter your email and use it to sign in.", "ok");
+    });
+    document.getElementById("forgot-btn").addEventListener("click", async () => {
+      setMsg("password-msg", "Sending\u2026");
+      const { res, data } = await api("/api/session/magic-link", { purpose: "reset" });
+      setMsg("password-msg", res.ok ? "Check your email for a reset link. It works once and expires in 15 minutes." : (data.detail || "Couldn't send the email. Try again."), res.ok ? "ok" : "err");
     });
     document.getElementById("logout-btn").addEventListener("click", async () => {
       await api("/api/session/logout");

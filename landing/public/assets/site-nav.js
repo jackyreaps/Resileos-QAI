@@ -11,8 +11,7 @@
     ["/how-it-works", "How it works"],
     ["/kin", "Kin"],
     ["/pricing", "Pricing"],
-    ["/login", "Sign in"],
-    ["/account", "Account"],
+    // Sign in / Account live in the chat header, which knows the session.
     ["/chat", "Chat"]
   ];
 

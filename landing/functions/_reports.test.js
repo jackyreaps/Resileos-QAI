@@ -114,7 +114,7 @@ test("unsigned and non-admin sessions cannot list or decide reports", async () =
   });
   assert.equal(forbidden.status, 403);
   const forbiddenBody = await forbidden.json();
-  assert.equal(forbiddenBody.detail, "Not an admin.");
+  assert.match(forbiddenBody.detail, /site admins only/);
 
   const approve = await handleReportsApprove({
     request: request("/api/session/reports/approve", {

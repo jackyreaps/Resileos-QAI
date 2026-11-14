@@ -197,7 +197,7 @@
       }
       if (res.status === 403) {
         document.getElementById("report").hidden = true;
-        setMsg(data.detail || "Not an admin.", "err");
+        setMsg(data.detail || "This page is for site admins only.", "err");
         return;
       }
       if (!res.ok) {
