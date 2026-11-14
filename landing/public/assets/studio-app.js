@@ -269,7 +269,13 @@
     clips.forEach(function (c) { tl.appendChild(assetCard(c, { w: 112, h: 72, onclick: play })); });
     pickList("video-pictures", function (a) { return a.kind === "image"; });
     pickList("video-clips", function (a) { return a.kind === "clip"; });
-    $("provider-note").textContent = providerReady ? "Uses the configured video provider." : "Unavailable: no video provider is set up on this host. Nothing will be faked.";
+    var sel = $("t2v-scene"), keep = sel.value;
+    sel.innerHTML = "";
+    sel.appendChild(el("option", { value: "", text: "No scene" }));
+    (project.scenes || []).forEach(function (s) { sel.appendChild(el("option", { value: s.id, text: s.title || "Untitled scene" })); });
+    sel.value = keep;
+    $("provider-note").textContent = "Pick a scene set in one of your places and we'll pan across that world's map. Your words alone aren't turned into pictures. " +
+      (providerReady ? "Without a scene, the configured video provider is used." : "Without a scene, it's unavailable: no video provider is set up, and nothing will be faked.");
     $("make-t2v").disabled = false;
   }
   function renderImage() {
@@ -420,8 +426,22 @@
     } else {
       status("Done");
       out.appendChild(el("p", { class: "sa-msg", text: "Made. These haven't been checked." }));
+      if (result.summary && result.summary.length) {
+        var ul = el("ul", { class: "sa-summary" });
+        result.summary.forEach(function (t) { ul.appendChild(el("li", { text: t })); });
+        out.appendChild(ul);
+      }
+      if (result.details && (result.details.confidence != null || result.details.cost)) {
+        var d = result.details, bits = [];
+        if (d.confidence != null) bits.push("Confidence " + Math.round(d.confidence * 100) + "%");
+        if (d.cost) bits.push(d.cost.seconds + " s, " + d.cost.memory_mb + " MB");
+        if (d.source) bits.push(d.source);
+        var det = el("details", {}, [el("summary", { text: "Details" }), el("p", { class: "micro", text: bits.join(" · ") })]);
+        out.appendChild(det);
+      }
     }
     rerender();
+    return result;
   }
 
   async function upload(files) {
@@ -455,6 +475,16 @@
     }, 125);
   }
 
+  function drawMap(m) {
+    var c = $("world-map"), ctx = c.getContext("2d"), n = m.length, px = c.width / n;
+    c.hidden = false;
+    for (var i = 0; i < n; i++) for (var j = 0; j < m[i].length; j++) {
+      var v = m[i][j];
+      ctx.fillStyle = "rgb(" + Math.round(v[0] * 255) + "," + Math.round(v[1] * 255) + "," + Math.round(v[2] * 255) + ")";
+      ctx.fillRect(j * px, i * px, Math.ceil(px), Math.ceil(px));
+    }
+  }
+
   function result(target, items, ok) {
     var host = $(target);
     host.innerHTML = "";
@@ -485,6 +515,15 @@
       });
     });
     document.querySelectorAll('input[name="depth"]').forEach(function (r) { r.addEventListener("change", worldDepth); });
+    var mapSeed = 0;
+    async function buildWorld() {
+      var res = await make("build_world", mapSeed ? { seed: project.id + "/" + mapSeed } : {}, "world-map-result");
+      if (!res || res.status !== "MADE") return;
+      var maps = project.assets.filter(function (a) { return a.name === "World map" && a.matrix; });
+      if (maps.length) drawMap(maps[maps.length - 1].matrix);
+    }
+    $("build-world").addEventListener("click", function () { mapSeed = 0; buildWorld(); });
+    $("rebuild-world").addEventListener("click", function () { mapSeed += 1; buildWorld(); });
     $("check-world").addEventListener("click", async function () {
       await flush();
       var out = (await call("POST", "/" + project.id + "/op/check", {})).result;
@@ -535,7 +574,7 @@
     });
     $("make-t2v").addEventListener("click", function () {
       if (!$("t2v").value.trim()) { status("Describe the video.", "error"); return; }
-      make("text_to_video", { prompt: $("t2v").value }, "video-result");
+      make("text_to_video", { prompt: $("t2v").value, scene: $("t2v-scene").value || null }, "video-result");
     });
     $("play").addEventListener("click", function () {
       var clips = project && project.assets.filter(function (a) { return a.kind === "clip"; });

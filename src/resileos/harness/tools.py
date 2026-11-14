@@ -259,9 +259,14 @@ GUIDE_BODY_CAP = 4000
 
 @_traced("budget", lambda r: {"ok": r.get("ok"), "reason": r.get("reason")})
 def budget_and_stuck_guard(packet: Dict[str, Any]) -> Dict[str, Any]:
-    """Budgeted loop + simple stuck detection."""
+    """Budgeted loop + simple stuck detection.
+
+    Counts steps and cost, and, when the packet carries them, wall time
+    (``seconds``) and memory (``memory_mb``): any of them at or below
+    zero stops the loop.
+    """
     budget = packet.get("budget_remaining", {})
-    if budget.get("steps", 1) <= 0 or budget.get("cost", 1) <= 0:
+    if any(budget.get(key, 1) <= 0 for key in ("steps", "cost", "seconds", "memory_mb")):
         return {
             "ok": False,
             "reason": "budget exhausted",

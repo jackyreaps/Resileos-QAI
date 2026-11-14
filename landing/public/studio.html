@@ -107,6 +107,16 @@
             <ul class="sa-tree" id="world-tree"></ul>
           </div>
           <div class="sa-card">
+            <h2>World map</h2>
+            <p class="micro">Lays out regions, puts your places in them, and fills in the land tile by tile so that neighbors fit. Made here, on this site. It's a draft, not a fact.</p>
+            <div class="sa-row">
+              <button class="btn btn-primary" type="button" id="build-world">Build the map</button>
+              <button class="btn btn-ghost" type="button" id="rebuild-world">Try another layout</button>
+            </div>
+            <canvas class="sa-map" id="world-map" width="216" height="216" aria-label="World map" hidden></canvas>
+            <div class="sa-result" id="world-map-result" aria-live="polite"></div>
+          </div>
+          <div class="sa-card">
             <h2>Dream</h2>
             <p class="micro">Mixes your own places, factions, and characters into new ideas. They're ideas, not facts.</p>
             <button class="btn btn-ghost" type="button" id="dream">Dream up ideas</button>
@@ -179,7 +189,7 @@
         <div class="sa-cols">
           <div class="sa-card">
             <h2>From pictures</h2>
-            <p class="micro">One picture makes a gentle color-and-motion clip. Several pictures become keyframes, blended in between.</p>
+            <p class="micro">One picture makes a gentle color-and-motion clip. Several pictures become keyframes, and the clip moves from one to the next.</p>
             <div class="sa-pick" id="video-pictures"></div>
             <button class="btn btn-primary" type="button" id="make-clip">Make clip</button>
           </div>
@@ -191,6 +201,8 @@
           <div class="sa-card">
             <h2>From a description</h2>
             <p class="micro" id="provider-note">Needs a video provider.</p>
+            <label class="micro" for="t2v-scene">Set in scene</label>
+            <select id="t2v-scene"><option value="">No scene</option></select>
             <textarea id="t2v" rows="2" maxlength="1500" placeholder="A lighthouse in a storm"></textarea>
             <button class="btn btn-ghost" type="button" id="make-t2v">Make video</button>
           </div>

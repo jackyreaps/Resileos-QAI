@@ -23,6 +23,16 @@ residual_betti
     Betti numbers of the active region under the standard 4/8 digital
     topology pairing. This is a per-frame count, not persistent homology.
 
+phase_band_coherence
+    Per cascade level (3, 5, 9, 12 bands from ``level_core.level_down``,
+    plus the detail left over 12): each Fourier coefficient k of the band
+    gets its phase step Δφ_t(k) = arg(F_{t+1}(k) · conj F_t(k)) for every
+    transition. R_k = |mean_t exp(i Δφ_t(k))| is the Kuramoto order
+    parameter of that coefficient's steps over the clip: 1 when it moves
+    at a steady phase velocity (smooth motion), near 0 when it jitters.
+    The level's R is the magnitude-weighted mean of R_k (DC excluded).
+    Needs at least two transitions; a level with no energy is None.
+
 Pure numpy. No learn, no scar matrix, no Titanos, no provider.
 """
 from __future__ import annotations
@@ -148,6 +158,33 @@ def residual_betti(frames: list[Any]) -> list[list[int]]:
     return out
 
 
+def phase_band_coherence(frames: Any) -> dict[str, Any]:
+    """Per-level Kuramoto coherence of band phases over a clip. Recorded; not gating."""
+    from resileos.studio.level_core import level_down
+
+    seq = [np.asarray(f, dtype=np.float64) for f in (frames or [])]
+    seq = [f.mean(axis=2) if f.ndim == 3 else f for f in seq]
+    if len(seq) < 3:
+        return {"levels": {}, "R": None, "transitions": max(0, len(seq) - 1)}
+    leveled = [level_down(f) for f in seq]
+    names = [str(b["frame"]) for b in leveled[0]["bands"]] + ["detail"]
+    out: dict[str, Optional[float]] = {}
+    for idx, name in enumerate(names):
+        bands = [lv["bands"][idx]["band"] if idx < len(lv["bands"]) else lv["detail"] for lv in leveled]
+        spectra = np.stack([np.fft.fft2(b) for b in bands])
+        steps = spectra[1:] * np.conj(spectra[:-1])
+        weight = np.abs(spectra).mean(axis=0)
+        weight.flat[0] = 0.0  # DC carries no motion
+        if float(weight.sum()) <= MOTION_FLOOR:
+            out[name] = None
+            continue
+        unit = np.where(np.abs(steps) > MOTION_FLOOR, steps / np.maximum(np.abs(steps), MOTION_FLOOR), 0.0)
+        r_k = np.abs(unit.mean(axis=0))
+        out[name] = round(float((weight * r_k).sum() / weight.sum()), 4)
+    vals = [v for v in out.values() if v is not None]
+    return {"levels": out, "R": round(float(np.mean(vals)), 4) if vals else None, "transitions": len(seq) - 1}
+
+
 def clip_check_metrics(frames: Any) -> dict[str, Any]:
     """Both metrics for a list of gray frames. Recorded; not gating."""
     seq = [np.asarray(frame, dtype=np.float64) for frame in (frames or [])]
@@ -181,6 +218,7 @@ __all__ = [
     "clip_check_metrics",
     "motion_phase_coherence",
     "order_parameter",
+    "phase_band_coherence",
     "phase_shift",
     "residual_betti",
     "residual_mask",

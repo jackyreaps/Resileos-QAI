@@ -1,4 +1,15 @@
-"""Studio legions: Forge video, graphify ingest, and the plan/test/debug loop.
+"""Studio legions: Forge video, graphify ingest, the plan/test/debug loop, and Muse.
+
+Muse is the native generative leaf, a legion under Apollo (not a Kin).
+ControlPacket plus a brief go in; evidence, confidence, and cost come
+out. Its output is evidence, never a fact: it never verifies, never
+calls learn, never touches scars, and never writes Titanos (Eat stays
+the only writer). Hades keeps at most a one-line lesson from it. The
+budget guard counts its time and memory. It is not on the confidence
+cascade: Studio calls it, or a caller names it explicitly. Engines run
+on the leveled core (``studio.level_core``): phase-based keyframe clips
+checked with ``clip_metrics``, and leveled WFC environments with the
+overlay scene graph and the game rule checks. No outside model.
 
 Hephaestus is the Studio patron and is not a Kin. Forge video and the
 plan/test/debug loop register on Hermes, which is paths and dispatch.
@@ -22,7 +33,9 @@ from resileos.kin.eat import eat_filter
 from resileos.kin.legions import invoke_legion, kin_catalogue, register_legion
 
 _MUTATING = frozenset({"write_file", "apply_diff", "git_commit"})
-_STUDIO = ("forge_video", "graphify", "plan_test_debug")
+_STUDIO = ("forge_video", "graphify", "plan_test_debug", "muse")
+MUSE_KINDS = ("clip", "environment", "text_video")
+MUSE_BUDGET = {"steps": 8, "cost": 1.0, "tokens": 1000, "seconds": 60.0, "memory_mb": 512.0}
 
 
 def _proof(packet: dict[str, Any] | None, apollo_result: dict[str, Any] | None) -> dict[str, Any]:
@@ -613,6 +626,229 @@ def _studio_ready() -> bool:
     return "forge_video" in hermes and "plan_test_debug" in hermes and "graphify" in eat
 
 
+# ── Muse: the native generative leaf (legion under Apollo) ──────────────
+
+def _evidence_id(obj: Any) -> str:
+    import hashlib
+
+    import numpy as np
+
+    h = hashlib.sha256()
+
+    def feed(x: Any) -> None:
+        if isinstance(x, np.ndarray):
+            h.update(np.round(x, 4).tobytes())
+        elif isinstance(x, dict):
+            for k in sorted(x):
+                h.update(str(k).encode())
+                feed(x[k])
+        elif isinstance(x, (list, tuple)):
+            for v in x:
+                feed(v)
+        else:
+            h.update(json.dumps(x, sort_keys=True, default=str).encode())
+
+    feed(obj)
+    return "ev-" + h.hexdigest()[:16]
+
+
+def _muse_clip(brief: dict[str, Any]) -> dict[str, Any]:
+    import numpy as np
+
+    from resileos.studio import level_core as core
+    from resileos.studio.clip_metrics import clip_check_metrics, phase_band_coherence
+
+    keys = list(brief.get("keyframes") or [])
+    if len(keys) < 2:
+        return {"status": "NOTHING", "reason": "a clip needs two or more keyframes", "confidence": 0.0}
+    seq = core.phase_clip(keys, per=int(brief.get("per") or 4), holds=brief.get("holds"),
+                          cap=int(brief.get("cap") or 24))
+    gray = [f.mean(axis=2) if f.ndim == 3 else f for f in seq]
+    bands = phase_band_coherence(seq)
+    return {
+        "status": "MADE",
+        "evidence": {"frames": [np.round(f, 3) for f in seq], "fps": 8, "keyframes": len(keys),
+                     "method": "keyframes with phase-based in-betweens on the cascade bands",
+                     "metrics": {**clip_check_metrics(gray), "phase_band_coherence": bands}},
+        "confidence": float(bands["R"] or 0.0),
+    }
+
+
+def _muse_environment(brief: dict[str, Any]) -> dict[str, Any]:
+    from resileos.studio import level_core as core
+    from resileos.studio.projects import check_game, check_timeline, game_lean_source
+
+    project = dict(brief.get("project") or {})
+    env = core.environment(project, seed=brief.get("seed"))
+    if not env.get("ok"):
+        return {"status": "FAILED", "reason": env.get("reason"), "confidence": 0.0}
+    game = project.get("game") or {}
+    bible = project.get("bible") or {}
+    checks = {
+        "regions_fit": env["regions"]["adjacency_ok"],
+        "tiles_fit": env["tiles"]["adjacency_ok"],
+        "tiles_nest_in_regions": env["tiles"]["nested_in_regions"],
+    }
+    game_out = check_game(game) if game.get("stats") else None
+    if game_out is not None:
+        checks["game_rules_hold"] = bool(game_out.get("ok"))
+    timeline = check_timeline(bible.get("timeline") or []) if bible.get("timeline") else None
+    if timeline is not None:
+        checks["timeline_fits"] = bool(timeline.get("ok"))
+    return {
+        "status": "MADE",
+        "evidence": {**env, "game": game_out, "timeline": timeline, "checks": checks,
+                     "lean_source": game_source if (game_source := game_lean_source(game)) else None,
+                     "method": "leveled wave function collapse: regions at frame 3, places at 5, scene tiles at 9"},
+        "confidence": sum(bool(v) for v in checks.values()) / len(checks),
+    }
+
+
+def _muse_text_video(brief: dict[str, Any]) -> dict[str, Any]:
+    """Words alone are not turned into pictures. A clip is made only from a
+    scene whose place is in the world bible: a slow pan over that world's
+    generated map. Otherwise UNAVAILABLE with url None."""
+    import math
+
+    import numpy as np
+
+    from resileos.studio import level_core as core
+    from resileos.studio.clip_metrics import clip_check_metrics, phase_band_coherence
+    from resileos.ui.cascade_address import BELT
+    from resileos.ui.residual_frame import motion_scale
+
+    project = dict(brief.get("project") or {})
+    scene = next((s for s in project.get("scenes") or [] if s.get("id") == brief.get("scene")), None)
+    places = {p.get("id") for p in (project.get("bible") or {}).get("places") or []}
+    if scene is None or not scene.get("place") or scene.get("place") not in places:
+        return {"status": "UNAVAILABLE", "url": None, "confidence": 0.0,
+                "reason": "Muse makes video only from a scene set in a place of this world. "
+                          "Words alone are not turned into pictures."}
+    env = core.environment(project, seed=brief.get("seed"))
+    if not env.get("ok"):
+        return {"status": "UNAVAILABLE", "url": None, "confidence": 0.0, "reason": env.get("reason")}
+    where = next(p for p in env["places"] if p["id"] == scene["place"])
+    big = np.kron(env["map"], np.ones((2, 2, 1)))  # 72 × 72
+    side = big.shape[0] * 2 // 3  # 48-pixel window
+    room = big.shape[1] - side
+    ri, rj = where["region"]
+    top = int(min(room, max(0, (ri + 0.5) * big.shape[0] / 3 - side / 2)))
+    start = float(min(room, max(0, (rj + 0.5) * big.shape[1] / 3 - side / 2)))
+    step = motion_scale()  # the magnetic-phase / φ motion step, as in clip_from_code
+    direction = -1.0 if start > room / 2 else 1.0
+    seq = []
+    for t in range(12):
+        x = start + direction * t * step / (2 * math.pi) * side / BELT
+        x = min(float(room), max(0.0, x))
+        lo = int(math.floor(x))
+        frac = x - lo
+        a = big[top:top + side, lo:lo + side]
+        b = big[top:top + side, min(lo + 1, room):min(lo + 1, room) + side]
+        seq.append((1 - frac) * a + frac * b)
+    gray = [f.mean(axis=2) for f in seq]
+    return {
+        "status": "MADE",
+        "url": None,
+        "evidence": {"frames": [np.round(f, 3) for f in seq], "fps": 8, "scene": scene.get("id"), "place": where["name"],
+                     "method": "a slow pan over this world's generated map, starting at the scene's place; "
+                               "your words were not turned into pictures",
+                     "metrics": {**clip_check_metrics(gray), "phase_band_coherence": phase_band_coherence(seq)},
+                     "regions": env["regions"]["grid"]},
+        "confidence": 1.0 if env["tiles"]["adjacency_ok"] and env["tiles"]["nested_in_regions"] else 0.0,
+    }
+
+
+def muse(seen: dict[str, Any], *, brief: dict[str, Any] | None = None, **_: Any) -> dict[str, Any]:
+    """Muse: native video and environment generation. Evidence, never facts."""
+    brief = dict(brief or {})
+    kind = str(brief.get("kind") or "")
+    if kind not in MUSE_KINDS:
+        return {"status": "NOTHING", "reason": f"unknown Muse brief: {kind!r}", "confidence": 0.0}
+    return {"clip": _muse_clip, "environment": _muse_environment, "text_video": _muse_text_video}[kind](brief)
+
+
+def _muse_ready() -> bool:
+    return "muse" in {row["name"] for row in kin_catalogue("apollo")}
+
+
+def run_muse(
+    brief: dict[str, Any],
+    *,
+    packet: Any = None,
+    hades: Any = None,
+) -> dict[str, Any]:
+    """Call Muse explicitly. Uniform leaf: ControlPacket + brief in,
+    evidence + confidence + cost out.
+
+    The budget guard runs first and counts ``seconds`` and ``memory_mb``.
+    The run is timed and its peak traced memory measured; both are taken
+    off the packet's budget and recorded as ``generative_cost``. A run
+    that overspends returns OVER_BUDGET and its evidence is dropped. The
+    result is never verified and never a fact. If ``hades`` is given it
+    keeps one line, the lesson, and nothing else from this run.
+    """
+    import time
+    import tracemalloc
+
+    from resileos.harness.packet import ControlPacket
+
+    register_studio_legions()
+    host = packet if packet is not None else ControlPacket(id=f"muse-{uuid.uuid4().hex[:8]}",
+                                                           budget_remaining=dict(MUSE_BUDGET))
+    budget = host.budget_remaining if isinstance(host, ControlPacket) else host.setdefault("budget_remaining", dict(MUSE_BUDGET))
+    for key in ("seconds", "memory_mb"):
+        budget.setdefault(key, MUSE_BUDGET[key])
+    guard = budget_and_stuck_guard({"budget_remaining": dict(budget), "history": []})
+    if not guard["ok"]:
+        return {"status": "OVER_BUDGET", "evidence": None, "confidence": 0.0, "cost": {"seconds": 0.0, "memory_mb": 0.0},
+                "verified": False, "is_fact": False, "url": None, "reason": guard["reason"]}
+    tracing = tracemalloc.is_tracing()
+    if not tracing:
+        tracemalloc.start()
+    tracemalloc.reset_peak()
+    began = time.perf_counter()
+    try:
+        out = invoke_legion("apollo", "muse", host, brief=brief)
+    finally:
+        seconds = time.perf_counter() - began
+        peak = tracemalloc.get_traced_memory()[1] / (1024 * 1024)
+        if not tracing:
+            tracemalloc.stop()
+    cost = {"seconds": round(seconds, 3), "memory_mb": round(peak, 2)}
+    budget["seconds"] = round(float(budget["seconds"]) - seconds, 3)
+    budget["memory_mb"] = round(float(budget["memory_mb"]) - peak, 2)
+    status = str(out.get("status") or "NOTHING")
+    evidence = out.get("evidence")
+    if budget["seconds"] < 0 or budget["memory_mb"] < 0:
+        status, evidence = "OVER_BUDGET", None
+    kind = str(brief.get("kind") or "")
+    source = f"muse/native:{kind}"
+    evidence_id = _evidence_id(evidence) if evidence is not None else None
+    if isinstance(host, ControlPacket):
+        host.generative_source, host.generative_cost, host.generative_evidence_id = source, cost, evidence_id
+        host.verified = False
+    else:
+        host.update({"generative_source": source, "generative_cost": cost,
+                     "generative_evidence_id": evidence_id, "verified": False})
+    lesson = f"muse {kind}: {status.lower()}, confidence {float(out.get('confidence') or 0.0):.2f}, {cost['seconds']:.2f}s"
+    if hades is not None and isinstance(host, ControlPacket):
+        hades.save(ControlPacket(id=host.id, verified=False), lesson=lesson)
+    return {
+        "status": status,
+        "evidence": evidence,
+        "confidence": round(float(out.get("confidence") or 0.0), 4),
+        "cost": cost,
+        "reason": out.get("reason"),
+        "url": out.get("url") if status != "UNAVAILABLE" else None,
+        "generative_source": source,
+        "generative_evidence_id": evidence_id,
+        "lesson": lesson,
+        "verified": False,
+        "is_fact": False,
+        "learned": False,
+    }
+
+
 def register_studio_legions() -> list[str]:
     """Register the Studio legions once. Idempotent."""
     if not _studio_ready():
@@ -645,6 +881,19 @@ def register_studio_legions() -> list[str]:
                 "action": "inspect cycle",
                 "writes_residual": False,
                 "executes": True,
+            },
+        )
+    if not _muse_ready():
+        register_legion(
+            "apollo",
+            muse,
+            name="muse",
+            constraints={
+                "action": "generate studio evidence",
+                "writes_residual": False,
+                "executes": True,
+                "may_set_verified": False,
+                "evidence_only": True,
             },
         )
     from resileos.kin.scene_legions import register_scene_legions

@@ -26,6 +26,12 @@ class ControlPacket:
     # Optional 5-pin cascade address. Recorded only; not a verify gate.
     pin: Optional[str] = None
     address: Optional[Dict[str, Any]] = None
+    # Optional generative-leaf fields (Muse). Recorded only: what made the
+    # evidence, what it cost (seconds, memory_mb), and the evidence id.
+    # Generative output is evidence, never a fact, and never verifies.
+    generative_source: Optional[str] = None
+    generative_cost: Optional[Dict[str, float]] = None
+    generative_evidence_id: Optional[str] = None
 
     def append(self, event: Dict[str, Any]) -> None:
         self.history.append({**event, "ts": datetime.utcnow().isoformat()})
@@ -50,6 +56,9 @@ class ControlPacket:
             "history": self.history[-20:],  # keep recent for context
             "pin": self.pin,
             "address": dict(self.address) if self.address is not None else None,
+            "generative_source": self.generative_source,
+            "generative_cost": dict(self.generative_cost) if self.generative_cost is not None else None,
+            "generative_evidence_id": self.generative_evidence_id,
         }
 
 

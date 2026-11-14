@@ -233,7 +233,7 @@ def _metrics(seq: list[np.ndarray]) -> dict[str, Any]:
 
 def clip_from_pictures(project: dict[str, Any], body: dict[str, Any], on_step: Step = _noop) -> tuple[dict[str, Any], dict[str, Any]]:
     """One picture: φ hue steps plus the φ motion step. Several: keyframes
-    with leveled in-betweens."""
+    with phase-based in-betweens from Muse (native, on the leveled core)."""
     from resileos.chat import cascade_tools as cascade
 
     ids = list(body.get("assets") or [])[:12]
@@ -248,16 +248,13 @@ def clip_from_pictures(project: dict[str, Any], body: dict[str, Any], on_step: S
     else:
         pics = _same_size([_picture(_asset(project, a)) for a in ids])
         per = max(2, frames_out // len(pics))
-        seq_np: list[np.ndarray] = []
-        for i, p in enumerate(pics):
-            nxt = pics[i + 1] if i + 1 < len(pics) else p
-            for t in range(per if i + 1 < len(pics) else 1):
-                a = t / per
-                seq_np.append((1 - a) * p + a * nxt)
+        on_step("Muse: moving between your keyframes", "running")
+        made = _muse({"kind": "clip", "keyframes": pics, "per": per, "cap": 24})
+        seq = [np.asarray(f).tolist() for f in made["evidence"]["frames"]]
         frame = max(f for f in CASCADE_FRAMES if f <= max(CASCADE_FRAMES[0], len(pics)))
-        seq = [np.round(f, 3).tolist() for f in seq_np]
-        details = {"method": "your pictures as keyframes, blended in between", "frame": frame_control(frame),
-                   "metrics": _metrics(seq_np)}
+        details = {"method": made["evidence"]["method"], "frame": frame_control(frame),
+                   "metrics": made["evidence"]["metrics"], "confidence": made["confidence"], "cost": made["cost"],
+                   "source": made["generative_source"], "evidence_id": made["generative_evidence_id"]}
     project, res = add_asset(project, {"kind": "clip", "frames": seq, "name": str(body.get("name") or "Clip")},
                              source="made", parent=ids[0])
     on_step("Clip ready", "done")
@@ -289,44 +286,105 @@ def storyboard_clip(project: dict[str, Any], body: dict[str, Any], on_step: Step
         raise ValueError("Add pictures to the storyboard first.")
     on_step(f"Laying out {len(shots)} shots", "running")
     pics = _same_size([_picture(_asset(project, s["asset"])) for s in shots])
-    seq_np: list[np.ndarray] = []
-    for i, (shot, p) in enumerate(zip(shots, pics)):
-        seq_np.extend([p] * int(shot.get("hold") or 1))
-        if i + 1 < len(pics):
-            for a in (1 / 3, 2 / 3):
-                seq_np.append((1 - a) * p + a * pics[i + 1])
-    seq_np = seq_np[:24] if len(seq_np) > 24 else seq_np
-    if len(seq_np) < 2:
-        seq_np = seq_np * 2
+    holds = [int(s.get("hold") or 1) for s in shots]
+    muse_out = None
+    if len(pics) >= 2:
+        # Each shot held, then two in-betweens at 1/3 and 2/3 (same steps as before), by Muse.
+        on_step("Muse: moving between shots", "running")
+        muse_out = _muse({"kind": "clip", "keyframes": pics, "per": 3, "holds": holds, "cap": 24})
+        seq_np = [np.asarray(f) for f in muse_out["evidence"]["frames"]]
+    else:
+        seq_np = [pics[0]] * max(2, holds[0])
     seq = [np.round(f, 3).tolist() for f in seq_np]
     project, res = add_asset(project, {"kind": "clip", "frames": seq, "name": f"{scene['title'] or 'Scene'} · storyboard"},
                              source="made", parent=shots[0]["asset"])
     on_step("Storyboard clip ready", "done")
-    return project, {"made": [res["asset"]], "verified": False, "details": {"shots": len(shots), "frames": len(seq),
-                                                                             "metrics": _metrics(seq_np)}}
+    details = {"shots": len(shots), "frames": len(seq),
+               "metrics": muse_out["evidence"]["metrics"] if muse_out else _metrics(seq_np)}
+    if muse_out:
+        details.update({"confidence": muse_out["confidence"], "cost": muse_out["cost"], "source": muse_out["generative_source"]})
+    return project, {"made": [res["asset"]], "verified": False, "details": details}
 
 
 def text_to_video(project: dict[str, Any], body: dict[str, Any], on_step: Step = _noop,
                   forge: Optional[Callable[..., dict[str, Any]]] = None) -> tuple[dict[str, Any], dict[str, Any]]:
-    """The provider slot. Never faked: UNAVAILABLE when no provider."""
+    """From a description. Never faked.
+
+    With a scene set in a place of this world, Muse makes it natively: a
+    slow pan over the world's generated map, starting at that place (the
+    words themselves are not turned into pictures). Without one, the
+    provider slot is asked, and it is UNAVAILABLE (url None) when no
+    provider is set up.
+    """
     from resileos.kin.studio_tools import run_forge_video
 
     prompt = str(body.get("prompt") or "").strip()[:1500]
     if not prompt:
         raise ValueError("Describe the video.")
+    if body.get("scene"):
+        on_step("Muse: building the scene's world", "running")
+        made = _muse({"kind": "text_video", "project": project, "scene": body.get("scene"), "prompt": prompt})
+        if made["status"] == "MADE":
+            frames = [np.asarray(f).tolist() for f in made["evidence"]["frames"]]
+            scene = next(s for s in project.get("scenes") or [] if s.get("id") == body.get("scene"))
+            project, res = add_asset(project, {"kind": "clip", "frames": frames,
+                                               "name": f"{scene.get('title') or 'Scene'} · world pan"}, source="made")
+            on_step("Clip ready", "done")
+            return project, {"status": "MADE", "url": None, "made": [res["asset"]], "verified": False,
+                             "summary": [made["evidence"]["method"] + ".", f"Starts at {made['evidence']['place']}."],
+                             "details": {"confidence": made["confidence"], "cost": made["cost"],
+                                         "source": made["generative_source"], "metrics": made["evidence"]["metrics"]}}
+        on_step("Muse can't make this", "unavailable")
+        return project, {"status": "UNAVAILABLE", "url": None, "made": [], "detail": made.get("reason") or "Muse couldn't make it."}
     on_step("Asking the video provider", "running")
     out = (forge or run_forge_video)(prompt, stage="draft", clip=True)
     status = str((out or {}).get("status") or "UNAVAILABLE")
     url = (out or {}).get("url")
     if status.upper() == "UNAVAILABLE" or not url:
         on_step("No video provider is set up", "unavailable")
-        return project, {"status": "UNAVAILABLE", "made": [],
+        return project, {"status": "UNAVAILABLE", "url": None, "made": [],
                          "detail": (out or {}).get("detail") or "No video generator is configured on this host."}
     on_step("Video ready", "done")
     return project, {"status": "MADE", "url": url, "made": [], "verified": False}
 
 
 # ── world building ─────────────────────────────────────────────────────
+
+def _muse(brief: dict[str, Any]) -> dict[str, Any]:
+    """Studio calls Muse (Apollo's generative leaf) explicitly."""
+    from resileos.kin.studio_tools import run_muse
+
+    return run_muse(brief)
+
+
+_TILE_WORDS = {"sea": "sea", "coast": "coast", "plain": "plains", "forest": "forest", "hills": "hills", "mountain": "mountains"}
+
+
+def build_world(project: dict[str, Any], body: dict[str, Any], on_step: Step = _noop) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Muse builds the world map: regions, where places sit, scene tiles,
+    the scene graph, and the game checks. Saved as a picture asset."""
+    on_step("Muse: laying out regions", "running")
+    made = _muse({"kind": "environment", "project": project, "seed": body.get("seed")})
+    if made["status"] != "MADE":
+        on_step("Couldn't build the map", "error")
+        return project, {"status": made["status"], "made": [], "detail": made.get("reason") or "Couldn't build the map."}
+    ev = made["evidence"]
+    on_step("Placing places and scene tiles", "running")
+    project, res = add_asset(project, {"kind": "image", "matrix": np.asarray(ev["map"]).tolist(), "name": "World map"},
+                             source="made")
+    words = {"regions_fit": "Neighbouring regions fit together", "tiles_fit": "Neighbouring tiles fit together",
+             "tiles_nest_in_regions": "Every tile fits its region", "game_rules_hold": "Game rules hold for 12 rounds",
+             "timeline_fits": "The timeline has no clashes"}
+    summary = [("✓ " if ok else "✗ ") + words.get(k, k) for k, ok in ev["checks"].items()]
+    summary += [f"{p['name'] or 'Unnamed'} is in the {_TILE_WORDS.get(p['region_kind'], p['region_kind'])}" for p in ev["places"]]
+    on_step("Map ready", "done")
+    return project, {"status": "MADE", "made": [res["asset"]], "verified": False, "summary": summary,
+                     "details": {"regions": ev["regions"]["grid"], "places": ev["places"], "checks": ev["checks"],
+                                 "scene_graph": ev["scene_graph"], "detail_level": ev["detail"],
+                                 "game": ev["game"], "lean_source": ev["lean_source"], "confidence": made["confidence"],
+                                 "cost": made["cost"], "source": made["generative_source"],
+                                 "evidence_id": made["generative_evidence_id"]}}
+
 
 def world_check(project: dict[str, Any], body: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     from resileos.studio.projects import check_game, check_timeline
@@ -413,4 +471,5 @@ OPS: dict[str, Callable[..., tuple[dict[str, Any], dict[str, Any]]]] = {
     "recolor_clip": recolor_clip,
     "storyboard_clip": storyboard_clip,
     "text_to_video": text_to_video,
+    "build_world": build_world,
 }
