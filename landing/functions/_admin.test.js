@@ -217,3 +217,48 @@ test("rotating a key remembers the old digest so the API can move old records", 
   const after = await loadAccount(kv, "ada@example.com");
   assert.deepEqual(after.past_digests, [before.key_digest]);
 });
+
+test("chat stream passes through the proxy as a live stream, with resume and cancel", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const session = await createSession({ kv, env, email: "ada@example.com", now: NOW });
+  for (const [m, p] of [["POST", "chat/stream"], ["GET", "chat/stream/abc123"], ["POST", "chat/stream/abc123/cancel"]]) {
+    assert.equal(publicApiAllowed(m, p.split("/")), true, p);
+  }
+  const seen = [];
+  const enc = new TextEncoder();
+  const fetchImpl = async (url, init) => {
+    seen.push({ url, lastEvent: init.headers.get("last-event-id"), accept: init.headers.get("accept") });
+    let sent = 0;
+    const body = new ReadableStream({
+      pull(controller) {
+        sent += 1;
+        if (sent === 1) controller.enqueue(enc.encode('id: 1\nevent: start\ndata: {"v":1,"type":"start","seq":1}\n\n'));
+        else if (sent === 2) controller.enqueue(enc.encode('id: 2\nevent: done\ndata: {"v":1,"type":"done","seq":2}\n\n'));
+        else controller.close();
+      },
+    });
+    return new Response(body, { status: 200, headers: { "content-type": "text/event-stream", "x-stream-id": "abc123", "cache-control": "no-cache" } });
+  };
+  const res = await proxy(env, "POST", "chat/stream", { session, body: { message: "hi" }, fetchImpl });
+  assert.equal(res.headers.get("content-type"), "text/event-stream");
+  assert.equal(res.headers.get("x-stream-id"), "abc123");
+  const reader = res.body.getReader();
+  const first = new TextDecoder().decode((await reader.read()).value);
+  assert.match(first, /"type":"start"/);  // the first part arrives before the stream ends
+  const rest = new TextDecoder().decode((await reader.read()).value);
+  assert.match(rest, /"type":"done"/);
+  const resumeReq = new Request("https://resileosai.fun/api/session/v1/chat/stream/abc123?after=1", {
+    headers: { origin: "https://resileosai.fun", cookie: `resileos_session=${session.id}`, "last-event-id": "1" },
+  });
+  await handleProxy({ request: resumeReq, env, params: { path: ["chat", "stream", "abc123"] }, fetchImpl, now: () => NOW });
+  assert.equal(seen[1].lastEvent, "1");
+  assert.match(seen[1].url, /\/chat\/stream\/abc123\?after=1$/);
+  const bad = new Request("https://resileosai.fun/api/session/v1/chat/stream/abc123", {
+    headers: { origin: "https://resileosai.fun", cookie: `resileos_session=${session.id}`, "last-event-id": "1; drop" },
+  });
+  await handleProxy({ request: bad, env, params: { path: ["chat", "stream", "abc123"] }, fetchImpl, now: () => NOW });
+  assert.equal(seen[2].lastEvent, null);
+  const cancel = await proxy(env, "POST", "chat/stream/abc123/cancel", { session, body: {}, fetchImpl: upstreamSpy().fetchImpl });
+  assert.equal(cancel.status, 200);
+});

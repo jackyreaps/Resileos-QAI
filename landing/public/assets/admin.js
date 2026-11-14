@@ -1,4 +1,4 @@
-/* Admin console: Reports, Knowledge, Diagnostics.
+/* Admin console: Reports, Knowledge, Operator, Diagnostics.
  * The page checks /api/session/me for admin, but that is only a courtesy:
  * the Pages proxy refuses every admin endpoint for non-admin accounts
  * (see functions/_admin.js). Nothing here changes how facts are saved;
@@ -10,6 +10,7 @@
   var TABS = [
     ["reports", "/admin/reports", "Reports"],
     ["knowledge", "/admin/knowledge", "Knowledge"],
+    ["operator", "/admin/operator", "Operator"],
     ["diagnostics", "/admin/diagnostics", "Diagnostics"],
   ];
 
@@ -571,6 +572,8 @@
     if (!count) grid.appendChild(el("p", "admin-intro", result.ok ? "No helpers registered." : "Couldn't list helpers (" + result.status + ")."));
   }
 
+  var STAGE = { packet: "iris", consistency: "iris", route: "metis", risk: "metis", budget: "metis", eat: "eat", review: "zeus", checkpoint: "hades", lesson: "hades" };
+
   /* Runs and replay: one run step by step in plain words (read-only). */
   function replayCard() {
     var card = el("div", "card admin-card replay-card");
@@ -588,15 +591,26 @@
       var res = await call("GET", "/runs/" + encodeURIComponent(id));
       steps.replaceChildren();
       if (!res.ok) { steps.appendChild(el("li", "admin-summary err", summarize(res))); return; }
+      var side = el("div", "separated-view");
       (res.data.steps || []).forEach(function (st) {
         var li = el("li", "run-step " + st.kind);
+        var stage = STAGE[st.kind];
+        if (stage) li.appendChild(el("span", "stage-tag " + stage, stage));
         li.appendChild(document.createTextNode(st.text));
+        if (st.kind === "review") {
+          var w = el("div", "sep-col");
+          w.append(el("strong", "", "Writer proposed"), el("p", "", "A change, held until review"));
+          var r = el("div", "sep-col");
+          r.append(el("strong", "", "Reviewers (blind to the writer)"), el("p", "", ((st.data.reviewers || []).join(", ") || "none") + ": " + (st.data.applied ? "approved" : "not approved")));
+          side.replaceChildren(w, r);
+        }
         var fold = el("details", "admin-raw");
         fold.appendChild(el("summary", "", "Details"));
         fold.appendChild(el("pre", "", JSON.stringify(st.data, null, 2)));
         li.appendChild(fold);
         steps.appendChild(li);
       });
+      if (side.childNodes.length) steps.after(side); else side.remove();
     }
     load.addEventListener("click", async function () {
       var res = await call("GET", "/runs?limit=20");
@@ -615,12 +629,94 @@
     return card;
   }
 
+  // ---------- Operator ----------
+  function kv(list, label, value) {
+    var row = el("div", "kv");
+    row.append(el("span", "k", label), el("span", "v", value === undefined || value === null || value === "" ? "\u2014" : String(value)));
+    list.appendChild(row);
+  }
+
+  function packetCard() {
+    var card = el("div", "card admin-card packet-card");
+    card.appendChild(el("h3", "", "Control packet"));
+    var body = el("div", "kv-list");
+    var drawer = el("details", "evidence-drawer");
+    drawer.appendChild(el("summary", "", "Evidence"));
+    var ev = el("ul", "");
+    drawer.appendChild(ev);
+    card.append(body, drawer);
+    card.refresh = async function () {
+      var res = await call("GET", "/operator/state");
+      body.replaceChildren();
+      ev.replaceChildren();
+      if (!res.ok) { body.appendChild(el("p", "admin-summary err", summarize(res))); return; }
+      var c = res.data.control || {};
+      if (!c.present) { body.appendChild(el("p", "micro", "No control packet yet. One starts with the first learning cycle.")); }
+      else {
+        kv(body, "Packet", c.id);
+        kv(body, "Step", c.turn);
+        kv(body, "Confidence", c.confidence);
+        kv(body, "Safety", c.risk_class);
+        kv(body, "Verified", c.verified ? "yes" : "no");
+        kv(body, "Guides", (c.guides_loaded || []).join(", "));
+        kv(body, "Scars", c.scars);
+        kv(body, "Budget left", Object.keys(c.budget_remaining || {}).map(function (k) { return k + " " + c.budget_remaining[k]; }).join(", "));
+        kv(body, "Recent events", (c.events || []).filter(Boolean).join(" \u2192 "));
+        (c.evidence || []).forEach(function (e) { ev.appendChild(el("li", "", JSON.stringify(e))); });
+        if (!(c.evidence || []).length) ev.appendChild(el("li", "micro", "No evidence attached yet."));
+      }
+      var cp = res.data.latest_checkpoint;
+      kv(body, "Latest checkpoint", cp ? cp.id + (cp.verified ? " (verified)" : "") + (cp.lesson ? " \u2014 " + cp.lesson : "") : "none");
+    };
+    return card;
+  }
+
+  function hadesCard(after) {
+    var card = el("div", "card admin-card");
+    card.appendChild(el("h3", "", "Checkpoints"));
+    card.appendChild(el("p", "admin-explain", "Save the current state, go back to the last verified one, or start fresh carrying only its lesson (no history, scars, or evidence)."));
+    var row = el("div", "cta-row");
+    var out = el("p", "admin-summary");
+    [["Save checkpoint", "POST", "/kin/hades/save", {}, null],
+     ["Restore latest verified", "POST", "/kin/hades/restore_latest_verified", {}, "Go back to the latest verified checkpoint?"],
+     ["Restart from lesson only", "POST", "/kin/hades/restart_lesson", {}, "Start a fresh packet with only the latest lesson?"]].forEach(function (b) {
+      var btn = el("button", "btn btn-ghost", b[0]);
+      btn.type = "button";
+      btn.addEventListener("click", async function () {
+        if (b[4] && !window.confirm(b[4])) return;
+        btn.disabled = true;
+        var res = await call(b[1], b[2], b[3]);
+        btn.disabled = false;
+        out.textContent = res.ok ? ({ SAVED: "Saved checkpoint ", RESTORED: "Restored ", RESTARTED: "Restarted from the lesson of " }[res.data.status] || "") + (res.data.checkpoint_id || "") : summarize(res);
+        out.className = "admin-summary" + (res.ok ? "" : " err");
+        if (after) after();
+      });
+      row.appendChild(btn);
+    });
+    card.append(row, out);
+    return card;
+  }
+
+  async function operatorPage(mount) {
+    var top = group(mount, "Right now", "The live control packet and checkpoint controls.");
+    var packet = packetCard();
+    top.appendChild(packet);
+    top.appendChild(hadesCard(function () { packet.refresh(); }));
+    await packet.refresh();
+    var runs = group(mount, "Runs and replay", "Every chat turn and fact save, step by step, tagged by the Kin that handled it.");
+    runs.appendChild(replayCard());
+  }
+
   async function diagnosticsPage(mount) {
     var top = group(mount, "Overview", "Health checks and settings for this browser.");
     top.appendChild(settingsCard());
     top.appendChild(await statusCard());
-    var runs = group(mount, "Runs and replay", "What happened in a run, step by step.");
-    runs.appendChild(replayCard());
+    var runs = group(mount, "Runs and replay", "");
+    var moved = el("p", "admin-explain", "");
+    var link = el("a", "", "Open Operator");
+    link.href = "/admin/operator";
+    moved.append(document.createTextNode("Run replay, checkpoints, and the control packet are on "), link, document.createTextNode("."));
+    runs.appendChild(moved);
     RAW_TOOLS.forEach(function (section) {
       var grid = group(mount, section[0], "");
       section[1].forEach(function (t) { grid.appendChild(rawCard(t[0], t[1], t[2], t[3])); });
@@ -654,6 +750,7 @@
     if (content) {
       content.hidden = false;
       if (active === "knowledge") knowledgePage(content);
+      if (active === "operator") await operatorPage(content);
       if (active === "diagnostics") await diagnosticsPage(content);
     }
     return account;

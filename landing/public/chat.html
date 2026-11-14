@@ -22,6 +22,7 @@
     <script src="/assets/auth.js"></script>
     <script src="/assets/nav.js" defer></script>
     <script src="/assets/media.js"></script>
+    <script src="/assets/stream-parts.js"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -485,6 +486,10 @@
         #studio-tools { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
         #studio-tools .action-card { min-width: 0; }
         .action-card .run { border-radius: 10px; padding: 8px 12px; justify-self: start; font-size: 0.82rem; font-weight: 600; }
+        .stop-turn { border: 1px solid var(--border, #2a3242); background: transparent; color: inherit; border-radius: 999px; padding: 6px 14px; font: inherit; cursor: pointer; }
+        .btn-retry { margin-top: 8px; border: 1px solid var(--border, #2a3242); background: transparent; color: inherit; border-radius: 999px; padding: 5px 12px; font: inherit; cursor: pointer; }
+        .live-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+        .live-reply[data-unverified]::before { content: attr(data-unverified); display: inline-block; font-size: .72rem; opacity: .75; border: 1px solid currentColor; border-radius: 999px; padding: 0 8px; margin-right: 6px; }
         .action-card .run.stop {
             background: transparent;
             color: var(--danger);
@@ -1101,7 +1106,7 @@
         function statusKind(status) {
             const s = String(status || '').toLowerCase();
             if (['accepted', 'answered', 'submitted', 'verified', 'fully_stopped', 'pass'].indexOf(s) !== -1) return 'accepted';
-            if (['abstained', 'abstain', 'no_rows', 'unverified', 'mouth_closed', 'running', 'stop_requested'].indexOf(s) !== -1) return 'abstained';
+            if (['abstained', 'abstain', 'no_rows', 'unverified', 'mouth_closed', 'running', 'stop_requested', 'cancelled'].indexOf(s) !== -1) return 'abstained';
             if (s === 'unavailable') return 'unavailable';
             if (['conflict', 'reject', 'rejected', 'error', 'refused'].indexOf(s) !== -1) return s === 'refused' ? 'refused' : 'conflict';
             return '';
@@ -2090,46 +2095,158 @@
                     window.ResileosMedia.saveToFiles(a.file, csrfToken).then(saved => { a.file_id = saved.id; }).catch(() => {});
                 });
             }
-            try {
-                const r = await apiFetch(`${apiUrl()}/assist`, {
-                    method: 'POST',
-                    headers: authHeaders(true),
-                    body: JSON.stringify({
-                        message: text,
-                        history: chatHistory,
-                        hub_id: hubId(),
-                        last_tool_empty: lastToolEmpty,
-                        persona: currentPersona(),
-                        prose: true,
-                        factors_opt_out: localStorage.getItem('resileos_share_patterns') === 'off',
-                        attachments: sent.map(a => window.ResileosMedia.wire(a)),
-                        hints: hints
-                    })
-                });
-                const d = await r.json().catch(() => ({}));
-                const ms = performance.now() - started;
-                if (!r.ok) {
-                    renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms });
-                    return;
+            const payload = {
+                message: text,
+                history: chatHistory,
+                hub_id: hubId(),
+                last_tool_empty: lastToolEmpty,
+                persona: currentPersona(),
+                prose: true,
+                factors_opt_out: localStorage.getItem('resileos_share_patterns') === 'off',
+                attachments: sent.map(a => window.ResileosMedia.wire(a)),
+                hints: hints
+            };
+            await runTurn(bubble, payload, sent, text, started);
+        }
+
+        // One turn. Streams typed parts when it can, falls back to one plain
+        // request when streaming isn't available. Stop cancels; Try again re-sends.
+        let activeTurn = null;
+        const stopBtn = document.createElement('button');
+        stopBtn.type = 'button';
+        stopBtn.className = 'stop-turn';
+        stopBtn.textContent = 'Stop';
+        stopBtn.hidden = true;
+        stopBtn.setAttribute('aria-label', 'Stop this reply');
+        sendBtn.after(stopBtn);
+        stopBtn.addEventListener('click', () => {
+            const turn = activeTurn;
+            if (!turn) return;
+            turn.ctl.abort();
+            if (turn.streamId) apiFetch(`${apiUrl()}/chat/stream/${turn.streamId}/cancel`, { method: 'POST', headers: authHeaders(true), body: '{}' }).catch(() => {});
+        });
+
+        function liveView(bubble) {
+            bubble.replaceChildren();
+            const steps = document.createElement('ul');
+            steps.className = 'trail live';
+            steps.setAttribute('aria-live', 'polite');
+            const chips = document.createElement('div');
+            chips.className = 'live-chips';
+            const reply = document.createElement('div');
+            reply.className = 'reply live-reply';
+            bubble.append(steps, chips, reply);
+            const byStep = {};
+            return {
+                part(p) {
+                    if (p.type === 'step') {
+                        let li = byStep[p.step];
+                        if (!li) { li = document.createElement('li'); byStep[p.step] = li; steps.appendChild(li); }
+                        li.className = 'trail-step ' + (p.status || 'done');
+                        li.textContent = p.label || '';
+                    } else if (p.type === 'token') {
+                        reply.textContent += p.content || '';
+                        if (p.verified === false) reply.dataset.unverified = 'Not verified';
+                    }
+                    const c = window.ResileosParts.chip(p);
+                    if (c && !chips.querySelector('[data-chip="' + c.text + '"]')) {
+                        const span = document.createElement('span');
+                        span.className = 'chip ' + c.kind;
+                        span.dataset.chip = c.text;
+                        span.textContent = c.text;
+                        chips.appendChild(span);
+                    }
+                    if (chat.contains(bubble)) chat.scrollTop = chat.scrollHeight;
                 }
-                renderReply(bubble, d, { ms: ms });
-                if (d.assist) renderAssist(bubble, d.assist, sent, text);
-                lastToolEmpty = ['NO_ROWS', 'ABSTAINED'].includes(d.status) || d.chip === 'no_rows' || d.chip === 'abstained';
-                const taken = d.action_taken || {};
-                chatHistory.push({ role: 'user', content: text || sent.map(a => a.name).join(', ') });
-                if (d.assist && d.assist.context) chatHistory.push({ role: 'assistant', content: 'Context: ' + d.assist.context.slice(0, 1500) });
-                chatHistory.push({
-                    role: 'assistant',
-                    content: d.reply_text || d.value || '',
-                    subject: d.subject || taken.subject || '',
-                    relation: taken.relation || '',
-                    obj: (Array.isArray(d.rows) && d.rows.length) ? String(d.rows[0]) : ''
-                });
-                if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
+            };
+        }
+
+        function retryButton(bubble, payload, sent, text) {
+            const again = document.createElement('button');
+            again.type = 'button';
+            again.className = 'btn-retry';
+            again.textContent = 'Try again';
+            again.addEventListener('click', () => { setTyping(bubble); runTurn(bubble, payload, sent, text, performance.now()); });
+            bubble.appendChild(again);
+        }
+
+        function finishTurn(bubble, d, sent, text, ms) {
+            renderReply(bubble, d, { ms: ms });
+            if (d.assist) renderAssist(bubble, d.assist, sent, text);
+            lastToolEmpty = ['NO_ROWS', 'ABSTAINED'].includes(d.status) || d.chip === 'no_rows' || d.chip === 'abstained';
+            const taken = d.action_taken || {};
+            chatHistory.push({ role: 'user', content: text || sent.map(a => a.name).join(', ') });
+            if (d.assist && d.assist.context) chatHistory.push({ role: 'assistant', content: 'Context: ' + d.assist.context.slice(0, 1500) });
+            chatHistory.push({
+                role: 'assistant',
+                content: d.reply_text || d.value || '',
+                subject: d.subject || taken.subject || '',
+                relation: taken.relation || '',
+                obj: (Array.isArray(d.rows) && d.rows.length) ? String(d.rows[0]) : ''
+            });
+            if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
+        }
+
+        async function plainAssist(payload) {
+            const r = await apiFetch(`${apiUrl()}/assist`, { method: 'POST', headers: authHeaders(true), body: JSON.stringify(payload) });
+            const d = await r.json().catch(() => ({}));
+            return { r: r, d: d };
+        }
+
+        async function runTurn(bubble, payload, sent, text, started) {
+            const ctl = new AbortController();
+            const turn = { ctl: ctl, streamId: null };
+            activeTurn = turn;
+            sendBtn.disabled = true;
+            stopBtn.hidden = false;
+            let view = null;
+            let final = null;
+            let stopped = false;
+            let failed = false;
+            try {
+                const out = window.ResileosParts ? await window.ResileosParts.run({
+                    url: `${apiUrl()}/chat/stream`,
+                    body: payload,
+                    headers: authHeaders(true),
+                    signal: ctl.signal,
+                    resumeUrl: id => `${apiUrl()}/chat/stream/${id}`,
+                    fallback: () => plainAssist(payload),
+                    onPart: p => {
+                        if (p.type === 'start') turn.streamId = p.stream_id;
+                        if (!view) view = liveView(bubble);
+                        view.part(p);
+                        if (p.type === 'final') final = p;
+                        if (p.type === 'cancelled') stopped = true;
+                        if (p.type === 'error') failed = true;
+                    }
+                }) : { fallback: true, result: await plainAssist(payload) };
+                const ms = performance.now() - started;
+                if (out.cancelled || stopped) {
+                    renderReply(bubble, { status: 'CANCELLED', value: 'Stopped. Nothing was saved.' }, { ms: ms });
+                    retryButton(bubble, payload, sent, text);
+                } else if (out.fallback) {
+                    const r = out.result.r, d = out.result.d;
+                    if (!r.ok) { renderReply(bubble, { status: 'ERROR', value: formatError(r, d) }, { ms: ms }); retryButton(bubble, payload, sent, text); }
+                    else finishTurn(bubble, d, sent, text, ms);
+                } else if (out.error) {
+                    const r = out.response;
+                    const d = r ? await r.json().catch(() => ({})) : {};
+                    renderReply(bubble, { status: 'ERROR', value: r ? formatError(r, d) : 'Network error.' }, { ms: ms });
+                    retryButton(bubble, payload, sent, text);
+                } else if (final) {
+                    const d = { status: (final.status || 'accepted').toUpperCase(), value: final.answer, reply_text: final.answer, verified: final.verified === true, assist: final.assist };
+                    finishTurn(bubble, d, sent, text, ms);
+                } else {
+                    renderReply(bubble, { status: 'ERROR', value: failed ? "Couldn't finish. Try again." : 'The reply was cut off.' }, { ms: ms });
+                    retryButton(bubble, payload, sent, text);
+                }
             } catch (e) {
                 renderReply(bubble, { status: 'ERROR', value: 'Network error.' });
                 setStatus('offline', 'Network error');
+                retryButton(bubble, payload, sent, text);
             } finally {
+                if (activeTurn === turn) activeTurn = null;
+                stopBtn.hidden = true;
                 sendBtn.disabled = false;
                 input.focus();
                 schedulePersist();

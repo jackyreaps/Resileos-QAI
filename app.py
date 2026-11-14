@@ -900,6 +900,80 @@ def hades_restore(payload: dict):
     }
 
 
+def _control_card(packet) -> dict:
+    """A ControlPacket summary for the operator view. Counts and ids, no history text."""
+    if packet is None:
+        return {"present": False}
+    evidence = list(getattr(packet, "evidence", []) or [])[-5:]
+    return {
+        "present": True,
+        "id": packet.id,
+        "turn": packet.turn,
+        "confidence": packet.confidence,
+        "risk_class": packet.risk_class,
+        "verified": bool(packet.verified),
+        "guides_loaded": list(packet.guides_loaded)[:20],
+        "scars": len(packet.scars or []),
+        "budget_remaining": dict(packet.budget_remaining or {}),
+        "evidence": [{k: e.get(k) for k in ("tool", "source", "risk_class", "verified", "hash") if isinstance(e, dict) and k in e} for e in evidence],
+        "events": [str((h or {}).get("event") or "")[:60] for h in list(packet.history or [])[-8:]],
+    }
+
+
+@app.get("/api/v1/operator/state", dependencies=[Depends(verify_api_key)])
+def operator_state():
+    """Operator view: the live ControlPacket and the latest checkpoint (admin-only)."""
+    bundle, store = _hades_store()
+    latest = store.latest()
+    return {
+        "control": _control_card(getattr(bundle, "control", None)),
+        "latest_checkpoint": None if latest is None else {
+            "id": latest.id, "verified": latest.verified, "lesson": latest.lesson, "created_at": latest.created_at,
+            "residual_hash": latest.residual_packet_hash,
+        },
+    }
+
+
+@app.post("/api/v1/kin/hades/save", dependencies=[Depends(verify_api_key)])
+def hades_save(payload: dict | None = None):
+    bundle, store = _hades_store()
+    control = getattr(bundle, "control", None)
+    if control is None:
+        raise HTTPException(409, "There is no control packet to save yet.")
+    lesson = str((payload or {}).get("lesson") or "").strip()[:240] or None
+    ckpt = store.save(control, residual_packet_hash=(payload or {}).get("residual_packet_hash"), lesson=lesson)
+    return {"status": "SAVED", "checkpoint_id": ckpt.id, "verified": ckpt.verified, "lesson": ckpt.lesson}
+
+
+@app.post("/api/v1/kin/hades/restore_latest_verified", dependencies=[Depends(verify_api_key)])
+def hades_restore_latest_verified():
+    bundle, store = _hades_store()
+    verified = [c for c in (store.load(i) for i in store.list_ids()) if c is not None and c.verified]
+    if not verified:
+        raise HTTPException(404, "No verified checkpoint yet.")
+    best = max(verified, key=lambda c: c.created_at)
+    bundle.control = store.restore_fresh(best.id)
+    return {"status": "RESTORED", "checkpoint_id": best.id, "lesson": best.lesson, "control": _control_card(bundle.control)}
+
+
+@app.post("/api/v1/kin/hades/restart_lesson", dependencies=[Depends(verify_api_key)])
+def hades_restart_lesson(payload: dict | None = None):
+    """A fresh packet that carries only the lesson: no guides, scars, evidence, or history."""
+    from resileos.harness.packet import ControlPacket
+
+    bundle, store = _hades_store()
+    cid = str((payload or {}).get("checkpoint_id") or "").strip()
+    ckpt = store.load(cid) if cid else store.latest()
+    if ckpt is None:
+        raise HTTPException(404, "No checkpoint to take a lesson from.")
+    fresh = ControlPacket(id=f"lesson-{ckpt.id}")
+    if ckpt.lesson:
+        fresh.guides_loaded.append("lesson:" + ckpt.id)
+        fresh.guide_bodies["lesson:" + ckpt.id] = ckpt.lesson
+    bundle.control = fresh
+    return {"status": "RESTARTED", "checkpoint_id": ckpt.id, "lesson": ckpt.lesson, "control": _control_card(fresh)}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Substrate (unchanged)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1277,6 +1351,9 @@ def _mount_surfaces() -> None:
         get_titanos=lambda: titanos_singleton,
         save=_save_titanos,
     )
+    from resileos.chat.stream import register_stream_routes
+
+    register_stream_routes(app, verify_api_key, owner_dep=conversation_key_id, get_titanos=lambda: titanos_singleton)
 
 
 _mount_surfaces()

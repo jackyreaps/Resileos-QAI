@@ -68,6 +68,7 @@
         if (status === 'refused') return { text: 'Declined', kind: 'refused' };
         if (status === 'error') return { text: 'Error', kind: 'error' };
         if (status === 'fully_stopped') return { text: 'Stopped', kind: 'accepted' };
+        if (status === 'cancelled') return { text: 'Stopped', kind: 'abstained' };
         if (status === 'stop_requested') return { text: 'Stop requested', kind: 'abstained' };
         if (data.verified === true || data.cycle_verified === true || status === 'verified' || status === 'pass') {
             return { text: 'Verified', kind: 'accepted' };
