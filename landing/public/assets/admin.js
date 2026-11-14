@@ -172,24 +172,164 @@
     return grid;
   }
 
+  // ---------- Knowledge: Add facts ----------
+  var ACCEPT = [".txt", ".md", ".csv", ".json", ".lean"];
+  function extOf(name) { var m = /\.[^.]+$/.exec(String(name || "").toLowerCase()); return m ? m[0] : ".txt"; }
+
+  function addFactsPanel() {
+    var section = el("div", "admin-group add-facts");
+    section.appendChild(el("h2", "", "Add facts"));
+    section.appendChild(el("p", "admin-intro",
+      "Drop files or paste some text. Each line like \u201cAthens | capital_of | Greece\u201d becomes a fact; a Lean proof that checks becomes a fact too. You'll see what would be saved before anything is."));
+    var card = el("div", "card admin-card");
+    var drop = el("div", "drop-zone");
+    drop.tabIndex = 0;
+    drop.setAttribute("role", "button");
+    drop.appendChild(el("strong", "", "Drop files here"));
+    drop.appendChild(el("span", "micro", " or click to choose. Text, Markdown, CSV, JSON, or Lean."));
+    var picker = el("input");
+    picker.type = "file";
+    picker.multiple = true;
+    picker.accept = ACCEPT.join(",");
+    picker.hidden = true;
+    var chosen = el("ul", "chosen-files");
+    var paste = el("textarea", "paste-box");
+    paste.rows = 5;
+    paste.placeholder = "Or paste here, one fact per line:\nAthens | capital_of | Greece | 1834-01-01\nLisbon | capital_of | Portugal";
+    paste.setAttribute("aria-label", "Paste facts");
+    var mineRow = el("div", "cta-row");
+    var mineBtn = el("button", "btn btn-ghost", "Use from My files");
+    mineBtn.type = "button";
+    var mineList = el("div", "mine-list");
+    mineList.hidden = true;
+    mineRow.append(mineBtn);
+    var actions = el("div", "cta-row");
+    var checkBtn = el("button", "btn", "Check facts");
+    checkBtn.type = "button";
+    actions.appendChild(checkBtn);
+    var out = el("div", "admin-out");
+    out.hidden = true;
+    card.append(drop, picker, chosen, paste, mineRow, mineList, actions, out);
+    section.appendChild(card);
+
+    var items = [];
+    function showChosen() {
+      chosen.replaceChildren();
+      items.forEach(function (it, i) {
+        var li = el("li", "", it.name + " ");
+        var x = el("button", "btn-link", "remove");
+        x.type = "button";
+        x.addEventListener("click", function () { items.splice(i, 1); showChosen(); });
+        li.appendChild(x);
+        chosen.appendChild(li);
+      });
+    }
+    function addFiles(list) {
+      Array.prototype.forEach.call(list || [], function (file) {
+        if (ACCEPT.indexOf(extOf(file.name)) === -1) {
+          items.push({ name: file.name, text: "" });
+          showChosen();
+          return;
+        }
+        file.text().then(function (text) { items.push({ name: file.name, text: text }); showChosen(); });
+      });
+    }
+    drop.addEventListener("click", function () { picker.click(); });
+    drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); picker.click(); } });
+    picker.addEventListener("change", function () { addFiles(picker.files); picker.value = ""; });
+    ["dragenter", "dragover"].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+    ["dragleave", "drop"].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+    drop.addEventListener("drop", function (e) { addFiles(e.dataTransfer && e.dataTransfer.files); });
+
+    mineBtn.addEventListener("click", async function () {
+      mineList.hidden = false;
+      mineList.replaceChildren(el("p", "micro", "Loading your files\u2026"));
+      var res = await call("GET", "/files");
+      mineList.replaceChildren();
+      var files = ((res.data || {}).files || []).filter(function (f) { return ACCEPT.indexOf(extOf(f.name)) !== -1; });
+      if (!res.ok || !files.length) { mineList.appendChild(el("p", "micro", res.ok ? "No text, CSV, JSON, or Lean files in My files yet." : "Couldn't load My files.")); return; }
+      files.forEach(function (f) {
+        var b = el("button", "btn btn-ghost btn-sm", f.name);
+        b.type = "button";
+        b.addEventListener("click", async function () {
+          var r = await fetch(API + "/files/" + encodeURIComponent(f.id), { credentials: "same-origin" });
+          if (r.ok) { items.push({ name: f.name, text: await r.text() }); showChosen(); }
+        });
+        mineList.appendChild(b);
+      });
+    });
+
+    function factLine(f) {
+      var when = f.valid_from || f.valid_to ? " (" + (f.valid_from || "\u2026") + " to " + (f.valid_to || "\u2026") + ")" : "";
+      return f.subject + " \u00b7 " + f.relation + " \u00b7 " + f.obj + when;
+    }
+
+    checkBtn.addEventListener("click", async function () {
+      var batch = items.slice();
+      if (paste.value.trim()) batch.push({ name: "pasted.txt", text: paste.value });
+      if (!batch.length) { out.hidden = false; out.replaceChildren(el("p", "admin-summary err", "Drop a file or paste something first.")); return; }
+      checkBtn.disabled = true;
+      var res = await call("POST", "/knowledge/preview", { items: batch });
+      checkBtn.disabled = false;
+      out.hidden = false;
+      out.replaceChildren();
+      if (!res.ok) { showResult(out, res); return; }
+      var ready = [];
+      var list = el("ul", "fact-items");
+      (res.data.items || []).forEach(function (item) {
+        var li = el("li", "fact-item");
+        li.appendChild(el("strong", "", item.name + ": "));
+        li.appendChild(document.createTextNode(item.status));
+        var fold = el("details", "admin-raw");
+        fold.appendChild(el("summary", "", "Details"));
+        var inner = el("ul", "fact-rows");
+        (item.facts || []).forEach(function (f) {
+          var row = el("li", "fact-row " + f.action);
+          if (f.action === "accept") {
+            var box = el("input");
+            box.type = "checkbox";
+            box.checked = true;
+            var fact = { subject: f.subject, relation: f.relation, obj: f.obj, valid_from: f.valid_from, valid_to: f.valid_to, item: item.name };
+            ready.push({ box: box, fact: fact });
+            var lab = el("label", "");
+            lab.append(box, document.createTextNode(" " + factLine(f)));
+            row.appendChild(lab);
+          } else {
+            row.textContent = factLine(f) + " \u2014 " + (f.reason === "overlapping_competing_claim" ? "conflicts with another fact you're adding" : f.action === "conflict" ? "conflicts with an existing fact" : f.reason === "already_stored" ? "already saved" : "held back (" + String(f.reason || f.action).replace(/_/g, " ") + ")");
+          }
+          inner.appendChild(row);
+        });
+        if (item.proof) inner.appendChild(el("li", "micro", "Lean: " + item.proof.status + (item.proof.summary ? " \u2014 " + item.proof.summary : "")));
+        fold.appendChild(inner);
+        li.appendChild(fold);
+        list.appendChild(li);
+      });
+      out.appendChild(list);
+      if (!ready.length) { out.appendChild(el("p", "micro", "Nothing is ready to save.")); return; }
+      var save = el("button", "btn", "Save " + ready.length + " fact" + (ready.length === 1 ? "" : "s"));
+      save.type = "button";
+      var saveOut = el("p", "admin-summary");
+      save.addEventListener("click", async function () {
+        var facts = ready.filter(function (r) { return r.box.checked; }).map(function (r) { return r.fact; });
+        if (!facts.length) { saveOut.textContent = "Tick at least one fact."; return; }
+        if (!window.confirm("Save " + facts.length + " fact" + (facts.length === 1 ? "" : "s") + "? Each one still goes through the accuracy checks.")) return;
+        save.disabled = true;
+        var done = await call("POST", "/knowledge/commit", { facts: facts, confirm: true });
+        saveOut.textContent = done.ok ? done.data.status : summarize(done);
+        saveOut.className = "admin-summary" + (done.ok ? "" : " err");
+      });
+      var row = el("div", "cta-row");
+      row.append(save);
+      out.append(row, saveOut);
+    });
+    return section;
+  }
+
   // ---------- Knowledge ----------
   function knowledgePage(mount) {
-    var add = group(mount, "Add and check facts",
+    var add = group(mount, "Check and look up facts",
       "Facts are short statements like \u201cAlice works at Acme\u201d. Every fact goes through the same accuracy checks before it is saved. Anything that fails a check is skipped, never forced in.");
-    add.appendChild(toolCard({
-      title: "Add facts from text",
-      explain: "Paste notes or an article. Studio pulls out simple facts. By default this is a preview and nothing is saved.",
-      fields: [
-        { name: "text", label: "Text", type: "textarea", placeholder: "Alice works at Acme. Acme is based in Lisbon." },
-        { name: "commit", label: "Save the facts that pass the checks", type: "checkbox", value: false,
-          help: "Leave this off to see what would be saved first." },
-      ],
-      button: "Find facts",
-      run: function (v) {
-        if (!v.text) return { error: "Paste some text first." };
-        return { method: "POST", path: "/studio/graphify", body: { source: v.text, commit: Boolean(v.commit) } };
-      },
-    }));
+    mount.insertBefore(addFactsPanel(), add.parentNode);
     add.appendChild(toolCard({
       title: "Check one fact (doesn't save)",
       explain: "See whether a single fact would pass the checks, and why. Nothing is written.",

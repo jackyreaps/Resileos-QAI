@@ -122,7 +122,10 @@ def _call_named_tool(name: str, payload: dict[str, Any] | None = None) -> Any:
 
 
 async def _maybe_search(query: str) -> dict[str, Any]:
-    result = await web_search(query)
+    # Our own index first; the third-party backend is an off-by-default fallback.
+    from resileos.kin.hermes_crawl import search_results
+
+    result = search_results(query)
     snippets = []
     for row in result.get("results") or []:
         title = row.get("title") or ""

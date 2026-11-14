@@ -41,3 +41,16 @@
 .admin-links a.card p { margin-top: 4px; }
 @media (max-width: 560px) { .admin-main { padding: 84px 14px 40px; } }
 .form .admin-check input[type="checkbox"] { width: 18px; height: 18px; padding: 0; flex: 0 0 auto; accent-color: var(--accent); }
+
+.drop-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 22px; text-align: center; cursor: pointer; }
+.drop-zone.over, .drop-zone:focus { border-color: #4a6fd0; outline: none; background: rgba(91, 140, 255, 0.08); }
+.paste-box { width: 100%; margin-top: 10px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border); background: #0a0e16; color: var(--text); font: inherit; font-size: 0.9rem; }
+.paste-box:focus { outline: 2px solid rgba(91,140,255,.35); border-color: #4a6fd0; }
+.chosen-files, .fact-items, .fact-rows { list-style: none; padding: 0; margin: 8px 0; }
+.chosen-files li { margin: 2px 0; }
+.btn-link { background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+.mine-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.fact-item { margin: 8px 0; }
+.fact-row { margin: 3px 0; }
+.fact-row.conflict { color: #f0a08f; }
+.fact-row.abstain, .fact-row.reject { opacity: 0.75; }

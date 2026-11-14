@@ -143,12 +143,14 @@ def test_admin_tabs_and_plain_language():
     js = read("assets/admin.js")
     for tab in ('"Reports"', '"Knowledge"', '"Diagnostics"'):
         assert tab in js
-    for plain in ("Add facts from text", "Save the facts that pass the checks", "Check one fact (doesn't save)",
+    for plain in ("Add facts", "Drop files here", "Use from My files", "Check facts", "Check one fact (doesn't save)",
                   "See what's saved", "Run a learning cycle", "Go back to a checkpoint",
                   "Show technical details under chat replies"):
         assert plain in js, plain
-    # Saving facts is opt-in, and every save still goes through the server's checks.
-    assert '{ name: "commit", label: "Save the facts that pass the checks", type: "checkbox", value: false' in js
+    # Saving facts needs an explicit confirm, and every save still goes through the server's checks.
+    assert 'call("POST", "/knowledge/preview", { items: batch })' in js
+    assert 'window.confirm("Save " + facts.length' in js
+    assert 'call("POST", "/knowledge/commit", { facts: facts, confirm: true })' in js
     assert "if (!account.admin)" in js
 
 
