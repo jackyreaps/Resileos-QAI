@@ -68,6 +68,17 @@ class AssistBody(BaseModel):
     last_tool_empty: bool = False
     attachments: list[Attachment] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     hints: Hints = Field(default_factory=Hints)
+    # Content-free use factors (residual_factors) are on by default; this
+    # opts the turn out. Files never contribute either way.
+    factors_opt_out: bool = False
+
+
+class CascadeMakeBody(BaseModel):
+    matrix: list[Any] | None = None
+    frames: list[Any] | None = Field(default=None, max_length=24)
+    code: str | None = Field(default=None, max_length=64)
+    n: int = Field(default=4, ge=1, le=6)
+    frames_out: int = Field(default=12, ge=2, le=24)
 
 
 class LeanBody(BaseModel):
@@ -160,35 +171,77 @@ def perceive_attachment(att: Attachment) -> dict[str, Any]:
 
 # ---------------------------------------------------------------- crawling
 
-def public_url(url: str) -> bool:
-    """True only for http(s) URLs whose host resolves to public addresses."""
+def resolve_public(url: str) -> str | None:
+    """The address to connect to, or None.
+
+    Only http(s) on ports 80/443, and only when every address the host
+    resolves to is global (no private, loopback, link-local, reserved,
+    or multicast). The caller connects to this exact address, so a second
+    DNS answer can't swap in a private one (DNS rebinding).
+    """
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return False
+        return None
     if parsed.port not in (None, 80, 443):
-        return False
+        return None
     try:
-        infos = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
     except OSError:
-        return False
+        return None
+    addrs = []
     for info in infos:
         addr = ipaddress.ip_address(info[4][0].split("%")[0])
         if not addr.is_global or addr.is_multicast:
-            return False
-    return bool(infos)
+            return None
+        addrs.append(addr)
+    return str(addrs[0]) if addrs else None
 
 
-async def guarded_fetch(url: str, *, client_factory: Callable[[], Any] | None = None) -> dict[str, Any]:
-    """Fetch one public page. Redirects are followed by hand and re-checked."""
+def public_url(url: str) -> bool:
+    """True only for http(s) URLs whose host resolves to public addresses."""
+    return resolve_public(url) is not None
+
+
+def pinned_request(url: str, ip: str) -> tuple[str, dict[str, str], dict[str, Any]]:
+    """(URL with the host replaced by ``ip``, headers, httpx extensions).
+
+    Host stays the real name for the server, and TLS uses it for SNI and
+    certificate checks, so pinning doesn't weaken HTTPS.
+    """
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    literal = f"[{ip}]" if ":" in ip else ip
+    netloc = literal + (f":{parsed.port}" if parsed.port else "")
+    target = parsed._replace(netloc=netloc).geturl()
+    host_header = host + (f":{parsed.port}" if parsed.port else "")
+    headers = {"Host": host_header, "User-Agent": "ResileosBot/1.0 (+https://resileosai.fun)"}
+    extensions = {"sni_hostname": host} if parsed.scheme == "https" else {}
+    return target, headers, extensions
+
+
+async def guarded_fetch(
+    url: str,
+    *,
+    client_factory: Callable[[], Any] | None = None,
+    resolver: Callable[[str], str | None] | None = None,
+) -> dict[str, Any]:
+    """Fetch one public page, connecting to the checked IP.
+
+    Each hop (including redirects, followed by hand) is resolved once,
+    checked, and then fetched from that exact address.
+    """
     import httpx
 
-    factory = client_factory or (lambda: httpx.AsyncClient(timeout=8.0, follow_redirects=False))
+    factory = client_factory or (lambda: httpx.AsyncClient(timeout=8.0, follow_redirects=False, trust_env=False))
+    resolve = resolver or resolve_public
     current = url
     async with factory() as client:
         for _ in range(4):
-            if not public_url(current):
+            ip = resolve(current)
+            if not ip:
                 return {"status": "BLOCKED", "content": ""}
-            resp = await client.get(current, headers={"User-Agent": "ResileosBot/1.0 (+https://resileosai.fun)"})
+            target, headers, extensions = pinned_request(current, ip)
+            resp = await client.get(target, headers=headers, extensions=extensions)
             if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("location"):
                 current = urljoin(current, resp.headers["location"])
                 continue
@@ -213,6 +266,21 @@ def crawl_pages(urls: list[str], fetch_fn: Callable[..., Any] | None = None) -> 
 
 
 # ---------------------------------------------------------------- the turn
+
+def _best_sentence(text: str, query: str) -> str:
+    """The page sentence that shares the most words with the query."""
+    want = {w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) > 2}
+    best, score = "", 0
+    for sentence in re.split(r"(?<=[.!?])\s+", text[:20000]):
+        sentence = " ".join(sentence.split())
+        if not 30 <= len(sentence) <= 400:
+            continue
+        have = set(re.findall(r"[a-z0-9]+", sentence.lower()))
+        hit = len(want & have)
+        if hit > score:
+            best, score = sentence, hit
+    return best
+
 
 def _clean(text: Any) -> str:
     """Search providers return HTML bits (<b>, &#x27;). Show plain words."""
@@ -249,12 +317,15 @@ async def run_assist(
     fetch_fn: Callable[..., Any] | None = None,
     forge_fn: Callable[..., dict[str, Any]] | None = None,
     lean_fn: Callable[[str], dict[str, Any]] | None = None,
+    factor_pool: Any | None = None,
+    crawl_top: int = 2,
 ) -> dict[str, Any]:
     from resileos.answer.agent_loop import _maybe_search, run_agent_chat
     from resileos.answer.user_profile import PERSONA_PACKS
     from resileos.kin.studio_tools import run_forge_video
     from resileos.ui.query_scale import to_jsonable
     from resileos.verify.lean_check import check_lean, extract_lean, looks_like_lean
+    from resileos.chat import cascade_tools as cascade
 
     chat_fn = chat_fn or run_agent_chat
     search_fn = search_fn or _maybe_search
@@ -275,6 +346,11 @@ async def run_assist(
             trail.append({"step": "perceive", "label": f"Couldn't read {att.name}", "status": "error", "detail": str(exc)[:200]})
             continue
         looked["name"] = att.name
+        try:
+            looked["cascade"] = cascade.address_upload(looked["kind"], looked.get("raw"), matrix=att.matrix, frames=att.frames, text=att.text)
+        except (ValueError, TypeError, IndexError):
+            looked["cascade"] = None
+        looked["from_files"] = bool(att.file_id)
         seen.append(looked)
         trail.append({"step": "perceive", "label": looked["label"], "status": "done", "detail": f"{att.name}: {looked['summary']}"})
         line = f"Attachment {att.name} ({looked['kind']}): {looked['summary']}."
@@ -320,24 +396,47 @@ async def run_assist(
     create = _intent_create(body)
     if wants_search:
         query = _URL.sub("", re.sub(r"^/search\s+", "", message, flags=re.I)).strip()
-        if not query and seen:
-            query = " ".join((seen[0].get("excerpt") or seen[0]["summary"]).split()[:12])
+        if seen and not cascade._tokens(query):
+            # "find sources about this": search for what was perceived.
+            looked = seen[0].get("excerpt") or seen[0]["summary"]
+            dominant = ((seen[0].get("cascade") or {}).get("chroma_code") or {}).get("dominant") or ""
+            query = " ".join((f"{dominant} {looked}" if dominant else looked).split()[:12])
         if query:
             search_body = await search_fn(query)
             results = ((search_body or {}).get("search") or {}).get("results") or []
-            for row in results:
-                if row.get("url"):
-                    sources.append({
-                        "title": _clean(row.get("title") or row["url"])[:160],
-                        "url": str(row["url"]),
-                        "snippet": _clean(row.get("snippet") or "")[:300],
+            cleaned = [
+                {"title": _clean(row.get("title") or row.get("url"))[:160], "url": str(row.get("url") or ""), "snippet": _clean(row.get("snippet") or "")[:300]}
+                for row in results if isinstance(row, dict)
+            ]
+            colors = [str((s.get("cascade") or {}).get("chroma_code", {}).get("dominant") or "") for s in seen if s.get("cascade") and s["cascade"].get("chroma_code")]
+            ranked = cascade.rank_sources(cleaned, query, extra_terms=colors if not cascade._tokens(query) else ())
+            for env in ranked["envelopes"]:
+                sources.append({"title": env["title"], "url": env["source"], "snippet": env["snippet"], "address": env["address"]["path"], "score": env["score"]})
+            kept = len(ranked["envelopes"])
+            label = f"Searched {len(results)} source{'s' if len(results) != 1 else ''}" if results else "Searched the web: nothing found"
+            if results and kept < len(results):
+                label += f", kept {kept}"
+            trail.append({"step": "search", "label": label, "status": "done", "detail": query})
+            # Crawl the best-ranked results (guarded fetch), then re-rank with page text.
+            if crawl_top and ranked["envelopes"]:
+                targets = [env["source"] for env in ranked["envelopes"][:crawl_top] if env["source"] not in urls]
+                pages = crawl_pages(targets, fetch_fn) if targets else []
+                read = [p for p in pages if p["status"] == "OK"]
+                for page in read:
+                    best = _best_sentence(page["text"], query)
+                    for src in sources:
+                        if src["url"] == page["url"]:
+                            src["read"] = True
+                            if best:
+                                src["excerpt"] = best
+                    context_lines.append(f"Page {page['url']}: {page['text'][:CONTEXT_CHARS]}")
+                if targets:
+                    trail.append({
+                        "step": "crawl",
+                        "label": f"Read {len(read)} of the top results" if read else "Couldn't open the top results",
+                        "status": "done" if read else "error",
+                        "detail": ", ".join(targets),
                     })
-            trail.append({
-                "step": "search",
-                "label": f"Searched {len(results)} source{'s' if len(results) != 1 else ''}" if results else "Searched the web: nothing found",
-                "status": "done",
-                "detail": query,
-            })
 
     # 5. answer
     history = list(body.history or [])[-10:]
@@ -352,7 +451,7 @@ async def run_assist(
         if found:
             lines = ["Here's what I found on the web. I haven't checked these against what's saved:"]
             for row in found[:5]:
-                lines.append(f"- {row['title']}: {row['snippet']}".rstrip(": "))
+                lines.append(f"- {row['title']}: {row.get('excerpt') or row['snippet']}".rstrip(": "))
             reply["value"] = reply["reply_text"] = "\n".join(lines)
             reply["verified"] = False
     elif message and not pasted_lean and not pure_create:
@@ -376,26 +475,31 @@ async def run_assist(
         clip_att = next((a for a in body.attachments if a.kind == "clip" and a.frames is not None), None)
         image_atts = [a for a in body.attachments if a.kind == "image" and a.matrix is not None]
         prompt = _URL.sub("", message).strip() or (seen[0]["summary"] if seen else "")
+        made_here = None
         try:
             if create == "clip":
                 frames = None
                 if clip_att is not None:
-                    frames = _gray(clip_att.frames)
-                elif len(image_atts) >= 2:
-                    shapes = {len(a.matrix) for a in image_atts}
-                    if len(shapes) == 1:
-                        frames = _gray([a.matrix for a in image_atts])
-                out = to_jsonable(forge_fn(prompt[:2000], stage="draft", frames=frames, clip=True))
+                    made_here = cascade.recolor_clip(clip_att.frames)
+                elif len(image_atts) >= 2 and len({(len(a.matrix), len(a.matrix[0]) if a.matrix else 0) for a in image_atts}) == 1:
+                    made_here = cascade.recolor_clip([a.matrix for a in image_atts], variant=0)
+                elif len(image_atts) == 1:
+                    made_here = cascade.clip_from_code(image_atts[0].matrix)
+                if made_here is None:
+                    out = to_jsonable(forge_fn(prompt[:2000], stage="draft", frames=frames, clip=True))
             else:
-                matrix = None
                 if image_src is not None:
-                    matrix = _gray([image_atts[0].matrix])[0]
-                out = to_jsonable(forge_fn(prompt[:2000], stage="draft", matrix=matrix))
+                    made_here = cascade.variations_from_code(image_atts[0].matrix, n=4)
+                else:
+                    out = to_jsonable(forge_fn(prompt[:2000], stage="draft", matrix=None))
         except Exception as exc:  # the trail reports it; nothing is faked
+            made_here = None
             out = {"status": "ERROR", "detail": type(exc).__name__, "url": None}
+        if made_here is not None:
+            out = {"status": "MADE", "url": None, "detail": made_here["method"], "check_metrics": made_here.get("check_metrics")}
         url = out.get("url") if isinstance(out.get("url"), str) and str(out.get("url")).startswith("http") else None
         preview = out.get("preview") if create == "clip" and out.get("preview") else None
-        made = bool(url or preview)
+        made = bool(url or preview or made_here)
         noun = "clip" if create == "clip" else ("variation" if image_src is not None else "picture")
         created = {
             "kind": create,
@@ -405,10 +509,16 @@ async def run_assist(
             "preview": preview,
             "detail": out.get("detail") or out.get("note") or "",
             "check_metrics": out.get("check_metrics"),
+            "variations": [v["matrix"] for v in made_here["variations"]] if made_here and made_here.get("variations") else None,
+            "frames": made_here.get("frames") if made_here else None,
+            "fps": made_here.get("fps") if made_here else None,
+            "code": made_here.get("code") if made_here else None,
         }
         created["unavailable"] = not made and (str(out.get("status") or "").upper() == "UNAVAILABLE" or out.get("produces_video") is False)
         if made:
-            trail.append({"step": "create", "label": f"Made a {noun}", "status": "done", "detail": ""})
+            many = created["variations"] and len(created["variations"]) > 1
+            label = f"Made {len(created['variations'])} variations" if many else f"Made a {noun}"
+            trail.append({"step": "create", "label": label, "status": "done", "detail": created["detail"]})
         else:
             unavailable = str(out.get("status") or "").upper() == "UNAVAILABLE" or out.get("produces_video") is False
             trail.append({
@@ -434,16 +544,45 @@ async def run_assist(
             else "I couldn't make that this time."
         )
     elif created and created["made"]:
-        parts.append("Here it is." if created["url"] else "Here's a clip made from your frames (black and white).")
+        if created["url"]:
+            parts.append("Here it is.")
+        elif created.get("variations"):
+            parts.append("Here are a few color variations, made from your picture's color code.")
+        elif created.get("frames"):
+            parts.append("Here's a short clip made from your picture's color code.")
+        else:
+            parts.append("Here's a clip made from your frames (black and white).")
     text = "\n\n".join(p for p in parts if p) or "Done."
     reply = dict(reply)
     reply["value"] = text
     reply["reply_text"] = text
     reply.setdefault("status", "ACCEPTED")
+    # Content-free use factors for the local hub. Only a checked turn counts
+    # (a Lean proof that checks, or a reply marked verified), and the factor
+    # is built from the turn's step outcomes only: no attachment, pasted
+    # text, or perception value goes into it.
+    counted = 0
+    if factor_pool is not None and not body.factors_opt_out:
+        gate = "lean" if (lean_result or {}).get("status") == "CHECKED" else ("verified" if reply.get("verified") is True else "")
+        if gate:
+            done = sum(1 for step in trail if step.get("status") == "done")
+            record = cascade.turn_factor(gate, steps_done=done, steps_total=len(trail))
+            counted += int(factor_pool.add(record))
     reply["assist"] = {
         "trail": trail,
         "sources": sources[:10],
-        "attachments": [{"name": s["name"], "kind": s["kind"], "summary": s["summary"]} for s in seen],
+        "attachments": [
+            {
+                "name": s["name"],
+                "kind": s["kind"],
+                "summary": s["summary"],
+                "address": ((s.get("cascade") or {}).get("address") or {}).get("path"),
+                "code": (s.get("cascade") or {}).get("code"),
+                "dominant": ((s.get("cascade") or {}).get("chroma_code") or {}).get("dominant"),
+            }
+            for s in seen
+        ],
+        "factors_counted": counted,
         "perception": [{"name": s["name"], "raw": s["raw"]} for s in seen],
         "lean": lean_result,
         "created": created,
@@ -460,14 +599,51 @@ def register_assist_routes(app: FastAPI, auth_dep: Any, *, get_titanos: Callable
     async def assist_route(body: AssistBody) -> dict[str, Any]:
         if not (body.message or "").strip() and not body.attachments:
             raise HTTPException(400, "Type a message or attach something.")
+        from resileos.chat.cascade_tools import FactorPool
+
         titan = get_titanos()
-        result = await run_assist(body, titanos=titan)
+        result = await run_assist(body, titanos=titan, factor_pool=FactorPool())
         if (result.get("action_taken") or {}).get("wrote") and save is not None:
             try:
                 save()
             except Exception:  # pragma: no cover - same policy as /chat
                 pass
         return result
+
+    @app.post("/api/v1/studio/variations", dependencies=deps)
+    def studio_variations(body: CascadeMakeBody) -> dict[str, Any]:
+        """Picture variations from a photo's chroma belt code (no provider)."""
+        from resileos.chat import cascade_tools as cascade
+
+        try:
+            if body.frames:
+                return cascade.recolor_clip(body.frames, code=body.code, variant=max(1, body.n))
+            if body.matrix is None:
+                raise HTTPException(400, "Add a photo to make variations from.")
+            return cascade.variations_from_code(body.matrix, n=body.n, code=body.code)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+
+    @app.post("/api/v1/studio/clip-from-picture", dependencies=deps)
+    def studio_clip_from_picture(body: CascadeMakeBody) -> dict[str, Any]:
+        """A short clip from one photo: φ hue steps + the motion phase step."""
+        from resileos.chat import cascade_tools as cascade
+
+        if body.matrix is None:
+            raise HTTPException(400, "Add a photo to make a clip from.")
+        try:
+            return cascade.clip_from_code(body.matrix, frames=body.frames_out, code=body.code)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+
+    @app.get("/api/v1/factors/hub", dependencies=deps)
+    def factors_hub() -> dict[str, Any]:
+        """Content-free use factors aggregated for the local hub, plus
+        Morpheus dream candidates. Read-only; Eat stays the only writer.
+        The Pages proxy keeps this admin-only."""
+        from resileos.chat.cascade_tools import FactorPool
+
+        return FactorPool().hub_aggregate()
 
     @app.post("/api/v1/verify/lean", dependencies=deps)
     def verify_lean_route(body: LeanBody) -> dict[str, Any]:

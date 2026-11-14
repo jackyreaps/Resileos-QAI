@@ -178,7 +178,7 @@ Pages → project `resileos` → Settings → Variables and secrets. Do not comm
 |---|---|---|
 | `SESSION_SECRET` | Pages secret, 16+ random characters | yes, or sign-in returns 503 `session secret not configured` |
 | `KEY_SEAL_SECRET` | Pages secret, different from the session secret | yes, or key creation returns 503 `key seal is not configured` |
-| `RESILEOS_PROXY_SECRET` | Pages secret **and** the API container, same value | yes for the anonymous trial |
+| `RESILEOS_PROXY_SECRET` | Pages secret **and** the API container, same value (16+ characters) | yes: anonymous trial, account keying, and admin endpoints |
 | `EMAIL_FROM` | Pages plaintext, address on a domain you send from, e.g. `login@resileosai.fun` | yes to send mail |
 | Email provider | one of the two below | yes, or `POST /api/session/magic-link` returns 503 `email not configured` and does not send |
 | `CLOUDFLARE_API_TOKEN` | API host only. Token scope **Account → Workers KV Storage → Read** | yes for the API to accept Pages keys |
@@ -236,3 +236,28 @@ The local `api/server.py` path remains available for development.
 - Shared demo namespace — **coming soon** (not in API)
 - Guild / world routes — in source, **not mounted** on hosted API
 - Benchmark numbers — scripts exist; published tables still pending
+
+
+## Admin endpoints, account keying, and link reading (API side)
+
+- **Admin is enforced by the API too.** `middleware/proxy_identity.py` runs on
+  every request. Anything outside the public list (`PUBLIC_API`, the same list
+  as `functions/_admin.js`) needs either a signed admin assertion from the
+  proxy (`X-Resileos-Admin*`, HMAC with `RESILEOS_PROXY_SECRET`, bound to the
+  method and path, 5-minute window) or an operator key whose record has
+  `"admin": true`. A plain user key or a trial request gets **403**. The proxy
+  only adds the assertion for emails in `ADMIN_EMAILS`, and builds its outgoing
+  headers from scratch, so a browser can't add them.
+- **Files and conversations belong to the account, not the key.** The proxy
+  sends `X-Resileos-Account` (sha256 of `account:` + the normalised email, never
+  the email itself), signed with the same secret, plus the current and past key
+  digests (`account.past_digests`, last 10). On the first request after deploy
+  the API moves records stored under those key digests to `acct:<id>`, once per
+  process, idempotently. Rotating a key no longer loses files or chats.
+  Accounts that rotated keys **before** this deploy have no recorded past
+  digest, so records under those older keys can't be found automatically.
+- **Link reading pins the checked IP.** `guarded_fetch` resolves the host,
+  refuses it unless every address is public and the port is 80/443, then
+  connects to that exact IP (Host and TLS SNI set to the real name, so
+  certificate checks still apply). Each redirect hop is checked the same way.
+  This closes the DNS-rebinding gap between the check and the fetch.

@@ -19,3 +19,10 @@ def client():
     from fastapi.testclient import TestClient
     from app import app
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_use_factors(tmp_path, monkeypatch):
+    """Use factors from /assist go to a temp file, never the repo's data/."""
+    monkeypatch.setenv("RESILEOS_FACTORS_PATH", str(tmp_path / "use_factors.jsonl"))
+    monkeypatch.setenv("RESILEOS_FILES_DIR", str(tmp_path / "files"))

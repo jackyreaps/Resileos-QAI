@@ -30,8 +30,8 @@ def run(body, **fakes):
         calls["search"].append(query)
         return {"status": "ACCEPTED", "value": "Unverified web search results", "verified": False,
                 "search": {"query": query, "results": [
-                    {"title": "One", "url": "https://one.example/a", "snippet": "x"},
-                    {"title": "Two", "url": "https://two.example/b", "snippet": "y"}]}}
+                    {"title": "One", "url": "https://one.example/a", "snippet": "a red fox in the snow " + query},
+                    {"title": "Two", "url": "https://two.example/b", "snippet": "more about " + query}]}}
 
     def forge_fn(prompt, **kw):
         calls["forge"].append((prompt, kw))
@@ -49,6 +49,7 @@ def run(body, **fakes):
     fakes.setdefault("search_fn", search_fn)
     fakes.setdefault("forge_fn", forge_fn)
     fakes.setdefault("lean_fn", lean_fn)
+    fakes.setdefault("crawl_top", 0)
     out = asyncio.run(A.run_assist(A.AssistBody(**body), titanos=None, **fakes))
     return out, calls
 
@@ -68,7 +69,8 @@ def test_image_is_perceived_then_searched_then_answered_with_sources():
     out, calls = run({"message": "find sources about this", "attachments": [{"name": "fox.png", "kind": "image", "matrix": IMG}]})
     assert labels(out)[0] == "Looked at your image"
     assert "red/orange" in out["assist"]["attachments"][0]["summary"]
-    assert calls["search"] and "Searched 2 sources" in labels(out)
+    assert calls["search"] and "red" in calls["search"][0]  # searched for what it saw
+    assert any(label.startswith("Searched 2 sources") for label in labels(out))
     assert [s["url"] for s in out["assist"]["sources"]] == ["https://one.example/a", "https://two.example/b"]
 
 
@@ -79,21 +81,40 @@ def test_attachment_context_reaches_the_chat_history():
     assert "Alice works at Acme" in out["assist"]["context"]
 
 
-def test_variation_request_without_a_generator_is_honest():
+def test_variation_is_made_from_the_chroma_code():
     out, calls = run({"message": "make a variation of this", "attachments": [{"name": "fox.png", "kind": "image", "matrix": IMG}]})
-    assert calls["forge"] and calls["forge"][0][1]["matrix"] is not None
+    assert not calls["forge"], "variations come from the chroma code, not a provider"
     created = out["assist"]["created"]
-    assert created["made"] is False and created["url"] is None and created["preview"] is None
-    assert "Couldn't make a variation: no generator is connected" in labels(out)
-    assert "won't pretend" in out["value"]
+    assert created["made"] is True and created["url"] is None
+    assert len(created["variations"]) == 4
+    assert all(len(v) == 6 and len(v[0]) == 8 and len(v[0][0]) == 3 for v in created["variations"])
+    assert "Made 4 variations" in labels(out)
     assert calls["chat"] == 0
+
+
+def test_picture_from_text_only_needs_a_provider():
+    out, calls = run({"message": "make a picture of a fox"})
+    assert calls["forge"]
+    created = out["assist"]["created"]
+    assert created["made"] is False and created["unavailable"] is True
+    assert "Couldn't make a picture: no generator is connected" in labels(out)
+    assert "won't pretend" in out["value"]
 
 
 def test_clip_from_an_uploaded_clip_returns_its_frames():
     out, calls = run({"message": "make a clip from this", "attachments": [{"name": "c.webm", "kind": "clip", "frames": CLIP}]})
     assert labels(out)[:1] == ["Watched your clip"]
     assert "Made a clip" in labels(out)
-    assert len(out["assist"]["created"]["preview"]) == 4
+    assert len(out["assist"]["created"]["frames"]) == 4
+    assert out["assist"]["created"]["check_metrics"]["version"] == "clip-metrics/1"
+
+
+def test_clip_from_one_picture_uses_phi_motion():
+    big = [[[0.9, 0.3, 0.1] if 6 <= y < 18 and 8 <= x < 20 else [0.1, 0.15, 0.25] for x in range(32)] for y in range(24)]
+    out, calls = run({"message": "make a clip from this", "attachments": [{"name": "fox.png", "kind": "image", "matrix": big}]})
+    created = out["assist"]["created"]
+    assert created["made"] and len(created["frames"]) == 12 and not calls["forge"]
+    assert created["check_metrics"]["moving_transitions"] > 0
 
 
 def test_clip_from_text_only_is_unavailable():
@@ -218,7 +239,9 @@ def test_assist_route(client, monkeypatch):
     body = res.json()
     trail = [s["label"] for s in body["assist"]["trail"]]
     assert trail[0] == "Looked at your image"
-    assert body["assist"]["created"]["made"] is False  # no generator configured in tests
+    assert body["assist"]["created"]["made"] is True  # variation from the chroma code
+    assert body["assist"]["attachments"][0]["address"].startswith("5/5/")
+    assert len(bytes.fromhex(body["assist"]["attachments"][0]["code"])) == 23
     assert body["assist"]["learned"] is False
 
 
@@ -250,5 +273,46 @@ def test_search_reply_is_plain_words():
 
     out, _ = run({"message": "search for lean 4"}, search_fn=search_fn)
     assert "<b>" not in out["value"] and "&#x27;" not in out["value"]
-    assert out["assist"]["sources"][0] == {"title": "Lean 4", "url": "https://lean-lang.org/", "snippet": "you're using Lean"}
+    first = out["assist"]["sources"][0]
+    assert {k: first[k] for k in ("title", "url", "snippet")} == {"title": "Lean 4", "url": "https://lean-lang.org/", "snippet": "you're using Lean"}
+    assert first["address"].startswith("5/3/")
     assert out["verified"] is False
+
+
+def test_guarded_fetch_connects_to_the_checked_ip():
+    """DNS rebinding: the fetch must use the address that was checked."""
+    import httpx
+
+    seen = []
+
+    def handler(request):
+        seen.append((str(request.url), request.headers.get("host"), request.extensions.get("sni_hostname")))
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"location": "https://evil.example/next"})
+        return httpx.Response(200, headers={"content-type": "text/html"}, text="<p>ok</p>")
+
+    answers = {"good.example": "93.184.216.34", "evil.example": None}
+
+    def resolver(url):
+        from urllib.parse import urlparse
+
+        return answers[urlparse(url).hostname]
+
+    factory = lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    out = asyncio.run(A.guarded_fetch("https://good.example/start", client_factory=factory, resolver=resolver))
+    # The first hop went to the pinned IP with the real Host and SNI; the
+    # redirect to a host that doesn't resolve publicly was refused.
+    assert seen == [("https://93.184.216.34/start", "good.example", "good.example")]
+    assert out["status"] == "BLOCKED"
+    answers["evil.example"] = "2606:4700::1111"
+    seen.clear()
+    out = asyncio.run(A.guarded_fetch("https://good.example/start", client_factory=factory, resolver=resolver))
+    assert out["status"] == "SUCCESS"
+    assert seen[1][0] == "https://[2606:4700::1111]/next" and seen[1][1] == "evil.example"
+
+
+def test_resolve_public_refuses_mixed_answers(monkeypatch):
+    monkeypatch.setattr(A.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443)), (2, 1, 6, "", ("10.0.0.1", 443))])
+    assert A.resolve_public("https://mixed.example/") is None
+    monkeypatch.setattr(A.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443))])
+    assert A.resolve_public("https://ok.example/") == "93.184.216.34"

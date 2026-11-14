@@ -46,6 +46,8 @@ const PUBLIC_API = [
   ["PUT", ["conversations", "*"]],
   ["POST", ["studio", "forge", "video"]],
   ["POST", ["studio", "video"]],
+  ["POST", ["studio", "variations"]],
+  ["POST", ["studio", "clip-from-picture"]],
   ["POST", ["generate", "video"]],
   ["GET", ["aphrodite", "*", "state"]],
   ["POST", ["aphrodite", "*", "state"]],

@@ -308,6 +308,9 @@
       ["Studio gate", "POST", "/studio/gate", { packet: { id: "studio-demo", budget_remaining: {} } }],
       ["Propose sampler (refused unless enabled)", "POST", "/studio/external-sampler", { condition: { prompt: "demo" }, register: false }],
     ]],
+    ["Shared patterns (content-free, read only)", [
+      ["Hub pattern aggregate + dream candidates", "GET", "/factors/hub", null],
+    ]],
     ["Perception and language (preview only, commit: false)", [
       ["Perceive image", "POST", "/perceive/image", { image: SAMPLE, subject: "image:studio-demo", commit: false }],
       ["Perceive art", "POST", "/perceive/art", { title: "Demo", description: "studio panel", world_id: "world:art", commit: false }],

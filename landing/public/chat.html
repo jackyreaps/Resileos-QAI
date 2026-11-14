@@ -723,10 +723,13 @@
                             <span class="menu-copy"><span class="menu-label">Search the web</span><span class="menu-desc">Also look this up online and link the sources.</span></span>
                         </button>
                         <button class="menu-item" id="btn-image" type="button" role="menuitemcheckbox" aria-pressed="false">
-                            <span class="menu-copy"><span class="menu-label">Make a picture</span><span class="menu-desc">From your message, or a variation of an attached picture.</span></span>
+                            <span class="menu-copy"><span class="menu-label">Make a picture</span><span class="menu-desc">Color variations of an attached picture.</span></span>
                         </button>
                         <button class="menu-item" id="btn-clip" type="button" role="menuitemcheckbox" aria-pressed="false">
-                            <span class="menu-copy"><span class="menu-label">Make a short clip</span><span class="menu-desc">From your message, an attached clip, or several photos.</span></span>
+                            <span class="menu-copy"><span class="menu-label">Make a short clip</span><span class="menu-desc">From an attached photo, clip, or several photos.</span></span>
+                        </button>
+                        <button class="menu-item" id="btn-share-patterns" type="button" role="menuitemcheckbox" aria-pressed="true">
+                            <span class="menu-copy"><span class="menu-label">Share anonymous patterns</span><span class="menu-desc">Only counts and color codes from checked answers, never your words, pictures, or files.</span></span>
                         </button>
                     </div>
                 </div>
@@ -1362,6 +1365,36 @@
                     dl.download = '';
                     dl.textContent = 'Download';
                     box.appendChild(dl);
+                } else if (Array.isArray(created.variations) && created.variations.length) {
+                    const grid = document.createElement('div');
+                    grid.className = 'created-grid';
+                    created.variations.forEach((m, i) => {
+                        const fig = document.createElement('figure');
+                        const c = document.createElement('canvas');
+                        c.width = 160;
+                        c.height = Math.round(160 * m.length / m[0].length);
+                        c.setAttribute('role', 'img');
+                        c.setAttribute('aria-label', 'Variation ' + (i + 1));
+                        window.ResileosMedia.drawFrame(c, m);
+                        const dl = document.createElement('button');
+                        dl.type = 'button';
+                        dl.className = 'link-chip';
+                        dl.textContent = 'Download';
+                        dl.addEventListener('click', () => c.toBlob(blob => saveBlob(blob, 'resileos-variation-' + (i + 1) + '.png'), 'image/png'));
+                        fig.append(c, dl);
+                        grid.appendChild(fig);
+                    });
+                    box.appendChild(grid);
+                } else if (Array.isArray(created.frames) && created.frames.length) {
+                    canvas = document.createElement('canvas');
+                    box.appendChild(canvas);
+                    playFrames(canvas, created.frames);
+                    const dl = document.createElement('button');
+                    dl.type = 'button';
+                    dl.className = 'link-chip';
+                    dl.textContent = 'Download frames (PNG)';
+                    dl.addEventListener('click', async () => saveBlob(await window.ResileosMedia.filmstrip(created.frames), 'resileos-clip-frames.png'));
+                    box.appendChild(dl);
                 } else if (Array.isArray(created.preview) && created.preview.length) {
                     canvas = document.createElement('canvas');
                     box.appendChild(canvas);
@@ -1419,7 +1452,28 @@
             if (chat.contains(bubble)) chat.scrollTop = chat.scrollHeight;
         }
 
+        function saveBlob(blob, name) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        }
+
         function playFrames(canvas, frames) {
+            if (Array.isArray(frames[0][0][0])) {
+                canvas.width = frames[0][0].length * 6;
+                canvas.height = frames.length ? frames[0].length * 6 : 0;
+                let j = 0;
+                (function tick() {
+                    if (!document.body.contains(canvas)) return;
+                    window.ResileosMedia.drawFrame(canvas, frames[j % frames.length]);
+                    j += 1;
+                    setTimeout(tick, 125);
+                })();
+                return;
+            }
             const h = frames[0].length, w = frames[0][0].length;
             canvas.width = w * 6;
             canvas.height = h * 6;
@@ -2047,6 +2101,7 @@
                         last_tool_empty: lastToolEmpty,
                         persona: currentPersona(),
                         prose: true,
+                        factors_opt_out: localStorage.getItem('resileos_share_patterns') === 'off',
                         attachments: sent.map(a => window.ResileosMedia.wire(a)),
                         hints: hints
                     })

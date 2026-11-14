@@ -144,11 +144,59 @@
     return out;
   }
 
+  /* Draw one frame (HxW gray or HxWx3 color, values 0..1) onto a canvas. */
+  function drawFrame(canvas, frame, lo, hi) {
+    var h = frame.length, w = frame[0].length;
+    var color = Array.isArray(frame[0][0]);
+    var small = document.createElement("canvas");
+    small.width = w;
+    small.height = h;
+    var sctx = small.getContext("2d");
+    var img = sctx.createImageData(w, h);
+    var a = color ? 0 : (lo === undefined ? 0 : lo);
+    var span = color ? 1 : ((hi === undefined ? 1 : hi) - a) || 1;
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var k = (y * w + x) * 4;
+        var px = frame[y][x];
+        for (var c = 0; c < 3; c++) {
+          var v = color ? Number(px[c]) : Number(px);
+          img.data[k + c] = Math.max(0, Math.min(255, Math.round(((v - a) / span) * 255)));
+        }
+        img.data[k + 3] = 255;
+      }
+    }
+    sctx.putImageData(img, 0, 0);
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
+  }
+
+  /* All frames side by side as one PNG blob. */
+  function filmstrip(frames, scale) {
+    var s = scale || 4;
+    var w = frames[0][0].length * s, h = frames[0].length * s;
+    var canvas = document.createElement("canvas");
+    canvas.width = w * frames.length;
+    canvas.height = h;
+    var ctx = canvas.getContext("2d");
+    frames.forEach(function (frame, i) {
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      drawFrame(c, frame);
+      ctx.drawImage(c, i * w, 0);
+    });
+    return new Promise(function (resolve) { canvas.toBlob(resolve, "image/png"); });
+  }
+
   /* Hand an attachment to Studio ("make a clip / variation from this"). */
   function handoff(att, type) {
     var payload = { type: type || (att.kind === "clip" ? "clip" : "image"), name: att.name, thumb: att.thumb || "" };
     if (att.grayFrames) payload.frames = att.grayFrames;
     else if (att.gray) payload.frames = [att.gray];
+    // Color copies, so Studio can expand the picture's chroma code.
+    if (att.matrix) payload.rgb = [att.matrix];
+    else if (Array.isArray(att.frames)) payload.rgb = att.frames;
     if (att.prompt) payload.prompt = att.prompt;
     try { sessionStorage.setItem("resileos_studio_handoff", JSON.stringify(payload)); } catch (err) { return false; }
     return true;
@@ -189,6 +237,8 @@
     readImage: readImage,
     readVideo: readVideo,
     handoff: handoff,
+    drawFrame: drawFrame,
+    filmstrip: filmstrip,
     takeHandoff: takeHandoff,
     fromSavedFile: fromSavedFile,
     saveToFiles: saveToFiles,

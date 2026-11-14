@@ -39,6 +39,8 @@ function fakeBackend() {
     "POST /api/v1/conversations": () => ({ id: "c1" }),
     "POST /api/v1/studio/forge/video": () => ({ status: "UNAVAILABLE", url: null }),
     "POST /api/v1/studio/video": () => ({ status: "drafted", preview: [[[0]]] }),
+    "POST /api/v1/studio/variations": () => ({ status: "MADE", made: true, variations: [{ matrix: [[[0, 0, 0]]] }] }),
+    "POST /api/v1/studio/clip-from-picture": () => ({ status: "MADE", made: true, frames: [[[[0, 0, 0]]], [[[1, 1, 1]]]] }),
     "GET /api/v1/aphrodite/anon/state": () => ({ companion_prompt: "Welcome back." }),
     "GET /api/v1/ready": () => ({ ready: true }),
     "GET /api/v1/usage": () => ({ count: 1 }),
@@ -102,6 +104,8 @@ const TOOLS = [
   ["conversations save", "POST", "conversations", { messages: [] }, "chat.html", "'/conversations'"],
   ["Studio picture", "POST", "studio/forge/video", { prompt: "fox", stage: "draft" }, "assets/studio.js", '"/studio/forge/video"'],
   ["Studio clip", "POST", "studio/video", { prompt: "fox", stage: "draft", frames: [[[0]]] }, "assets/studio.js", '"/studio/video"'],
+  ["Studio variations (chroma code)", "POST", "studio/variations", { matrix: [[[0, 0, 0]]], n: 2 }, "assets/studio.js", '"/studio/variations"'],
+  ["Studio clip from a picture", "POST", "studio/clip-from-picture", { matrix: [[[0, 0, 0]]] }, "assets/studio.js", '"/studio/clip-from-picture"'],
   ["persona / tutorial state", "GET", "aphrodite/anon/state", undefined, "chat.html", "/aphrodite/"],
   ["ready", "GET", "ready", undefined, "chat.html", "${apiUrl()}/ready"],
 ];

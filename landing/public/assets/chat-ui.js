@@ -256,6 +256,20 @@
         if (label && mode) label.textContent = MODE_LABELS[mode] || '';
     }
     // Optional hints for the next message. The server picks steps on its own too.
+    var share = document.getElementById("btn-share-patterns");
+    if (share) {
+      var paint = function () {
+        var on = localStorage.getItem("resileos_share_patterns") !== "off";
+        share.setAttribute("aria-pressed", on ? "true" : "false");
+        share.classList.toggle("active", on);
+      };
+      share.addEventListener("click", function () {
+        var on = localStorage.getItem("resileos_share_patterns") !== "off";
+        try { localStorage.setItem("resileos_share_patterns", on ? "off" : "on"); } catch (err) { /* ignore */ }
+        paint();
+      });
+      paint();
+    }
     window.ResileosHints = function () {
         return { search: mode === 'search', create: mode === 'image' || mode === 'clip' ? mode : null };
     };
