@@ -59,3 +59,13 @@
 .run-list, .run-steps { margin: 8px 0; padding-left: 1.2rem; }
 .run-step { margin: 4px 0; }
 .run-step .admin-raw summary { font-size: 0.75rem; }
+
+.packet-card .kv-list { display: grid; gap: 4px; }
+.kv { display: grid; grid-template-columns: 9rem 1fr; gap: 8px; font-size: 0.88rem; }
+.kv .k { opacity: 0.7; }
+.kv .v { word-break: break-word; }
+.evidence-drawer { margin-top: 8px; }
+.stage-tag { display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; margin-right: 8px; opacity: .85; }
+.separated-view { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.sep-col { border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+@media (max-width: 560px) { .separated-view { grid-template-columns: 1fr; } .kv { grid-template-columns: 7rem 1fr; } }

@@ -254,6 +254,21 @@ async def guarded_fetch(
     return {"status": "ERROR", "content": ""}
 
 
+class _Trail(list):
+    """The turn's trail; each appended step is also streamed (if asked)."""
+
+    def __init__(self, notify: Callable[[dict[str, Any]], None]):
+        super().__init__()
+        self._notify = notify
+
+    def append(self, step: dict[str, Any]) -> None:  # type: ignore[override]
+        super().append(step)
+        try:
+            self._notify({"type": "step", **{k: v for k, v in step.items() if k in ("step", "label", "status", "detail")}})
+        except Exception:
+            pass
+
+
 def _guarded_sync(url: str) -> dict[str, Any]:
     from resileos.kin.outer_legions import _resolve
 
@@ -363,6 +378,7 @@ async def _run_assist(
     lean_fn: Callable[[str], dict[str, Any]] | None = None,
     factor_pool: Any | None = None,
     crawl_top: int = 2,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     from resileos.answer.agent_loop import run_agent_chat
     from resileos.answer.user_profile import PERSONA_PACKS
@@ -377,7 +393,8 @@ async def _run_assist(
     lean_fn = lean_fn or check_lean
     persona = body.persona if body.persona in PERSONA_PACKS else "honest"
     message = (body.message or "").strip()
-    trail: list[dict[str, Any]] = []
+    notify = on_event or (lambda _event: None)
+    trail: list[dict[str, Any]] = _Trail(notify)
     sources: list[dict[str, str]] = []
     context_lines: list[str] = []
     seen: list[dict[str, Any]] = []
@@ -408,6 +425,7 @@ async def _run_assist(
     if lean_source is None and looks_like_lean(message):
         lean_source = extract_lean(message)
     if lean_source:
+        notify({"type": "step", "step": "lean", "status": "running", "label": "Checking your proof"})
         lean_result = lean_fn(lean_source)
         status = lean_result.get("status")
         label = {
@@ -446,6 +464,7 @@ async def _run_assist(
             dominant = ((seen[0].get("cascade") or {}).get("chroma_code") or {}).get("dominant") or ""
             query = " ".join((f"{dominant} {looked}" if dominant else looked).split()[:12])
         if query:
+            notify({"type": "step", "step": "search", "status": "running", "label": "Searching"})
             search_body = await search_fn(query)
             results = ((search_body or {}).get("search") or {}).get("results") or []
             cleaned = [

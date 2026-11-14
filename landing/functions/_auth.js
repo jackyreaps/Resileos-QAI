@@ -984,6 +984,8 @@ export async function handleProxy({ request, env, params, fetchImpl, now }) {
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
   headers.set("accept", request.headers.get("accept") || "application/json");
+  const lastEvent = request.headers.get("last-event-id");
+  if (lastEvent && /^\d{1,9}$/.test(lastEvent)) headers.set("last-event-id", lastEvent);
   if (session) {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && !csrfOk(request, session.record)) {
       return detail("This page is out of date. Refresh it and try again.", 403);
@@ -1036,7 +1038,7 @@ export async function handleProxy({ request, env, params, fetchImpl, now }) {
   if (method !== "GET" && method !== "HEAD") init.body = request.body;
   const upstream = await fetchFn(target, init);
   const out = new Headers();
-  for (const name of ["content-type", "content-disposition", "cache-control", "x-content-type-options", "x-usage-count", "x-usage-quota", "x-ratelimit-remaining", "x-trial-remaining", "retry-after"]) {
+  for (const name of ["content-type", "content-disposition", "cache-control", "x-content-type-options", "x-usage-count", "x-usage-quota", "x-ratelimit-remaining", "x-trial-remaining", "retry-after", "x-stream-id", "x-accel-buffering"]) {
     const value = upstream.headers.get(name);
     if (value) out.set(name, value);
   }
