@@ -1565,7 +1565,14 @@
                 if (!bubble || bubble.querySelector('.typing')) return;
                 const reply = bubble.querySelector('.reply');
                 const link = bubble.querySelector(':scope > a');
-                const text = ((reply ? reply.textContent : bubble.textContent) + (link ? '\n' + link.textContent : '')).trim();
+                const userText = bubble.querySelector('.user-text');
+                const sentNames = Array.from(bubble.querySelectorAll('.sent-attachment figcaption')).map(el => el.textContent);
+                let text;
+                if (row.classList.contains('user') && (userText || sentNames.length)) {
+                    text = ((userText ? userText.textContent : '') + (sentNames.length ? (userText ? '\n' : '') + '[attached: ' + sentNames.join(', ') + ']' : '')).trim();
+                } else {
+                    text = ((reply ? reply.textContent : bubble.textContent) + (link ? '\n' + link.textContent : '')).trim();
+                }
                 if (!text) return;
                 messages.push({
                     role: row.classList.contains('user') ? 'user' : 'assistant',

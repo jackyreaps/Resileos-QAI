@@ -241,3 +241,14 @@ def test_verify_lean_route_is_honest_without_lean(client, monkeypatch):
     res = client.post("/api/v1/verify/lean", json={"source": "theorem t : 1 = 1 := rfl"})
     assert res.status_code == 200
     assert res.json()["status"] == "UNAVAILABLE"
+
+
+def test_search_reply_is_plain_words():
+    async def search_fn(query):
+        return {"status": "ACCEPTED", "value": "Unverified web search results:\n- <b>Lean</b>", "search": {"results": [
+            {"title": "<b>Lean</b> 4", "url": "https://lean-lang.org/", "snippet": "you&#x27;re using <b>Lean</b>"}]}}
+
+    out, _ = run({"message": "search for lean 4"}, search_fn=search_fn)
+    assert "<b>" not in out["value"] and "&#x27;" not in out["value"]
+    assert out["assist"]["sources"][0] == {"title": "Lean 4", "url": "https://lean-lang.org/", "snippet": "you're using Lean"}
+    assert out["verified"] is False

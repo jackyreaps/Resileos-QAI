@@ -20,6 +20,7 @@ Every step is listed in ``trail`` in plain words, with sources linked.
 from __future__ import annotations
 
 import ipaddress
+import html
 import re
 import socket
 from typing import Any, Awaitable, Callable
@@ -213,6 +214,11 @@ def crawl_pages(urls: list[str], fetch_fn: Callable[..., Any] | None = None) -> 
 
 # ---------------------------------------------------------------- the turn
 
+def _clean(text: Any) -> str:
+    """Search providers return HTML bits (<b>, &#x27;). Show plain words."""
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", "", str(text or ""))).split())
+
+
 def _intent_create(body: AssistBody) -> str | None:
     hint = (body.hints.create or "").lower()
     if hint in {"image", "clip"}:
@@ -321,7 +327,11 @@ async def run_assist(
             results = ((search_body or {}).get("search") or {}).get("results") or []
             for row in results:
                 if row.get("url"):
-                    sources.append({"title": str(row.get("title") or row["url"])[:160], "url": str(row["url"])})
+                    sources.append({
+                        "title": _clean(row.get("title") or row["url"])[:160],
+                        "url": str(row["url"]),
+                        "snippet": _clean(row.get("snippet") or "")[:300],
+                    })
             trail.append({
                 "step": "search",
                 "label": f"Searched {len(results)} source{'s' if len(results) != 1 else ''}" if results else "Searched the web: nothing found",
@@ -338,6 +348,13 @@ async def run_assist(
     reply: dict[str, Any]
     if search_body is not None:
         reply = dict(search_body)
+        found = [src for src in sources if src.get("snippet") is not None]
+        if found:
+            lines = ["Here's what I found on the web. I haven't checked these against what's saved:"]
+            for row in found[:5]:
+                lines.append(f"- {row['title']}: {row['snippet']}".rstrip(": "))
+            reply["value"] = reply["reply_text"] = "\n".join(lines)
+            reply["verified"] = False
     elif message and not pasted_lean and not pure_create:
         reply = await chat_fn(
             titanos,
