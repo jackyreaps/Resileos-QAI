@@ -621,6 +621,11 @@ async def _run_assist(
         parts.append(base_text)
     if lean_result:
         parts.append(lean_result.get("summary", ""))
+        # A proof turn whose only answer is the Lean result: Lean checked
+        # it, so the turn is verified. A chat or search reply alongside a
+        # proof keeps its own flag.
+        if lean_result.get("status") == "CHECKED" and not base_text and search_body is None:
+            reply["verified"] = True
     if seen and not base_text:
         parts.append("Here's what I see: " + "; ".join(f"{s['name']}: {s['summary']}" for s in seen) + ".")
     if created and not created["made"]:

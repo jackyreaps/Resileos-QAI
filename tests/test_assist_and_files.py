@@ -133,6 +133,19 @@ def test_lean_attachment_and_pasted_proof_are_checked():
     assert calls2["chat"] == 0
 
 
+def test_a_checked_proof_is_verified_and_a_failing_one_is_not():
+    failing, _ = run({"message": "theorem t : 1 = 2 := rfl"})
+    assert failing["verified"] is False
+    checked, _ = run({"message": "theorem t : 1 = 1 := rfl"},
+                     lean_fn=lambda src: {"status": "CHECKED", "summary": "Proof checks."})
+    assert checked["verified"] is True
+    assert checked["value"] == "Proof checks."
+    # A proof pasted into a question still answered by chat keeps chat's own flag.
+    mixed, _ = run({"message": "what does this mean? theorem t : 1 = 1 := rfl and why"},
+                   lean_fn=lambda src: {"status": "CHECKED", "summary": "Proof checks."})
+    assert mixed.get("verified") is not True
+
+
 def test_links_are_read_through_the_guarded_fetcher(monkeypatch):
     monkeypatch.setattr(A, "public_url", lambda url: True)
 
