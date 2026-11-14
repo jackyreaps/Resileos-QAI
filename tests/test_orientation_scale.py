@@ -7,9 +7,15 @@ from resileos.substrate.suite_constants import PHI
 from resileos.ui.cascade_address import (
     BELT,
     ORIENTATION_SCALES,
+    CASCADE_FRAMES,
+    WAIST,
     cascade_address,
+    frame_control,
+    frame_weight,
     orientation_scale,
-    phi_level_weight,
+    phi_address,
+    pin_address,
+    waist_span,
 )
 from resileos.ui.residual_embed import address_triple, embed_frame
 
@@ -31,8 +37,9 @@ def test_orientation_scale_all_four_scales():
         assert ctrl["orientation"] == orientation
         assert ctrl["proportion"] == PHI
         assert ctrl["proportion"] == OSC_PHI
-        assert ctrl["phi_weight"] == pytest.approx(PHI ** (-level))
-        assert ctrl["phi_weight"] == pytest.approx(phi_level_weight(level))
+        assert ctrl["phi_weight"] == pytest.approx(PHI ** (-(frame - 3)))
+        assert ctrl["phi_weight"] == pytest.approx(phi_address(frame) / phi_address(3))
+        assert ctrl["frame_control"] == frame_control(frame)
 
 
 def test_orientation_scale_orion_is_level_2_frame_9():
@@ -118,3 +125,84 @@ def test_embed_frame_sets_address_for_each_scale():
         assert out["scale_level"] == ctrl["scale_level"]
         assert out["frame"] == ctrl["frame"]
         assert out["orientation"] == ctrl["orientation"]
+
+
+# ── native 3/5/9/12 frame address ──────────────────────────────────────
+
+
+def test_phi_address_is_phi_power_of_the_frame():
+    for frame in CASCADE_FRAMES:
+        assert phi_address(frame) == PHI ** (-frame)
+
+
+def test_phi_address_is_not_a_halving_step():
+    for frame in CASCADE_FRAMES:
+        assert phi_address(frame) != pytest.approx(2.0 ** (-frame))
+    # Consecutive frames differ by a φ power, never by a factor of 2.
+    pairs = zip(CASCADE_FRAMES, CASCADE_FRAMES[1:])
+    for a, b in pairs:
+        assert phi_address(a) / phi_address(b) == pytest.approx(PHI ** (b - a))
+
+
+def test_waist_spans():
+    assert WAIST == 36
+    assert waist_span(12) == 3
+    assert waist_span(9) == 4
+    assert waist_span(3) == 12
+    assert waist_span(5) is None
+
+
+def test_frame_control_five_is_pentagram_orientation():
+    ctrl = frame_control(5)
+    assert ctrl["orientation"] is True
+    assert ctrl["figure"] == "pentagram"
+    assert ctrl["span"] is None
+    assert ctrl["address"] == round(PHI ** -5, 6)
+    for frame in (3, 9, 12):
+        other = frame_control(frame)
+        assert other["orientation"] is False
+        assert other["figure"] == "cascade"
+        assert other["span"] == WAIST // frame
+
+
+@pytest.mark.parametrize("frame", [0, 1, 2, 4, 6, 8, 16, 36])
+def test_phi_address_raises_on_a_non_frame(frame):
+    with pytest.raises(ValueError):
+        phi_address(frame)
+
+
+def test_frame_weight_and_pin_address_use_the_phi_address():
+    assert frame_weight(3) == pytest.approx(1.0)
+    assert frame_weight(12) == pytest.approx(PHI ** -9)
+    assert pin_address("global")["frame_control"] == frame_control(9)
+    assert pin_address("individual")["frame_control"]["figure"] == "pentagram"
+
+
+def test_cascade_search_ranks_by_phi_address():
+    from resileos.chat.cascade_tools import rank_sources
+
+    rows = [{"url": f"https://ex.org/{i}", "title": "acme widget", "snippet": ""} for i in range(12)]
+    out = rank_sources(rows, "acme widget")
+    by_level = {env["level"]: env["score"] for env in out["envelopes"]}
+    assert by_level[0] == round(frame_weight(3), 6)
+    assert by_level[1] == round(frame_weight(5), 6)
+    assert by_level[2] == round(frame_weight(9), 6)
+    # φ^{-9} sits under the 1/64 floor, so the 12-frame ranks drop.
+    assert 3 not in by_level
+
+
+def test_chroma_scales_use_the_phi_address():
+    from resileos.ui.chroma import expand_variations
+
+    code = {"chroma": [1, 1, 1, 1, 1], "hue_step": 0, "orientation": "orion"}
+    pal = expand_variations(code)[0]
+    assert max(pal["weights"]) <= frame_weight(9) + 1e-9
+
+
+def test_frame_motion_clip_carries_its_frame_control():
+    import numpy as np
+    from resileos.chat.cascade_tools import clip_from_code
+
+    pic = np.random.default_rng(0).random((8, 10, 3))
+    assert clip_from_code(pic, frames=12)["frame_control"] == frame_control(12)
+    assert clip_from_code(pic, frames=6)["frame_control"] == frame_control(5)

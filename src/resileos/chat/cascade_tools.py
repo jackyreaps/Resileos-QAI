@@ -41,7 +41,8 @@ from resileos.ui.cascade_address import (
     cascade_address,
     clip_factors,
     keep_packet,
-    phi_level_weight,
+    frame_control,
+    frame_weight,
     pin_address,
 )
 from resileos.ui.chroma import (
@@ -214,8 +215,10 @@ def rank_sources(results: Iterable[dict[str, Any]], query: str, *, extra_terms: 
 
     Each result gets an address ``5/frame/qN`` (frame from its provider
     rank on 3/5/9/12, N the belt bin of its query overlap 0..5) and a
-    score relevance · φ^{-level}. Scores under 1/64 are dropped; the kept
-    list is capped at the waist (36).
+    score relevance · φ^{-(frame-3)} (the frame's φ address relative to
+    the 3-frame, ``frame_weight``; not a halving). Scores under 1/64 are
+    dropped, so the outer 12-frame falls below the floor; the kept list is
+    capped at the waist (36).
     """
     want = _tokens(query) | {t for term in extra_terms for t in _tokens(term)}
     kept: list[dict[str, Any]] = []
@@ -230,7 +233,7 @@ def rank_sources(results: Iterable[dict[str, Any]], query: str, *, extra_terms: 
         level, frame = spot
         have = _tokens(f"{row.get('title', '')} {row.get('snippet', '')} {row.get('text', '')[:2000] if row.get('text') else ''}")
         relevance = (len(want & have) / len(want)) if want else 0.5
-        score = relevance * phi_level_weight(level)
+        score = relevance * frame_weight(frame)
         if not keep_packet(score):
             dropped += 1
             continue
@@ -333,6 +336,9 @@ def clip_from_code(matrix: Any, *, frames: int = 12, code: dict[str, Any] | str 
         "code": pack_code(code).hex(),
         "check_metrics": metrics,
         "method": "chroma code stepped by φ hue rotation and the magnetic-phase/φ motion scale",
+        # The clip sits at the cascade frame its length reaches: a φ
+        # address, not a halving level.
+        "frame_control": frame_control(max(f for f in CASCADE_FRAMES if f <= max(CASCADE_FRAMES[0], count))),
         "learned": False,
     }
 
