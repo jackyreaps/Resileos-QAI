@@ -1,6 +1,6 @@
 """Operator-facing upgrade proposals from verified dream candidates.
 
-Proposals are split into two tiers:
+Proposals are split into tiers (and an L0 refusal, below):
 
 - Auto: only the explicit allowlist of bounded operational state
   (tool weights, search/crawl cache, source-quality ranking, metric
@@ -11,6 +11,23 @@ Proposals are split into two tiers:
   Eat changes, values outside bounds, unknown targets). These stay
   ``pending`` until a human approves them. An approved proposal
   becoming a PR is out of scope; that step is documented, not run.
+
+Every proposal is also checked against the harness level registry
+(``LEVELS`` below). The harness is leveled:
+
+- L0, protected substrate: the residual core math, the Packet schema and
+  hash, Zeus approval, ``require_verified``, residual consistency, the
+  Hades lesson-only rule, and the abstain / NO_ROWS / CONFLICT meanings.
+  Never rewritten by a proposal: anything touching L0 is ``refused``.
+- L1, engines: Kin roles, demi-gods, legions, the cascade router, risk
+  rules, SeparatedCycle, budget and scar accounting, ControlPacket
+  policy. Review only, after a held-out eval and admin approval. Never
+  auto-applied.
+- L2, outer matcher: guides, thresholds, lesson extraction, telemetry,
+  UI chips, routing heuristics, eval reporting. Only the L2 allowlisted
+  operational params may auto-apply, versioned, metric-gated, and
+  auto-reverted, including when an L0 or L1 metric on the held-out
+  suite gets worse (``guard_l2``).
 
 Classification uses the allowlist and defaults to review. This module
 never modifies code or config files, never calls Eat, learn, or
@@ -29,19 +46,151 @@ from resileos.persona.operational_tune import AUTO_TARGETS, OperationalStore, in
 PROPOSAL_KINDS = ("tighter_method", "new_module", "schema_change")
 # Kinds that can never auto-apply, even if the target is on the allowlist.
 REVIEW_KINDS = frozenset({"new_module", "schema_change"})
-PROPOSAL_STATUSES = ("pending", "auto_applied", "auto_reverted", "approved", "rejected")
+PROPOSAL_STATUSES = ("pending", "auto_applied", "auto_reverted", "approved", "rejected", "refused")
+
+# ── Harness level registry ──────────────────────────────────────────────
+# Dotted module, or ``module:symbol``, -> level. The longest matching
+# module prefix wins. A symbol can sit at a deeper level than its module
+# (Zeus approval is L0 inside the L1 SeparatedCycle module): a proposal
+# naming the whole module file counts as touching its L0 symbols, so it
+# must name the symbol (``module:Symbol``) to stay at L1. Anything not
+# listed is treated as L1: review only, never auto.
+L0, L1, L2 = 0, 1, 2
+LEVEL_NAMES = {L0: "L0 protected substrate", L1: "L1 engines", L2: "L2 outer matcher"}
+LEVELS: dict[str, int] = {
+    # L0: protected substrate. Never rewritten by a proposal.
+    "resileos.core": L0,                                   # residual core math
+    "resileos.packet": L0,                                 # Packet schema and packet_hash
+    "resileos.harness.separated:zeus_head": L0,            # Zeus approval
+    "resileos.kin.mouth_policy": L0,                       # require_verified
+    "resileos.verify": L0,                                 # require_verified (Lean)
+    "resileos.harness.tools:residual_consistency": L0,     # residual consistency
+    "resileos.harness.tools:verify_on_stop": L0,           # verified needs raw evidence
+    "resileos.kin.hades": L0,                              # lesson-only rule
+    "resileos.abstention": L0,                             # abstain meaning
+    "resileos.chat.router:NO_ROWS": L0,                    # NO_ROWS meaning
+    "resileos.chat.router:CONFLICT": L0,                   # CONFLICT meaning
+    # L1: engines. Review only, after held-out eval and admin approval.
+    "resileos.kin": L1,                                    # Kin roles
+    "resileos.kin.demigods": L1,                           # demi-gods
+    "resileos.kin.legions": L1,                            # legions
+    "resileos.kin.outer_legions": L1,
+    "resileos.harness.legions": L1,
+    "resileos.harness.cascade": L1,                        # cascade router
+    "resileos.harness.tools:risk_classify": L1,            # risk rules
+    "resileos.harness.tools:budget_and_stuck_guard": L1,   # budget accounting
+    "resileos.harness.separated": L1,                      # SeparatedCycle
+    "resileos.harness.packet": L1,                         # ControlPacket policy
+    "resileos.persona.residual_factors": L1,               # scar accounting
+    # L2: outer matcher. Bounded plasticity, scored on the held-out suite.
+    "resileos.kin.demigods.guides": L2,                    # guides
+    "resileos.harness.tools:confidence_route": L2,         # routing thresholds
+    "resileos.harness.tools:guide_load": L2,
+    "resileos.chat.router": L2,                            # routing heuristics
+    "resileos.kin.lesson_store": L2,                       # lesson extraction
+    "resileos.run_trace": L2,                              # telemetry
+    "resileos.kin.iris_trace": L2,
+    "scripts.harness_equal_budget": L2,                    # eval reporting (held-out suite)
+    "landing.public.assets.chat-ui": L2,                   # UI chips
+    "landing.public.assets.stream-parts": L2,
+}
+# Operational targets: the only L2 params the auto tier may touch.
+for _target in AUTO_TARGETS:
+    LEVELS["param." + _target] = L2
+
+
+def _dotted(path: str) -> str:
+    """``src/resileos/kin/hades.py`` or ``resileos/kin/hades.py`` -> ``resileos.kin.hades``."""
+    raw = str(path or "").strip().replace("\\", "/")
+    if raw.startswith("src/"):
+        raw = raw[4:]
+    for ext in (".py", ".js", ".md"):
+        if raw.endswith(ext):
+            raw = raw[: -len(ext)]
+    raw = raw.replace("/", ".").strip(".")
+    if raw.endswith(".__init__"):
+        raw = raw[: -len(".__init__")]
+    return raw
+
+
+def level_of(path: str) -> int:
+    """The harness level of a module, ``module:symbol``, file path, or ``param.<target>``.
+
+    Longest-prefix match on the registry; unlisted paths are L1 (review).
+    A whole module that holds a registered L0 symbol counts as L0.
+    """
+    raw = str(path or "").strip()
+    module, _, symbol = raw.partition(":")
+    name = _dotted(module)
+    if symbol and f"{name}:{symbol}" in LEVELS:
+        return LEVELS[f"{name}:{symbol}"]
+    best, level = "", L1
+    for key, lv in LEVELS.items():
+        if ":" in key:
+            continue
+        if name == key or name.startswith(key + "."):
+            if len(key) > len(best):
+                best, level = key, lv
+    if not symbol and any(k.startswith(name + ":") and lv == L0 for k, lv in LEVELS.items()):
+        return L0
+    return level
+
+
+def proposal_level(target: str, paths: Any = None) -> int:
+    """Deepest (lowest) level among the target and every touched path."""
+    names = [f"param.{target}" if target in AUTO_TARGETS else str(target or "")]
+    names += [str(p) for p in (paths or []) if str(p).strip()]
+    levels = [level_of(n) for n in names if n]
+    return min(levels) if levels else L1
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Coherence metrics and the level each one protects. An L2 change must
+# not lower any of these on the held-out suite.
+COHERENCE_METRICS: dict[str, int] = {
+    "residual_consistency": L0,
+    "verification_rate": L0,
+    "correct_abstention": L1,
+    "budget_efficiency": L1,
+}
+
+
+def guard_l2(before: dict[str, float], after: dict[str, float], *, tol: float = 1e-9) -> dict[str, Any]:
+    """Did an L2 change degrade any L0/L1 coherence metric on the held-out suite?
+
+    ``degraded`` lists every guarded metric that is lower after (or
+    missing after). An empty list means the change may stay.
+    """
+    degraded = []
+    for name in COHERENCE_METRICS:
+        if name not in before:
+            continue
+        if name not in after or float(after[name]) < float(before[name]) - tol:
+            degraded.append(name)
+    return {"ok": not degraded, "degraded": degraded,
+            "levels": {n: LEVEL_NAMES[COHERENCE_METRICS[n]] for n in degraded}}
+
+
 def classify(
     kind: str,
     target: str,
     value: Any | None = None,
+    paths: Any = None,
 ) -> str:
-    """Return ``auto`` or ``review``. Unknown targets default to review."""
+    """Return ``refused``, ``review`` or ``auto``.
+
+    Touching L0 anywhere is refused. L1 is review only. Only an L2
+    allowlisted param, in bounds, on a tuning kind, can be auto.
+    Unknown targets default to review.
+    """
+    level = proposal_level(target, paths)
+    if level == L0:
+        return "refused"
+    if level == L1:
+        return "review"
     if kind not in PROPOSAL_KINDS or kind in REVIEW_KINDS:
         return "review"
     if target not in AUTO_TARGETS:
@@ -57,6 +206,7 @@ def proposal_from_candidate(
     kind: str,
     target: str,
     value: Any | None = None,
+    paths: Any = None,
 ) -> dict[str, Any]:
     """Build one structured proposal. Status is pending until classified."""
     if kind not in PROPOSAL_KINDS:
@@ -70,14 +220,19 @@ def proposal_from_candidate(
         "factor_count": candidate.get("factor_count"),
         "count": candidate.get("count"),
     }
-    tier = classify(kind, target, value)
+    touched = [str(p) for p in (paths or []) if str(p).strip()]
+    tier = classify(kind, target, value, touched)
+    level = proposal_level(target, touched)
     return {
         "kind": kind,
         "target": target,
+        "paths": touched,
+        "level": level,
+        "level_name": LEVEL_NAMES[level],
         "tier": tier,
         "evidence": evidence,
         "verification_status": "verified" if candidate.get("verified") else "unverified",
-        "proposal_status": "pending",
+        "proposal_status": "refused" if tier == "refused" else "pending",
         "value": value,
         "created_at": _now(),
         "writes_code": False,
@@ -131,6 +286,9 @@ class UpgradeReport:
         for item in self.proposals:
             if item.get("id") != proposal_id:
                 continue
+            if item.get("tier") == "refused" or item.get("proposal_status") == "refused":
+                return {"ok": False, "applied": False, "reason": "L0 changes are refused; they cannot be approved here",
+                        "proposal": item}
             item["proposal_status"] = status
             item["decided_at"] = _now()
             if actor:
@@ -156,16 +314,30 @@ class UpgradeReport:
         store: OperationalStore | None = None,
         metric_name: str = "",
         metric_before: float | None = None,
+        paths: Any = None,
+        guard_before: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Record a proposal. Auto-tier items may apply on the store.
+        """Record a proposal. Only L2 auto-tier items may apply on the store.
 
-        Unverified candidates are recorded as pending review and are
-        never auto-applied. Applying still does not touch Eat, learn,
-        scars, or Titanos.
+        L0 proposals are recorded as ``refused`` and never applied or
+        approvable. L1 proposals stay pending review, whatever their
+        target. Unverified candidates are recorded as pending review and
+        are never auto-applied. Applying still does not touch Eat,
+        learn, scars, or Titanos. ``guard_before`` holds the L0/L1
+        coherence metrics on the held-out suite before the change; pass
+        the after-metrics to ``OperationalStore.evaluate``.
         """
         proposal = proposal_from_candidate(
-            candidate, kind=kind, target=target, value=value
+            candidate, kind=kind, target=target, value=value, paths=paths
         )
+        if proposal["tier"] == "refused":
+            proposal["reason"] = "touches the protected L0 substrate"
+            return self.add(proposal)
+        if proposal["level"] != L2:
+            proposal["tier"] = "review"
+            proposal["proposal_status"] = "pending"
+            proposal["reason"] = "L1 changes go to review only"
+            return self.add(proposal)
         if proposal["verification_status"] != "verified":
             proposal["tier"] = "review"
             proposal["proposal_status"] = "pending"
@@ -178,6 +350,7 @@ class UpgradeReport:
                 key=key,
                 value=value,
                 metric_name=metric_name or "residual_gain",
+                guard_before=guard_before,
                 metric_before=float(
                     metric_before
                     if metric_before is not None
@@ -219,6 +392,8 @@ class UpgradeReport:
             evidence = item.get("evidence") or {}
             lines.append(f"- **{item.get('kind')}** on `{item.get('target')}`")
             lines.append(f"  - tier: {item.get('tier')}")
+            if item.get("level_name"):
+                lines.append(f"  - level: {item.get('level_name')}")
             lines.append(f"  - verification: {item.get('verification_status')}")
             lines.append(f"  - status: {item.get('proposal_status')}")
             lines.append(f"  - residual gain: {evidence.get('residual_gain')}")

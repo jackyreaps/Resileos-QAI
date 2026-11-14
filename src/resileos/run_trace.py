@@ -182,9 +182,47 @@ def plain(row: dict[str, Any]) -> str:
     return str(kind)
 
 
+def _share(hits: int, total: int) -> Optional[float]:
+    return round(hits / total, 4) if total else None
+
+
+def coherence(path: Optional[Path] = None, *, limit: int = 200) -> dict[str, Any]:
+    """Coherence of recent runs, read-only from the trace. Real counts only.
+
+    - residual_consistency: share of residual consistency checks that held.
+    - verification_rate: share of runs with a decision that ended verified
+      (reviewers approved, a verified checkpoint, or a stored lesson).
+    - budget_efficiency: share of budget checks that were within budget.
+    - abstain_rate: share of routes that held back. Whether holding back
+      was *correct* needs labels; that number comes from the held-out suite.
+    A metric is ``None`` when the trace has no events for it.
+    """
+    runs = {r["run"] for r in list_runs(path, limit=limit)}
+    rows = [r for r in _rows(path) if r.get("run") in runs]
+    cons = [r for r in rows if r.get("kind") == "consistency"]
+    budget = [r for r in rows if r.get("kind") == "budget"]
+    routes = [r for r in rows if r.get("kind") == "route"]
+    decided: dict[str, bool] = {}
+    for r in rows:
+        kind = r.get("kind")
+        if kind not in ("review", "checkpoint", "lesson") or r.get("loaded") is not None:
+            continue
+        ok = bool(r.get("applied") if kind == "review" else r.get("verified") if kind == "checkpoint" else r.get("stored"))
+        decided[r["run"]] = decided.get(r["run"], False) or ok
+    return {
+        "runs": len(runs),
+        "residual_consistency": _share(sum(1 for r in cons if r.get("ok")), len(cons)),
+        "verification_rate": _share(sum(decided.values()), len(decided)),
+        "budget_efficiency": _share(sum(1 for r in budget if r.get("ok")), len(budget)),
+        "abstain_rate": _share(sum(1 for r in routes if r.get("route") == "escalate_or_abstain"), len(routes)),
+        "correct_abstention": None,
+        "counts": {"consistency": len(cons), "decided_runs": len(decided), "budget": len(budget), "routes": len(routes)},
+    }
+
+
 def replay(run_id: str, path: Optional[Path] = None) -> dict[str, Any]:
     rows = read_run(run_id, path)
     return {"run": run_id, "steps": [{"seq": r.get("seq"), "kind": r.get("kind"), "text": plain(r), "data": r} for r in rows]}
 
 
-__all__ = ["KINDS", "current_run", "emit", "list_runs", "plain", "read_run", "replay", "start_run", "trace_path", "traced"]
+__all__ = ["KINDS", "coherence", "current_run", "emit", "list_runs", "plain", "read_run", "replay", "start_run", "trace_path", "traced"]

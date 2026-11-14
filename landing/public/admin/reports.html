@@ -42,6 +42,14 @@
           <p class="msg" id="status-msg">Loading…</p>
           <div id="report" hidden></div>
         </div>
+        <div class="card" id="coherence-card" style="margin-top: 16px;" hidden>
+          <h2>Coherence</h2>
+          <p class="msg">How steady the checked core is. Upgrades to outer settings are undone if any of these drop on the held-out test set.</p>
+          <dl class="form" id="coherence-trace"></dl>
+          <div class="cta-row"><button type="button" class="btn btn-ghost" id="run-held-out">Run the held-out test set</button></div>
+          <p class="msg" id="held-out-msg"></p>
+          <dl class="form" id="coherence-held"></dl>
+        </div>
       </div>
     </section>
   </main>
@@ -121,6 +129,7 @@
           field("Kind", item.kind),
           field("Target", item.target),
           field("Tier", item.tier),
+          field("Level", item.level_name || ""),
           field("Verification", item.verification_status),
           field("Status", item.proposal_status)
         );
@@ -210,6 +219,47 @@
       render(data);
     }
 
+    const LABELS = {
+      residual_consistency: "Memory stays consistent",
+      verification_rate: "Answers that were checked and right",
+      correct_abstention: "Held back when it should",
+      budget_efficiency: "Right outcomes per unit of budget",
+      abstain_rate: "Held back (share of routes)",
+    };
+
+    function pct(v) {
+      return v == null ? "No data yet" : Math.round(v * 1000) / 10 + "%";
+    }
+
+    function fillMetrics(list, data, guarded) {
+      list.replaceChildren();
+      Object.keys(LABELS).forEach((key) => {
+        if (!(key in data)) return;
+        if (key === "correct_abstention" && data[key] == null) return;
+        const tag = guarded && guarded[key] ? " (" + guarded[key].split(" ")[0] + ")" : "";
+        list.append(field(LABELS[key] + tag, pct(data[key])));
+      });
+    }
+
+    async function loadCoherence(heldOut) {
+      const res = await fetch("/api/session/v1/coherence" + (heldOut ? "?held_out=true" : ""), { credentials: "same-origin" });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (!data) return;
+      document.getElementById("coherence-card").hidden = false;
+      fillMetrics(document.getElementById("coherence-trace"), data.trace || {}, data.guarded);
+      document.getElementById("coherence-trace").prepend(field("Recent runs", (data.trace || {}).runs || 0));
+      if (data.held_out) {
+        document.getElementById("held-out-msg").textContent = "Ran " + data.held_out.suite.replace(/^held-out: /, "") + ".";
+        fillMetrics(document.getElementById("coherence-held"), data.held_out, data.guarded);
+      }
+    }
+
+    document.getElementById("run-held-out").addEventListener("click", () => {
+      document.getElementById("held-out-msg").textContent = "Running…";
+      loadCoherence(true).catch(() => { document.getElementById("held-out-msg").textContent = "Could not run the test set."; });
+    });
+
     async function load() {
       const me = await fetch("/api/session/me", { credentials: "same-origin" });
       const account = await me.json().catch(() => ({}));
@@ -219,6 +269,7 @@
         return;
       }
       await loadReport();
+      await loadCoherence(false).catch(() => {});
     }
 
     load().catch(() => setMsg("Could not load the report.", "err"));

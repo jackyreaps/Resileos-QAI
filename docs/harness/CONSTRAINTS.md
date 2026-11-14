@@ -35,3 +35,26 @@ is behaving correctly.
 - Read-only actions (`query`, `chain`, `sparql`, `answer`, `stats`,
   `ready`) do not.
 - Unknown action types default to requiring verification. Fail closed.
+
+## Harness levels
+
+The harness is leveled, like a layered medium: a protected deep layer,
+engines in the middle, and a plastic outer layer. The registry is
+`LEVELS` in `src/resileos/persona/upgrade_report.py`, and the upgrade
+proposer enforces it.
+
+| Level | What lives there | What a proposal may do |
+|---|---|---|
+| L0 protected substrate | residual core math (`resileos.core`), the Packet schema and `packet_hash` (`resileos.packet`), Zeus approval (`zeus_head`), `require_verified` (`kin.mouth_policy`, `verify`), `residual_consistency` and `verify_on_stop`, the Hades lesson-only rule (`kin.hades`), and what abstain / NO_ROWS / CONFLICT mean | Nothing. Refused outright and never approvable. |
+| L1 engines | Kin roles, demi-gods, legions, the cascade router, risk rules, `SeparatedCycle`, budget and scar accounting, ControlPacket policy (`harness.packet`) | Review only, after a held-out eval and admin approval. Never auto-applied. |
+| L2 outer matcher | guides, routing thresholds (`confidence_route`), routing heuristics (`chat.router`), lesson extraction (`kin.lesson_store`), telemetry (`run_trace`), UI chips, eval reporting | Only the allowlisted operational params (`OperationalStore`) may auto-apply. Each change is versioned, metric-gated, and auto-reverted. |
+
+- Lookup uses the longest matching prefix. A `module:Symbol` entry can be
+  deeper than its module: `zeus_head` is L0 inside the L1
+  `harness.separated`. A proposal that names the whole file of a module
+  holding an L0 symbol counts as L0. Unlisted modules count as L1.
+- An L2 auto change is also reverted when any L0 or L1 coherence metric
+  on the held-out suite drops, even if its own metric improved
+  (`guard_l2`). The guarded metrics are residual consistency and
+  verification rate (L0), and correct abstention and budget efficiency
+  (L1). See `docs/400-operations/trace-and-lessons.md`.
