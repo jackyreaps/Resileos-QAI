@@ -571,10 +571,56 @@
     if (!count) grid.appendChild(el("p", "admin-intro", result.ok ? "No helpers registered." : "Couldn't list helpers (" + result.status + ")."));
   }
 
+  /* Runs and replay: one run step by step in plain words (read-only). */
+  function replayCard() {
+    var card = el("div", "card admin-card replay-card");
+    card.appendChild(el("h3", "", "Replay a run"));
+    card.appendChild(el("p", "admin-explain", "Every chat turn and fact save is one run. Pick one to see each check it went through, in order. Only counts and results are kept, never what was typed."));
+    var row = el("div", "cta-row");
+    var load = el("button", "btn btn-ghost", "Show recent runs");
+    load.type = "button";
+    row.appendChild(load);
+    var list = el("ul", "run-list");
+    var steps = el("ol", "run-steps");
+    card.append(row, list, steps);
+    async function open(id) {
+      steps.replaceChildren(el("li", "micro", "Loading\u2026"));
+      var res = await call("GET", "/runs/" + encodeURIComponent(id));
+      steps.replaceChildren();
+      if (!res.ok) { steps.appendChild(el("li", "admin-summary err", summarize(res))); return; }
+      (res.data.steps || []).forEach(function (st) {
+        var li = el("li", "run-step " + st.kind);
+        li.appendChild(document.createTextNode(st.text));
+        var fold = el("details", "admin-raw");
+        fold.appendChild(el("summary", "", "Details"));
+        fold.appendChild(el("pre", "", JSON.stringify(st.data, null, 2)));
+        li.appendChild(fold);
+        steps.appendChild(li);
+      });
+    }
+    load.addEventListener("click", async function () {
+      var res = await call("GET", "/runs?limit=20");
+      list.replaceChildren();
+      var runs = (res.data || {}).runs || [];
+      if (!res.ok || !runs.length) { list.appendChild(el("li", "micro", res.ok ? "No runs yet." : summarize(res))); return; }
+      runs.forEach(function (r) {
+        var li = el("li", "");
+        var b = el("button", "btn-link", (r.task || "run") + " \u00b7 " + new Date((r.started || 0) * 1000).toLocaleString() + " \u00b7 " + r.events + " steps");
+        b.type = "button";
+        b.addEventListener("click", function () { open(r.run); });
+        li.appendChild(b);
+        list.appendChild(li);
+      });
+    });
+    return card;
+  }
+
   async function diagnosticsPage(mount) {
     var top = group(mount, "Overview", "Health checks and settings for this browser.");
     top.appendChild(settingsCard());
     top.appendChild(await statusCard());
+    var runs = group(mount, "Runs and replay", "What happened in a run, step by step.");
+    runs.appendChild(replayCard());
     RAW_TOOLS.forEach(function (section) {
       var grid = group(mount, section[0], "");
       section[1].forEach(function (t) { grid.appendChild(rawCard(t[0], t[1], t[2], t[3])); });

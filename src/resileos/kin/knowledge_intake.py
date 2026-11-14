@@ -212,14 +212,15 @@ def preview_items(items: list[dict[str, Any]], *, titanos: Any = None,
     return {"items": out, "ready": sum(r.get("ready", 0) for r in out)}
 
 
-def commit_facts(facts: list[dict[str, Any]], *, titanos: Any, ask_fn: Any = None, source: str = "admin") -> dict[str, Any]:
+def commit_facts(facts: list[dict[str, Any]], *, titanos: Any, ask_fn: Any = None, source: str = "admin",
+                 lessons: Any = None) -> dict[str, Any]:
     """Save the facts the admin confirmed, through Eat and the reviewers."""
     envelopes = []
     for fact in list(facts or [])[:MAX_FACTS]:
         claim = _from_dict(fact if isinstance(fact, dict) else {})
         envelopes.append({"claim": claim, "source": f"{source}:{str(fact.get('item') or 'paste')[:120]}"}
                          if claim else {"claim": None})
-    result = eat_commit_envelopes(envelopes, titanos=titanos, ask_fn=ask_fn)
+    result = eat_commit_envelopes(envelopes, titanos=titanos, ask_fn=ask_fn, lessons=lessons)
     rows = result["results"]
     saved = sum(1 for r in rows if r["action"] == "committed")
     conflicts = sum(1 for r in rows if r["action"] == "conflict")

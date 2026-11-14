@@ -54,3 +54,8 @@
 .fact-row { margin: 3px 0; }
 .fact-row.conflict { color: #f0a08f; }
 .fact-row.abstain, .fact-row.reject { opacity: 0.75; }
+
+.replay-card { grid-column: 1 / -1; }
+.run-list, .run-steps { margin: 8px 0; padding-left: 1.2rem; }
+.run-step { margin: 4px 0; }
+.run-step .admin-raw summary { font-size: 0.75rem; }

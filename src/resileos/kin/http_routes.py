@@ -192,8 +192,40 @@ def register_kin_routes(
     def api_knowledge_commit(body: KnowledgeCommit) -> dict:
         if not body.confirm:
             raise HTTPException(400, "Confirm before saving.")
+        from resileos.kin.lesson_store import LessonStore
+        from resileos.run_trace import start_run
+
         titan = get_titanos()
-        return knowledge_intake.commit_facts(body.facts, titanos=titan, ask_fn=_ask_fn(titan))
+        with start_run("add facts") as run_id:
+            out = knowledge_intake.commit_facts(body.facts, titanos=titan, ask_fn=_ask_fn(titan),
+                                                lessons=LessonStore("operator"))
+        out["run_id"] = run_id
+        return out
+
+    # Telemetry and replay (admin-only: not in PUBLIC_API). Read-only.
+    @app.get("/api/v1/runs", dependencies=deps)
+    def api_runs(limit: int = 30) -> dict:
+        from resileos.run_trace import list_runs
+
+        return {"runs": list_runs(limit=max(1, min(int(limit), 200)))}
+
+    @app.get("/api/v1/runs/{run_id}", dependencies=deps)
+    def api_run(run_id: str) -> dict:
+        from resileos.run_trace import replay
+
+        if not run_id.isalnum() or len(run_id) > 32:
+            raise HTTPException(404, "Run not found.")
+        out = replay(run_id)
+        if not out["steps"]:
+            raise HTTPException(404, "Run not found.")
+        return out
+
+    @app.get("/api/v1/lessons", dependencies=deps)
+    def api_lessons(q: str = "", k: int = 5) -> dict:
+        from resileos.kin.lesson_store import LessonStore
+
+        store = LessonStore("operator")
+        return {"lessons": store.relevant(q, k) if q.strip() else store.rows()[-max(1, min(k, 50)):]}
 
     class CrawlRequest(BaseModel):
         query: str = Field(default="", max_length=300)
