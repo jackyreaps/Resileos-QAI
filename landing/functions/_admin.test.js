@@ -63,6 +63,7 @@ test("publicApiAllowed lets through only what chat and Studio use", () => {
     ["GET", "files"], ["POST", "files"], ["GET", "files/0123456789abcdef0123456789abcdef"], ["DELETE", "files/0123456789abcdef0123456789abcdef"],
     ["GET", "conversations"], ["POST", "conversations"], ["GET", "conversations/abc123"], ["PUT", "conversations/abc123"],
     ["POST", "studio/forge/video"], ["POST", "studio/video"], ["POST", "generate/video"],
+    ["POST", "studio/variations"], ["POST", "studio/clip-from-picture"],
     ["GET", "aphrodite/anon/state"], ["HEAD", "ready"],
   ];
   for (const [method, path] of allowed) {
@@ -75,7 +76,7 @@ test("publicApiAllowed lets through only what chat and Studio use", () => {
     ["POST", "perceive/language"], ["POST", "studio/stop"], ["POST", "studio/plan-test-debug"], ["GET", "studio/codecs"],
     ["POST", "aphrodite/anon/preference"], ["POST", "aphrodite/anon/reset"], ["DELETE", "conversations/abc123"],
     ["POST", "ready"], ["GET", "conversations/../tools"], ["POST", "studio/video/restore"],
-    ["POST", "upload"], ["PUT", "files/abc"], ["POST", "verify_manifold"], ["POST", "learn"], ["POST", "persona/promote"],
+    ["POST", "upload"], ["PUT", "files/abc"], ["GET", "factors/hub"], ["POST", "verify_manifold"], ["POST", "learn"], ["POST", "persona/promote"],
   ];
   for (const [method, path] of denied) {
     assert.equal(publicApiAllowed(method, path.split("/")), false, `${method} ${path} should be admin-only`);

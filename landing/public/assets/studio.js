@@ -14,6 +14,7 @@
   var csrf = "";
   var signedIn = false;
   var frames = null;
+  var rgbFrames = null;
   var playTimer = null;
   var handoffPrompt = "";
 
@@ -36,8 +37,8 @@
     $("source-legend").textContent = clip ? "Describe it, or use your photos" : "Describe it, or start from a photo";
     $("upload-title").textContent = clip ? "Choose photos or a short video" : "Choose a photo";
     $("upload-desc").textContent = clip
-      ? "Pick 2 to 12 photos in order, or one short video. They stay in your browser until you press Make it."
-      : "Studio makes a variation of it. It stays in your browser until you press Make it.";
+      ? "Pick one photo to bring it to life, or 2 to 12 photos in order, or one short video. They stay in your browser until you press Make it."
+      : "Studio makes color variations of it from its color code. It stays in your browser until you press Make it.";
     $("describe-wrap").hidden = upload;
     $("upload-wrap").hidden = !upload;
     $("upload").multiple = clip;
@@ -47,7 +48,7 @@
     document.querySelectorAll('input[name="color"]').forEach(function (el) { el.disabled = upload; });
     if (upload) document.querySelector('input[name="color"][value="bw"]').checked = true;
     $("style-note").textContent = upload
-      ? (clip ? "Clips from your photos come out in black and white. Length sets how long the clip plays." : "Variations start from a black-and-white copy of your photo.")
+      ? (clip ? "One photo becomes a moving clip in color. Two or more photos play in order, in black and white. Length sets how long it plays." : "You get four color variations that keep your photo's shapes.")
       : "";
     $("prompt").placeholder = clip ? "Waves rolling onto a beach at dusk" : "A red fox in fresh snow at sunrise";
     $("generate").textContent = clip ? "Make the clip" : "Make the picture";
@@ -71,12 +72,22 @@
     if (!list.length) return null;
     var M = window.ResileosMedia;
     var video = list.find(function (f) { return /^video\//.test(f.type); });
-    if (video) return (await M.readVideo(video, MAX_SIDE)).gray;
+    if (video) {
+      var clip = await M.readVideo(video, MAX_SIDE);
+      rgbFrames = clip.rgb;
+      return clip.gray;
+    }
     var images = list.filter(function (f) { return /^image\//.test(f.type); }).slice(0, MAX_FRAMES);
     if (!images.length) throw new Error("Pick photos or a short video.");
     var first = await M.readImage(images[0], MAX_SIDE);
     var out = [first.gray];
-    for (var i = 1; i < images.length; i++) out.push((await M.readImage(images[i], MAX_SIDE, first.dims)).gray);
+    var rgb = [first.rgb];
+    for (var i = 1; i < images.length; i++) {
+      var next = await M.readImage(images[i], MAX_SIDE, first.dims);
+      out.push(next.gray);
+      rgb.push(next.rgb);
+    }
+    rgbFrames = rgb;
     return out;
   }
 
@@ -86,6 +97,7 @@
     playTimer = null;
   }
   function drawFrame(canvas, frame, lo, hi) {
+    if (Array.isArray(frame[0][0])) return window.ResileosMedia.drawFrame(canvas, frame);
     var h = frame.length, w = frame[0].length;
     var small = document.createElement("canvas");
     small.width = w;
@@ -112,6 +124,7 @@
     });
   }
   function range(list) {
+    if (Array.isArray(list[0][0][0])) return [0, 1];
     var lo = Infinity, hi = -Infinity;
     list.forEach(function (f) { f.forEach(function (r) { r.forEach(function (v) { v = Number(v); if (v < lo) lo = v; if (v > hi) hi = v; }); }); });
     return [lo, hi];
@@ -272,6 +285,54 @@
       return;
     }
 
+    if (Array.isArray(d.variations) && d.variations.length) {
+      title.textContent = "Your variations are ready";
+      text.textContent = "Made from your photo's color code. Pick one to download.";
+      var grid = document.createElement("div");
+      grid.className = "variation-grid";
+      d.variations.forEach(function (v, i) {
+        var m = v.matrix || v;
+        var fig = document.createElement("figure");
+        var c = document.createElement("canvas");
+        c.width = 180;
+        c.height = Math.round((180 * m.length) / m[0].length);
+        c.setAttribute("role", "img");
+        c.setAttribute("aria-label", "Variation " + (i + 1));
+        window.ResileosMedia.drawFrame(c, m);
+        var dl = button("Download", false, function () {
+          c.toBlob(function (blob) { downloadBlob(blob, "resileos-variation-" + (i + 1) + ".png"); }, "image/png");
+        });
+        fig.append(c, dl);
+        grid.appendChild(fig);
+      });
+      media.appendChild(grid);
+      return;
+    }
+
+    if (validFrames(d.frames) && d.made) {
+      var secs = LENGTH_SECONDS[picked("length")] || 2;
+      var v2 = playPreview(d.frames, secs);
+      title.textContent = "Your clip is ready";
+      text.textContent = "Made from your photo's color code, stepped over time. Download it below.";
+      actions.appendChild(button("Download clip", true, async function (ev) {
+        var btn = ev.currentTarget;
+        btn.disabled = true;
+        btn.textContent = "Preparing…";
+        try {
+          downloadBlob(await recordClip(d.frames, v2), "resileos-clip.webm");
+        } catch (err) {
+          downloadBlob(await window.ResileosMedia.filmstrip(d.frames), "resileos-clip-frames.png");
+          setMsg("This browser can't save video, so the frames were saved as one picture instead.");
+        }
+        btn.disabled = false;
+        btn.textContent = "Download clip";
+      }));
+      actions.appendChild(button("Download frames (PNG)", false, async function () {
+        downloadBlob(await window.ResileosMedia.filmstrip(d.frames), "resileos-clip-frames.png");
+      }));
+      return;
+    }
+
     if (sent.frames && validFrames(d.preview)) {
       var seconds = LENGTH_SECONDS[picked("length")] || 2;
       var view = playPreview(d.preview, seconds);
@@ -309,7 +370,7 @@
   async function generate(event) {
     event.preventDefault();
     var type = picked("type");
-    var upload = type === "clip" && picked("source") === "upload";
+    var upload = picked("source") === "upload";
     var path = type === "clip" ? "/studio/video" : "/studio/forge/video";
     var body = { stage: "draft" };
     var sent = {};
@@ -319,11 +380,14 @@
         $("upload").focus();
         return;
       }
-      body.prompt = (describedPrompt() || "A variation of my photo").slice(0, 2000);
-      body.matrix = frames[0];
+      path = "/studio/variations";
+      body = { matrix: (rgbFrames && rgbFrames[0]) || frames[0], n: 4 };
+    } else if (upload && frames && frames.length === 1) {
+      path = "/studio/clip-from-picture";
+      body = { matrix: (rgbFrames && rgbFrames[0]) || frames[0], frames_out: { short: 12, medium: 18, long: 24 }[picked("length")] || 12 };
     } else if (upload) {
       if (!frames || frames.length < 2) {
-        setMsg("Choose 2 to 12 photos, or one short video, first.", "err");
+        setMsg("Choose a photo, a few photos, or one short video first.", "err");
         $("upload").focus();
         return;
       }
@@ -377,13 +441,13 @@
   async function onUpload() {
     var summary = $("upload-summary");
     frames = null;
+    rgbFrames = null;
     summary.textContent = "Reading…";
     try {
       frames = await readUpload($("upload").files);
-      var needed = picked("type") === "clip" ? 2 : 1;
-      summary.textContent = frames && frames.length >= needed
-        ? (needed === 1 ? "Photo ready." : frames.length + " frames ready.")
-        : "Pick at least 2 photos, or one short video.";
+      summary.textContent = frames && frames.length
+        ? (frames.length === 1 ? "Photo ready." : frames.length + " frames ready.")
+        : "Pick a photo or a short video.";
     } catch (err) {
       frames = null;
       summary.textContent = err && err.message ? err.message : "Those files could not be read.";
@@ -412,6 +476,7 @@
       document.querySelector('input[name="type"][value="' + kind + '"]').checked = true;
       document.querySelector('input[name="source"][value="upload"]').checked = true;
       frames = handed.frames;
+      rgbFrames = Array.isArray(handed.rgb) && handed.rgb.length ? handed.rgb : null;
       handoffPrompt = String(handed.prompt || "").slice(0, 500);
       if (handoffPrompt) $("prompt").value = handoffPrompt;
       $("upload-summary").textContent = "From chat: " + (handed.name || "your attachment") + (frames.length > 1 ? " (" + frames.length + " frames)" : "") + ".";
@@ -426,7 +491,6 @@
         sync();
         frames = await readUpload([file]);
         $("upload-summary").textContent = "From your files: " + file.name + ".";
-        if (isClip && frames.length < 2) $("upload-summary").textContent += " Add another photo to make a clip.";
       }).catch(function () { $("upload-summary").textContent = "That file couldn't be opened."; });
     }
     $("studio-form").addEventListener("submit", generate);
