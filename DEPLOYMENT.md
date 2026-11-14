@@ -90,3 +90,59 @@ docker compose up -d --force-recreate
 ```
 
 State survives because it lives in named volumes, not the container.
+
+## 9. Lean proof checks (optional)
+
+Chat checks Lean proofs that people attach (`.lean`) or paste in a
+```` ```lean ```` block, through `POST /api/v1/verify/lean`
+(`src/resileos/verify/lean_check.py`). Without Lean on the host it answers
+`UNAVAILABLE`. It never reports a pass it didn't get. A check never learns
+and never changes `require_verified`.
+
+What the host needs:
+
+1. **elan + Lean.** Build the image with
+   `docker compose build --build-arg LEAN_TOOLCHAIN=leanprover/lean4:v4.15.0`.
+   That installs elan for the `resileos` user (`/home/resileos/.elan/bin`
+   on `PATH`). Outside Docker:
+   `curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.15.0`.
+   Run `lean --version` once so the toolchain downloads at build time and
+   not on the first check.
+2. **Mathlib (optional).** Plain `lean` checks core Lean only. For
+   `import Mathlib`, create a Lake project with Mathlib, run `lake exe cache get`,
+   and set `RESILEOS_LEAN_PROJECT=/path/to/project` so checks run as
+   `lake env lean` inside it.
+3. **No network for the checker.** By default each check runs under
+   `unshare -rn` (an empty network namespace; util-linux, already in
+   Debian images). Test it in the container: `docker compose exec api unshare -rn true`.
+   If that fails, Docker's seccomp profile blocks user namespaces. Either
+   allow them for this container, or run the API with no egress and set
+   `RESILEOS_LEAN_NETWORK=off`. Until one of those is true, checks answer
+   `UNAVAILABLE`.
+
+Limits (env, all optional):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `RESILEOS_LEAN_BIN` | `lean` on `PATH` | Lean binary |
+| `RESILEOS_LEAN_TIMEOUT_S` | 60 (max 300) | Wall-clock limit per check |
+| `RESILEOS_LEAN_MEMORY_MB` | 2048 | `lean --memory` limit |
+| `RESILEOS_LEAN_MAX_BYTES` | 200000 | Largest source accepted |
+| `RESILEOS_LEAN_NETWORK` | `isolate` | `isolate` needs `unshare -rn`; `off` only behind a no-egress host |
+
+The checker also sets CPU, file-size, and core-dump rlimits, runs in a
+fresh temp HOME with a scrubbed environment, and refuses source that
+runs code (`#eval`, `IO`, `run_cmd`, `extern`, `unsafe`, `initialize`, ...).
+
+## 10. User files
+
+Signed-in people can keep files (`/files`, `GET/POST/DELETE /api/v1/files`).
+They are stored per API key under `RESILEOS_FILES_DIR` (default
+`data/files`; the image sets `/app/data/files`, so keep `/app/data` on a
+volume). They are personal only: nothing is promoted to a hub and
+nothing learns from them. Limits: `RESILEOS_FILE_MAX_BYTES` (10 MB),
+`RESILEOS_FILES_MAX_TOTAL` (100 MB per account), `RESILEOS_FILES_MAX_COUNT`
+(200). Allowed types: png, jpg, webp, gif, mp4, webm, mov, txt, md, csv,
+json, py, lean. Images and clips are checked by their file signature.
+Files are tied to the account's key, so rotating the key starts an empty
+list (see the PR notes).

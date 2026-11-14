@@ -30,6 +30,19 @@ RUN pip install -e ".[all]" \
 
 USER resileos
 
+# Optional: Lean proof checks in chat (POST /api/v1/verify/lean).
+# Build with --build-arg LEAN_TOOLCHAIN=leanprover/lean4:v4.15.0 to install
+# elan + Lean for the resileos user. Without it, proof checks answer
+# UNAVAILABLE (never a fake pass). See DEPLOYMENT.md "Lean proof checks".
+ARG LEAN_TOOLCHAIN=""
+RUN if [ -n "$LEAN_TOOLCHAIN" ]; then \
+        curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+          | sh -s -- -y --no-modify-path --default-toolchain "$LEAN_TOOLCHAIN" \
+        && /home/resileos/.elan/bin/lean --version; \
+    fi
+ENV PATH="/home/resileos/.elan/bin:${PATH}" \
+    RESILEOS_FILES_DIR=/app/data/files
+
 # Documentation only. Do not publish these with `ports:`.
 EXPOSE 8000 8501
 
