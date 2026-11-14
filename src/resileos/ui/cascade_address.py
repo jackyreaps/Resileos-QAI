@@ -133,6 +133,7 @@ def pin_address(pin: str, residual: str | None = None) -> dict[str, Any]:
         "epsilon": EPSILON,
         "residual": path["residual"],
         "path": path["path"],
+        "frame_control": frame_control(frame),
     }
 
 
@@ -211,14 +212,71 @@ def phi_level_weight(level: int) -> float:
     return float(PHI ** (-int(level)))
 
 
+# ── native 3/5/9/12 frame address ──────────────────────────────────────
+# These are not powers of two, so they are not levels of a halving
+# pyramid. In the suite each frame is a cascade level at the φ-power
+# address. They share factors, so they are not one remainder code. They
+# combine by orientation: the pentagram 3-5 is the figure, and 9 and 12
+# are the outer frames it sits on. The waist N=36 is divisible by 3, 9
+# and 12. It is not divisible by 5. The 5-frame is the orientation, not
+# a divisor of the waist.
+
+
+def phi_address(frame: int) -> float:
+    """The suite address of a frame. φ^{-frame}, not a dyadic step."""
+    if frame not in CASCADE_FRAMES:
+        raise ValueError(frame)
+    from resileos.substrate.suite_constants import PHI
+
+    return float(PHI ** (-int(frame)))
+
+
+def waist_span(frame: int) -> int | None:
+    """How many waist blocks the frame divides, if it divides.
+
+    3, 9, 12 divide 36. 5 does not. None means orientation, not span.
+    """
+    if WAIST % frame == 0:
+        return WAIST // frame
+    return None
+
+
+def frame_control(frame: int) -> dict[str, Any]:
+    """Control for a visual matrix at one cascade frame.
+
+    address is the φ-power. span is the waist division, or None
+    when the frame is an orientation (the 5).
+    """
+    return {
+        "frame": int(frame),
+        "address": round(phi_address(frame), 6),
+        "span": waist_span(frame),
+        "orientation": frame == 5,
+        "figure": "pentagram" if frame == 5 else "cascade",
+        "note": "phi address; not a halving level",
+    }
+
+
+def frame_weight(frame: int) -> float:
+    """A frame's φ address relative to the first frame: φ^{-(frame-3)}.
+
+    The ratio of two φ addresses, so the 3-frame carries full weight and
+    each outer frame sits at its φ-power below it. Consumers that need a
+    weight in [0, 1] (ranking, palette strength) use this, never a halving.
+    """
+    return phi_address(frame) / phi_address(CASCADE_FRAMES[0])
+
+
 def orientation_scale(scale: str) -> dict[str, Any]:
     """Visual-path control for one orientation scale.
 
     ``orientation_scale("orion")`` returns scale_level 2, frame 9.
     There is no ``belt`` field here; belt is only the 5-mod Human
     Belt on a cascade path. ``proportion`` is the shared core
-    ``PHI``. ``phi_weight`` is ``PHI ** (-scale_level)``. An unknown
-    scale raises ``ValueError``.
+    ``PHI``. ``phi_weight`` is the frame's φ address relative to the
+    3-frame (``frame_weight``); ``frame_control`` carries the address,
+    the waist span, and whether the frame is the orientation (5). An
+    unknown scale raises ``ValueError``.
     """
     try:
         index = ORIENTATION_SCALES.index(scale)
@@ -233,5 +291,6 @@ def orientation_scale(scale: str) -> dict[str, Any]:
         "frame": int(spec["frame"]),
         "orientation": str(spec["orientation"]),
         "proportion": float(PHI),
-        "phi_weight": phi_level_weight(index),
+        "phi_weight": frame_weight(int(spec["frame"])),
+        "frame_control": frame_control(int(spec["frame"])),
     }
