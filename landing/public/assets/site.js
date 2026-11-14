@@ -36,8 +36,10 @@
     return fetch(url, options);
   }
 
-  // Load public config (payment links, etc.)
-  api("/api/config")
+  // Load public config (payment links, API base in code samples) only on
+  // pages that show them, so other pages make no extra request.
+  const needsConfig = document.querySelector("#link-builder, #link-team, #code-learn, #code-query, #code-chain");
+  (needsConfig ? api("/api/config") : Promise.resolve(null))
     .then((r) => (r.ok ? r.json() : null))
     .then((cfg) => {
       if (!cfg) return;

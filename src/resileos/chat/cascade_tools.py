@@ -407,6 +407,30 @@ class FactorPool:
         return {"aggregate": result, "dreams": dreams, "records": len(self.records()), "writes": False, "learned": False}
 
 
+TURN_GATES = ("lean", "verified")
+
+
+def turn_factor(gate: str, *, steps_done: int, steps_total: int) -> dict[str, Any] | None:
+    """One content-free factor for a checked turn.
+
+    Built only from which gate passed and how many steps finished. It
+    never sees attachments, pasted text, or perception values.
+    """
+    from resileos.persona.residual_factors import factorize
+
+    if gate not in TURN_GATES:
+        return None
+    total = max(1, int(steps_total))
+    done = max(0, min(int(steps_done), total))
+    return factorize(
+        energy=max(EPSILON, done / total),
+        verified=True,
+        residual_bin=f"turn_{gate}",
+        orientation="edge",
+        factor_count=done,
+    )
+
+
 def use_factor(address: dict[str, Any], *, verified: bool, error: float | None = None, opt_out: bool = False, orientation: str | None = None) -> dict[str, Any] | None:
     """One content-free factor for a turn, or None when it must not count."""
     from resileos.persona.residual_factors import factorize

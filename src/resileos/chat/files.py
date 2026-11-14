@@ -210,3 +210,41 @@ def register_file_routes(app: FastAPI, key_id_dep: Callable[..., str]) -> None:
             if blob.exists():
                 blob.unlink()
         return {"deleted": True, "id": file_id}
+
+
+def migrate_owner(old_ids: list[str], new_id: str) -> int:
+    """One-time move of files kept under old key hashes to the account.
+
+    Idempotent: an old folder is removed once its files are moved, so a
+    second call finds nothing. Returns how many files moved.
+    """
+    with _LOCK:
+        return _migrate(old_ids, new_id)
+
+
+def _migrate(old_ids: list[str], new_id: str) -> int:
+    target = _owner_dir(new_id)
+    moved = 0
+    for old in old_ids:
+        if not old or old == new_id:
+            continue
+        source = _owner_dir(old)
+        if not source.is_dir():
+            continue
+        rows = _index(target)
+        have = {row.get("id") for row in rows}
+        for row in _index(source):
+            fid = str(row.get("id") or "")
+            blob = source / f"{fid}.bin"
+            if not re.fullmatch(r"[a-f0-9]{32}", fid) or fid in have or not blob.exists():
+                continue
+            target.mkdir(parents=True, exist_ok=True)
+            os.replace(blob, target / f"{fid}.bin")
+            rows.append(row)
+            have.add(fid)
+            moved += 1
+        _write_index(target, rows)
+        for leftover in source.iterdir():
+            leftover.unlink()
+        source.rmdir()
+    return moved

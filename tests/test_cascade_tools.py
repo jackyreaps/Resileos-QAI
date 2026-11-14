@@ -110,25 +110,45 @@ def test_factor_pool_is_content_free_and_needs_three(tmp_path):
     assert not contains_content(blob, ["fox.png", "Alice works at Acme"], pixels=[picture()])
 
 
-def test_assist_counts_factors_only_when_verified_and_never_from_files(tmp_path):
+def test_only_checked_turns_count_and_factors_hold_no_content(tmp_path):
     from resileos.chat import assist as A
+    from resileos.persona.residual_factors import contains_content
 
     pool = C.FactorPool(tmp_path / "f.jsonl")
     img = picture(6, 8).tolist()
+    pasted = "Alice's bank PIN is 4417 and she lives at 12 Oak Lane."
+    verified_reply = {"v": True}
 
     async def chat_fn(*a, **k):
-        return {"status": "ACCEPTED", "value": "ok", "verified": True}
+        return {"status": "ACCEPTED", "value": "ok", "verified": verified_reply["v"]}
 
     def go(**body):
         return asyncio.run(A.run_assist(A.AssistBody(**body), titanos=None, chat_fn=chat_fn, factor_pool=pool, crawl_top=0))
 
-    out = go(message="what is this?", attachments=[{"name": "p.png", "kind": "image", "matrix": img}])
+    # Unchecked turn with pasted text and a picture: nothing counts.
+    verified_reply["v"] = False
+    out = go(message=pasted, attachments=[{"name": "notes.txt", "kind": "text", "text": pasted}, {"name": "p.png", "kind": "image", "matrix": img}])
+    assert out["assist"]["factors_counted"] == 0
+    # Checked turn: one turn-level factor, whatever was attached.
+    verified_reply["v"] = True
+    out = go(message=pasted, attachments=[{"name": "notes.txt", "kind": "text", "text": pasted}, {"name": "p.png", "kind": "image", "matrix": img}])
     assert out["assist"]["factors_counted"] == 1
-    out = go(message="what is this?", attachments=[{"name": "p.png", "kind": "image", "matrix": img, "file_id": "a" * 32}])
+    out = go(message="what is this?", factors_opt_out=True)
     assert out["assist"]["factors_counted"] == 0
-    out = go(message="what is this?", factors_opt_out=True, attachments=[{"name": "p.png", "kind": "image", "matrix": img}])
-    assert out["assist"]["factors_counted"] == 0
-    assert len(pool.records()) == 1
+    rows = pool.records()
+    assert len(rows) == 1 and rows[0]["bin"] == "turn_verified"
+    blob = (tmp_path / "f.jsonl").read_text()
+    assert not contains_content(blob, [pasted, "Alice", "4417", "Oak Lane", "notes.txt", "p.png"], pixels=[np.asarray(img)])
+    # The factor doesn't change with what was attached.
+    other = go(message="hello", attachments=[{"name": "q.png", "kind": "image", "matrix": (1 - picture(6, 8)).tolist()}])
+    assert other["assist"]["factors_counted"] == 1
+    a, b = pool.records()[-2:]
+    assert {k: v for k, v in a.items()} == {k: v for k, v in b.items()} or a["bin"] == b["bin"] == "turn_verified"
+
+
+def test_turn_factor_needs_a_gate():
+    assert C.turn_factor("", steps_done=1, steps_total=1) is None
+    assert C.turn_factor("lean", steps_done=2, steps_total=2)["bin"] == "turn_lean"
 
 
 def test_studio_endpoints(client, monkeypatch, tmp_path):

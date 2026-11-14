@@ -319,6 +319,7 @@ export async function attachDigest(kv, account, digest) {
   if (!rec || rec.revoked) return account;
   if (account.key_digest && account.key_digest !== digest) {
     await revokeDigest(kv, account.key_digest);
+    account.past_digests = [account.key_digest, ...(account.past_digests || [])].filter((d, i, all) => d && all.indexOf(d) === i).slice(0, 10);
   }
   account.key_digest = digest;
   account.prefix = rec.prefix || "";
@@ -610,6 +611,7 @@ export async function rotateKey({ kv, env, email, now }) {
   const minted = await mintStoredKey({ kv, env, plan, email, name: plan });
   if (!minted.ok) return minted;
   await revokeDigest(kv, old);
+  account.past_digests = [old, ...(account.past_digests || [])].filter((d, i, all) => d && all.indexOf(d) === i).slice(0, 10);
   account.key_digest = minted.digest;
   account.prefix = minted.prefix;
   account.tier = minted.record.tier;
@@ -646,6 +648,33 @@ export async function hmacHex(secret, message) {
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/* Stable account id the API keys Files and conversations by, so a key
+ * rotation keeps them. Never the email itself. */
+export async function accountId(email) {
+  return sha256Hex("account:" + normalizeEmail(email));
+}
+
+/* Signed assertions from the proxy (RESILEOS_PROXY_SECRET):
+ * - account: id + the key digests it has used (for the one-time move of
+ *   key-hash records), and
+ * - admin: only for ADMIN_EMAILS sessions, bound to method + path. */
+export async function accountHeaders(secret, { email, digests, admin, method, path, ts }) {
+  const id = await accountId(email);
+  const legacy = [...new Set((digests || []).filter((d) => /^[a-f0-9]{64}$/.test(String(d))))].slice(0, 10).join(",");
+  const out = {
+    "X-Resileos-Account": id,
+    "X-Resileos-Account-Ts": String(ts),
+    "X-Resileos-Account-Legacy": legacy,
+    "X-Resileos-Account-Proof": await hmacHex(secret, `account\n${id}\n${ts}\n${legacy}`),
+  };
+  if (admin) {
+    out["X-Resileos-Admin"] = id;
+    out["X-Resileos-Admin-Ts"] = String(ts);
+    out["X-Resileos-Admin-Proof"] = await hmacHex(secret, `admin\n${id}\n${ts}\n${String(method).toUpperCase()}\n${path}`);
+  }
+  return out;
 }
 
 export async function trialHeaders(secret, ip, ts) {
@@ -982,6 +1011,18 @@ export async function handleProxy({ request, env, params, fetchImpl, now }) {
       return detail("Key is unavailable.", 503);
     }
     headers.set("X-API-Key", apiKey);
+    const proxySecret = String(env.RESILEOS_PROXY_SECRET || "").trim();
+    if (proxySecret.length >= 16) {
+      const stamped = await accountHeaders(proxySecret, {
+        email: session.email,
+        digests: [session.account.key_digest, ...(session.account.past_digests || [])],
+        admin: isAdminEmail(session.email, env),
+        method,
+        path: "/" + parts.join("/"),
+        ts: Math.floor(clock / 1000),
+      });
+      for (const [name, value] of Object.entries(stamped)) headers.set(name, value);
+    }
   } else {
     const secret = String(env.RESILEOS_PROXY_SECRET || "").trim();
     if (secret.length < 16) return detail("Sign in to continue.", 401);

@@ -277,3 +277,42 @@ def test_search_reply_is_plain_words():
     assert {k: first[k] for k in ("title", "url", "snippet")} == {"title": "Lean 4", "url": "https://lean-lang.org/", "snippet": "you're using Lean"}
     assert first["address"].startswith("5/3/")
     assert out["verified"] is False
+
+
+def test_guarded_fetch_connects_to_the_checked_ip():
+    """DNS rebinding: the fetch must use the address that was checked."""
+    import httpx
+
+    seen = []
+
+    def handler(request):
+        seen.append((str(request.url), request.headers.get("host"), request.extensions.get("sni_hostname")))
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"location": "https://evil.example/next"})
+        return httpx.Response(200, headers={"content-type": "text/html"}, text="<p>ok</p>")
+
+    answers = {"good.example": "93.184.216.34", "evil.example": None}
+
+    def resolver(url):
+        from urllib.parse import urlparse
+
+        return answers[urlparse(url).hostname]
+
+    factory = lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    out = asyncio.run(A.guarded_fetch("https://good.example/start", client_factory=factory, resolver=resolver))
+    # The first hop went to the pinned IP with the real Host and SNI; the
+    # redirect to a host that doesn't resolve publicly was refused.
+    assert seen == [("https://93.184.216.34/start", "good.example", "good.example")]
+    assert out["status"] == "BLOCKED"
+    answers["evil.example"] = "2606:4700::1111"
+    seen.clear()
+    out = asyncio.run(A.guarded_fetch("https://good.example/start", client_factory=factory, resolver=resolver))
+    assert out["status"] == "SUCCESS"
+    assert seen[1][0] == "https://[2606:4700::1111]/next" and seen[1][1] == "evil.example"
+
+
+def test_resolve_public_refuses_mixed_answers(monkeypatch):
+    monkeypatch.setattr(A.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443)), (2, 1, 6, "", ("10.0.0.1", 443))])
+    assert A.resolve_public("https://mixed.example/") is None
+    monkeypatch.setattr(A.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443))])
+    assert A.resolve_public("https://ok.example/") == "93.184.216.34"

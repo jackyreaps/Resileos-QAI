@@ -171,35 +171,77 @@ def perceive_attachment(att: Attachment) -> dict[str, Any]:
 
 # ---------------------------------------------------------------- crawling
 
-def public_url(url: str) -> bool:
-    """True only for http(s) URLs whose host resolves to public addresses."""
+def resolve_public(url: str) -> str | None:
+    """The address to connect to, or None.
+
+    Only http(s) on ports 80/443, and only when every address the host
+    resolves to is global (no private, loopback, link-local, reserved,
+    or multicast). The caller connects to this exact address, so a second
+    DNS answer can't swap in a private one (DNS rebinding).
+    """
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return False
+        return None
     if parsed.port not in (None, 80, 443):
-        return False
+        return None
     try:
-        infos = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
     except OSError:
-        return False
+        return None
+    addrs = []
     for info in infos:
         addr = ipaddress.ip_address(info[4][0].split("%")[0])
         if not addr.is_global or addr.is_multicast:
-            return False
-    return bool(infos)
+            return None
+        addrs.append(addr)
+    return str(addrs[0]) if addrs else None
 
 
-async def guarded_fetch(url: str, *, client_factory: Callable[[], Any] | None = None) -> dict[str, Any]:
-    """Fetch one public page. Redirects are followed by hand and re-checked."""
+def public_url(url: str) -> bool:
+    """True only for http(s) URLs whose host resolves to public addresses."""
+    return resolve_public(url) is not None
+
+
+def pinned_request(url: str, ip: str) -> tuple[str, dict[str, str], dict[str, Any]]:
+    """(URL with the host replaced by ``ip``, headers, httpx extensions).
+
+    Host stays the real name for the server, and TLS uses it for SNI and
+    certificate checks, so pinning doesn't weaken HTTPS.
+    """
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    literal = f"[{ip}]" if ":" in ip else ip
+    netloc = literal + (f":{parsed.port}" if parsed.port else "")
+    target = parsed._replace(netloc=netloc).geturl()
+    host_header = host + (f":{parsed.port}" if parsed.port else "")
+    headers = {"Host": host_header, "User-Agent": "ResileosBot/1.0 (+https://resileosai.fun)"}
+    extensions = {"sni_hostname": host} if parsed.scheme == "https" else {}
+    return target, headers, extensions
+
+
+async def guarded_fetch(
+    url: str,
+    *,
+    client_factory: Callable[[], Any] | None = None,
+    resolver: Callable[[str], str | None] | None = None,
+) -> dict[str, Any]:
+    """Fetch one public page, connecting to the checked IP.
+
+    Each hop (including redirects, followed by hand) is resolved once,
+    checked, and then fetched from that exact address.
+    """
     import httpx
 
-    factory = client_factory or (lambda: httpx.AsyncClient(timeout=8.0, follow_redirects=False))
+    factory = client_factory or (lambda: httpx.AsyncClient(timeout=8.0, follow_redirects=False, trust_env=False))
+    resolve = resolver or resolve_public
     current = url
     async with factory() as client:
         for _ in range(4):
-            if not public_url(current):
+            ip = resolve(current)
+            if not ip:
                 return {"status": "BLOCKED", "content": ""}
-            resp = await client.get(current, headers={"User-Agent": "ResileosBot/1.0 (+https://resileosai.fun)"})
+            target, headers, extensions = pinned_request(current, ip)
+            resp = await client.get(target, headers=headers, extensions=extensions)
             if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("location"):
                 current = urljoin(current, resp.headers["location"])
                 continue
@@ -515,15 +557,16 @@ async def run_assist(
     reply["value"] = text
     reply["reply_text"] = text
     reply.setdefault("status", "ACCEPTED")
-    # Content-free use factors for the local hub (never from Files).
+    # Content-free use factors for the local hub. Only a checked turn counts
+    # (a Lean proof that checks, or a reply marked verified), and the factor
+    # is built from the turn's step outcomes only: no attachment, pasted
+    # text, or perception value goes into it.
     counted = 0
     if factor_pool is not None and not body.factors_opt_out:
-        verified = bool(reply.get("verified") is True or (lean_result or {}).get("status") == "CHECKED")
-        for s_ in seen:
-            if s_.get("from_files") or not s_.get("cascade"):
-                continue
-            code = s_["cascade"].get("chroma_code") or {}
-            record = cascade.use_factor(s_["cascade"], verified=verified, orientation=code.get("orientation"))
+        gate = "lean" if (lean_result or {}).get("status") == "CHECKED" else ("verified" if reply.get("verified") is True else "")
+        if gate:
+            done = sum(1 for step in trail if step.get("status") == "done")
+            record = cascade.turn_factor(gate, steps_done=done, steps_total=len(trail))
             counted += int(factor_pool.add(record))
     reply["assist"] = {
         "trail": trail,

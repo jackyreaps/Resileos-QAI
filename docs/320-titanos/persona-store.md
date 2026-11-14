@@ -91,7 +91,7 @@ Auth matches the rest of the API (`X-API-Key`).
 
 `X-Resileos-Account` must match `account_id` when the header is sent. Signed-out sessions expire (default 24 hours, `RESILEOS_PERSONA_SESSION_TTL_S`).
 
-`landing/public/persona-hook.js` exposes `ResileosPersona.list`, `.put`, `.remove`, and `.recall`. Chat can also send `persona: name Ada`, `persona: goal …`, `persona: skill …`, `persona: shared <id> <text>`, or `persona: forget <id>`. Those lines do not teach Titanos.
+The persona routes (`/api/v1/persona/individual`, `/api/v1/persona/recall`) are admin-only on the API (`middleware/proxy_identity.py`); no site page calls them (the unused `persona-hook.js` helper was removed). Chat can send `persona: name Ada`, `persona: goal …`, `persona: skill …`, `persona: shared <id> <text>`, or `persona: forget <id>`. Those lines do not teach Titanos.
 
 The mouth attaches `persona_recall` when it renders. A chat turn attaches the same packet, including the next seed tutorial step. A verified tutorial fragment records `progress_<step>` as user-stated. It does not write a residual fact through Aphrodite.
 

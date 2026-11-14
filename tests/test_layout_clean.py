@@ -163,3 +163,10 @@ def test_admin_is_enforced_on_the_server():
         assert admin_only not in allow, admin_only
     middleware = (FUNCTIONS / "admin" / "_middleware.js").read_text(encoding="utf-8")
     assert "handleAdminPage" in middleware
+
+
+def test_site_js_fetches_config_only_where_it_is_used():
+    js = read("assets/site.js")
+    assert "const needsConfig = document.querySelector(" in js
+    assert "(needsConfig ? api(\"/api/config\") : Promise.resolve(null))" in js
+    assert (ROOT / "landing" / "functions" / "api" / "config.js").exists()

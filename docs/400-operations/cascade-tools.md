@@ -10,7 +10,7 @@ suite already has. None of them needs an outside provider.
 | Picture variations | Belt coordinates (black, white, red, blue, yellow) + `expand_variations` (belt rotation, RBY permutation, φ hue steps), picked by the golden-ratio sequence; the photo's own brightness is kept | Chat ("make a variation of this"), Studio picture from a photo (`POST /api/v1/studio/variations`) |
 | Clip from one picture | φ hue steps over time + the `MAGNETIC_PHASE / PHI` motion step as a pan; `clip_check_metrics` recorded (not gating) | Chat ("make a clip from this"), Studio clip from one photo (`POST /api/v1/studio/clip-from-picture`) |
 | Clip variation | One expanded palette on every frame of an uploaded clip | Chat, `POST /api/v1/studio/variations` with `frames` |
-| Use factors | `residual_factors.factorize` (content-free; verified turns only), `aggregate_factors` (≥ 3 contributors, local hub), `offer_to_eat` (envelope stays pending for Eat), Morpheus `dream_factor_candidates` (unverified) | Recorded per `/assist` turn to `RESILEOS_FACTORS_PATH` (default `data/use_factors.jsonl`); admins read `GET /api/v1/factors/hub` in Admin → Diagnostics |
+| Use factors | `turn_factor` → `residual_factors.factorize` (one record per **checked** turn, built only from which gate passed and how many steps finished: no attachment, pasted text, or perception value), `aggregate_factors` (≥ 3 contributors, local hub), `offer_to_eat` (envelope stays pending for Eat), Morpheus `dream_factor_candidates` (unverified) | Recorded per `/assist` turn to `RESILEOS_FACTORS_PATH` (default `data/use_factors.jsonl`); admins read `GET /api/v1/factors/hub` in Admin → Diagnostics |
 
 Rules kept:
 
@@ -18,7 +18,8 @@ Rules kept:
   aggregate is an Eat envelope with `eat: "pending"`; Eat and reviewers
   stay the only writers.
 - Factors count only when the turn passed a gate (Lean `CHECKED`, or a
-  reply marked verified). Attachments reused from Files never count.
+  reply marked verified), and they never include attachment or pasted
+  content. Attachments and Files don't feed the factor at all.
   People can turn sharing off in chat (Options → Share anonymous patterns).
 - A picture or clip from a text description alone still needs a
   generator. Without one it stays `UNAVAILABLE`.

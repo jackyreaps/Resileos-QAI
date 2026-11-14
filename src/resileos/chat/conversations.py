@@ -344,3 +344,31 @@ def register_conversation_routes(app: FastAPI, key_id_dep: Callable[..., str]) -
             _write(data)
             saved = dict(record)
         return _public(saved, with_messages=True)
+
+
+def migrate_owner(old_ids: list[str], new_id: str) -> int:
+    """One-time move of conversations kept under old key hashes to the
+    account. Existing account threads win on an id clash. Idempotent."""
+    moved = 0
+    with _store_lock:
+        data = _read()
+        owners = data["owners"]
+        olds = [o for o in old_ids if o and o != new_id and isinstance(owners.get(o), dict)]
+        if not olds:
+            return 0
+        target = _owner_bucket(data, new_id)
+        for old in olds:
+            for username, user_bucket in owners.pop(old).items():
+                if not isinstance(user_bucket, dict):
+                    continue
+                dest_user = target.setdefault(username, {})
+                for hub_id, hub in (user_bucket.get("hubs") or {}).items():
+                    if not isinstance(hub, dict):
+                        continue
+                    dest_hub = _hub_bucket(dest_user, hub_id)
+                    for conv_id, record in hub.items():
+                        if conv_id not in dest_hub:
+                            dest_hub[conv_id] = record
+                            moved += 1
+        _write(data)
+    return moved

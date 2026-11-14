@@ -172,3 +172,48 @@ test("/admin pages: sign-in redirect, 403 for regular accounts, served to admins
   assert.equal(ok.headers.get("cache-control"), "no-store");
   assert.match(await ok.text(), /admin/);
 });
+
+test("proxy signs account and admin assertions the API checks (fixed vectors match Python)", async () => {
+  const { accountHeaders, accountId } = await import("./_auth.js");
+  assert.equal(await accountId("Ada@Example.com"), "16f55e06a07f262d5b737d3381588c82563d6cb0d600e2567b84d343646d5511");
+  const plain = await accountHeaders("proxy-secret-value", {
+    email: "ada@example.com", digests: ["a".repeat(64), "not-a-digest"], admin: false, method: "POST", path: "/kin/cycle", ts: 1700000000,
+  });
+  assert.equal(plain["X-Resileos-Account-Legacy"], "a".repeat(64));
+  assert.equal(plain["X-Resileos-Account-Proof"], "0678addbfd80d9c157b3471189a7072a69567797e5256cb5397f2c2e3bf06672");
+  assert.equal(plain["X-Resileos-Admin"], undefined);
+  const admin = await accountHeaders("proxy-secret-value", {
+    email: "ada@example.com", digests: [], admin: true, method: "post", path: "/kin/cycle", ts: 1700000000,
+  });
+  assert.equal(admin["X-Resileos-Admin-Proof"], "cecdab765758b67d05cb3e7263fbab0d09f93d8a9ff4461bdb123a5e2dc8af54");
+});
+
+test("the proxy forwards an admin assertion only for admins, and an account id for everyone signed in", async () => {
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const seen = [];
+  const fetchImpl = async (url, init) => { seen.push(new Headers(init.headers)); return new Response("{}", { status: 200 }); };
+  const user = await createSession({ kv, env, email: "ada@example.com", now: NOW });
+  const admin = await createSession({ kv, env, email: ADMIN, now: NOW });
+  await proxy(env, "POST", "chat", { session: user, body: { message: "hi" }, fetchImpl });
+  await proxy(env, "POST", "kin/cycle", { session: admin, body: {}, fetchImpl });
+  await proxy(env, "POST", "chat", { body: { message: "hi" }, fetchImpl });
+  assert.match(seen[0].get("x-resileos-account"), /^[a-f0-9]{64}$/);
+  assert.equal(seen[0].get("x-resileos-admin"), null);
+  assert.match(seen[1].get("x-resileos-admin-proof"), /^[a-f0-9]{64}$/);
+  assert.equal(seen[2].get("x-resileos-account"), null, "signed-out visitors carry no account");
+});
+
+test("rotating a key remembers the old digest so the API can move old records", async () => {
+  const { rotateKey, loadAccount } = await import("./_auth.js");
+  const kv = memoryKv();
+  const env = baseEnv(kv);
+  const user = await createSession({ kv, env, email: "ada@example.com", now: NOW });
+  await proxy(env, "POST", "chat", { session: user, body: { message: "hi" }, fetchImpl: async () => new Response("{}") });
+  const before = await loadAccount(kv, "ada@example.com");
+  assert.ok(before.key_digest);
+  const rotated = await rotateKey({ kv, env, email: "ada@example.com", now: NOW });
+  assert.equal(rotated.ok, true);
+  const after = await loadAccount(kv, "ada@example.com");
+  assert.deepEqual(after.past_digests, [before.key_digest]);
+});

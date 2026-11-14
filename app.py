@@ -25,6 +25,7 @@ import io
 from resileos.ui.shared_state import init_shared
 from resileos.ui.query_scale import with_scale
 from fastapi.security.api_key import APIKeyHeader
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.status import HTTP_403_FORBIDDEN
 
@@ -108,6 +109,20 @@ _KEYS_PATH = Path(
     os.getenv("API_KEYS_PATH", str(ROOT / "configs" / "api_keys.json"))
 )
 _AUTH_BYPASS = os.getenv("RESILEOS_AUTH_BYPASS", "0") == "1"
+
+
+@app.middleware("http")
+async def _admin_only_endpoints(request: Request, call_next):
+    """Admin-only API endpoints need an admin identity: the proxy's signed
+    admin assertion, or a key record marked admin. A plain user key gets
+    403. Same public list as the Pages proxy (middleware/proxy_identity)."""
+    if not _AUTH_BYPASS:
+        from middleware.proxy_identity import admin_gate
+
+        denied = admin_gate(request.method, request.url.path, request.headers)
+        if denied is not None:
+            return JSONResponse({"detail": denied[1]}, status_code=denied[0])
+    return await call_next(request)
 
 # Static site (Cloudflare Pages). RESILEOS_CORS_ORIGINS replaces this list.
 DEFAULT_CORS_ORIGINS = (
@@ -1194,12 +1209,41 @@ async def key_usage(
     return info
 
 
+_MIGRATED: set[tuple[str, str]] = set()
+
+
+def _migrate_key_records(owner: str, digests: list[str]) -> None:
+    from resileos.chat.conversations import migrate_owner as migrate_conversations
+    from resileos.chat.files import migrate_owner as migrate_files
+
+    pending = [d for d in dict.fromkeys(digests) if d and (owner, d) not in _MIGRATED]
+    if not pending:
+        return
+    try:
+        migrate_conversations(pending, owner)
+        migrate_files(pending, owner)
+    except Exception as exc:  # never block a request on the move
+        log.warning("key-record migration failed: %s", type(exc).__name__)
+        return
+    for digest in pending:
+        _MIGRATED.add((owner, digest))
+
+
 async def conversation_key_id(
     request: Request,
     api_key: str | None = Depends(_api_key_header),
 ) -> str:
     """Auth for conversation routes. Returns the key hash, never the key."""
     await verify_api_key(request, api_key)
+    from middleware.proxy_identity import account_assertion, account_owner
+
+    account = account_assertion(request.headers)
+    if account is not None and api_key and api_key.strip():
+        # Signed in through the site: key Files and conversations by the
+        # account, and move anything still under its old key hashes once.
+        owner = account_owner(account)
+        _migrate_key_records(owner, [_hash_key(api_key.strip()), *account["legacy"]])
+        return owner
     if api_key and api_key.strip():
         return _hash_key(api_key.strip())
     decision = getattr(request.state, "resileos_decision", None)
