@@ -27,7 +27,6 @@ from resileos.ui.cascade_address import (
     ORIENTATION_SCALES,
     TRIADIC,
     orientation_scale,
-    phi_level_weight,
 )
 
 # Channel names on the Human Belt, in order.
